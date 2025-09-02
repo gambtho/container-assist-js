@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { SessionService } from '@service/session/manager.js';
-import { InMemorySessionStore } from '@infrastructure/core/persistence/memory-store.js';
-import { createMockLogger } from '@test/utils/test-helpers.js';
-import { createMockSession, createMockWorkflowState } from '@test/utils/mock-factories.js';
-import type { Session, WorkflowState } from '@domain/types/session.js';
+import { SessionService } from '../../../../../src/application/session/manager.js';
+import { InMemorySessionStore } from '../../../../../src/infrastructure/core/persistence/memory-store.js';
+import { createMockLogger } from '../../../utils/test-helpers.js';
+import { createMockSession, createMockWorkflowState } from '../../../../utils/mock-factories.js';
+import type { Session, WorkflowState } from '../../../../../src/domain/types/session.js';
 import { nanoid } from 'nanoid';
 
 describe('SessionService', () => {
@@ -266,7 +266,7 @@ describe('SessionService', () => {
       const completed = await sessionService.completeSession(session.id, true);
       
       expect(completed.status).toBe('completed');
-      expect(new Date(completed.expires_at!).getTime()).toBeGreaterThan(Date.now();
+      expect(new Date(completed.expires_at!).getTime()).toBeGreaterThan(Date.now());
     });
     
     it('should complete session with failure', async () => {

@@ -1,210 +1,168 @@
 /**
- * Result type for handling success and failure states
- * Provides a consistent way to handle errors without exceptions
+ * Result Monad Pattern
+ * A functional approach to error handling without exceptions
  */
 
-export interface AppError {
-  code: string
-  message: string
-  context?: string
-  cause?: Error
-  metadata?: Record<string, unknown>
-}
-
-export interface Result<T> {
-  success: boolean
-  data?: T
-  error?: AppError
-  timestamp: string
-  metadata?: Record<string, unknown>
+/**
+ * Success result type
+ */
+export interface Ok<T> {
+  readonly kind: 'ok';
+  readonly value: T;
 }
 
 /**
- * Create a successful result
+ * Failure result type
  */
-export function ok<T>(data: T, metadata?: Record<string, unknown>): Result<T> {
-  return {
-    success: true,
-    data,
-    timestamp: new Date().toISOString(),
-    ...(metadata ? { metadata } : {})
-  }
+export interface Fail {
+  readonly kind: 'fail';
+  readonly error: string;
+  readonly code?: string;
+  readonly details?: unknown;
 }
 
 /**
- * Create a failed result
+ * Result type - either Ok or Fail
  */
-export function fail<T>(
-  error: AppError | Error | string,
-  metadata?: Record<string, unknown>
-): Result<T> {
-  let appError: AppError
+export type Result<T> = Ok<T> | Fail;
 
-  if (typeof error === 'string') {
-    appError = { code: 'error', message: error }
-  } else if (error instanceof Error) {
-    appError = {
-      code: 'error',
-      message: error.message,
-      cause: error
-    }
-  } else {
-    appError = error
-  }
-
-  return {
-    success: false,
-    error: appError,
-    timestamp: new Date().toISOString(),
-    ...(metadata ? { metadata } : {})
-  }
+/**
+ * Create a success result
+ */
+export function ok<T>(value: T): Ok<T> {
+  return { kind: 'ok', value };
 }
 
 /**
- * Type guard to check if result is successful
+ * Create a failure result
  */
-export function isOk<T>(result: Result<T>): result is Result<T> & { success: true; data: T } {
-  return result.success === true && result.data !== undefined
+export function fail(error: string, code?: string, details?: unknown): Fail {
+  return { kind: 'fail', error, code, details };
 }
 
 /**
- * Type guard to check if result is failed
+ * Type guard to check if result is Ok
  */
-export function isFail<T>(
-  result: Result<T>
-): result is Result<T> & { success: false; error: AppError } {
-  return result.success === false && result.error !== undefined
+export function isOk<T>(result: Result<T>): result is Ok<T> {
+  return result.kind === 'ok';
 }
 
 /**
- * Map a successful result to a new value
+ * Type guard to check if result is Fail
+ */
+export function isFail<T>(result: Result<T>): result is Fail {
+  return result.kind === 'fail';
+}
+
+/**
+ * Map over a successful result
  */
 export function map<T, U>(
   result: Result<T>,
   fn: (value: T) => U
 ): Result<U> {
   if (isOk(result)) {
-    return ok(fn(result.data), result.metadata)
+    return ok(fn(result.value));
   }
-  return result as unknown as Result<U>
+  return result;
 }
 
 /**
- * Chain results together (flatMap)
+ * Flat map (chain) over a successful result
  */
 export function chain<T, U>(
   result: Result<T>,
   fn: (value: T) => Result<U>
 ): Result<U> {
   if (isOk(result)) {
-    const newResult = fn(result.data)
-    // Merge metadata if present
-    if (result.metadata && newResult.metadata) {
-      newResult.metadata = { ...result.metadata, ...newResult.metadata }
-    } else if (result.metadata) {
-      newResult.metadata = result.metadata
-    }
-    return newResult
+    return fn(result.value);
   }
-  return result as unknown as Result<U>
+  return result;
 }
 
 /**
- * Get the value or throw an error
+ * Unwrap the value or throw an error
  */
 export function unwrap<T>(result: Result<T>): T {
   if (isOk(result)) {
-    return result.data
+    return result.value;
   }
-  throw new Error((result.error?.message != null && result.error.message !== '') ? result.error.message : 'Result is not ok')
+  throw new Error(result.error);
 }
 
 /**
- * Get the value or return a default
+ * Unwrap the value or return a default
  */
 export function unwrapOr<T>(result: Result<T>, defaultValue: T): T {
   if (isOk(result)) {
-    return result.data
+    return result.value;
   }
-  return defaultValue
+  return defaultValue;
+}
+
+/**
+ * Execute a side effect on success
+ */
+export function tap<T>(
+  result: Result<T>,
+  fn: (value: T) => void
+): Result<T> {
+  if (isOk(result)) {
+    fn(result.value);
+  }
+  return result;
+}
+
+/**
+ * Execute a side effect on failure
+ */
+export function tapError<T>(
+  result: Result<T>,
+  fn: (error: string, code?: string) => void
+): Result<T> {
+  if (isFail(result)) {
+    fn(result.error, result.code);
+  }
+  return result;
+}
+
+/**
+ * Convert a Promise to a Result
+ */
+export async function fromPromise<T>(
+  promise: Promise<T>
+): Promise<Result<T>> {
+  try {
+    const value = await promise;
+    return ok(value);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return fail(message);
+  }
 }
 
 /**
  * Combine multiple results into a single result
  */
-export function all<T>(results: Result<T>[]): Result<T[]> {
-  const failures = results.filter(isFail)
-
-  if (failures.length > 0) {
-    const firstFailure = failures[0]
-    if (!firstFailure?.error) {
-      return fail('Unknown error in result combination')
+export function combine<T>(results: Result<T>[]): Result<T[]> {
+  const values: T[] = [];
+  
+  for (const result of results) {
+    if (isFail(result)) {
+      return result;
     }
-
-    return fail({
-      code: 'multiple_errors',
-      message: `${failures.length} operations failed`,
-      metadata: {
-        errors: failures.map(f => f.error),
-        firstError: firstFailure.error
-      }
-    })
+    values.push(result.value);
   }
-
-  const data = results
-    .filter(isOk)
-    .map(r => r.data)
-
-  return ok(data)
+  
+  return ok(values);
 }
 
 /**
- * Try to execute a function and return a Result
+ * Helper type aliases for common patterns
  */
-export async function tryAsync<T>(
-  fn: () => Promise<T>,
-  errorCode?: string
-): Promise<Result<T>> {
-  try {
-    const data = await fn()
-    return ok(data)
-  } catch (error) {
-    if (error instanceof Error) {
-      return fail({
-        code: (errorCode != null && errorCode !== '') ? errorCode : 'async_error',
-        message: error.message,
-        cause: error
-      })
-    }
-    return fail({
-      code: (errorCode != null && errorCode !== '') ? errorCode : 'async_error',
-      message: String(error)
-    })
-  }
-}
+export type Success<T> = Ok<T>;
+export type Failure = Fail;
 
-/**
- * Try to execute a sync function and return a Result
- */
-export function trySync<T>(
-  fn: () => T,
-  errorCode?: string
-): Result<T> {
-  try {
-    const data = fn()
-    return ok(data)
-  } catch (error) {
-    if (error instanceof Error) {
-      return fail({
-        code: (errorCode != null && errorCode !== '') ? errorCode : 'sync_error',
-        message: error.message,
-        cause: error
-      })
-    }
-    return fail({
-      code: errorCode || 'sync_error',
-      message: String(error)
-    })
-  }
-}
-
+// Re-export for backward compatibility
+export const Success = ok;
+export const Failure = fail;

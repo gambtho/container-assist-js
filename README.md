@@ -1,222 +1,338 @@
-# Container Kit MCP Server - TypeScript Implementation
+# Container Kit MCP Server
 
-A TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support. Provides 15 specialized MCP tools for complete application containerization from analysis to deployment.
+A Model Context Protocol (MCP) server for AI-powered containerization workflows with Docker and Kubernetes support.
 
-## Current Status
+## Features
 
-🔧 **TypeScript Recovery in Progress** - Actively fixing compilation errors (146 remaining from initial 316).
-
-### What's Working
-- ✅ MCP server protocol with @modelcontextprotocol/sdk 
-- ✅ 15 tool registry with automated registration
-- ✅ Clean 3-layer architecture (API/Service/Domain/Infrastructure)
-- ✅ Session management with persistence
-- ✅ Configuration management system
-- ✅ Workflow orchestration foundation
-
-### Currently Being Fixed
-- 🔧 TypeScript compilation errors (146 remaining)
-- 🔧 Tool implementation syntax issues
-- 🔧 Logger standardization across service layer
+- 🐳 **Docker Integration**: Build, scan, and deploy container images
+- ☸️ **Kubernetes Support**: Generate manifests and deploy applications
+- 🤖 **AI-Powered**: Intelligent Dockerfile generation and optimization
+- 🔄 **Workflow Orchestration**: Complete containerization pipelines
+- 📊 **Progress Tracking**: Real-time progress updates via MCP
+- 🔒 **Security Scanning**: Built-in vulnerability scanning with Trivy
 
 ## Quick Start
 
 ### Installation
 
+#### As an MCP Server
 ```bash
-cd js-mcp
+npm install -g @thgamble/containerization-assist-mcp
+```
+
+#### For Development
+```bash
+git clone https://github.com/gambtho/container-assist-js
+cd containerization-assist-js
 npm install
 npm run build
 ```
 
-### Running the Server
+### Usage
 
-```bash
-# Start the MCP server
-npm start
+#### With Claude Desktop
 
-# Or run in development mode with auto-reload
-npm run start:dev
-```
+Add to your `claude_desktop_config.json`:
 
-### Testing Connectivity
-
-```bash
-# Test with the ping tool
-echo '{"jsonrpc":"2.0","method":"tools/ping","params":{},"id":1}' | ./dist/bin/cli.js
-```
-
-## Available Tools
-
-### Workflow Tools
-- `analyze_repository` - Analyze Java repository structure
-- `resolve_base_images` - Find optimal JDK/JRE base images
-- `generate_dockerfile` - Create multi-stage Dockerfile
-- `build_image` - Build Docker image
-- `scan_image` - Security vulnerability scanning
-- `tag_image` - Tag Docker images
-- `push_image` - Push to registry
-- `generate_k8s_manifests` - Create Kubernetes manifests
-- `prepare_cluster` - Prepare K8s cluster
-- `deploy_application` - Deploy to Kubernetes
-- `verify_deployment` - Verify deployment health
-
-### Orchestration Tools
-- `start_workflow` - Start complete containerization workflow
-- `workflow_status` - Check workflow progress
-
-### Utility Tools
-- `list_tools` - List all available tools
-- `ping` - Test connectivity
-- `server_status` - Get server status
-
-### Error Recovery Tools  
-- `error_recovery` - Handle and retry failed operations
-- `workflow_rollback` - Rollback partial workflow state
-
-## Configuration
-
-Copy `.env.example` to `.env` and configure:
-
-```bash
-# MCP Server Configuration
-MCP_SERVER_NAME=container-kit-mcp
-LOG_LEVEL=info
-SESSION_TIMEOUT=3600000
-
-# Docker Configuration  
-DOCKER_SOCKET=/var/run/docker.sock
-DOCKER_REGISTRY=localhost:5000
-DOCKER_BUILD_TIMEOUT=600
-
-# Kubernetes Configuration
-KUBECONFIG=~/.kube/config
-K8S_NAMESPACE=default
-K8S_DEPLOYMENT_TIMEOUT=300
-
-# AI Configuration
-ENABLE_AI_OPTIMIZATION=true
-AI_PROVIDER=mcp-sampling
-MAX_RETRIES=3
-```
-
-## Example Usage
-
-### Analyze a Repository
-
-```javascript
+```json
 {
-  "method": "tools/analyze_repository", 
-  "params": {
-    "repo_path": "/path/to/project",
-    "language": "java",
-    "frameworks": ["spring-boot"]
-  }
-}
-```
-
-### Start Complete Workflow
-
-```javascript
-{
-  "method": "tools/start_workflow",
-  "params": {
-    "repo_path": "/path/to/project",
-    "session_id": "workflow-123",
-    "options": {
-      "scan_vulnerabilities": true,
-      "deploy_to_k8s": true,
-      "optimize_image": true
+  "mcpServers": {
+    "container-kit": {
+      "command": "container-kit-mcp",
+      "args": ["start"],
+      "env": {
+        "DOCKER_SOCKET": "/var/run/docker.sock",
+        "LOG_LEVEL": "info"
+      }
     }
   }
 }
 ```
 
-## Project Structure
+For Windows users:
+```json
+{
+  "mcpServers": {
+    "container-kit": {
+      "command": "container-kit-mcp",
+      "args": ["start"],
+      "env": {
+        "DOCKER_SOCKET": "//./pipe/docker_engine",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+#### With MCP Inspector
+
+```bash
+npx @modelcontextprotocol/inspector container-kit-mcp start
+```
+
+#### Programmatic Usage
+
+```typescript
+import { ContainerKitMCPServer } from '@thgamble/containerization-assist-mcp';
+
+const server = new ContainerKitMCPServer();
+await server.start();
+```
+
+## Available Tools
+
+| Tool | Category | Description |
+|------|----------|-------------|
+| `analyze_repository` | Analysis | Analyze repository structure and detect language/framework |
+| `analyze_repository_v2` | Analysis | Enhanced repository analysis with AI |
+| `resolve_base_images` | Build | Find optimal base images for applications |
+| `generate_dockerfile` | Build | Create optimized Dockerfiles |
+| `generate_dockerfile_ext` | Build | Extended Dockerfile generation with AI |
+| `fix_dockerfile` | Build | Fix and optimize existing Dockerfiles |
+| `build_image` | Build | Build Docker images with progress tracking |
+| `scan_image` | Build | Security vulnerability scanning with Trivy |
+| `tag_image` | Build | Tag Docker images |
+| `push_image` | Build | Push images to registry |
+| `generate_k8s_manifests` | Deploy | Create Kubernetes deployment configurations |
+| `prepare_cluster` | Deploy | Prepare Kubernetes cluster for deployment |
+| `deploy_application` | Deploy | Deploy applications to Kubernetes |
+| `verify_deployment` | Deploy | Verify deployment health and status |
+| `start_workflow` | Workflow | Start complete containerization workflow |
+| `workflow_status` | Workflow | Check workflow progress and status |
+| `list_tools` | Ops | List all available tools |
+| `ping` | Ops | Test server connectivity |
+| `server_status` | Ops | Get server health status |
+| `registry` | Ops | Tool registry operations |
+| `error_recovery` | Ops | Handle and retry failed operations |
+
+## System Requirements
+
+- Node.js 20+
+- Docker or Docker Desktop
+- Optional: Kubernetes (for deployment features)
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DOCKER_SOCKET` | Docker daemon socket path | `/var/run/docker.sock` |
+| `KUBECONFIG` | Kubernetes config path | `~/.kube/config` |
+| `LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` |
+| `SESSION_DIR` | Session storage directory | `~/.container-kit/sessions` |
+| `AI_CACHE_TTL` | AI response cache duration (ms) | `900000` (15 min) |
+| `K8S_NAMESPACE` | Default Kubernetes namespace | `default` |
+| `DOCKER_REGISTRY` | Default Docker registry | `docker.io` |
+
+### Advanced Configuration
+
+```json
+{
+  "mcpServers": {
+    "container-kit": {
+      "command": "container-kit-mcp",
+      "args": [
+        "start",
+        "--mode", "production",
+        "--tools", "all",
+        "--progress", "true"
+      ],
+      "env": {
+        "DOCKER_SOCKET": "/var/run/docker.sock",
+        "KUBECONFIG": "/home/user/.kube/config",
+        "LOG_LEVEL": "debug",
+        "SESSION_DIR": "/home/user/.container-kit",
+        "ENABLE_CACHE": "true",
+        "AI_CACHE_TTL": "1800000"
+      }
+    }
+  }
+}
+```
+
+## Architecture
+
+### System Design
 
 ```
-js-mcp/
-├── src/
-│   ├── bin/                      # CLI entry point
-│   ├── service/                  # Service layer
-│   │   ├── config/               # Configuration management
-│   │   ├── tools/                # 15 MCP tools with handlers
-│   │   └── session/              # Session management service
-│   ├── domain/                   # Domain layer
-│   │   ├── types/                # Domain types (Session, Workflow, Result)
-│   │   └── workflow/             # Workflow orchestration logic
-│   └── infrastructure/           # Infrastructure layer
-│       ├── ai/                   # AI sampling integration
-│       ├── core/                 # Core utilities (Docker, K8s)  
-│       └── persistence/          # Session persistence
-├── test/                         # Comprehensive test suites
-│   ├── unit/                     # Unit tests
-│   ├── integration/              # Integration tests
-│   └── performance/              # Performance tests
-├── dist/                         # Compiled TypeScript output
-└── docs/                         # Architecture documentation
+┌─────────────────────────────────────────┐
+│            MCP Client (Claude)          │
+└─────────────────┬───────────────────────┘
+                  │ MCP Protocol
+┌─────────────────▼───────────────────────┐
+│          MCP Server Layer               │
+│  ┌─────────────────────────────────┐    │
+│  │     Tool Registry & Router      │    │
+│  └─────────────────────────────────┘    │
+└─────────────────┬───────────────────────┘
+                  │
+┌─────────────────▼───────────────────────┐
+│         Application Layer               │
+│  ┌──────────┐ ┌──────────┐ ┌────────┐  │
+│  │  Tools   │ │Workflow  │ │Session │  │
+│  └──────────┘ └──────────┘ └────────┘  │
+└─────────────────┬───────────────────────┘
+                  │
+┌─────────────────▼───────────────────────┐
+│         Infrastructure Layer            │
+│  ┌──────┐ ┌──────┐ ┌─────┐ ┌────────┐  │
+│  │Docker│ │ K8s  │ │ AI  │ │Session │  │
+│  └──────┘ └──────┘ └─────┘ └────────┘  │
+└─────────────────────────────────────────┘
 ```
+
+### Project Structure
+
+```
+src/
+├── config/          # Single source of truth for configuration
+├── domain/          # Pure types only (no business logic!)
+├── infrastructure/  # External adapters (docker, k8s, ai, core)
+├── application/     # Business logic (tools, workflow, factories)
+└── platform/        # Entry points (bin, server)
+```
+
+## Example Usage
+
+### Basic Workflow
+
+Ask Claude to:
+- "Analyze my Node.js application for containerization"
+- "Generate a Dockerfile for this Python project"
+- "Build and scan a Docker image"
+- "Create Kubernetes deployment manifests"
+
+### Step-by-Step Example
+
+1. **Analyze your project:**
+   ```
+   "Analyze the repository at /path/to/my-app"
+   ```
+
+2. **Generate Dockerfile:**
+   ```
+   "Create an optimized Dockerfile for this Node.js app"
+   ```
+
+3. **Build image:**
+   ```
+   "Build a Docker image with tag myapp:latest"
+   ```
+
+4. **Scan for vulnerabilities:**
+   ```
+   "Scan the image for security issues"
+   ```
+
+5. **Deploy to Kubernetes:**
+   ```
+   "Generate Kubernetes manifests and deploy the application"
+   ```
+
+## Supported Technologies
+
+### Languages
+- Java (8-21)
+- Node.js/TypeScript
+- Python (3.8+)
+- Go (1.19+)
+- .NET/C# (6.0+)
+- Ruby, PHP, Rust
+
+### Frameworks
+- **Java**: Spring Boot, Quarkus, Micronaut
+- **Node.js**: Express, NestJS, Fastify, Next.js
+- **Python**: FastAPI, Django, Flask
+- **Go**: Gin, Echo, Fiber
+- **.NET**: ASP.NET Core, Blazor
+
+### Build Systems
+- Maven, Gradle (Java)
+- npm, yarn, pnpm (Node.js)
+- pip, poetry, pipenv (Python)
+- go mod (Go)
+- dotnet CLI (.NET)
+
+## Troubleshooting
+
+### Docker Not Found
+**Error**: "Docker is not available"
+
+**Solution**:
+1. Ensure Docker Desktop is running
+2. Check Docker socket path in configuration
+3. On Windows, ensure Docker is set to "Linux containers"
+
+### Permission Denied
+**Error**: "Permission denied accessing Docker socket"
+
+**Solution** (Linux/Mac):
+```bash
+sudo usermod -aG docker $USER
+# Log out and back in
+```
+
+### Tools Not Available
+**Error**: Claude doesn't see Container Kit tools
+
+**Solution**:
+1. Verify server is installed: `container-kit-mcp --version`
+2. Check configuration file syntax (valid JSON)
+3. Restart Claude Desktop
+4. Check logs: `~/.container-kit/logs/`
 
 ## Documentation
 
-- **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and technical architecture
-- **[Development Guide](docs/DEVELOPMENT.md)** - Development setup and guidelines  
-- **[Contributing](docs/CONTRIBUTING.md)** - How to contribute to the project
-- **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Production deployment instructions
-- **[Maintenance Guide](docs/MAINTENANCE_GUIDE.md)** - Operations and maintenance procedures
+- [User Setup Guide](docs/user/SETUP_GUIDE.md)
+- [Developer Guide](docs/developer/ARCHITECTURE.md)
+- [Tool Development](docs/developer/TOOL_DEVELOPMENT.md)
+- [API Reference](docs/api/TOOLS_REFERENCE.md)
 
-## Development Commands
+## Development
+
+### Commands
 
 ```bash
-# Quality checks
-npm run typecheck     # TypeScript validation
-npm run lint          # ESLint code linting  
-npm run format        # Prettier code formatting
-npm run validate      # Run all quality checks
+# Build and Development
+npm run build          # Compile TypeScript
+npm run build:watch    # Watch mode compilation
+npm run start:dev      # Development server with auto-reload
+
+# Code Quality
+npm run lint           # ESLint linting
+npm run lint:fix       # Auto-fix linting issues
+npm run typecheck      # TypeScript type checking
+npm run format         # Prettier formatting
+npm run validate       # Run all checks
 
 # Testing
-npm test              # Run all tests
-npm run test:unit     # Unit tests only
+npm test               # Run all tests
+npm run test:unit      # Unit tests only
 npm run test:integration # Integration tests
-npm run test:coverage # Test coverage report
-
-# Build and run
-npm run build         # Build TypeScript to dist/
-npm run start:dev     # Development mode with auto-reload
-npm start             # Production mode
+npm run test:coverage  # Coverage report
 ```
 
-For detailed development setup, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+### Code Standards
 
-## Application Support
+- **TypeScript**: Strict mode with ES2022 modules
+- **Imports**: Relative paths only (no path aliases)
+- **Architecture**: Clean separation between layers
+- **Error Handling**: Result monad pattern throughout
+- **Testing**: Comprehensive unit and integration tests
 
-### Languages & Build Systems
-- **Java**: Maven, Gradle, Ant
-- **Node.js**: npm, yarn, pnpm
-- **Python**: pip, poetry, pipenv
-- **Go**: go.mod
-- **Docker**: Multi-stage builds, optimization
+See [CLAUDE.md](CLAUDE.md) for detailed development guidelines.
 
-### Frameworks  
-- **Java**: Spring Boot, Quarkus, Micronaut, Jakarta EE
-- **Node.js**: Express, NestJS, Fastify
-- **Python**: FastAPI, Django, Flask
-- **Go**: Gin, Echo, Fiber
+## Contributing
 
-### Container Optimization
-- Multi-stage builds for smaller images
-- Base image selection and security scanning
-- JVM/runtime tuning for containerized environments
-- Health check and readiness probe generation
-
-## Architecture Benefits
-
-- **Clean Architecture**: 3-layer separation with clear dependencies
-- **Session Persistence**: Stateful workflows with BoltDB storage  
-- **Type Safety**: Full TypeScript with Zod schema validation
-- **MCP Protocol**: Standard tool interface for AI integration
-- **Error Recovery**: Robust error handling with retry mechanisms
+Please read [CONTRIBUTING.md](docs/developer/CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 
-Same as the parent Container Kit project
+MIT License - See [LICENSE](LICENSE) file for details.
+
+## Support
+
+- GitHub Issues: https://github.com/gambtho/container-assist-js/issues
+- Documentation: https://github.com/gambtho/container-assist-js#readme

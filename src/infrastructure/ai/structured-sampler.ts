@@ -1,192 +1,365 @@
 /**
- * Structured JSON sampler with auto-repair capabilities
- * Implements AI reliability features for guaranteed JSON parsing
+ * Structured Sampler for AI-driven content generation
+ * Provides structured output generation with validation
  */
 
-import { z } from 'zod'
-import type { AIRequest, MCPSampler } from './ai-types.js'
-import { Result, ok, fail } from '../../domain/types/result.js'
-
-export interface StructuredSamplingOptions {
-  maxRepairAttempts?: number
-  schema?: z.ZodSchema
-}
-
-export interface ValidationResult {
-  isValid: boolean
-  issues: SecurityIssue[]
-  summary: string
-}
-
-export interface SecurityIssue {
-  severity: 'high' | 'medium' | 'low'
-  message: string
-  category: string
-}
+import type { Logger } from 'pino';
+import { z } from 'zod';
+import type { MCPSampler } from './mcp-sampler';
+import type { AIRequest } from '../ai-request-builder';
 
 /**
- * Enhanced sampler that guarantees structured JSON output with auto-repair
+ * Security issue detected during generation
+ */
+export interface SecurityIssue {
+  type: 'credential' | 'vulnerability' | 'exposure' | 'misconfiguration';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  location?: string;
+  recommendation?: string;
+
+/**
+ * Validation result for structured output
+ */
+export interface ValidationResult {
+  valid: boolean;
+  errors?: string[];
+  warnings?: string[];
+  securityIssues?: SecurityIssue[];
+
+/**
+ * Options for structured sampling
+ */
+export interface StructuredSampleOptions {
+  schema?: z.ZodSchema;
+  format?: 'json' | 'yaml' | 'text';
+  validateSecurity?: boolean;
+  maxRetries?: number;
+  temperature?: number;
+  maxTokens?: number;
+
+/**
+ * Result from structured sampling
+ */
+export interface StructuredSampleResult<T = any> {
+  success: boolean;
+  data?: T;
+  raw?: string;
+  error?: string;
+  validation?: ValidationResult;
+  metadata?: {
+    attempts: number;
+    model?: string;
+    tokensUsed?: number;
+  };
+
+/**
+ * Structured Sampler implementation
  */
 export class StructuredSampler {
-  constructor(private readonly baseSampler: MCPSampler) {}
+  private sampler: MCPSampler;
+  private logger: Logger;
+
+  constructor(sampler: MCPSampler, logger: Logger) {
+    this.sampler = sampler;
+    this.logger = logger.child({ component: 'structured-sampler' });
+  }
 
   /**
-   * Sample JSON with automatic repair and validation
-   * @param request - AI request configuration
-   * @param schema - Optional Zod schema for validation
-   * @param options - Sampling options
+   * Generate structured output with validation
    */
-  async sampleJSON<T>(
-    request: AIRequest,
-    schema?: z.ZodSchema<T>,
-    options: StructuredSamplingOptions = {}
-  ): Promise<Result<T>> {
-    const { maxRepairAttempts = 2 } = options
+  async generateStructured<T = any>(
+    prompt: string,
+    options: StructuredSampleOptions = {}
+  ): Promise<StructuredSampleResult<T>> {
+    const {
+      schema,
+      format = 'json',
+      validateSecurity = true,
+      maxRetries = 3,
+      temperature = 0.3,
+      maxTokens = 2000
+    } = options;
 
-    for (let attempt = 0; attempt <= maxRepairAttempts; attempt++) {
-      const response = await this.baseSampler.sample({
-        ...request,
-        format: 'json'
-      })
+    let attempts = 0;
+    let lastError: string | undefined;
 
-      if (!response.success) {
-        return fail(response.error?.message || 'Sampling failed')
-      }
+    while (attempts < maxRetries) {
+      attempts++;
 
-      // Try parsing the JSON
-      const parsed = this.tryParseJSON(response.content)
-      if (parsed.success) {
+      try {
+        // Build the AI request
+        const request: AIRequest = {
+          prompt: this.buildStructuredPrompt(prompt, format, schema),
+          temperature,
+          maxTokens,
+          context: {
+            format,
+            structured: true
+          }
+        };
+
+        // Sample from the AI
+        const response = await this.sampler.sample(request);
+
+        if ('error' in response) {
+          lastError = response.error;
+          this.logger.warn({ attempt: attempts, error: response.error }, 'Sampling failed');
+          continue;
+        }
+
+        // Parse the response
+        const parsed = this.parseResponse(response.text, format);
+
         // Validate with schema if provided
         if (schema) {
-          const validated = schema.safeParse(parsed.data)
-          if (validated.success) {
-            return ok(validated.data)
-          } else if (attempt < maxRepairAttempts) {
-            // Retry with validation errors
-            request = this.createRepairRequest(request, response.content, validated.error)
-            continue
-          } else {
-            return fail(`Schema validation failed: ${validated.error.message}`)
+          const parseResult = schema.safeParse(parsed);
+          if (!parseResult.success) {
+            lastError = `Schema validation failed: ${parseResult.error.message}`;`
+            this.logger.warn(
+              {
+                attempt: attempts,
+                errors: parseResult.error.errors
+              },
+              'Schema validation failed'
+            );
+            continue;
           }
-        } else {
-          return ok(parsed.data)
         }
-      } else if (attempt < maxRepairAttempts) {
-        // Retry with parsing error
-        const parseError = parsed.error instanceof Error ? parsed.error : new Error(String(parsed.error))
-        request = this.createRepairRequest(request, response.content, parseError)
-        continue
+
+        // Validate security if requested
+        const validation = validateSecurity
+          ? this.validateSecurity(response.text)
+          : { valid: true };
+
+        return {
+          success: true,
+          data: parsed as T,
+          raw: response.text,
+          validation,
+          metadata: {
+            attempts,
+            ...(response.model && { model: response.model }),
+            ...(response.tokenCount !== undefined && { tokensUsed: response.tokenCount })
+          }
+        };
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(
+          {
+            attempt: attempts,
+            error: lastError
+          },
+          'Structured generation error'
+        );
       }
-    }
-
-    return fail('Failed to get valid JSON after repair attempts')
-  }
-
-  /**
-   * Sample with structured output format (YAML, Dockerfile, etc.)
-   * @param request - AI request configuration
-   * @param format - Output format
-   */
-  async sampleStructured(
-    request: AIRequest,
-    format: 'yaml' | 'dockerfile' | 'kubernetes'
-  ): Promise<Result<string>> {
-    const response = await this.baseSampler.sample({
-      ...request,
-      format
-    })
-
-    if (!response.success) {
-      return fail(response.error?.message || 'Sampling failed')
-    }
-
-    // Clean up markdown code fences if present
-    const cleaned = this.cleanMarkdownFences(response.content, format)
-
-    return ok(cleaned)
-  }
-
-  /**
-   * Try to parse JSON content with cleanup
-   * @param content - Raw content to parse
-   */
-  private tryParseJSON(content: string): Result<any> {
-    try {
-      // Remove markdown code fences if present
-      const cleaned = content.replace(/```(?:json)?\n?(.*?)\n?```/s, '$1').trim()
-      const parsed = JSON.parse(cleaned)
-      return ok(parsed)
-    } catch (error) {
-      return fail(error as Error)
-    }
-  }
-
-  /**
-   * Create repair request for malformed JSON
-   * @param originalRequest - Original request
-   * @param malformedContent - Malformed JSON content
-   * @param error - Parse or validation error
-   */
-  private createRepairRequest(
-    originalRequest: AIRequest,
-    malformedContent: string,
-    error: Error | z.ZodError
-  ): AIRequest {
-    let errorMessage = error.message
-    let repairInstruction = 'Fix the JSON syntax and format errors. Return only valid JSON.'
-
-    if (error instanceof z.ZodError) {
-      errorMessage = this.formatZodError(error)
-      repairInstruction = 'Fix the JSON structure to match the required schema. Return only valid JSON.'
     }
 
     return {
-      ...originalRequest,
-      variables: {
-        ...originalRequest.variables,
-        malformed_json: malformedContent,
-        error_message: errorMessage,
-        repair_instruction: repairInstruction
-      },
-      templateId: 'json-repair'
+      success: false,
+      error: lastError ?? 'Max retries exceeded',
+      metadata: { attempts }
+    };
+  }
+
+  /**
+   * Build a structured prompt with format instructions
+   */
+  private buildStructuredPrompt(basePrompt: string, format: string, schema?: z.ZodSchema): string {
+    let prompt = basePrompt;
+
+    // Add format instructions
+    switch (format) {
+      case 'json':
+        prompt +=
+          '\n\nPlease respond with valid JSON only. Do not include any markdown formatting or explanations.';
+        break;
+      case 'yaml':
+        prompt +=
+          '\n\nPlease respond with valid YAML only. Do not include any markdown formatting or explanations.';
+        break;
+      case 'text':
+        prompt += '\n\nPlease respond with plain text only.';
+        break;
     }
-  }
 
-  /**
-   * Format Zod validation errors for repair
-   * @param error - Zod validation error
-   */
-  private formatZodError(error: z.ZodError): string {
-    const issues = error.issues.map(issue =>
-      `${issue.path.join('.')}: ${issue.message}`
-    )
-    return `Schema validation errors: ${issues.join(', ')}`
-  }
-
-  /**
-   * Clean markdown code fences from structured content
-   * @param content - Raw content
-   * @param format - Expected format
-   */
-  private cleanMarkdownFences(content: string, format: string): string {
-    // Remove code fences with optional language specification
-    const patterns = [
-      new RegExp(`\`\`\`(?:${format})?\n?(.*?)\n?\`\`\``, 's'),
-      /```yaml\n?(.*?)\n?```/s,
-      /```dockerfile\n?(.*?)\n?```/s,
-      /```kubernetes\n?(.*?)\n?```/s,
-      /```\n?(.*?)\n?```/s
-    ]
-
-    for (const pattern of patterns) {
-      const match = content.match(pattern)
-      if (match?.[1]) {
-        return match[1].trim()
+    // Add schema instructions if provided
+    if (schema) {
+      const schemaDescription = this.describeSchema(schema);
+      if (schemaDescription) {
+        prompt += `\n\nThe response must conform to this structure:\n${schemaDescription}`;`
       }
     }
 
-    return content.trim()
+    return prompt;
   }
-}
 
+  /**
+   * Parse response based on format
+   */
+  private parseResponse(text: string, format: string): unknown {
+    // Clean the response
+    text = text.trim();
 
+    // Remove markdown code blocks if present
+    const codeBlockRegex = /^``(?:json|yaml|text)?\n?([\s\S]*?)\n?``$/;`
+    const match = text.match(codeBlockRegex);
+    if (match?.[1]) {
+      text = match[1];
+    }
+
+    switch (format) {
+      case 'json':
+        return JSON.parse(text);
+      case 'yaml':
+        // In a real implementation, use a YAML parser
+        // For now, just return the text
+        return text;
+      case 'text':
+        return text;
+      default:
+        return text;
+    }
+  }
+
+  /**
+   * Describe a Zod schema in human-readable format
+   */
+  private describeSchema(_schema: z.ZodSchema): string | null {
+    try {
+      // In a real implementation, this would generate a detailed schema description
+      // For now, return a simplified version
+      return 'Follow the expected schema structure';
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Validate security aspects of generated content
+   */
+  private validateSecurity(content: string): ValidationResult {
+    const issues: SecurityIssue[] = [];
+    const warnings: string[] = [];
+
+    // Check for potential credentials
+    const credentialPatterns = [
+      /api[_-]?key\s*[:=]\s*["']?[\w-]{20,}/gi,'
+      /password\s*[:=]\s*["']?[^"'\s]+/gi,
+      /token\s*[:=]\s*["']?[\w-]{20,}/gi,'
+      /secret\s*[:=]\s*["']?[\w-]{20,}/gi'
+    ];
+
+    for (const pattern of credentialPatterns) {
+      if (pattern.test(content)) {
+        issues.push({
+          type: 'credential',
+          severity: 'high',
+          description: 'Potential credential exposure detected',
+          recommendation: 'Use environment variables or secrets management'
+        });
+      }
+    }
+
+    // Check for known vulnerable patterns
+    const vulnerablePatterns = [
+      { pattern: /eval\s*\(/, desc: 'eval() usage detected' },
+      { pattern: /exec\s*\(/, desc: 'exec() usage detected' },
+      { pattern: /\$\{.*\}/, desc: 'Template injection risk' }
+    ];
+
+    for (const { pattern, desc } of vulnerablePatterns) {
+      if (pattern.test(content)) {
+        warnings.push(desc);
+      }
+    }
+
+    const result: ValidationResult = {
+      valid: issues.length === 0
+    };
+
+    if (issues.length > 0) {
+      result.errors = ['Security issues detected'];
+      result.securityIssues = issues;
+    }
+    if (warnings.length > 0) {
+      result.warnings = warnings;
+    }
+
+    return result;
+  }
+
+  /**
+   * Generate structured Dockerfile content
+   */
+  async generateDockerfile(
+    requirements: string,
+    constraints?: Record<string, any>
+  ): Promise<StructuredSampleResult<string>> {
+    const prompt = `Generate a production-ready Dockerfile based on these requirements:``
+requirements}
+
+constraints ? `Constraints: ${JSON.stringify(constraints, null, 2)}` : ''}`
+
+Follow best practices for:
+- Multi-stage builds
+- Layer caching
+- Security (non-root user, minimal base images)
+- Size optimization`;``
+
+    return this.generateStructured(prompt, {
+      format: 'text',
+      validateSecurity: true,
+      temperature: 0.2,
+      maxTokens: 3000
+    });
+  }
+
+  /**
+   * Generate Kubernetes manifests
+   */
+  async generateKubernetesManifests(
+    appDescription: string,
+    options?: Record<string, unknown>
+  ): Promise<StructuredSampleResult<unknown>> {
+    const prompt = `Generate Kubernetes manifests for:``
+appDescription}
+
+options ? `Options: ${JSON.stringify(options, null, 2)}` : ''}`
+
+Include:
+- Deployment
+- Service
+- ConfigMap (if needed)
+- Ingress (if specified)`;``
+
+    return this.generateStructured(prompt, {
+      format: 'yaml',
+      validateSecurity: true,
+      temperature: 0.2,
+      maxTokens: 4000
+    });
+  }
+
+  /**
+   * Sample structured output (alias for generateStructured)
+   */
+  async sampleStructured<T = any>(
+    prompt: string,
+    options: StructuredSampleOptions = {}
+  ): Promise<StructuredSampleResult<T>> {
+    return this.generateStructured<T>(prompt, options);
+  }
+
+  /**
+   * Sample JSON output
+   */
+  async sampleJSON<T = any>(
+    prompt: string,
+    options: Omit<StructuredSampleOptions, 'format'> = {}
+  ): Promise<StructuredSampleResult<T>> {
+    return this.generateStructured<T>(prompt, {
+      ...options,
+      format: 'json'
+    });
+  }

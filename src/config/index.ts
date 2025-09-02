@@ -1,8 +1,5 @@
 /**
  * Unified Configuration Module
- * 
- * Main entry point for all configuration functionality.
- * Provides a clean API for creating, validating, and managing application configuration.
  */
 
 // Export all types
@@ -25,83 +22,98 @@ export type {
   AIServicesConfig,
   WorkflowConfig,
   FeatureFlags,
-  ConfigurationOptions,
-  ValidationResult,
-  ValidationError,
-  ValidationWarning,
-  ConfigurationProfile,
   NodeEnv,
   LogLevel,
   WorkflowMode,
   StoreType,
   SamplerMode
-} from './types.js'
+} from './types';
 
-// Export factory and utilities
-export { ConfigurationFactory, ConfigurationError } from './factory.js'
-export { ConfigurationValidator, ApplicationConfigSchema } from './validation.js'
-export { EnvironmentParser } from './env-parser.js'
+// Export configuration functions
+export {
+  createConfiguration,
+  createConfigurationForEnv,
+  validateConfiguration,
+  getConfigurationSummary
+} from './config';
 
-// Export defaults and profiles
-export { 
-  BASE_CONFIG, 
-  DEVELOPMENT_PROFILE, 
-  PRODUCTION_PROFILE, 
-  TEST_PROFILE, 
-  CI_PROFILE,
-  CONFIGURATION_PROFILES,
-  getProfile 
-} from './defaults.js'
-
-// Export environment mapping
-export { ENVIRONMENT_MAPPING, LEGACY_ENV_MAPPING } from './env-mapping.js'
-
-// Create and export singleton configuration instance
-import { ConfigurationFactory } from './factory.js'
+// Import configuration
+import {
+  createConfiguration,
+  createConfigurationForEnv,
+  getConfigurationSummary
+} from './config';
+import type { ApplicationConfig } from './types';
 
 /**
- * Default configuration instance
- * 
- * This is created automatically based on the current environment.
+ * Lazy-loaded configuration instance
+ * Configuration is only created when first accessed
+ */
+let _config: ApplicationConfig | undefined;
+
+/**
+ * Get the default configuration instance
+ *
+ * This is created lazily on first access based on the current environment.
  * Use this for most application needs.
  */
-export const config = ConfigurationFactory.createFromEnv()
+export function getConfig(): ApplicationConfig {
+  if (!_config) {
+    _config = createConfiguration();
+  }
+  return _config;
+}
 
 /**
- * Create configuration with custom options
- * 
- * Use this when you need specific configuration behavior,
- * such as custom profiles or overrides.
+ * Reset configuration (mainly for testing)
  */
-export const createConfig = ConfigurationFactory.create.bind(ConfigurationFactory)
+export function resetConfig(): void {
+  _config = undefined;
+}
+
+export const config = new Proxy({} as ApplicationConfig, {
+  get(_target, prop) {
+    return getConfig()[prop as keyof ApplicationConfig];
+  },
+  set(_target, prop, value) {
+    getConfig()[prop as keyof ApplicationConfig] = value;
+    return true;
+  }
+});
+
+/**
+ * Create configuration with defaults
+ */
+export const createConfig = createConfiguration;
 
 /**
  * Create configuration for testing
- * 
- * Provides a configuration suitable for unit tests with minimal overhead.
  */
-export const createTestConfig = ConfigurationFactory.createTestConfig.bind(ConfigurationFactory)
+export const createTestConfig = () => createConfigurationForEnv('test');
 
 /**
  * Create minimal configuration
- * 
- * Provides the absolute minimum configuration needed for basic operation.
  */
-export const createMinimalConfig = ConfigurationFactory.createMinimalConfig.bind(ConfigurationFactory)
-
-/**
- * Validate configuration
- * 
- * Validates a configuration object and returns detailed results.
- */
-export const validateConfig = ConfigurationFactory.validate.bind(ConfigurationFactory)
+export const createMinimalConfig = () => createConfigurationForEnv('test');
 
 /**
  * Get configuration summary
- * 
- * Returns a summary of the configuration suitable for logging.
  */
-export const getConfigSummary = ConfigurationFactory.getConfigurationSummary.bind(ConfigurationFactory)
+export const getConfigSummary = getConfigurationSummary;
+
+/**
+ * Development helper: log configuration summary on startup
+ * This is moved to be called explicitly in CLI to avoid side effects during import
+ *
+ * Usage: logConfigSummaryIfDev(config)
+ */
+export function logConfigSummaryIfDev(configInstance: ApplicationConfig): void {
+  if (configInstance.server.nodeEnv === 'development' && configInstance.features.enableDebugLogs) {
+    // TODO: Replace with SDK logging once server instance is available
+    // For now, keep console.log for development configuration debugging
+    console.log('Configuration loaded:', getConfigurationSummary(configInstance));
+  }
+}
 
 /**
  * Configuration helper functions
@@ -110,50 +122,32 @@ export const ConfigHelpers = {
   /**
    * Check if running in production
    */
-  isProduction: ConfigurationFactory.isProduction.bind(ConfigurationFactory),
+  isProduction: (config: ApplicationConfig) => config.server.nodeEnv === 'production',
 
   /**
    * Check if running in development
    */
-  isDevelopment: ConfigurationFactory.isDevelopment.bind(ConfigurationFactory),
+  isDevelopment: (config: ApplicationConfig) => config.server.nodeEnv === 'development',
 
   /**
    * Check if running in test mode
    */
-  isTest: ConfigurationFactory.isTest.bind(ConfigurationFactory),
+  isTest: (config: ApplicationConfig) => config.server.nodeEnv === 'test',
 
   /**
    * Check if AI services are available
    */
-  hasAI: ConfigurationFactory.hasAIEnabled.bind(ConfigurationFactory),
+  hasAI: (config: ApplicationConfig) =>
+    config.features.aiEnabled && (!!config.aiServices.ai.apiKey ?? config.features.mockMode),
 
   /**
    * Parse TTL string to milliseconds
    */
-  parseTTL: ConfigurationFactory.parseTTLToMs.bind(ConfigurationFactory),
-
-  /**
-   * Convert milliseconds to TTL string
-   */
-  formatTTL: ConfigurationFactory.msToTTL.bind(ConfigurationFactory),
-
-  /**
-   * Get available configuration profiles
-   */
-  getProfiles: ConfigurationFactory.getAvailableProfiles.bind(ConfigurationFactory),
-
-  /**
-   * Get environment variable documentation
-   */
-  getEnvDocs: ConfigurationFactory.getEnvironmentDocumentation.bind(ConfigurationFactory),
-
-  /**
-   * Merge two configurations
-   */
-  merge: ConfigurationFactory.mergeConfigurations.bind(ConfigurationFactory)
-}
-
-// Development helper: log configuration summary on startup
-if (config.server.nodeEnv === 'development' && config.features.enableDebugLogs) {
-  console.log('Configuration loaded:', getConfigSummary(config))
-}
+  parseTTL: (ttl: string) => {
+    const match = ttl.match(/^(\d+)(h|m|s)$/);
+    if (!match) throw new Error(`Invalid TTL format: ${ttl}`);
+    const [, value, unit] = match;
+    const num = parseInt(value!, 10);
+    return unit === 'h' ? num * 3600000 : unit === 'm' ? num * 60000 : num * 1000;
+  }
+};

@@ -8,7 +8,7 @@ import {
   K8sManifestResult, 
   DeploymentResult,
   WorkflowStep
-} from '@domain/types/session.js';
+} from '../../src/domain/types/session.js';
 import { nanoid } from 'nanoid';
 
 export function createMockSession(overrides?: Partial<Session>): Session {

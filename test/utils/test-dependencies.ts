@@ -4,7 +4,7 @@
 
 import { MockMCPSampler } from './mock-mcp-sampler.js';
 import { createTestLogger } from './test-logger.js';
-import type { Logger } from '@infrastructure/core/logger-types.js';
+import type { Logger } from '../../src/infrastructure/core/logger-types.js';
 
 export interface TestDependencies {
   logger: Logger;

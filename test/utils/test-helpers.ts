@@ -1,86 +1,34 @@
 import { jest } from '@jest/globals';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { Config } from '@service/config/config.js';
-import { Dependencies } from '@service/dependencies.js';
-import { createLogger } from '@infrastructure/core/logger.js';
-import type { Logger } from '@infrastructure/core/logger-types.js';
+import type { Logger } from 'pino';
 
 export interface TestContext {
-  config: Config;
   logger: Logger;
-  server: Server;
-  deps: Dependencies;
 }
 
 export function createTestContext(overrides?: Partial<any>): TestContext {
-  const config = new Config({
-    features: {
-      mockMode: true,
-      ...overrides?.features
-    },
-    nodeEnv: 'test',
-    logLevel: 'error',
-    ...overrides
-  });
-  
-  const logger = createLogger({
-    level: 'error',
-    pretty: false
-  });
-  
-  const server = new Server(
-    { name: 'test-server', version: '1.0.0' },
-    { capabilities: { tools: {}, sampling: {} } }
-  );
-  
-  const deps = new Dependencies({
-    config: {
-      workspaceDir: '/tmp/test-workspace',
-      session: {
-        store: 'memory',
-        ttl: 300,
-        maxSessions: 100,
-      },
-      docker: {
-        socketPath: '/var/run/docker.sock',
-      },
-      kubernetes: {
-        namespace: 'test',
-      },
-      features: {
-        aiEnabled: false,
-        mockMode: true,
-      }
-    },
-    logger,
-    mcpServer: server
-  });
-  
-  return { config, logger, server, deps };
+  const logger = createMockLogger();
+  return { logger };
 }
 
 export async function cleanupTestContext(context: TestContext): Promise<void> {
-  try {
-    await context.deps.cleanup();
-  } catch (error) {
-    // Ignore cleanup errors in tests
-  }
+  // Cleanup not needed for mock logger
 }
 
 export function createMockLogger(): Logger {
-  // Create a proper recursive mock logger
-  const mockLogger: Logger = {
+  // Create a proper recursive mock logger matching pino's interface
+  const mockLogger: any = {
     debug: jest.fn(),
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
-    child: jest.fn((meta: Record<string, any>) => {
-      // Return a new mock logger for each child call
-      return createMockLogger();
-    })
+    fatal: jest.fn(),
+    trace: jest.fn(),
+    silent: jest.fn(),
+    child: jest.fn(() => createMockLogger()),
+    level: 'info'
   };
   
-  return mockLogger;
+  return mockLogger as Logger;
 }
 
 /**

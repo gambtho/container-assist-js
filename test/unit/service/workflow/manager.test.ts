@@ -4,8 +4,8 @@
  */
 
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { createMockLogger } from '@test/utils/test-helpers.js';
-import type { Logger } from '@infrastructure/core/logger-types.js';
+import { createMockLogger } from '../../../utils/test-helpers.js';
+import type { Logger } from 'pino';
 
 // Mock workflow types for testing
 interface MockWorkflowState {

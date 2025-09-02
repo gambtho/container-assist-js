@@ -1,281 +1,531 @@
 /**
- * Simple error recovery system with retry logic
- * Following the simplified approach from the implementation plan
+ * Enhanced Error Recovery Service
+ * Integrates error context, recovery strategies, and coordination logic
  */
 
-import type { Result } from '../../domain/types/result.js'
-import { fail } from '../../domain/types/result.js'
+import type { Logger } from 'pino';
+import type { AIRequest } from '../ai-request-builder';
+import { ErrorContext, ErrorContextFactory, ErrorContextUtils } from './error-context';
+import { RecoveryCoordinator, type RecoveryStrategy } from './recovery-strategy';
+import { DEFAULT_RECOVERY_STRATEGIES } from './recovery-strategies';
 
 /**
- * Retry options for error recovery
+ * Enhanced error recovery options
  */
-export interface RetryOptions {
-  maxAttempts?: number
-  delayMs?: number
-  backoff?: 'linear' | 'exponential'
+export interface EnhancedRecoveryOptions {
+  /** Maximum number of recovery attempts */
+  maxAttempts?: number;
+
+  /** Maximum time to spend on recovery (ms) */
+  maxRecoveryTimeMs?: number;
+
+  /** Maximum tokens to consume during recovery */
+  maxTokenBudget?: number;
+
+  /** Custom recovery strategies to use */
+  customStrategies?: RecoveryStrategy[];
+
+  /** Whether to enable detailed logging */
+  enableDetailedLogging?: boolean;
+
+  /** Callback for recovery progress updates */
+  onRecoveryProgress?: (context: ErrorContext, strategy?: string) => void;
 }
 
 /**
- * Execute operation with retry logic
+ * Recovery attempt result
  */
-export async function withRetry<T>(
-  operation: () => Promise<T>,
-  options: RetryOptions = {}
+export interface RecoveryAttemptResult<T = any> {
+  /** Whether the recovery was successful */
+  success: boolean;
+
+  /** The result data if successful */
+  data?: T;
+
+  /** Error if recovery failed */
+  error?: Error;
+
+  /** Updated error context */
+  context: ErrorContext;
+
+  /** Strategy that was used */
+  strategy?: RecoveryStrategy;
+
+  /** Metadata about the attempt */
+  metadata: {
+    /** Duration of this attempt (ms) */
+    attemptDurationMs: number;
+
+    /** Tokens consumed in this attempt */
+    tokensUsed?: number;
+
+    /** Confidence in this attempt */
+    confidence: number;
+
+    /** Whether this was the final attempt */
+    wasFinalAttempt: boolean;
+  };
+}
+
+/**
+ * Complete recovery session result
+ */
+export interface RecoverySessionResult<T = any> {
+  /** Whether any recovery attempt succeeded */
+  success: boolean;
+
+  /** Final result if successful */
+  data?: T | undefined;
+
+  /** Final error if all attempts failed */
+  finalError?: Error | undefined;
+
+  /** Complete error context history */
+  context: ErrorContext;
+
+  /** Summary of all attempts */
+  attempts: Array<{
+    strategy: string;
+    success: boolean;
+    durationMs: number;
+    confidence: number;
+  }>;
+
+  /** Session metadata */
+  metadata: {
+    /** Total session duration (ms) */
+    totalDurationMs: number;
+
+    /** Total tokens consumed */
+    totalTokensUsed: number;
+
+    /** Strategies attempted */
+    strategiesUsed: string[];
+
+    /** Recovery insights */
+    insights: string[];
+
+    /** Reason recovery was abandoned (if unsuccessful) */
+    abandonReason?: string;
+  };
+}
+
+/**
+ * Enhanced AI Error Recovery Service
+ * Provides sophisticated error recovery with context tracking and multiple strategies
+ */
+export class EnhancedErrorRecovery {
+  private coordinator: RecoveryCoordinator;
+  private options: Required<EnhancedRecoveryOptions>;
+  private logger: Logger;
+
+  constructor(logger: Logger, options: EnhancedRecoveryOptions = {}) {
+    this.logger = logger.child({ service: 'enhanced-error-recovery' });
+    this.options = {
+      maxAttempts: 5,
+      maxRecoveryTimeMs: 60000, // 60 seconds
+      maxTokenBudget: 10000,
+      customStrategies: [],
+      enableDetailedLogging: false,
+      onRecoveryProgress: () => {},
+      ...options
+    };
+
+    // Initialize coordinator with default + custom strategies
+    const allStrategies = [...DEFAULT_RECOVERY_STRATEGIES, ...this.options.customStrategies];
+    this.coordinator = new RecoveryCoordinator(allStrategies);
+  }
+
+  /**
+   * Execute comprehensive error recovery
+   * @param originalRequest - The original AI request that failed
+   * @param initialError - The initial error that occurred
+   * @param templateId - Template ID that failed
+   * @param variables - Original template variables
+   * @param executor - Function to execute recovery attempts
+   */
+  async recoverWithContext<T>(
+    originalRequest: AIRequest,
+    initialError: Error,
+    templateId: string,
+    variables: Record<string, any>,
+    executor: (request: AIRequest) => Promise<T>
+  ): Promise<RecoverySessionResult<T>> {
+    const sessionStartTime = Date.now();
+    const attempts: RecoverySessionResult<T>['attempts'] = [];
+    const insights: string[] = [];
+
+    // Create initial error context
+    let context = ErrorContextFactory.createInitial(
+      templateId,
+      variables,
+      originalRequest,
+      initialError
+    );
+
+    this.logRecoveryStart(context);
+    this.options.onRecoveryProgress(context);
+
+    // Recovery loop
+    while (context.attempt <= this.options.maxAttempts) {
+      // Check if we should abandon recovery
+      if (this.shouldAbandonRecovery(context, sessionStartTime)) {
+        const abandonReason = this.getAbandonReason(context, sessionStartTime);
+        this.logger.warn(
+          {
+            reason: abandonReason,
+            context: ErrorContextUtils.getDebugInfo(context)
+          },
+          'Recovery abandoned'
+        );
+
+        const result: RecoverySessionResult<T> = {
+          success: false,
+          finalError: new Error(`Recovery abandoned: ${abandonReason}`),
+          context,
+          attempts,
+          metadata: {
+            totalDurationMs: Date.now() - sessionStartTime,
+            totalTokensUsed: context.metadata?.tokensUsed ?? 0,
+            strategiesUsed: context.strategiesUsed ?? [],
+            insights
+          }
+        };
+
+        if (abandonReason) {
+          result.metadata.abandonReason = abandonReason;
+        }
+
+        return result;
+      }
+
+      // Execute recovery attempt
+      const lastError = new Error(ErrorContextUtils.getLastError(context));
+      const attemptResult = await this.executeRecoveryAttempt(
+        originalRequest,
+        lastError,
+        context,
+        executor
+      );
+
+      await attempts.push({
+        strategy: attemptResult.strategy?.name ?? 'unknown',
+        success: attemptResult.success,
+        durationMs: attemptResult.metadata.attemptDurationMs,
+        confidence: attemptResult.metadata.confidence
+      });
+
+      // If successful, return result
+      if (attemptResult.success && attemptResult.success.length > 0) {
+        this.logger.info(
+          {
+            strategy: attemptResult.strategy?.name,
+            attempt: context.attempt,
+            totalDurationMs: Date.now() - sessionStartTime
+          },
+          'Recovery successful'
+        );
+
+        return {
+          success: true,
+          data: attemptResult.data,
+          context: attemptResult.context,
+          attempts,
+          metadata: {
+            totalDurationMs: Date.now() - sessionStartTime,
+            totalTokensUsed: attemptResult.context.metadata?.tokensUsed ?? 0,
+            strategiesUsed: attemptResult.context.strategiesUsed ?? [],
+            insights
+          }
+        };
+      }
+
+      // Update context for next attempt
+      context = attemptResult.context;
+
+      // Collect insights from failed attempt
+      if (attemptResult.strategy?.analyzeFailure && attemptResult.error) {
+        const strategyInsights = attemptResult.strategy.analyzeFailure(
+          attemptResult.error,
+          context
+        );
+        await insights.push(...strategyInsights);
+      }
+
+      this.options.onRecoveryProgress(context, attemptResult.strategy?.name);
+
+      if (this.options.enableDetailedLogging) {
+        this.logger.debug(
+          {
+            attempt: context.attempt,
+            strategy: attemptResult.strategy?.name,
+            error: attemptResult.error?.message,
+            confidence: attemptResult.metadata.confidence
+          },
+          'Recovery attempt failed'
+        );
+      }
+    }
+
+    // All attempts exhausted
+    this.logger.warn(
+      {
+        attempts: context.attempt,
+        strategies: context.strategiesUsed,
+        totalDurationMs: Date.now() - sessionStartTime
+      },
+      'All recovery attempts exhausted'
+    );
+
+    return {
+      success: false,
+      finalError: new Error('All recovery attempts exhausted'),
+      context,
+      attempts,
+      metadata: {
+        totalDurationMs: Date.now() - sessionStartTime,
+        totalTokensUsed: context.metadata?.tokensUsed ?? 0,
+        strategiesUsed: context.strategiesUsed ?? [],
+        insights,
+        abandonReason: 'Max attempts reached'
+      }
+    };
+  }
+
+  /**
+   * Execute a single recovery attempt
+   */
+  private async executeRecoveryAttempt<T>(
+    originalRequest: AIRequest,
+    error: Error,
+    context: ErrorContext,
+    executor: (request: AIRequest) => Promise<T>
+  ): Promise<RecoveryAttemptResult<T>> {
+    const attemptStart = Date.now();
+
+    // Get recovery strategy
+    const recoveryResult = await this.coordinator.executeRecovery(originalRequest, error, context);
+
+    if (!recoveryResult) {
+      return {
+        success: false,
+        error: new Error('No recovery strategy available'),
+        context: ErrorContextFactory.updateForFailure(
+          context,
+          new Error('No recovery strategy available'),
+          'none'
+        ),
+        metadata: {
+          attemptDurationMs: Date.now() - attemptStart,
+          confidence: 0,
+          wasFinalAttempt: true
+        }
+      };
+    }
+
+    try {
+      // Execute recovery attempt
+      const result = await executor(recoveryResult.request);
+
+      // Validate result if strategy provides validation
+      const isValid = recoveryResult.strategy.validateResult
+        ? recoveryResult.strategy.validateResult(result, context)
+        : true;
+
+      if (!isValid) {
+        throw new Error('Recovery result failed validation');
+      }
+
+      // Success - update context with token usage if available
+      const updatedContext =
+        context.metadata?.tokensUsed !== undefined
+          ? (ErrorContextUtils.getDebugInfo(context) as unknown) // Type assertion for metadata access
+          : context;
+
+      return {
+        success: true,
+        data: result,
+        context: updatedContext,
+        strategy: recoveryResult.strategy,
+        metadata: {
+          attemptDurationMs: Date.now() - attemptStart,
+          confidence: recoveryResult.metadata.confidence,
+          wasFinalAttempt: recoveryResult.metadata.isFinalAttempt ?? false
+        }
+      };
+    } catch (attemptError) {
+      // Recovery attempt failed
+      const newError =
+        attemptError instanceof Error ? attemptError : new Error(String(attemptError));
+      const updatedContext = ErrorContextFactory.updateForFailure(
+        context,
+        newError,
+        recoveryResult.strategy.name
+      );
+
+      return {
+        success: false,
+        error: newError,
+        context: updatedContext,
+        strategy: recoveryResult.strategy,
+        metadata: {
+          attemptDurationMs: Date.now() - attemptStart,
+          confidence: recoveryResult.metadata.confidence,
+          wasFinalAttempt: recoveryResult.metadata.isFinalAttempt ?? false
+        }
+      };
+    }
+  }
+
+  /**
+   * Check if recovery should be abandoned
+   */
+  private shouldAbandonRecovery(context: ErrorContext, sessionStart: number): boolean {
+    // Use factory method for standard checks
+    if (ErrorContextFactory.shouldAbandonRecovery(context)) {
+      return true;
+    }
+
+    // Additional checks based on options
+    const elapsed = Date.now() - sessionStart;
+    if (elapsed > this.options.maxRecoveryTimeMs) {
+      return true;
+    }
+
+    const tokensUsed = context.metadata?.tokensUsed ?? 0;
+    if (tokensUsed > this.options.maxTokenBudget) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Get reason for abandoning recovery
+   */
+  private getAbandonReason(context: ErrorContext, sessionStart: number): string {
+    if (context.attempt > this.options.maxAttempts) {
+      return `Max attempts exceeded (${this.options.maxAttempts})`;
+    }
+
+    const elapsed = Date.now() - sessionStart;
+    if (elapsed > this.options.maxRecoveryTimeMs) {
+      return `Max time exceeded (${this.options.maxRecoveryTimeMs}ms)`;
+    }
+
+    const tokensUsed = context.metadata?.tokensUsed ?? 0;
+    if (tokensUsed > this.options.maxTokenBudget) {
+      return `Token budget exceeded (${this.options.maxTokenBudget})`;
+    }
+
+    // Check factory reasons
+    if (context.metadata?.totalElapsedMs && context.metadata.totalElapsedMs > 60000) {
+      return 'Timeout exceeded';
+    }
+
+    const recentErrors = context.previousErrors.slice(-3);
+    if (recentErrors.length >= 3 && recentErrors.every((err) => err === recentErrors[0])) {
+      return 'Repeating errors with no progress';
+    }
+
+    return 'Unknown reason';
+  }
+
+  /**
+   * Log recovery session start
+   */
+  private logRecoveryStart(context: ErrorContext): void {
+    this.logger.info(
+      {
+        templateId: context.templateId,
+        errorType: context.errorType,
+        initialError: ErrorContextUtils.getLastError(context),
+        maxAttempts: this.options.maxAttempts,
+        strategies: this.coordinator.getAvailableStrategies(
+          new Error(ErrorContextUtils.getLastError(context)),
+          context
+        )
+      },
+      'Starting error recovery session'
+    );
+  }
+
+  /**
+   * Add custom recovery strategy
+   */
+  addStrategy(strategy: RecoveryStrategy): void {
+    this.coordinator.addStrategy(strategy);
+  }
+
+  /**
+   * Get available strategies for error context (for debugging)
+   */
+  getAvailableStrategies(error: Error, context: ErrorContext): string[] {
+    return this.coordinator.getAvailableStrategies(error, context);
+  }
+
+  /**
+   * Get recovery statistics for monitoring
+   */
+  getRecoveryStats(sessionResult: RecoverySessionResult): Record<string, any> {
+    return {
+      success: sessionResult.success,
+      totalAttempts: sessionResult.attempts.length,
+      totalDurationMs: sessionResult.metadata.totalDurationMs,
+      totalTokensUsed: sessionResult.metadata.totalTokensUsed,
+      strategiesUsed: sessionResult.metadata.strategiesUsed,
+      averageConfidence:
+        sessionResult.attempts.reduce((sum, a) => sum + a.confidence, 0) /
+        sessionResult.attempts.length,
+      insightCount: sessionResult.metadata.insights.length,
+      abandonReason: sessionResult.metadata.abandonReason ?? null
+    };
+  }
+}
+
+/**
+ * Factory function for creating configured error recovery service
+ */
+export function createEnhancedErrorRecovery(
+  logger: Logger,
+  options?: EnhancedRecoveryOptions
+): EnhancedErrorRecovery {
+  return new EnhancedErrorRecovery(logger, options);
+}
+
+/**
+ * Utility function to execute recovery with default configuration
+ */
+export async function executeWithEnhancedRecovery<T>(
+  request: AIRequest,
+  templateId: string,
+  variables: Record<string, any>,
+  executor: (request: AIRequest) => Promise<T>,
+  logger: Logger,
+  options?: EnhancedRecoveryOptions
 ): Promise<T> {
-  const { maxAttempts = 3, delayMs = 1000, backoff = 'exponential' } = options
-  let lastError: Error
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await operation()
-    } catch (error) {
-      lastError = error as Error
-
-      if (attempt === maxAttempts) break
-
-      const delay = backoff === 'exponential' ? delayMs * attempt : delayMs
-      await new Promise(resolve => setTimeout(resolve, delay))
-    }
-  }
-
-  throw lastError!
-}
-
-/**
- * Execute operation with retry and return Result
- * Simple usage in handlers as shown in the plan
- */
-export async function executeWithRetry<T>(
-  operation: () => Promise<Result<T>>,
-  context: string
-): Promise<Result<T>> {
-  const { maxAttempts = 3, delayMs = 1000, backoff = 'exponential' } = {}
-  let lastError: string = ''
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const result = await operation()
-      if (result.success) {
-        return result
-      }
-
-      lastError = result.error?.message || 'Unknown error'
-
-      if (attempt === maxAttempts) break
-
-      const delay = backoff === 'exponential' ? delayMs * attempt : delayMs
-      await new Promise(resolve => setTimeout(resolve, delay))
-    } catch (error) {
-      lastError = (error as Error).message
-
-      if (attempt === maxAttempts) break
-
-      const delay = backoff === 'exponential' ? delayMs * attempt : delayMs
-      await new Promise(resolve => setTimeout(resolve, delay))
-    }
-  }
-
-  return fail(`${context} failed after retries: ${lastError}`)
-}
-
-/**
- * Get helpful error suggestions based on error type and context
- */
-export function getBuildErrorSuggestions(error: Error | undefined, language?: string): string[] {
-  const message = error?.message || ''
-  const suggestions: string[] = []
-
-  // File and path errors
-  if (message.includes('no such file') || message.includes('file not found')) {
-    suggestions.push('- Verify all COPY/ADD paths exist in build context')
-    suggestions.push('- Check .dockerignore for excluded files')
-    suggestions.push('- Ensure file paths are relative to build context')
-  }
-
-  // Network and connectivity errors
-  if (message.includes('network') || message.includes('timeout') || message.includes('connection')) {
-    suggestions.push('- Check network connectivity')
-    suggestions.push('- Try using different package manager mirrors')
-    suggestions.push('- Increase timeout values in build commands')
-  }
-
-  // Permission errors
-  if (message.includes('permission denied') || message.includes('access denied')) {
-    suggestions.push('- Ensure files have correct permissions (chmod)')
-    suggestions.push('- Consider using non-root user in Dockerfile')
-    suggestions.push('- Check if files are owned by correct user')
-  }
-
-  // Dependency and package errors
-  if (message.includes('dependency') || message.includes('package') || message.includes('module')) {
-    if (language) {
-      switch (language.toLowerCase()) {
-        case 'javascript':
-        case 'nodejs':
-        case 'typescript':
-          suggestions.push('- Run npm cache clean --force')
-          suggestions.push('- Use npm ci instead of npm install')
-          suggestions.push('- Check package.json for correct dependencies')
-          break
-        case 'python':
-          suggestions.push('- Update pip: pip install --upgrade pip')
-          suggestions.push('- Use requirements.txt for consistent dependencies')
-          suggestions.push('- Try using virtual environment')
-          break
-        case 'java':
-          suggestions.push('- Clean Maven/Gradle cache')
-          suggestions.push('- Verify repository URLs in pom.xml/build.gradle')
-          suggestions.push('- Check Java version compatibility')
-          break
-        case 'go':
-          suggestions.push('- Run go mod tidy to clean dependencies')
-          suggestions.push('- Check go.mod for correct module versions')
-          suggestions.push('- Verify GOPROXY settings')
-          break
-      }
-    } else {
-      suggestions.push('- Clear package manager cache')
-      suggestions.push('- Verify dependency versions and repositories')
-      suggestions.push('- Check for dependency conflicts')
-    }
-  }
-
-  // Build tool specific errors
-  if (message.includes('maven') || message.includes('mvn')) {
-    suggestions.push('- Run mvn dependency:resolve to check dependencies')
-    suggestions.push('- Use mvn dependency:go-offline for offline builds')
-    suggestions.push('- Check Maven settings.xml configuration')
-  }
-
-  if (message.includes('gradle')) {
-    suggestions.push('- Run gradle --refresh-dependencies')
-    suggestions.push('- Clear Gradle cache: ~/.gradle/caches')
-    suggestions.push('- Check build.gradle for syntax errors')
-  }
-
-  if (message.includes('npm') || message.includes('yarn')) {
-    suggestions.push('- Clear npm cache: npm cache clean --force')
-    suggestions.push('- Delete node_modules and package-lock.json')
-    suggestions.push('- Use exact versions in package.json')
-  }
-
-  if (message.includes('pip')) {
-    suggestions.push('- Upgrade pip: pip install --upgrade pip')
-    suggestions.push('- Use pip cache purge to clear cache')
-    suggestions.push('- Pin dependency versions in requirements.txt')
-  }
-
-  // Memory and resource errors
-  if (message.includes('memory') || message.includes('out of space') || message.includes('disk')) {
-    suggestions.push('- Increase Docker memory limits')
-    suggestions.push('- Clean up unused Docker images and containers')
-    suggestions.push('- Use multi-stage builds to reduce image size')
-    suggestions.push('- Add .dockerignore to exclude unnecessary files')
-  }
-
-  // Generic Docker errors
-  if (message.includes('docker') || message.includes('container')) {
-    suggestions.push('- Verify Docker daemon is running')
-    suggestions.push('- Check Docker version compatibility')
-    suggestions.push('- Try rebuilding with --no-cache flag')
-  }
-
-  // If no specific suggestions, provide generic ones
-  if (suggestions.length === 0) {
-    suggestions.push('- Review Dockerfile and build context')
-    suggestions.push('- Check logs for more detailed error information')
-    suggestions.push('- Verify all required files are present')
-    suggestions.push('- Try building with verbose logging enabled')
-  }
-
-  return suggestions
-}
-
-/**
- * Get error recovery suggestions for different operation types
- */
-export function getRecoverySuggestions(
-  operationType: 'build' | 'push' | 'scan' | 'deploy' | 'general',
-  error: Error,
-  language?: string
-): string[] {
-  const suggestions: string[] = []
-
-  switch (operationType) {
-    case 'build':
-      suggestions.push(...getBuildErrorSuggestions(error, language))
-      break
-
-    case 'push':
-      if (error.message.includes('authentication') || error.message.includes('unauthorized')) {
-        suggestions.push('- Verify registry credentials')
-        suggestions.push('- Check if logged in to correct registry')
-        suggestions.push('- Ensure push permissions for the repository')
-      } else if (error.message.includes('network') || error.message.includes('timeout')) {
-        suggestions.push('- Check network connectivity to registry')
-        suggestions.push('- Try pushing to different registry')
-        suggestions.push('- Verify registry URL is correct')
-      } else {
-        suggestions.push('- Verify image exists locally')
-        suggestions.push('- Check image tag format')
-        suggestions.push('- Ensure registry is accessible')
-      }
-      break
-
-    case 'scan':
-      if (error.message.includes('trivy') || error.message.includes('scanner')) {
-        suggestions.push('- Update vulnerability database')
-        suggestions.push('- Verify scanner installation')
-        suggestions.push('- Check if image exists and is accessible')
-      } else {
-        suggestions.push('- Verify image name and tag')
-        suggestions.push('- Ensure scanning tool is available')
-        suggestions.push('- Check network access for database updates')
-      }
-      break
-
-    case 'deploy':
-      if (error.message.includes('kubernetes') || error.message.includes('k8s')) {
-        suggestions.push('- Verify Kubernetes cluster connectivity')
-        suggestions.push('- Check kubectl configuration')
-        suggestions.push('- Ensure sufficient cluster resources')
-        suggestions.push('- Verify namespace exists and is accessible')
-      } else {
-        suggestions.push('- Check deployment configuration')
-        suggestions.push('- Verify all required resources exist')
-        suggestions.push('- Ensure proper permissions')
-      }
-      break
-
-    default:
-      suggestions.push('- Review error message for specific details')
-      suggestions.push('- Check system resources and connectivity')
-      suggestions.push('- Verify all prerequisites are met')
-      suggestions.push('- Try the operation again after addressing issues')
-      break
-  }
-
-  return suggestions
-}
-
-/**
- * Enhanced execute with retry that includes operation-specific suggestions
- */
-export async function executeWithRecovery<T>(
-  operation: () => Promise<Result<T>>,
-  context: string,
-  operationType: 'build' | 'push' | 'scan' | 'deploy' | 'general' = 'general',
-  language?: string
-): Promise<Result<T>> {
   try {
-    return await withRetry(operation, { maxAttempts: 3 })
-  } catch (error) {
-    const suggestions = getRecoverySuggestions(operationType, error as Error, language)
-    const errorMsg = `${context} failed after retries: ${(error as Error).message}`
-    const fullMessage = `${errorMsg}\n\nSuggestions:\n${suggestions.join('\n')}`
+    // Try original request first
+    return await executor(request);
+  } catch (initialError) {
+    // Execute recovery
+    const recovery = createEnhancedErrorRecovery(logger, options);
+    const result = await recovery.recoverWithContext(
+      request,
+      initialError as Error,
+      templateId,
+      variables,
+      executor
+    );
 
-    return fail(fullMessage)
+    if (result.success && result.data !== undefined) {
+      return result.data;
+    }
+
+    // Recovery failed - throw with context
+    const finalError = result.finalError ?? new Error('Recovery failed');
+    const contextInfo = ErrorContextUtils.getDebugInfo(result.context);
+    finalError.message += ` (Recovery failed after ${result.attempts.length} attempts: ${JSON.stringify(contextInfo)})`;
+    throw finalError;
   }
 }
-
-

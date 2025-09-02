@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { ContainerKitMCPServer } from '../../../src/index.js';
-import { Config } from '@service/config/config.js';
+import { Config } from '../../../src/application/config/config.js';
 import { nanoid } from 'nanoid';
 import path from 'path';
 import fs from 'fs/promises';
-import { createTempDir, waitFor, measureTime } from '@test/utils/test-helpers.js';
+import { createTempDir, waitFor, measureTime } from '../../utils/test-helpers.js';
 
 describe('Full Containerization Workflow Integration', () => {
   let server: ContainerKitMCPServer;
@@ -482,7 +482,7 @@ npm test
         arguments: args
       });
       
-      if (result.isError) {
+      if (!result.success) {
         return {
           success: false,
           error: {

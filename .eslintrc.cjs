@@ -30,8 +30,20 @@ module.exports = {
     '@typescript-eslint/no-non-null-assertion': 'error',
     '@typescript-eslint/prefer-as-const': 'error',
     
-    // Import rules (simplified)
+    // Import rules (strict ESM patterns)
     'no-duplicate-imports': 'error',
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: [
+          { 
+            group: ['@domain/*','@service/*','@infrastructure/*', '@application/*'], 
+            message: 'Use relative ESM imports instead of path aliases.' 
+          }
+        ]
+      }
+    ],
+    '@typescript-eslint/no-floating-promises': 'error',
     
     // General rules
     'no-console': ['warn', { 

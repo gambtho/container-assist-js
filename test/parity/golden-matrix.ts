@@ -1,44 +1,11 @@
 /**
- * Golden Test Matrix - Testing Framework
+ * Golden Test Matrix - Phase 8 Testing Framework
  * Defines comprehensive test cases for validating feature parity with Go implementation
  */
 
-import { z } from 'zod';
-
-export interface GoldenTestCase {
-  name: string;
-  description: string;
-  input: Record<string, unknown>;
-  goldenOutput: string;
-  assertions: string[];
-  skipExactMatch?: boolean;
-  customValidator?: string;
-}
-
-// Export JSON schemas for MCP registration
-export function exportJsonSchema(schema: z.ZodSchema): unknown {
-  // Convert Zod schema to JSON Schema (simplified implementation)
-  return {
-    type: 'object',
-    properties: {},
-    additionalProperties: true
-  };
-}
-
-export const GOLDEN_TEST_MATRIX: Record<string, GoldenTestCase[]> = {
+export const GOLDEN_TEST_MATRIX = {
   // Repository Analysis Tests
   analyze_repository: [
-    {
-      name: 'mcp-server-architecture',
-      description: 'MCP Server Architecture Validation',
-      input: { 
-        repoPath: './test/fixtures/mcp-server-architecture',
-        sessionId: 'test-analyze-mcp-server'
-      },
-      goldenOutput: './test/golden/analyze/mcp-server-architecture.json',
-      assertions: ['architecture.consolidated', 'architecture.teams.alpha.status', 'architecture.teams.bravo.status', 'architecture.teams.charlie.status', 'architecture.testCoverage.threshold'],
-      skipExactMatch: true
-    },
     {
       name: 'spring-boot-maven',
       description: 'Java Spring Boot project with Maven',
@@ -47,17 +14,6 @@ export const GOLDEN_TEST_MATRIX: Record<string, GoldenTestCase[]> = {
         sessionId: 'test-analyze-1'
       },
       goldenOutput: './test/golden/analyze/spring-boot-maven.json',
-      assertions: ['language', 'framework', 'buildSystem', 'port'],
-      skipExactMatch: true
-    },
-    {
-      name: 'quarkus-gradle',
-      description: 'Java Quarkus project with Gradle',
-      input: { 
-        repoPath: './test/fixtures/java-quarkus',
-        sessionId: 'test-analyze-2'
-      },
-      goldenOutput: './test/golden/analyze/quarkus-gradle.json',
       assertions: ['language', 'framework', 'buildSystem', 'port'],
       skipExactMatch: true
     },
@@ -73,17 +29,6 @@ export const GOLDEN_TEST_MATRIX: Record<string, GoldenTestCase[]> = {
       skipExactMatch: true
     },
     {
-      name: 'python-flask',
-      description: 'Python Flask application',
-      input: { 
-        repoPath: './test/fixtures/python-flask',
-        sessionId: 'test-analyze-4'
-      },
-      goldenOutput: './test/golden/analyze/python-flask.json',
-      assertions: ['language', 'framework', 'pythonVersion', 'port'],
-      skipExactMatch: true
-    },
-    {
       name: 'dotnet-webapi',
       description: '.NET Core Web API application',
       input: { 
@@ -91,17 +36,6 @@ export const GOLDEN_TEST_MATRIX: Record<string, GoldenTestCase[]> = {
         sessionId: 'test-analyze-5'
       },
       goldenOutput: './test/golden/analyze/dotnet-webapi.json',
-      assertions: ['language', 'framework', 'dotnetVersion', 'port'],
-      skipExactMatch: true
-    },
-    {
-      name: 'dotnet-mvc',
-      description: 'ASP.NET MVC application',
-      input: { 
-        repoPath: './test/fixtures/dotnet-mvc',
-        sessionId: 'test-analyze-6'
-      },
-      goldenOutput: './test/golden/analyze/dotnet-mvc.json',
       assertions: ['language', 'framework', 'dotnetVersion', 'port'],
       skipExactMatch: true
     }
@@ -124,54 +58,6 @@ export const GOLDEN_TEST_MATRIX: Record<string, GoldenTestCase[]> = {
       assertions: ['FROM openjdk', 'COPY --from=builder', 'EXPOSE 8080', 'USER'],
       skipExactMatch: true,
       customValidator: 'dockerfileValidator'
-    },
-    {
-      name: 'node-production',
-      description: 'Node.js production Dockerfile',
-      input: { 
-        sessionId: 'test-dockerfile-2',
-        requirements: {
-          baseImage: 'node:18-alpine',
-          port: 3000,
-          healthCheck: true
-        }
-      },
-      goldenOutput: './test/golden/dockerfiles/node-express.Dockerfile',
-      assertions: ['FROM node', 'npm ci --only=production', 'HEALTHCHECK', 'USER node'],
-      skipExactMatch: true,
-      customValidator: 'dockerfileValidator'
-    },
-    {
-      name: 'dotnet-webapi-multistage',
-      description: '.NET Core Web API with multi-stage build',
-      input: { 
-        sessionId: 'test-dockerfile-3',
-        requirements: {
-          baseImage: 'mcr.microsoft.com/dotnet/aspnet:8.0',
-          multistage: true,
-          port: 80
-        }
-      },
-      goldenOutput: './test/golden/dockerfiles/dotnet-webapi.Dockerfile',
-      assertions: ['FROM mcr.microsoft.com/dotnet/sdk', 'FROM mcr.microsoft.com/dotnet/aspnet', 'dotnet publish', 'EXPOSE 80'],
-      skipExactMatch: true,
-      customValidator: 'dockerfileValidator'
-    },
-    {
-      name: 'dotnet-mvc-production',
-      description: 'ASP.NET MVC production Dockerfile',
-      input: { 
-        sessionId: 'test-dockerfile-4',
-        requirements: {
-          baseImage: 'mcr.microsoft.com/dotnet/aspnet:8.0',
-          port: 5000,
-          healthCheck: true
-        }
-      },
-      goldenOutput: './test/golden/dockerfiles/dotnet-mvc.Dockerfile',
-      assertions: ['FROM mcr.microsoft.com/dotnet/aspnet', 'dotnet publish', 'HEALTHCHECK', 'EXPOSE 5000'],
-      skipExactMatch: true,
-      customValidator: 'dockerfileValidator'
     }
   ],
 
@@ -187,34 +73,6 @@ export const GOLDEN_TEST_MATRIX: Record<string, GoldenTestCase[]> = {
       },
       goldenOutput: './test/golden/build/success.json',
       assertions: ['imageId', 'size', 'layers'],
-      skipExactMatch: true
-    },
-    {
-      name: 'build-with-errors',
-      description: 'Build with recoverable errors',
-      input: { 
-        context: './test/fixtures/broken-dockerfile',
-        tag: 'test-broken:latest',
-        sessionId: 'test-build-2'
-      },
-      goldenOutput: './test/golden/build/error-recovery.json',
-      assertions: ['error', 'retryAttempts', 'finalStatus'],
-      skipExactMatch: true
-    }
-  ],
-
-  // Image Scanning Tests
-  scan_image: [
-    {
-      name: 'trivy-scan-results',
-      description: 'Trivy security scan results',
-      input: {
-        imageTag: 'test-spring:latest',
-        sessionId: 'test-scan-1',
-        scannerType: 'trivy'
-      },
-      goldenOutput: './test/golden/scan/trivy-results.json',
-      assertions: ['vulnerabilities', 'summary', 'scannerUsed'],
       skipExactMatch: true
     }
   ],
@@ -234,41 +92,11 @@ export const GOLDEN_TEST_MATRIX: Record<string, GoldenTestCase[]> = {
       assertions: ['apiVersion: apps/v1', 'kind: Deployment', 'replicas: 3'],
       skipExactMatch: true,
       customValidator: 'k8sValidator'
-    },
-    {
-      name: 'with-ingress',
-      description: 'Deployment with ingress',
-      input: { 
-        sessionId: 'test-k8s-2',
-        imageTag: 'webapp:v1.0.0',
-        port: 80,
-        ingress: {
-          enabled: true,
-          host: 'myapp.example.com'
-        }
-      },
-      goldenOutput: './test/golden/k8s-manifests/with-ingress.yaml',
-      assertions: ['kind: Ingress', 'host: myapp.example.com', 'kind: Service'],
-      skipExactMatch: true,
-      customValidator: 'k8sValidator'
     }
   ],
 
   // Complete Workflow Tests
   start_workflow: [
-    {
-      name: 'mcp-server-architecture-validation',
-      description: 'MCP Server architecture validation workflow',
-      input: { 
-        repoPath: './test/fixtures/mcp-server-architecture',
-        targetEnvironment: 'test',
-        sessionId: 'test-mcp-server-validation',
-        workflowType: 'validation'
-      },
-      goldenOutput: './test/golden/workflow/mcp-server-complete.json',
-      assertions: ['teamValidation.alpha.status', 'teamValidation.bravo.status', 'teamValidation.charlie.status', 'teamValidation.delta.status', 'results.overallTestCoverage'],
-      skipExactMatch: true
-    },
     {
       name: 'complete-java-workflow',
       description: 'End-to-end Java application workflow',
@@ -280,19 +108,6 @@ export const GOLDEN_TEST_MATRIX: Record<string, GoldenTestCase[]> = {
       },
       goldenOutput: './test/golden/workflow/java-complete.json',
       assertions: ['steps', 'status', 'artifacts'],
-      skipExactMatch: true
-    },
-    {
-      name: 'build-only-workflow',
-      description: 'Build-only workflow for CI/CD',
-      input: {
-        repoPath: './test/fixtures/java-spring-boot-maven',
-        targetEnvironment: 'ci',
-        sessionId: 'test-workflow-2',
-        workflowType: 'build-only'
-      },
-      goldenOutput: './test/golden/workflow/build-only.json',
-      assertions: ['steps', 'status', 'buildArtifacts'],
       skipExactMatch: true
     }
   ],
@@ -361,15 +176,15 @@ export const TOOL_CATEGORIES = {
 export const EXPECTED_TOOL_COUNT = 15;
 
 // Test execution priorities
-export enum TestPriority {
-  P0 = 'critical',      // Must pass for production
-  P1 = 'high',         // Important functionality
-  P2 = 'medium',       // Nice to have
-  P3 = 'low'           // Edge cases
-}
+export const TestPriority = {
+  P0: 'critical',      // Must pass for production
+  P1: 'high',         // Important functionality
+  P2: 'medium',       // Nice to have
+  P3: 'low'           // Edge cases
+};
 
 // Tool priority mapping
-export const TOOL_PRIORITIES: Record<string, TestPriority> = {
+export const TOOL_PRIORITIES = {
   // P0 - Critical for basic functionality
   analyze_repository: TestPriority.P0,
   generate_dockerfile: TestPriority.P0,

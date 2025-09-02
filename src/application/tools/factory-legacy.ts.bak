@@ -1,0 +1,271 @@
+/**
+ * Tool Factory for Dependency Injection
+ * Creates tool handlers with injected services instead of service locator
+ */
+
+import { BaseToolHandler } from './base-handler.js';
+import type { CoreServices } from '../services/interfaces.js';
+import { getSimpleToolConfig, type SimpleToolConfig } from './simple-config.js';
+
+// Import the new constructor injection tools
+import { BuildImageTool } from './build/build-image-v2.js';
+
+// Import existing tools that we'll convert gradually
+import analyzeRepositoryHandler from './analysis/analyze-repository.js';
+import generateDockerfileHandler from './build/generate-dockerfile.js';
+import scanImageHandler from './build/scan-image.js';
+import tagImageHandler from './build/tag-image.js';
+import pushImageHandler from './build/push-image.js';
+import generateK8sManifestsHandler from './deploy/generate-k8s-manifests.js';
+import deployApplicationHandler from './deploy/deploy-application.js';
+import pingHandler from './ops/ping.js';
+import listToolsHandler from './ops/list-tools.js';
+import serverStatusHandler from './ops/server-status.js';
+
+/**
+ * Legacy tool handler interface for backwards compatibility
+ */
+interface LegacyToolHandler {
+  name: string;
+  description?: string;
+  category?: string;
+  inputSchema: any;
+  outputSchema?: any;
+  execute: (input: any, context: any) => Promise<any>;
+  chainHint?: any;
+}
+
+/**
+ * Wrapper to make legacy handlers compatible with new base class
+ */
+class LegacyToolWrapper extends BaseToolHandler {
+  private legacyHandler: LegacyToolHandler;
+
+  constructor(services: CoreServices, config: SimpleToolConfig, handler: LegacyToolHandler) {
+    super(services, config);
+    this.legacyHandler = handler;
+  }
+
+  get inputSchema() {
+    return this.legacyHandler.inputSchema;
+  }
+
+  get outputSchema() {
+    return this.legacyHandler.outputSchema;
+  }
+
+  get chainHint() {
+    return this.legacyHandler.chainHint;
+  }
+
+  async execute(input: any): Promise<any> {
+    // Create legacy context from services
+    const context = {
+      logger: this.services.logger,
+      sessionService: this.services.session,
+      dockerClient: this.services.docker,
+      kubernetesService: this.services.kubernetes,
+      aiService: this.services.ai,
+      progressEmitter: this.services.progress,
+      
+      // Legacy getters for backwards compatibility
+      getDockerService: async () => this.services.docker,
+      getKubernetesService: async () => this.services.kubernetes,
+      getAIService: async () => this.services.ai,
+      getSessionService: async () => this.services.session,
+      getProgressEmitter: async () => this.services.progress
+    };
+
+    return await this.legacyHandler.execute(input, context);
+  }
+}
+
+/**
+ * Tool factory that creates handlers with dependency injection
+ */
+export class ToolFactory {
+  constructor(private services: CoreServices) {}
+
+  /**
+   * Create a tool handler by name
+   */
+  createTool(toolName: string): BaseToolHandler {
+    const config = getSimpleToolConfig(toolName);
+    
+    // Route to new constructor injection tools
+    switch (toolName) {
+      case 'build_image':
+        return new BuildImageTool(this.services, config);
+        
+      // Legacy tools wrapped for compatibility
+      case 'analyze_repository':
+        return new LegacyToolWrapper(this.services, config, analyzeRepositoryHandler);
+        
+      case 'generate_dockerfile':
+        return new LegacyToolWrapper(this.services, config, generateDockerfileHandler);
+        
+      case 'scan_image':
+        return new LegacyToolWrapper(this.services, config, scanImageHandler);
+        
+      case 'tag_image':
+        return new LegacyToolWrapper(this.services, config, tagImageHandler);
+        
+      case 'push_image':
+        return new LegacyToolWrapper(this.services, config, pushImageHandler);
+        
+      case 'generate_k8s_manifests':
+        return new LegacyToolWrapper(this.services, config, generateK8sManifestsHandler);
+        
+      case 'deploy_application':
+        return new LegacyToolWrapper(this.services, config, deployApplicationHandler);
+        
+      case 'ping':
+        return new LegacyToolWrapper(this.services, config, pingHandler);
+        
+      case 'list_tools':
+        return new LegacyToolWrapper(this.services, config, listToolsHandler);
+        
+      case 'server_status':
+        return new LegacyToolWrapper(this.services, config, serverStatusHandler);
+        
+      default:
+        throw new Error(`Unknown tool: ${toolName}`);
+    }
+  }
+
+  /**
+   * Get all available tools
+   */
+  getAllTools(): BaseToolHandler[] {
+    return AVAILABLE_TOOLS.map(name => this.createTool(name));
+  }
+
+  /**
+   * Get tool configuration
+   */
+  private getToolConfig(toolName: string): ToolConfig {
+    const configs: Record<string, ToolConfig> = {
+      // Analysis tools
+      analyze_repository: {
+        name: 'analyze_repository',
+        description: 'Analyze repository structure and dependencies',
+        category: 'workflow',
+        nextTool: null,
+        chainReason: null,
+        schema: { type: 'object', properties: {} }
+      },
+      
+      // Build tools  
+      build_image: {
+        name: 'build_image',
+        description: 'Build Docker image from Dockerfile',
+        category: 'workflow',
+        nextTool: 'scan_image',
+        chainReason: 'Scan built image for vulnerabilities'
+      },
+      
+      scan_image: {
+        name: 'scan_image', 
+        description: 'Scan Docker image for vulnerabilities',
+        category: 'workflow'
+      },
+      
+      tag_image: {
+        name: 'tag_image',
+        description: 'Tag Docker image with new tag',
+        category: 'workflow'
+      },
+      
+      push_image: {
+        name: 'push_image',
+        description: 'Push Docker image to registry',
+        category: 'workflow'
+      },
+      
+      generate_dockerfile: {
+        name: 'generate_dockerfile',
+        description: 'Generate Dockerfile from repository analysis',
+        category: 'workflow',
+        nextTool: 'build_image',
+        chainReason: 'Build the generated Dockerfile'
+      },
+      
+      // Deploy tools
+      generate_k8s_manifests: {
+        name: 'generate_k8s_manifests',
+        description: 'Generate Kubernetes manifests',
+        category: 'workflow',
+        nextTool: 'deploy_application', 
+        chainReason: 'Deploy the generated manifests'
+      },
+      
+      deploy_application: {
+        name: 'deploy_application',
+        description: 'Deploy application to Kubernetes cluster',
+        category: 'deploy'
+      },
+      
+      // Ops tools
+      ping: {
+        name: 'ping',
+        description: 'Health check for the server',
+        category: 'utility'
+      },
+      
+      list_tools: {
+        name: 'list_tools',
+        description: 'List all available tools',
+        category: 'utility'
+      },
+      
+      server_status: {
+        name: 'server_status',
+        description: 'Get server status and health',
+        category: 'utility'
+      }
+    };
+
+    const config = configs[toolName];
+    if (!config) {
+      throw new Error(`No configuration found for tool: ${toolName}`);
+    }
+    
+    return config;
+  }
+}
+
+/**
+ * List of all available tools
+ */
+export const AVAILABLE_TOOLS = [
+  // Analysis
+  'analyze_repository',
+  
+  // Build workflow
+  'generate_dockerfile',
+  'build_image', 
+  'scan_image',
+  'tag_image',
+  'push_image',
+  
+  // Deploy workflow
+  'generate_k8s_manifests',
+  'deploy_application',
+  
+  // Operations
+  'ping',
+  'list_tools',
+  'server_status'
+] as const;
+
+/**
+ * Tool names type
+ */
+export type ToolName = typeof AVAILABLE_TOOLS[number];
+
+/**
+ * Helper to check if a tool name is valid
+ */
+export function isValidToolName(name: string): name is ToolName {
+  return (AVAILABLE_TOOLS as readonly string[]).includes(name);
+}

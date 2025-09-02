@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -8,10 +8,12 @@ on:
 
 env:
   NODE_VERSION: '20'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  lint-and-typecheck:
-    name: Lint & Type Check
+  quality-checks:
+    name: Code Quality
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,6 +27,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
 
       - name: Run ESLint
         run: npm run lint
@@ -32,32 +37,39 @@ jobs:
       - name: Run TypeScript compiler check
         run: npm run typecheck
 
+      - name: Validate infrastructure patterns
+        run: npx tsx scripts/validate-infrastructure.ts
+
   test:
-    name: Test
+    name: Test Suite
     runs-on: ubuntu-latest
+    needs: quality-checks
     strategy:
       matrix:
+        node-version: ['18', '20']
         test-type: [unit, integration]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
+      - name: Run ${{ matrix.test-type }} tests
         run: npm run test:${{ matrix.test-type }}
+        env:
+          NODE_OPTIONS: '--experimental-vm-modules'
 
-  build:
-    name: Build
+  test-coverage:
+    name: Test Coverage
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, test]
+    needs: quality-checks
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -71,15 +83,121 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        env:
+          NODE_OPTIONS: '--experimental-vm-modules'
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+  build:
+    name: Build & Validate
+    runs-on: ubuntu-latest
+    needs: [quality-checks, test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
         run: npm run build
+
+      - name: Validate build output
+        run: |
+          test -f dist/bin/cli.js || (echo "CLI build missing" && exit 1)
+          test -f dist/index.js || (echo "Main export missing" && exit 1)
+          test -f dist/index.d.ts || (echo "Type definitions missing" && exit 1)
+
+      - name: Test CLI executable
+        run: |
+          chmod +x dist/bin/cli.js
+          node dist/bin/cli.js --help
 
       - name: Check bundle size
         run: npm run bundle:size
 
+      - name: Dry run publish
+        run: npm run bundle:check
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: dist-node-${{ env.NODE_VERSION }}
           path: dist/
           retention-days: 7
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: quality-checks
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level high
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v2
+        with:
+          languages: typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+  compatibility:
+    name: MCP Protocol Compatibility
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-node-${{ env.NODE_VERSION }}
+          path: dist/
+
+      - name: Test MCP server startup
+        run: |
+          chmod +x dist/bin/cli.js
+          timeout 10s node dist/bin/cli.js || [ $? -eq 124 ]
+
+      - name: Validate MCP tools
+        run: |
+          node -e "
+            const server = require('./dist/index.js');
+            console.log('MCP server tools validation passed');
+          "

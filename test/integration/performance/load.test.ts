@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { ContainerKitMCPServer } from '../../../src/index.js';
-import { Config } from '@service/config/config.js';
+import { Config } from '../../../src/application/config/config.js';
 import { performance } from 'perf_hooks';
-import { measureTime, createTempDir } from '@test/utils/test-helpers.js';
+import { measureTime, createTempDir } from '../../utils/test-helpers.js';
 
 describe('Performance and Load Tests', () => {
   let server: ContainerKitMCPServer;
@@ -45,7 +45,7 @@ describe('Performance and Load Tests', () => {
       });
       
       // All requests should succeed
-      expect(result.every(r => !r.isError)).toBe(true);
+      expect(result.every(r => r.success)).toBe(true);
       
       // Should complete in reasonable time (under 10 seconds)
       expect(duration).toBeLessThan(10000);
@@ -78,7 +78,7 @@ describe('Performance and Load Tests', () => {
         
         // All should succeed
         results.forEach(result => {
-          expect(result.isError).toBeUndefined();
+          expect(result.success).toBe(true);
           const data = JSON.parse(result.content[0].text);
           expect(data.success).toBe(true);
         });
@@ -113,7 +113,7 @@ describe('Performance and Load Tests', () => {
       });
       
       // All should succeed
-      expect(result.every(r => !r.isError)).toBe(true);
+      expect(result.every(r => r.success)).toBe(true);
       
       // Should handle mixed load efficiently
       expect(duration).toBeLessThan(8000);
@@ -145,7 +145,7 @@ describe('Performance and Load Tests', () => {
         
         // Verify all succeeded
         results.forEach(result => {
-          expect(result.isError).toBeUndefined();
+          expect(result.success).toBe(true);
         });
         
         // Take memory snapshot every 100 operations
@@ -198,7 +198,7 @@ describe('Performance and Load Tests', () => {
           }
         });
         
-        expect(result.isError).toBeUndefined();
+        expect(result.success).toBe(true);
       });
       
       // Should handle large payloads in reasonable time
@@ -219,7 +219,7 @@ describe('Performance and Load Tests', () => {
             name: 'server_status',
             arguments: {}
           });
-          expect(result.isError).toBeUndefined();
+          expect(result.success).toBe(true);
         });
         
         responseTimes.push(duration);
@@ -265,7 +265,7 @@ describe('Performance and Load Tests', () => {
         const reqEnd = performance.now();
         const reqDuration = reqEnd - reqStart;
         
-        expect(result.isError).toBeUndefined();
+        expect(result.success).toBe(true);
         responseTimes.push(reqDuration);
         requestCount++;
         
@@ -309,7 +309,7 @@ describe('Performance and Load Tests', () => {
         const results = await Promise.all(promises);
         
         // Most should succeed (some might fail due to limits, which is expected)
-        const successCount = results.filter(r => !r.isError).length;
+        const successCount = results.filter(r => r.success).length;
         expect(successCount).toBeGreaterThan(sessionCount * 0.8); // At least 80% success
       });
       
@@ -335,7 +335,7 @@ describe('Performance and Load Tests', () => {
           arguments: {}
         });
         
-        expect(result.isError).toBeUndefined();
+        expect(result.success).toBe(true);
         const status = JSON.parse(result.content[0].text);
         expect(status.server).toBeDefined();
       });
@@ -377,7 +377,7 @@ describe('Performance and Load Tests', () => {
         arguments: {}
       });
       
-      expect(statusResult.isError).toBeUndefined();
+      expect(statusResult.success).toBe(true);
       
       console.log('Resource cleanup test completed - system remains responsive');
     });

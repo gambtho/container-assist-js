@@ -1,0 +1,150 @@
+/**
+ * Error Recovery Service
+ * Provides retry and error recovery functionality for tools
+ */
+
+import { retry as retryAsync, type RetryOptions as AsyncRetryOptions } from '../../shared/async';
+import { normalizeError } from '../../errors/index';
+
+// Re-export and alias types
+export type RetryOptions = AsyncRetryOptions;
+
+export interface ErrorSuggestions {
+  suggestions: string[];
+  recovery?: string;
+}
+
+/**
+ * Retry with Result type handling
+ */
+export async function withRetry<T>(fn: () => Promise<T>, options?: RetryOptions): Promise<T> {
+  return retryAsync(fn, options);
+}
+
+/**
+ * Execute with retry, throwing errors
+ */
+export async function executeWithRetry<T>(
+  fn: () => Promise<T>,
+  options?: RetryOptions
+): Promise<T> {
+  return retryAsync(fn, options);
+}
+
+/**
+ * Execute with error recovery
+ */
+export async function executeWithRecovery<T>(
+  fn: () => Promise<T>,
+  recoveryFn?: (error: unknown) => Promise<T>,
+  options?: RetryOptions
+): Promise<T> {
+  try {
+    return await executeWithRetry(fn, options);
+  } catch (error) {
+    if (recoveryFn) {
+      return recoveryFn(error);
+    }
+    throw normalizeError(error, 'Operation failed after retries');
+  }
+}
+
+/**
+ * Get build error suggestions
+ */
+export function getBuildErrorSuggestions(error: string): ErrorSuggestions {
+  const suggestions: string[] = [];
+
+  if (error.includes('dockerfile')) {
+    await suggestions.push('Check Dockerfile syntax');
+    await suggestions.push('Ensure all base images are accessible');
+  }
+  if (error.includes('permission')) {
+    await suggestions.push('Check Docker daemon permissions');
+    await suggestions.push('Ensure Docker socket is accessible');
+  }
+  if (error.includes('space')) {
+    await suggestions.push('Check available disk space');
+    await suggestions.push('Clean up unused Docker images');
+  }
+
+  return {
+    suggestions,
+    recovery: suggestions.length > 0 ? 'Try the suggestions above' : 'Check Docker logs for details'
+  };
+}
+
+/**
+ * Get deployment error suggestions
+ */
+export function getDeploymentErrorSuggestions(error: string): ErrorSuggestions {
+  const suggestions: string[] = [];
+
+  if (error.includes('kubernetes') || error.includes('k8s')) {
+    await suggestions.push('Check Kubernetes cluster connectivity');
+    await suggestions.push('Verify kubeconfig is valid');
+  }
+  if (error.includes('namespace')) {
+    await suggestions.push('Ensure namespace exists');
+    await suggestions.push('Check namespace permissions');
+  }
+  if (error.includes('resource')) {
+    await suggestions.push('Check resource quotas');
+    await suggestions.push('Verify manifest syntax');
+  }
+
+  return {
+    suggestions,
+    recovery: suggestions.length > 0 ? 'Try the suggestions above' : 'Check deployment logs'
+  };
+}
+
+/**
+ * Get scan error suggestions
+ */
+export function getScanErrorSuggestions(error: string): ErrorSuggestions {
+  const suggestions: string[] = [];
+
+  if (error.includes('trivy')) {
+    await suggestions.push('Ensure Trivy is installed');
+    await suggestions.push('Update Trivy vulnerability database');
+  }
+  if (error.includes('timeout')) {
+    await suggestions.push('Increase scan timeout');
+    await suggestions.push('Try scanning with reduced scope');
+  }
+  if (error.includes('image')) {
+    await suggestions.push('Verify image exists locally');
+    await suggestions.push('Pull image if necessary');
+  }
+
+  return {
+    suggestions,
+    recovery: suggestions.length > 0 ? 'Try the suggestions above' : 'Check scanner logs'
+  };
+}
+
+/**
+ * Get generic error suggestions
+ */
+export function getGenericErrorSuggestions(error: string): ErrorSuggestions {
+  const suggestions: string[] = [];
+
+  if (error.includes('network')) {
+    await suggestions.push('Check network connectivity');
+    await suggestions.push('Verify proxy settings if applicable');
+  }
+  if (error.includes('auth')) {
+    await suggestions.push('Check authentication credentials');
+    await suggestions.push('Verify registry access');
+  }
+  if (error.includes('timeout')) {
+    await suggestions.push('Increase timeout values');
+    await suggestions.push('Check system resources');
+  }
+
+  return {
+    suggestions: suggestions.length > 0 ? suggestions : ['Check logs for more details'],
+    recovery: 'Review error message and try again'
+  };
+}

@@ -1,21 +1,23 @@
 /**
- * External system integrations - consolidated exports
+ * External System Integrations
+ * Exports for external service clients and adapters
  */
 
-// Shared types
-export * from './external-types.js'
+// Docker-related exports
+export * from '../docker-client';
 
-// Docker operations
-export * from './docker/docker-service.js'
-export * from './docker/integration.js'
-export * from './docker/client.js'
+// Kubernetes-related exports
+export * from '../kubernetes-client';
 
-// CLI tools
-export * from './cli/docker-cli.js'
-export * from './cli/trivy.js'
-export * from './cli/executor.js'
+// AI service exports
+export * from '../ai-client';
+export * from '../enhanced-ai-service';
 
-// Kubernetes integrations
-// export * from './kubernetes/client.js'
+// Request builder
+export * from '../ai-request-builder';
 
+// Sampling strategy
+export * from '../sampling-strategy';
 
+// Types and interfaces
+export type { AIServiceConfig, AIAnalysisResult, AIGenerationResult } from '../ai/ai-types';

@@ -10,7 +10,7 @@ import {
   determinePerformanceStatus, 
   createMockBenchmark,
   waitFor
-} from './test-helpers.js';
+} from '../../utils/test-helpers.js';
 
 describe('Consolidated Test Utilities', () => {
   describe('createMockLogger', () => {

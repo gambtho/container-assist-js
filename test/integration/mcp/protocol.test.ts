@@ -3,8 +3,8 @@ import { Server, Client } from '@modelcontextprotocol/sdk';
 import { StdioServerTransport, StdioClientTransport } from '@modelcontextprotocol/sdk/stdio.js';
 import { spawn, ChildProcess } from 'child_process';
 import { ContainerKitMCPServer } from '../../../src/index.js';
-import { Config } from '@service/config/config.js';
-import { createTempDir } from '@test/utils/test-helpers.js';
+import { Config } from '../../../src/application/config/config.js';
+import { createTempDir } from '../../utils/test-helpers.js';
 
 describe('MCP Protocol Integration', () => {
   let server: ContainerKitMCPServer;
@@ -91,7 +91,7 @@ describe('MCP Protocol Integration', () => {
       expect(response.content).toBeDefined();
       expect(response.content[0].type).toBe('text');
       expect(response.content[0].text).toContain('pong');
-      expect(response.isError).toBeUndefined();
+      expect(response.success).toBe(true);
     });
     
     it('should handle tool validation errors', async () => {
@@ -104,7 +104,7 @@ describe('MCP Protocol Integration', () => {
         }
       });
       
-      expect(response.isError).toBe(true);
+      expect(response.success).toBe(false);
       expect(response.content[0].text).toContain('Validation error');
     });
     
@@ -115,7 +115,7 @@ describe('MCP Protocol Integration', () => {
         arguments: {}
       });
       
-      expect(response.isError).toBe(true);
+      expect(response.success).toBe(false);
       expect(response.content[0].text).toContain('not found');
     });
     
@@ -127,7 +127,7 @@ describe('MCP Protocol Integration', () => {
       });
       
       expect(response.content).toBeDefined();
-      expect(response.isError).toBeUndefined();
+      expect(response.success).toBe(true);
       
       const status = JSON.parse(response.content[0].text);
       expect(status.server).toBeDefined();
@@ -144,7 +144,7 @@ describe('MCP Protocol Integration', () => {
       });
       
       expect(response.content).toBeDefined();
-      expect(response.isError).toBeUndefined();
+      expect(response.success).toBe(true);
       
       const result = JSON.parse(response.content[0].text);
       expect(result.tools).toBeDefined();
@@ -167,7 +167,7 @@ describe('MCP Protocol Integration', () => {
         }
       });
       
-      expect(analysisResponse.isError).toBeUndefined();
+      expect(analysisResponse.success).toBe(true);
       const analysisResult = JSON.parse(analysisResponse.content[0].text);
       expect(analysisResult.success).toBe(true);
       
@@ -179,7 +179,7 @@ describe('MCP Protocol Integration', () => {
         }
       });
       
-      expect(dockerfileResponse.isError).toBeUndefined();
+      expect(dockerfileResponse.success).toBe(true);
       const dockerfileResult = JSON.parse(dockerfileResponse.content[0].text);
       expect(dockerfileResult.success).toBe(true);
       
@@ -191,7 +191,7 @@ describe('MCP Protocol Integration', () => {
         }
       });
       
-      expect(statusResponse.isError).toBeUndefined();
+      expect(statusResponse.success).toBe(true);
       const statusResult = JSON.parse(statusResponse.content[0].text);
       expect(statusResult.completed_steps).toHaveLength(2);
     });
@@ -240,7 +240,7 @@ describe('MCP Protocol Integration', () => {
       results.forEach((result, i) => {
         expect(result.content).toBeDefined();
         expect(result.content[0].text).toContain(`concurrent-${i}`);
-        expect(result.isError).toBeUndefined();
+        expect(result.success).toBe(true);
       });
     });
   });
@@ -295,7 +295,7 @@ describe('MCP Protocol Integration', () => {
         }
       });
       
-      expect(invalidResponse.isError).toBe(true);
+      expect(invalidResponse.success).toBe(false);
       expect(invalidResponse.content[0].text).toContain('Validation error');
     });
   });
@@ -356,7 +356,7 @@ describe('MCP Protocol Integration', () => {
       // All should succeed
       results.forEach(result => {
         expect(result.content).toBeDefined();
-        expect(result.isError).toBeUndefined();
+        expect(result.success).toBe(true);
       });
       
       // Average response time should be reasonable

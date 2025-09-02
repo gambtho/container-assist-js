@@ -4,17 +4,27 @@
  */
 
 // External system integrations
-export * from './external/index.js'
+export * from './external/index';
 
 // AI/ML services
-export * from './ai/factory.js'
-export * from './ai/mcp-sampler.js'
-export * from './ai/mock-sampler.js'
-export * from './ai/repository-analyzer.js'
-export * from './ai/structured-sampler.js'
-export * from './ai/content-validator.js'
+export * from './ai/factory';
+export * from './ai/mcp-sampler';
+export * from './ai/mock-sampler';
+// Skip repository-analyzer to avoid duplicate export
+
+// Explicit exports to resolve naming conflicts
+export type {
+  SecurityIssue as StructuredSamplerSecurityIssue,
+  ValidationResult as StructuredSamplerValidationResult
+} from './ai/structured-sampler';
+export type {
+  SecurityIssue as ContentValidatorSecurityIssue,
+  ValidationResult as ContentValidatorValidationResult
+} from './ai/content-validator';
+
+// Export the main classes from these modules
+export { StructuredSampler } from './ai/structured-sampler';
+export { ContentValidator } from './ai/content-validator';
 
 // Core infrastructure services
-export * from './core/index.js'
-
-
+// (Currently no core services - removed obsolete directory)

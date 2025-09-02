@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "sourceMap": false,
+    "declaration": true,
+    "declarationMap": false,
+    "removeComments": true,
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo-prod",
+    "composite": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "stripInternal": true,
+    "importsNotUsedAsValues": "remove"
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist", 
+    "test",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/__tests__/**",
+    "**/*.d.ts"
+  ]
+}

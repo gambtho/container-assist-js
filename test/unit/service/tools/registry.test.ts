@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { ToolRegistry } from '@service/tools/registry.js';
+import { ToolRegistry } from '../../../../../src/application/tools/ops/registry.js';
 import { z } from 'zod';
-import { ok, fail } from '@domain/types/result.js';
-import { ErrorCode, ServiceError } from '@domain/types/errors.js';
-import { createTestContext, cleanupTestContext, createMockLogger } from '@test/utils/test-helpers.js';
-import type { ToolDescriptor, ToolContext } from '@service/tools/types.js';
+import { ok, fail } from '../../../../../src/domain/types/result.js';
+import { ErrorCode, ServiceError } from '../../../../../src/domain/types/errors.js';
+import { createTestContext, cleanupTestContext, createMockLogger } from '../../../utils/test-helpers.js';
+import type { ToolDescriptor, ToolContext } from '../../../../../src/application/tools/tool-types.js';
 
 describe('ToolRegistry', () => {
   let registry: ToolRegistry;
@@ -106,7 +106,7 @@ describe('ToolRegistry', () => {
   
   describe('handleToolCall', () => {
     it('should execute tool and return MCP response', async () => {
-      const mockExecute = jest.fn().mockResolvedValue(ok({ result: 'success' });
+      const mockExecute = jest.fn().mockResolvedValue(ok({ result: 'success' }));
       
       const tool: ToolDescriptor = {
         name: 'execute_test',
@@ -137,7 +137,7 @@ describe('ToolRegistry', () => {
       expect(response.content).toHaveLength(1);
       expect(response.content[0].type).toBe('text');
       expect(JSON.parse(response.content[0].text!)).toEqual({ result: 'success' });
-      expect(response.isError).toBeUndefined();
+      expect(response.success).toBe(true);
     });
     
     it('should handle tool not found', async () => {
@@ -147,7 +147,7 @@ describe('ToolRegistry', () => {
       });
       
       expect(response.content[0].text).toBe('Tool non_existent_tool not found');
-      expect(response.isError).toBe(true);
+      expect(response.success).toBe(false);
     });
     
     it('should validate input before execution', async () => {
@@ -173,7 +173,7 @@ describe('ToolRegistry', () => {
       });
       
       expect(mockExecute).not.toHaveBeenCalled();
-      expect(response.isError).toBe(true);
+      expect(response.success).toBe(false);
       expect(response.content[0].text).toContain('Validation error');
     });
     
@@ -198,7 +198,7 @@ describe('ToolRegistry', () => {
         arguments: {}
       });
       
-      expect(response.isError).toBe(true);
+      expect(response.success).toBe(false);
       expect(response.content[0].text).toBe('Error: Tool execution failed');
     });
     
@@ -250,7 +250,7 @@ describe('ToolRegistry', () => {
         arguments: {}
       });
       
-      expect(response.isError).toBe(true);
+      expect(response.success).toBe(false);
       // Output validation may show different error messages
       expect(response.content[0].text).toMatch(/Error|Validation error/);
     });
@@ -335,7 +335,7 @@ describe('ToolRegistry', () => {
       
       const response = await registry.handleSamplingRequest({});
       
-      expect(response.isError).toBe(true);
+      expect(response.success).toBe(false);
       expect(response.content[0].text).toBe('AI sampling not available');
     });
     
@@ -349,7 +349,7 @@ describe('ToolRegistry', () => {
       
       const response = await registry.handleSamplingRequest({});
       
-      expect(response.isError).toBe(true);
+      expect(response.success).toBe(false);
       expect(response.content[0].text).toContain('Sampling error: Sampling failed');
     });
   });
@@ -432,7 +432,7 @@ describe('ToolRegistry', () => {
   
   describe('tool context creation', () => {
     it('should create proper tool context', async () => {
-      const mockExecute = jest.fn().mockResolvedValue(ok({ result: 'test' });
+      const mockExecute = jest.fn().mockResolvedValue(ok({ result: 'test' }));
       
       const tool: ToolDescriptor = {
         name: 'context_test',

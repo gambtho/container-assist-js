@@ -1,0 +1,383 @@
+/**
+ * Container Kit MCP Server - Main Entry Point
+ * A Model Context Protocol server for containerization workflows
+ */
+
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
+import { z } from 'zod';
+import { initializeServices, cleanupServices, type Services, type ServicesConfig } from '../src/services/index.js';
+import { ToolRegistry } from '../src/application/tools/ops/registry.js';
+import { createPinoLogger } from '../src/runtime/logger.js';
+// Use the new unified configuration
+import { config as applicationConfig, type ApplicationConfig } from '../src/config/index.js';
+import process from 'node:process';
+import type { Logger } from 'pino';
+
+export class ContainerKitMCPServer {
+  private server: Server;
+  private services: Services | null = null;
+  private registry: ToolRegistry | null = null;
+  private logger: Logger;
+  private shutdownHandlers: Array<() => Promise<void>> = [];
+  private appConfig: ApplicationConfig;
+
+  constructor(config?: ApplicationConfig) {
+    // Use the unified configuration if no config provided
+    this.appConfig = config || applicationConfig;
+
+    this.logger = createPinoLogger({
+      level: this.appConfig.server.logLevel,
+      environment: this.appConfig.server.nodeEnv
+    });
+
+    // Properly typed server initialization with experimental progress support
+    const serverInfo = {
+      name: 'container-kit-mcp',
+      version: '2.0.0'
+    };
+    
+    const serverOptions: ServerOptions = {
+      capabilities: {
+        tools: {},
+        logging: {},
+        // Enable experimental progress notifications
+        experimental_progress: true
+      }
+    };
+
+    this.server = new Server(serverInfo, serverOptions);
+    
+    // Initialize SDK logging infrastructure
+    this.initializeLogging();
+  }
+
+  /**
+   * Initialize SDK logging infrastructure
+   */
+  private initializeLogging(): void {
+    // MCP SDK logging is handled through the logging capability
+    // The client will set the logging level via logging/setLevel requests
+    // We can respond to these requests when received
+  }
+
+  /**
+   * Log tool execution with sanitized parameters
+   */
+  private logToolExecution(toolName: string, params: any): void {
+    // Use MCP SDK logging notification
+    try {
+      this.server.notification({
+        method: 'notifications/message',
+        params: {
+          level: 'info',
+          logger: 'tool-execution',
+          data: {
+            tool: toolName,
+            params: this.sanitizeParams(params),
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+    } catch (error) {
+      // Fallback to regular logger if MCP logging fails
+      this.logger.info({
+        tool: toolName,
+        params: this.sanitizeParams(params)
+      }, 'Tool execution started');
+    }
+  }
+
+  /**
+   * Sanitize parameters for logging (remove sensitive data)
+   */
+  private sanitizeParams(params: any): any {
+    if (!params || typeof params !== 'object') {
+      return params;
+    }
+
+    const sanitized = { ...params };
+    const sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth', 'credential'];
+    
+    for (const key of Object.keys(sanitized)) {
+      if (sensitiveKeys.some(sensitive => key.toLowerCase().includes(sensitive))) {
+        sanitized[key] = '[REDACTED]';
+      }
+    }
+    
+    return sanitized;
+  }
+
+  /**
+   * Log workflow state changes through MCP server
+   */
+  logWorkflowStateChange(sessionId: string, previousState: any, newState: any): void {
+    try {
+      this.server.notification({
+        method: 'notifications/message',
+        params: {
+          level: 'info',
+          logger: 'workflow-state',
+          data: {
+            sessionId,
+            previousStage: previousState?.stage,
+            newStage: newState?.stage,
+            previousProgress: previousState?.progress?.percentage,
+            newProgress: newState?.progress?.percentage,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+    } catch (error) {
+      // Fallback to regular logger if MCP logging fails
+      this.logger.info({
+        sessionId,
+        previousStage: previousState?.stage,
+        newStage: newState?.stage
+      }, 'Workflow state changed');
+    }
+  }
+
+  /**
+   * Log performance metrics for long operations
+   */
+  logPerformanceMetrics(operation: string, duration: number, metadata?: any): void {
+    try {
+      this.server.notification({
+        method: 'notifications/message',
+        params: {
+          level: 'info',
+          logger: 'performance-metrics',
+          data: {
+            operation,
+            duration,
+            metadata: metadata || {},
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+    } catch (error) {
+      // Fallback to regular logger if MCP logging fails
+      this.logger.info({
+        operation,
+        duration,
+        metadata: metadata || {}
+      }, 'Performance metrics');
+    }
+  }
+
+  async start(): Promise<void> {
+    try {
+      // Convert ApplicationConfig to ServicesConfig
+      const servicesConfig: ServicesConfig = {
+        docker: {
+          socketPath: this.appConfig.infrastructure?.docker?.socketPath || '/var/run/docker.sock',
+          host: this.appConfig.infrastructure?.docker?.host,
+          port: this.appConfig.infrastructure?.docker?.port,
+          protocol: this.appConfig.infrastructure?.docker?.protocol as any
+        },
+        kubernetes: {
+          kubeconfig: this.appConfig.infrastructure?.kubernetes?.kubeconfig,
+          context: this.appConfig.infrastructure?.kubernetes?.context,
+          namespace: this.appConfig.infrastructure?.kubernetes?.namespace
+        },
+        ai: {
+          modelPreferences: this.appConfig.infrastructure?.ai?.modelPreferences
+        },
+        session: {
+          storeType: 'memory',
+          ttl: this.appConfig.session?.ttl
+        }
+      };
+
+      // Initialize services directly
+      this.services = await initializeServices(
+        servicesConfig,
+        this.logger,
+        undefined // No MCP sampler yet - would need to implement this
+      );
+
+      // Create tool registry with direct service injection
+      this.registry = new ToolRegistry(this.services, this.logger);
+
+      // Attach MCP server to registry for SDK tool registration
+      this.registry.setServer(this.server);
+
+      // Setup workflow state logging if session service is available
+      if (this.services.session && 'on' in this.services.session) {
+        // Set up workflow state change logging
+        (this.services.session as any).on?.('workflow:updated', (event: any) => {
+          this.logWorkflowStateChange(
+            event.session?.id || 'unknown',
+            event.previousState || {},
+            event.session?.workflow_state || {}
+          );
+        });
+      }
+
+      // Register all tools
+      await this.registry.registerAll();
+
+      // Setup MCP handlers
+      this.setupMCPHandlers();
+
+      // Setup graceful shutdown
+      this.setupGracefulShutdown();
+
+      // Connect transport
+      const transport = new StdioServerTransport();
+      await this.server.connect(transport);
+
+      this.logger.info({
+        pid: process.pid,
+        version: '2.0.0',
+        tools: this.registry.getToolCount()
+      }, 'MCP server started');
+    } catch (error) {
+      this.logger.error({ error }, 'Failed to start server');
+      throw error;
+    }
+  }
+
+  private setupMCPHandlers(): void {
+    // Set up proper MCP request handlers using SDK
+    
+    // Tools list handler
+    this.server.setRequestHandler(
+      { method: z.literal('tools/list') } as any,
+      async () => {
+        return this.registry?.listTools() || { tools: [] };
+      }
+    );
+    
+    // Tools call handler
+    this.server.setRequestHandler(
+      { method: z.literal('tools/call') } as any,
+      async (request: any) => {
+        return this.registry?.handleToolCall(request) || { error: 'Registry not initialized' };
+      }
+    );
+
+    // Sampling handler (for AI operations) - keep this as it's custom
+    this.server.setRequestHandler(
+      { method: z.literal('sampling/create') } as any,
+      async (request: any) => {
+        return this.registry?.handleSamplingRequest(request) || { error: 'Registry not initialized' };
+      }
+    );
+  }
+
+  private setupGracefulShutdown(): void {
+    const shutdown = async (signal: string): Promise<void> => {
+      this.logger.info({ signal }, 'Shutting down');
+
+      try {
+        // Run custom shutdown handlers
+        await Promise.all(this.shutdownHandlers.map(handler =>
+          handler().catch((err: any) =>
+            this.logger.error({ error: err }, 'Shutdown handler error')
+          )
+        ));
+
+        // Clean up services
+        if (this.services) {
+          await cleanupServices(this.services, this.logger);
+          this.services = null;
+        }
+
+        this.logger.info('Graceful shutdown complete');
+        process.exit(0);
+      } catch (error) {
+        this.logger.error({ error }, 'Shutdown error');
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+
+    // Handle uncaught errors
+    process.on('uncaughtException', (error) => {
+      this.logger.fatal({ error }, 'Uncaught exception');
+      process.exit(1);
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      this.logger.fatal({ reason, promise }, 'Unhandled rejection');
+      process.exit(1);
+    });
+  }
+
+  /**
+   * Register a custom shutdown handler
+   */
+  onShutdown(handler: () => Promise<void>): void {
+    this.shutdownHandlers.push(handler);
+  }
+
+  /**
+   * Get server health status
+   */
+  async getHealth(): Promise<{
+    status: 'healthy' | 'unhealthy'
+    uptime: number
+    services: Record<string, boolean>
+    metrics?: Record<string, unknown>
+  }> {
+    if (!this.services) {
+      return {
+        status: 'unhealthy',
+        uptime: process.uptime(),
+        services: {}
+      };
+    }
+
+    try {
+      const dockerHealth = await this.services.docker.health();
+      const k8sHealth = await this.services.kubernetes.checkClusterAccess();
+      
+      const healthy = dockerHealth.available && k8sHealth;
+      
+      return {
+        status: healthy ? 'healthy' : 'unhealthy',
+        uptime: process.uptime(),
+        services: {
+          docker: dockerHealth.available,
+          kubernetes: k8sHealth,
+          ai: this.services.ai.isAvailable(),
+          session: true
+        }
+      };
+    } catch (error) {
+      this.logger.error({ error }, 'Health check failed');
+      return {
+        status: 'unhealthy',
+        uptime: process.uptime(),
+        services: {}
+      };
+    }
+  }
+
+  /**
+   * Shutdown the server
+   */
+  async shutdown(): Promise<void> {
+    if (this.services) {
+      await cleanupServices(this.services, this.logger);
+      this.services = null;
+    }
+  }
+}
+
+// This file is now a library module only
+// Use ./bin/cli.js for command-line usage
+
+// Export for programmatic usage
+export {
+  config as applicationConfig,
+  type ApplicationConfig
+} from '../src/config/index.js';
+export { initializeServices, cleanupServices, type Services } from '../src/services/index.js';
+export { ToolRegistry } from '../src/application/tools/ops/registry.js';
+

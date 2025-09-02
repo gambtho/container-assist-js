@@ -4,7 +4,7 @@
  */
 
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { createMockLogger } from '@test/utils/test-helpers.js';
+import { createMockLogger } from '../../../utils/test-helpers.js';
 import type { Logger } from 'pino';
 
 // Mock session types for Team Alpha consolidation testing
@@ -266,7 +266,7 @@ describe('Comprehensive Session Management', () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       metadata: { concurrent: true, index: i }
-    });
+    }));
 
     mockSessionManager.createSession
       .mockResolvedValueOnce(mockResults[0])
@@ -280,7 +280,7 @@ describe('Comprehensive Session Management', () => {
     expect(results).toHaveLength(5);
     expect(mockSessionManager.createSession).toHaveBeenCalledTimes(5);
     results.forEach((result, i) => {
-      expect(result.metadata.index).toBe(i);
+      expect(result.metadata?.index).toBe(i);
     });
   });
 });

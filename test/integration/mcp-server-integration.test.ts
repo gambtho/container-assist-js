@@ -6,8 +6,8 @@
 import { describe, test, expect, beforeAll, afterAll, jest } from '@jest/globals';
 import { performance } from 'perf_hooks';
 
-// Mock implementations for consolidated architecture testing
-interface ConsolidatedArchitectureComponents {
+// Mock implementations for architecture testing
+interface ArchitectureTestComponents {
   // Team Alpha - Consolidated Types
   domainTypes: {
     Session: any;
@@ -46,7 +46,7 @@ interface ConsolidatedArchitectureComponents {
 }
 
 describe('Week 5: Comprehensive Integration Testing', () => {
-  let components: ConsolidatedArchitectureComponents;
+  let components: ArchitectureTestComponents;
   let performanceBaseline: Map<string, number>;
 
   beforeAll(async () => {
