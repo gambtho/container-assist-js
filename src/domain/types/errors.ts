@@ -1,0 +1,358 @@
+/**
+ * Error types and taxonomy for the Container Kit MCP Server
+ * Provides structured error handling with categorization
+ */
+
+export enum ErrorCode {
+  // Domain errors
+  ValidationFailed = 'VALIDATION_FAILED',
+  VALIDATION_ERROR = 'VALIDATION_ERROR', // Alias for compatibility
+  SessionNotFound = 'SESSION_NOT_FOUND',
+  SessionExpired = 'SESSION_EXPIRED',
+  WorkflowFailed = 'WORKFLOW_FAILED',
+  WorkflowStepFailed = 'WORKFLOW_STEP_FAILED',
+  InvalidState = 'INVALID_STATE',
+
+  // Infrastructure errors
+  DockerError = 'DOCKER_ERROR',
+  DockerNotAvailable = 'DOCKER_NOT_AVAILABLE',
+  DockerBuildFailed = 'DOCKER_BUILD_FAILED',
+  DockerPushFailed = 'DOCKER_PUSH_FAILED',
+  KubernetesError = 'KUBERNETES_ERROR',
+  KubernetesNotConfigured = 'KUBERNETES_NOT_CONFIGURED',
+  KubernetesDeploymentFailed = 'KUBERNETES_DEPLOYMENT_FAILED',
+  AIGenerationError = 'AI_GENERATION_ERROR',
+  AINotAvailable = 'AI_NOT_AVAILABLE',
+  StorageError = 'STORAGE_ERROR',
+
+  // Service errors
+  ToolNotFound = 'TOOL_NOT_FOUND',
+  ToolExecutionFailed = 'TOOL_EXECUTION_FAILED',
+  ToolTimeout = 'TOOL_TIMEOUT',
+  DependencyNotInitialized = 'DEPENDENCY_NOT_INITIALIZED',
+  ServiceUnavailable = 'SERVICE_UNAVAILABLE',
+
+  // Input/Output errors
+  InvalidInput = 'INVALID_INPUT',
+  InvalidOutput = 'INVALID_OUTPUT',
+  ParseError = 'PARSE_ERROR',
+  SerializationError = 'SERIALIZATION_ERROR',
+
+  // System errors
+  UnknownError = 'UNKNOWN_ERROR',
+  InternalError = 'INTERNAL_ERROR',
+  ConfigurationError = 'CONFIGURATION_ERROR',
+  PermissionDenied = 'PERMISSION_DENIED',
+  ResourceNotFound = 'RESOURCE_NOT_FOUND',
+  ResourceExhausted = 'RESOURCE_EXHAUSTED',
+
+  // Additional error codes used by handlers
+  AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
+  OPERATION_FAILED = 'OPERATION_FAILED',
+  TIMEOUT = 'TIMEOUT'
+}
+
+/**
+ * Base error class for domain-specific errors
+ */
+export class DomainError extends Error {
+  public readonly code: ErrorCode
+  public override readonly cause?: Error
+  public readonly metadata?: Record<string, unknown>
+
+  constructor(
+    code: ErrorCode,
+    message: string,
+    cause?: Error,
+    metadata?: Record<string, unknown>
+  ) {
+    super(message)
+    this.name = 'DomainError'
+    this.code = code
+    if (cause) {
+      this.cause = cause
+    }
+    if (metadata) {
+      this.metadata = metadata
+    }
+
+    // Maintain proper stack trace for where our error was thrown
+    if (Error.captureStackTrace !== undefined) {
+      Error.captureStackTrace(this, DomainError)
+    }
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      code: this.code,
+      message: this.message,
+      metadata: this.metadata,
+      stack: this.stack,
+      cause: this.cause ? {
+        name: this.cause.name,
+        message: this.cause.message,
+        stack: this.cause.stack
+      } : undefined
+    }
+  }
+}
+
+/**
+ * Infrastructure layer errors
+ */
+export class InfrastructureError extends Error {
+  public readonly code: ErrorCode
+  public override readonly cause?: Error
+  public readonly metadata?: Record<string, unknown>
+
+  constructor(
+    code: ErrorCode,
+    message: string,
+    cause?: Error,
+    metadata?: Record<string, unknown>
+  ) {
+    super(message)
+    this.name = 'InfrastructureError'
+    this.code = code
+    if (cause) {
+      this.cause = cause
+    }
+    if (metadata) {
+      this.metadata = metadata
+    }
+
+    if (Error.captureStackTrace !== undefined) {
+      Error.captureStackTrace(this, InfrastructureError)
+    }
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      code: this.code,
+      message: this.message,
+      metadata: this.metadata,
+      stack: this.stack,
+      cause: this.cause ? {
+        name: this.cause.name,
+        message: this.cause.message,
+        stack: this.cause.stack
+      } : undefined
+    }
+  }
+}
+
+/**
+ * Service layer errors
+ */
+export class ServiceError extends Error {
+  public readonly code: ErrorCode
+  public override readonly cause?: Error
+  public readonly metadata?: Record<string, unknown>
+
+  constructor(
+    code: ErrorCode,
+    message: string,
+    cause?: Error,
+    metadata?: Record<string, unknown>
+  ) {
+    super(message)
+    this.name = 'ServiceError'
+    this.code = code
+    if (cause) {
+      this.cause = cause
+    }
+    if (metadata) {
+      this.metadata = metadata
+    }
+
+    if (Error.captureStackTrace !== undefined) {
+      Error.captureStackTrace(this, ServiceError)
+    }
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      code: this.code,
+      message: this.message,
+      metadata: this.metadata,
+      stack: this.stack,
+      cause: this.cause ? {
+        name: this.cause.name,
+        message: this.cause.message,
+        stack: this.cause.stack
+      } : undefined
+    }
+  }
+}
+
+/**
+ * Validation error with field-specific details
+ */
+export class ValidationError extends DomainError {
+  constructor(
+    message: string,
+    public readonly fields?: Record<string, string[]>,
+    cause?: Error
+  ) {
+    super(ErrorCode.ValidationFailed, message, cause, { fields })
+    this.name = 'ValidationError'
+  }
+}
+
+/**
+ * Tool execution error with context
+ */
+export class ToolError extends ServiceError {
+  constructor(
+    public readonly toolName: string,
+    message: string,
+    code: ErrorCode = ErrorCode.ToolExecutionFailed,
+    cause?: Error,
+    metadata?: Record<string, unknown>
+  ) {
+    super(code, message, cause, { ...metadata, toolName })
+    this.name = 'ToolError'
+  }
+}
+
+/**
+ * Workflow error with step context
+ */
+export class WorkflowError extends DomainError {
+  constructor(
+    public readonly workflowId: string,
+    public readonly step: string,
+    message: string,
+    cause?: Error,
+    metadata?: Record<string, unknown>
+  ) {
+    super(
+      ErrorCode.WorkflowStepFailed,
+      message,
+      cause,
+      { ...metadata, workflowId, step }
+    )
+    this.name = 'WorkflowError'
+  }
+}
+
+/**
+ * Helper function to determine if an error is retryable
+ */
+export function isRetryable(error: Error): boolean {
+  if (error instanceof InfrastructureError) {
+    return [
+      ErrorCode.DockerError,
+      ErrorCode.KubernetesError,
+      ErrorCode.ServiceUnavailable,
+      ErrorCode.ResourceExhausted
+    ].includes(error.code)
+  }
+
+  if (error instanceof ServiceError) {
+    return error.code === ErrorCode.ToolTimeout
+  }
+
+  return false
+}
+
+/**
+ * Helper function to get error severity
+ */
+export function getErrorSeverity(error: Error): 'low' | 'medium' | 'high' | 'critical' {
+  if (error instanceof DomainError) {
+    switch (error.code) {
+      case ErrorCode.ValidationFailed:
+      case ErrorCode.InvalidInput:
+        return 'low'
+      case ErrorCode.SessionNotFound:
+      case ErrorCode.SessionExpired:
+        return 'medium'
+      case ErrorCode.WorkflowFailed:
+      case ErrorCode.InvalidState:
+        return 'high'
+      default:
+        return 'medium'
+    }
+  }
+
+  if (error instanceof InfrastructureError) {
+    switch (error.code) {
+      case ErrorCode.AINotAvailable:
+        return 'low'
+      case ErrorCode.DockerError:
+      case ErrorCode.KubernetesError:
+        return 'high'
+      case ErrorCode.StorageError:
+        return 'critical'
+      default:
+        return 'medium'
+    }
+  }
+
+  if (error instanceof ServiceError) {
+    switch (error.code) {
+      case ErrorCode.ToolTimeout:
+        return 'medium'
+      case ErrorCode.DependencyNotInitialized:
+      case ErrorCode.ServiceUnavailable:
+        return 'critical'
+      default:
+        return 'medium'
+    }
+  }
+
+  return 'high'
+}
+
+/**
+ * Convert any error to our structured error format
+ */
+export function normalizeError(error: unknown): DomainError | InfrastructureError | ServiceError {
+  if (error instanceof DomainError ||
+      error instanceof InfrastructureError ||
+      error instanceof ServiceError) {
+    return error
+  }
+
+  if (error instanceof Error) {
+    // Try to categorize based on error message or name
+    const message = error.message.toLowerCase()
+
+    if (message.includes('docker')) {
+      return new InfrastructureError(ErrorCode.DockerError, error.message, error)
+    }
+
+    if (message.includes('kubernetes') || message.includes('k8s')) {
+      return new InfrastructureError(ErrorCode.KubernetesError, error.message, error)
+    }
+
+    if (message.includes('validation') || message.includes('invalid')) {
+      return new DomainError(ErrorCode.ValidationFailed, error.message, error)
+    }
+
+    if (message.includes('not found')) {
+      return new ServiceError(ErrorCode.ResourceNotFound, error.message, error)
+    }
+
+    if (message.includes('permission') || message.includes('denied')) {
+      return new ServiceError(ErrorCode.PermissionDenied, error.message, error)
+    }
+
+    // Default to InternalError
+    return new ServiceError(ErrorCode.InternalError, error.message, error)
+  }
+
+  // Handle non-Error objects
+  return new ServiceError(
+    ErrorCode.UnknownError,
+    String(error),
+    undefined,
+    { originalError: error }
+  )
+}
+
+
