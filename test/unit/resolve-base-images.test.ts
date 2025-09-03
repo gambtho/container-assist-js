@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import resolveBaseImagesHandler from '../../src/application/tools/build/resolve-base-images.js';
+import resolveBaseImagesHandler from '../../src/application/tools/resolve-base-images/resolve-base-images.js';
 import { ToolContext } from '../../src/application/tools/tool-types.js';
 import { ok } from '../../src/domain/types/index.js';
 
@@ -175,7 +175,7 @@ describe('Resolve Base Images Handler', () => {
 
   it('should handle different language contexts correctly', async () => {
     const testCase = { language: 'python', framework: 'django', expected: 'python' };
-    
+
     const sessionWithLanguage = {
       ...mockSession,
       workflow_state: {
@@ -234,7 +234,7 @@ describe('Resolve Base Images Handler', () => {
     };
 
     const result = await resolveBaseImagesHandler.execute(input, contextWithLanguage);
-    
+
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.primary_recommendation.image).toContain(testCase.expected);

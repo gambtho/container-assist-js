@@ -92,42 +92,6 @@ export interface MCPToolContext {
 }
 
 /**
- * Tool handler definition (Legacy)
- */
-export interface ToolHandler<TInput = any, TOutput = any> {
-  name: string;
-  description: string;
-  category: 'workflow' | 'orchestration' | 'utility';
-  inputSchema: z.ZodType<TInput> | z.ZodEffects<any, TInput, any> | z.ZodObject<any>;
-  outputSchema: z.ZodType<TOutput> | z.ZodEffects<any, TOutput, any> | z.ZodObject<any>;
-  execute(input: TInput, context: ToolContext): Promise<TOutput>;
-  chainHint?: {
-    nextTool: string;
-    reason: string;
-    paramMapper?: (output: TOutput) => Record<string, unknown>;
-  };
-  timeout?: number;
-}
-
-/**
- * Tool registration descriptor - same as ToolHandler for consistency (Legacy)
- */
-export interface ToolDescriptor<TInput = any, TOutput = any> {
-  name: string;
-  description: string;
-  category: 'workflow' | 'orchestration' | 'utility';
-  inputSchema: z.ZodType<TInput> | z.ZodEffects<any, TInput, any> | z.ZodObject<any>;
-  outputSchema: z.ZodType<TOutput> | z.ZodEffects<any, TOutput, any> | z.ZodObject<any>;
-  execute(input: TInput, context: ToolContext): Promise<TOutput>;
-  chainHint?: {
-    nextTool: string;
-    reason: string;
-    paramMapper?: (output: TOutput) => Record<string, unknown>;
-  };
-  timeout?: number;
-}
-
-/**
  * MCP SDK compatible tool handler
  */
 export interface MCPToolHandler<TInput, TOutput> {
@@ -210,42 +174,6 @@ export interface ToolProgress {
 /**
  * Repository Analysis Tool Parameters
  */
-export interface AnalyzeRepositoryParams {
-  repoPath: string;
-  sessionId?: string;
-  depth?: 'shallow' | 'deep';
-  includeTests?: boolean;
-}
-
-export interface AnalyzeRepositoryResult {
-  success: boolean;
-  sessionId: string;
-  language: string;
-  languageVersion?: string;
-  framework?: string;
-  frameworkVersion?: string;
-  buildSystem?: {
-    type: string;
-    buildFile: string;
-    buildCommand?: string;
-    testCommand?: string;
-  };
-  dependencies: Array<{
-    name: string;
-    version?: string;
-    type?: 'runtime' | 'dev' | 'test';
-  }>;
-  ports: number[];
-  hasDockerfile: boolean;
-  hasDockerCompose: boolean;
-  hasKubernetes: boolean;
-  metadata?: Record<string, any>;
-  recommendations?: {
-    baseImage?: string;
-    buildStrategy?: string;
-    securityNotes?: string[];
-  };
-}
 
 /**
  * Dockerfile Generation Tool Parameters

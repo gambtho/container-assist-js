@@ -11,9 +11,7 @@ import { McpError, ErrorCode as MCPErrorCode } from '@modelcontextprotocol/sdk/t
 import { ServiceError, ErrorCode } from '../../../contracts/types/errors.js';
 import type { Services } from '../../../services/index.js';
 import type {
-  ToolHandler,
   ToolContext as HandlerContext,
-  ToolDescriptor,
   MCPToolDescriptor,
   MCPToolContext
 } from '../tool-types.js';
@@ -77,44 +75,6 @@ export class ToolRegistry {
     }
 
     return sanitized;
-  }
-
-  /**
-   * Register a tool with the registry (Legacy method)
-   */
-  register<TInput, TOutput>(descriptor: ToolDescriptor<TInput, TOutput>): void {
-    try {
-      // Validate schemas can produce JSON Schema
-      const inputJson = zodToJsonSchema(descriptor.inputSchema);
-      // Validate output schema can also be converted (but we don't need to store it)
-      zodToJsonSchema(descriptor.outputSchema);
-
-      // Store the tool locally for compatibility
-      this.tools.set(descriptor.name, descriptor);
-
-      // Add to tool list for MCP
-      this.toolList.push({
-        name: descriptor.name,
-        description: descriptor.description,
-        inputSchema: inputJson
-      });
-
-      this.logger.info(
-        {
-          tool: descriptor.name,
-          category: descriptor.category,
-          hasChainHint: !!descriptor.chainHint
-        },
-        'Tool registered'
-      );
-    } catch (error) {
-      this.logger.error({ error, tool: descriptor.name }, 'Failed to register tool');
-      throw new ServiceError(
-        ErrorCode.ToolNotFound,
-        `Failed to register tool ${descriptor.name}`,
-        error instanceof Error ? error : undefined
-      );
-    }
   }
 
   /**

@@ -2,86 +2,27 @@
  * Build Image - MCP SDK Compatible Version
  */
 
-import { z } from 'zod';
 import path from 'node:path';
+import { promises as fs } from 'node:fs';
 import { DockerBuildOptions, DockerBuildResult } from '../../../contracts/types/index.js';
 import { executeWithRetry } from '../error-recovery.js';
 import { ValidationError, NotFoundError } from '../../../errors/index.js';
-// import { SimpleProgressTracker } from '../../workflow/progress.js''; // Unused'
+import {
+  BuildImageInput as BuildImageInputSchema,
+  BuildResultSchema,
+  BuildImageParams,
+  BuildResult
+} from '../schemas.js';
 import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import { fileExists } from '../utils.js';
 
-// Input schema with support for both snake_case and camelCase
-const BuildImageInput = z
-  .object({
-    session_id: z.string().optional(),
-    sessionId: z.string().optional(),
-    context: z.string().default('.'),
-    buildContext: z.string().optional(),
-    dockerfile: z.string().default('Dockerfile'),
-    dockerfilePath: z.string().optional(),
-    tag: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-    build_args: z.record(z.string(), z.string()).optional(),
-    buildArgs: z.record(z.string(), z.string()).optional(),
-    target: z.string().optional(),
-    no_cache: z.boolean().default(false),
-    noCache: z.boolean().optional(),
-    platform: z.string().optional(),
-    platforms: z.array(z.string()).optional(),
-    push: z.boolean().default(false),
-    registry: z.string().optional(),
-    squash: z.boolean().default(false),
-    pull: z.boolean().default(true)
-  })
-  .transform((data) => ({
-    sessionId: data.session_id ?? (data.sessionId || ''),
-    context: data.buildContext ?? data.context,
-    dockerfile: data.dockerfilePath ?? data.dockerfile,
-    tags: data.tags ?? (data.tag ? [data.tag] : []),
-    buildArgs: data.build_args ?? (data.buildArgs || {}),
-    target: data.target,
-    noCache: data.no_cache ?? data.noCache ?? false,
-    platform: data.platform ?? (data.platforms ? data.platforms.join(',') : undefined),
-    push: data.push,
-    registry: data.registry,
-    squash: data.squash,
-    pull: data.pull
-  }));
-
-// Output schema
-const BuildImageOutput = z.object({
-  success: z.boolean(),
-  imageId: z.string(),
-  tags: z.array(z.string()),
-  size: z.number().optional(),
-  layers: z.number().optional(),
-  buildTime: z.number(),
-  digest: z.string().optional(),
-  warnings: z.array(z.string()).optional(),
-  metadata: z.object({
-    baseImage: z.string().optional(),
-    platform: z.string().optional(),
-    dockerfile: z.string(),
-    context: z.string(),
-    cached: z.boolean().optional()
-  })
-});
+const BuildImageInput = BuildImageInputSchema;
+const BuildImageOutput = BuildResultSchema;
 
 // Type aliases
-export type BuildInput = z.infer<typeof BuildImageInput>;
-export type BuildOutput = z.infer<typeof BuildImageOutput>;
+export type BuildInput = BuildImageParams;
+export type BuildOutput = BuildResult;
 
-/**
- * Check if file exists
- */
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await fs.access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Prepare build arguments with defaults
@@ -245,14 +186,14 @@ const buildImageHandler: MCPToolDescriptor<BuildInput, BuildOutput> = {
       const dockerfileContent = await fs.readFile(dockerfilePath, 'utf-8');
 
       // Analyze for security issues
-      const warnings = analyzeBuildSecurity(dockerfileContent, buildArgs);
+      const warnings = analyzeBuildSecurity(dockerfileContent, buildArgs ?? {});
       if (warnings.length > 0) {
         logger.warn({ warnings }); // Fixed logger call
       }
 
       // Prepare tags
       const projectName = session.metadata?.projectName ?? path.basename(repoPath);
-      const imageTags = tags.length > 0 ? tags : [`${projectName}:latest`];
+      const imageTags = (tags && tags.length > 0) ? tags : [`${projectName}:latest`];
 
       // Add registry prefix if specified
       const fullTags = input.registry
@@ -284,7 +225,7 @@ const buildImageHandler: MCPToolDescriptor<BuildInput, BuildOutput> = {
         context: path.resolve(repoPath),
         dockerfile: path.relative(path.resolve(repoPath), dockerfilePath),
         tags: fullTags,
-        buildArgs: prepareBuildArgs(buildArgs, session),
+        buildArgs: prepareBuildArgs(buildArgs ?? {}, session),
         ...(target && { target }),
         noCache,
         ...(platform && { platform })
@@ -368,12 +309,12 @@ const buildImageHandler: MCPToolDescriptor<BuildInput, BuildOutput> = {
       }));
 
       // Push to registry if requested
-      if (input.push && input.registry && dockerService) {
+      if (input.push && input.registry && dockerService && fullTags) {
         logger.info({ registry: input.registry }, 'Pushing to registry');
 
         for (const tag of fullTags) {
           if ('push' in dockerService) {
-            await (dockerService as unknown).push({
+            await (dockerService as any).push({
               image: tag,
               registry: input.registry
             });
@@ -417,6 +358,7 @@ const buildImageHandler: MCPToolDescriptor<BuildInput, BuildOutput> = {
 
       return {
         success: true,
+        sessionId,
         imageId: buildResult.imageId ?? '',
         tags: buildResult.tags ?? [],
         size: buildResult.size ?? 0,
@@ -433,7 +375,8 @@ const buildImageHandler: MCPToolDescriptor<BuildInput, BuildOutput> = {
         }
       };
     } catch (error: unknown) {
-      logger.error({ error: error.message }, 'Docker build error');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ error: errorMessage }, 'Docker build error');
 
       if (progressEmitter && sessionId) {
         await progressEmitter.emit({
