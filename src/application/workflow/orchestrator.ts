@@ -166,7 +166,7 @@ export class WorkflowOrchestrator {
 
       result.status = 'failed';
       result.duration = Date.now() - startTime;
-      result.await errors.push({
+      result.errors.push({
         step: 'workflow',
         error: error instanceof Error ? error.message : String(error)
       });
@@ -231,7 +231,7 @@ export class WorkflowOrchestrator {
     // Check if step should be executed
     if (step.condition != null && !step.condition(state)) {
       this.logger.info({ step: step.name }); // Fixed logger call
-      result.await skippedSteps.push(step.name);
+      result.skippedSteps.push(step.name);
       return;
     }
 
@@ -274,7 +274,7 @@ export class WorkflowOrchestrator {
 
         // Store output and mark as completed
         result.outputs[step.name] = toolResult;
-        result.await completedSteps.push(step.name);
+        result.completedSteps.push(step.name);
 
         // Mark step as completed in session
         await this.sessionService.markStepCompleted(sessionId, step.name);
@@ -328,8 +328,8 @@ export class WorkflowOrchestrator {
     }
 
     // Step failed after all retries
-    result.await failedSteps.push(step.name);
-    result.await errors.push({
+    result.failedSteps.push(step.name);
+    result.errors.push({
       step: step.name,
       error: lastError?.message ?? 'Unknown error'
     });
@@ -347,7 +347,7 @@ export class WorkflowOrchestrator {
     if (step.onError === 'fail') {
       throw lastError;
     } else if (step.onError === 'skip') {
-      result.await skippedSteps.push(step.name);
+      result.skippedSteps.push(step.name);
       this.logger.info({ step: step.name }); // Fixed logger call
     }
     // 'continue' - log and proceed

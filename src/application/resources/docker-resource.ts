@@ -127,7 +127,7 @@ export class DockerResourceProvider {
               tags: image.RepoTags ?? image.tags || [],
               size: image.Size ?? image.size || 0,
               created: image.Created ?? image.created,
-              parentId: image.ParentId ?? image.parentId || null
+              parentId: image.ParentId ?? image.parentId ?? null
             }));
 
             return {

@@ -48,7 +48,7 @@ const GenerateDockerfileInput = z
   .transform((data) => ({
     sessionId: data.session_id ?? data.sessionId || '',
     targetPath: data.target_path ?? data.targetPath || './Dockerfile',
-    baseImage: data.base_image ?? data.baseImage || undefined,
+    baseImage: data.base_image ?? data.baseImage ?? undefined,
     optimization: data.optimization,
     multistage: data.multistage,
     optimizeSize: data.optimize_size,
@@ -56,7 +56,7 @@ const GenerateDockerfileInput = z
     includeHealthcheck: data.include_healthcheck ?? data.includeHealthcheck ?? true,
     includeSecurityScanning: data.include_security_scanning ?? data.includeSecurityScanning ?? true,
     customCommands: data.custom_commands ?? data.customCommands || [],
-    customInstructions: data.custom_instructions ?? data.customInstructions || undefined,
+    customInstructions: data.custom_instructions ?? data.customInstructions ?? undefined,
     forceRegenerate: data.force_regenerate ?? data.forceRegenerate ?? false
   }));
 
@@ -264,33 +264,33 @@ async function generateDockerfileContent(
 
     // Ensure non-root user if not present
     if (!content.includes('USER ') && !content.includes('adduser')) {
-      const userSetup = ``
+      const userSetup = `
 # Create non-root user
 RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser
-USER appuser`;`
-      content = content.replace(/EXPOSE/g, `${userSetup}\nEXPOSE`);`
+USER appuser`;
+      content = content.replace(/EXPOSE/g, `${userSetup}\nEXPOSE`);
     }
   }
 
   if (options.includeHealthcheck) {
     optimizations.push('Health check endpoint');
     const port = analysis.ports?.[0] || 3000;
-    const healthcheck = ``
+    const healthcheck = `
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${port}/health ?? exit 1`;`
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${port}/health || exit 1`;
 
     if (!content.includes('HEALTHCHECK')) {
-      content = content.replace(/CMD \[/, `${healthcheck}\n\nCMD [`);`
+      content = content.replace(/CMD \[/, `${healthcheck}\n\nCMD [`);
     }
   }
 
   // Add custom commands
   if (options.customCommands.length > 0) {
-    const customSection = ``
+    const customSection = `
 # Custom commands
-options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}`;`
-    content = content.replace(/USER /, `${customSection}\n\nUSER `);`
+${options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}`;
+    content = content.replace(/USER /, `${customSection}\n\nUSER `);
   }
 
   // Parse stages from content
@@ -331,18 +331,18 @@ function generateOptimizedDockerfile(analysis: AnalysisResult, options: Dockerfi
   const deps = analysis.dependencies?.map((d) => d.name) || [];
 
   // Build optimized Dockerfile content
-  let dockerfile = `# AI-Optimized Dockerfile for ${analysis.language}${framework ? ` (${framework})` : ''}`
+  let dockerfile = `# AI-Optimized Dockerfile for ${analysis.language}${framework ? ` (${framework})` : ''}
 # Generated on ${new Date().toISOString()}
 
-`;`
+`;
 
   if (options.multistage && deps.length > 5) {
-    dockerfile += `# Build stage`
+    dockerfile += `# Build stage
 FROM ${baseImage} AS builder
 WORKDIR /app
 
 # Copy dependency files first for better caching
-getBuildCommands(analysis, 'build')}
+${getBuildCommands(analysis, 'build')}
 
 # Runtime stage
 FROM ${baseImage.includes('alpine') ? baseImage : baseImage.replace(/:\d+/, ':alpine')}
@@ -352,47 +352,47 @@ WORKDIR /app
 RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser
 
 # Copy built artifacts
-getBuildCommands(analysis, 'runtime')}
+${getBuildCommands(analysis, 'runtime')}
 
-`;`
+`;
   } else {
-    dockerfile += `FROM ${baseImage}`
+    dockerfile += `FROM ${baseImage}
 WORKDIR /app
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser
 
-getBuildCommands(analysis, 'single')}
+${getBuildCommands(analysis, 'single')}
 
-`;`
+`;
   }
 
   // Add ports
   const ports = analysis.ports ?? [3000];
   ports.forEach((port) => {
-    dockerfile += `EXPOSE ${port}\n`;`
+    dockerfile += `EXPOSE ${port}\n`;
   });
 
   // Add health check if requested
   if (options.includeHealthcheck) {
     const primaryPort = ports[0] || 3000;
-    dockerfile += ``
+    dockerfile += `
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${primaryPort}/health ?? exit 1
-`;`
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${primaryPort}/health || exit 1
+`;
   }
 
   // Add custom commands if provided
   if (options.customCommands && options.customCommands.length > 0) {
-    dockerfile += ``
+    dockerfile += `
 # Custom commands
-options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}`
-`;`
+${options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}
+`;
   }
 
   // Switch to non-root user
-  dockerfile += `\nUSER appuser\n`;`
+  dockerfile += `\nUSER appuser\n`;
 
   // Add start command based on language/framework
   dockerfile += getStartCommand(analysis);
@@ -505,8 +505,8 @@ function analyzeDockerfileSecurity(content: string): string[] {
   // Check for exposed sensitive ports
   const sensitiveports = [22, 23, 135, 139, 445];
   for (const port of sensitiveports) {
-    if (content.includes(`EXPOSE ${port}`)) {`
-      warnings.push(`Exposing potentially sensitive port ${port}`);`
+    if (content.includes(`EXPOSE ${port}`)) {
+      warnings.push(`Exposing potentially sensitive port ${port}`);
     }
   }
 
@@ -544,9 +544,9 @@ function estimateImageSize(language: string, dependencies: string[], multistage:
   }
 
   if (estimatedSize < 100) {
-    return `~${estimatedSize}MB`;`
+    return `~${estimatedSize}MB`;
   } else {
-    return `~${Math.round(estimatedSize / 100) / 10}GB`;`
+    return `~${Math.round(estimatedSize / 100) / 10}GB`;
   }
 
 /**
@@ -757,7 +757,7 @@ const generateDockerfileHandler: MCPToolDescriptor<DockerfileInput, DockerfileOu
     paramMapper: (output) => ({
       session_id: output.path.includes('/') ? undefined : output.path,
       dockerfile_path: output.path,
-      tags: [`app:${Date.now()}`]`
+      tags: [`app:${Date.now()}`]
     })
   }
 

@@ -236,7 +236,7 @@ export class MCPSamplerFactory {
     }
 
     // For testing/development, return mock sampler
-    if (config.useMock || process.env.NODE_ENV === 'test') {
+    if (config.useMock ?? process.env.NODE_ENV === 'test') {
       return new MockMCPSampler(logger);
     }
 

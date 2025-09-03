@@ -236,7 +236,7 @@ function analyzeIssues(
   }
 
   // Check pod issues
-  const unhealthyPods = pods.filter((p) => !p.ready || p.status !== 'Running');
+  const unhealthyPods = pods.filter((p) => !p.ready ?? p.status !== 'Running');
   if (unhealthyPods.length > 0) {
     issues.push(`${unhealthyPods.length} pods are not healthy`);
   }

@@ -198,7 +198,7 @@ export class AIClient {
 
   // Private prompt building methods
   private buildDockerfilePrompt(context: DockerfileContext): string {
-    return `Generate a Dockerfile for the following project:`
+    return `Generate a Dockerfile for the following project:
 
 Language: ${context.language ?? 'unknown'}
 Dependencies: ${JSON.stringify(context.dependencies ?? [])}
@@ -213,11 +213,11 @@ Requirements:
 - Use multi-stage builds if beneficial
 - Include health checks when appropriate
 
-Return only the Dockerfile content, no explanation.`;`
+Return only the Dockerfile content, no explanation.`;
   }
 
   private buildRepositoryAnalysisPrompt(repoPath: string, files?: string[]): string {
-    return `Analyze this repository and return a JSON object with the following structure:`
+    return `Analyze this repository and return a JSON object with the following structure:
 
 Repository Path: ${repoPath}
 ${files ? `Files: ${files.slice(0, 10).join(', ')}${files.length > 10 ? '...' : ''}` : ''}
@@ -233,11 +233,11 @@ Return JSON with:
   "recommendations": ["list of containerization recommendations"]
 }
 
-Analyze the code structure and return only the JSON, no explanation.`;`
+Analyze the code structure and return only the JSON, no explanation.`;
   }
 
   private buildOptimizationPrompt(dockerfile: string): string {
-    return `Analyze this Dockerfile and suggest optimizations:`
+    return `Analyze this Dockerfile and suggest optimizations:
 
 ${dockerfile}
 
@@ -248,11 +248,11 @@ Provide optimization suggestions focusing on:
 - Best practices
 - Caching strategies
 
-Format each suggestion as a bullet point starting with - or *`;`
+Format each suggestion as a bullet point starting with - or *`;
   }
 
   private buildDockerfileFixPrompt(dockerfile: string, error: string): string {
-    return `Fix this Dockerfile that's causing an error:'
+    return `Fix this Dockerfile that's causing an error:
 
 DOCKERFILE:
 ${dockerfile}
@@ -261,6 +261,6 @@ ERROR:
 ${error}
 
 Provide a corrected version of the Dockerfile that fixes the error.
-Return only the corrected Dockerfile content, no explanation.`;`
+Return only the corrected Dockerfile content, no explanation.`;
   }
 }

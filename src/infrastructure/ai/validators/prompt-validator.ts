@@ -111,7 +111,7 @@ export class PromptValidator {
     // Token limit validation
     if (systemTokens > this.maxSystemPromptTokens) {
       errors.push(
-        `System prompt too long: ${systemTokens} tokens (max: ${this.maxSystemPromptTokens})``
+        `System prompt too long: ${systemTokens} tokens (max: ${this.maxSystemPromptTokens})`
       );
       suggestions.push({
         type: 'token_reduction',
@@ -133,7 +133,7 @@ export class PromptValidator {
 
     if (totalTokens > this.maxTotalTokens) {
       warnings.push(
-        `Total prompt tokens (${totalTokens}) exceed recommended limit (${this.maxTotalTokens})``
+        `Total prompt tokens (${totalTokens}) exceed recommended limit (${this.maxTotalTokens})`
       );
     }
 
@@ -176,7 +176,7 @@ export class PromptValidator {
   } {
     const warnings: string[] = [];
     const suggestions: OptimizationSuggestion[] = [];
-    const combined = `${prompt.system} ${prompt.user}`;`
+    const combined = `${prompt.system} ${prompt.user};
 
     // Check for inefficient patterns
     for (const [name, config] of this.inefficientPatterns) {
@@ -203,13 +203,13 @@ export class PromptValidator {
     const repetitionAnalysis = this.analyzeWordRepetition(combined);
     if (repetitionAnalysis.score < 0.7) {
       warnings.push(
-        `High word repetition detected (score: ${Math.round(repetitionAnalysis.score * 100)}%)``
+        `High word repetition detected (score: ${Math.round(repetitionAnalysis.score * 100)}%)`
       );
       suggestions.push({
         type: 'redundancy',
         description: 'Reduce repeated words and phrases',
         impact: 'medium',
-        example: `Most repeated: ${repetitionAnalysis.topRepeated.slice(0, 3).join(', ')}``
+        example: `Most repeated: ${repetitionAnalysis.topRepeated.slice(0, 3).join(', ')}`
       });
     }
 
@@ -222,7 +222,7 @@ export class PromptValidator {
   } {
     const warnings: string[] = [];
     const suggestions: OptimizationSuggestion[] = [];
-    const combined = `${prompt.system} ${prompt.user}`;`
+    const combined = `${prompt.system} ${prompt.user};
 
     for (const [issue, config] of this.clarityIssues) {
       const matches = combined.match(config.pattern);
@@ -302,7 +302,7 @@ export class PromptValidator {
 
     if (significantOverlap.size > 5) {
       warnings.push(
-        `High overlap between system and user prompts: ${significantOverlap.size} significant words``
+        `High overlap between system and user prompts: ${significantOverlap.size} significant words`
       );
       suggestions.push({
         type: 'redundancy',
@@ -320,7 +320,7 @@ export class PromptValidator {
         type: 'redundancy',
         description: 'Remove or consolidate repeated phrases',
         impact: 'low',
-        example: `E.g., "${phraseRepetition[0]}" appears multiple times``
+        example: `E.g., "${phraseRepetition[0]}" appears multiple times`
       });
     }
 
@@ -374,7 +374,7 @@ export class PromptValidator {
   ): { score: number; issues: string[] } {
     let score = 100;
     const issues: string[] = [];
-    const combined = `${prompt.system} ${prompt.user}`;`
+    const combined = `${prompt.system} ${prompt.user};
 
     // Token efficiency (30% of score)
     const totalTokens = this.tokenEstimator.estimate(combined);

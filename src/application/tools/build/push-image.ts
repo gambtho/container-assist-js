@@ -26,7 +26,7 @@ const PushImageInput = z
   })
   .transform((data) => ({
     sessionId: data.session_id ?? data.sessionId,
-    tags: data.tags ?? data.image_tags || data.imageTags ?? (data.image ? [data.image] : []),
+    tags: data.tags ?? data.image_tags ?? data.imageTags ?? (data.image ? [data.image] : []),
     registry: data.registry,
     username: data.username,
     password: data.password,

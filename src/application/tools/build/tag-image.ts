@@ -27,7 +27,7 @@ const TagImageInput = z
   })
   .transform((data) => ({
     sessionId: data.session_id ?? data.sessionId,
-    sourceImage: data.source_tag ?? data.sourceTag || data.source_image ?? data.sourceImage,
+    sourceImage: data.source_tag ?? data.sourceTag ?? data.source_image ?? data.sourceImage,
     targetTags:
       data.target_tags ?? data.targetTags ||
       (data.target_tag ? [data.target_tag] : data.targetTag ? [data.targetTag] : []),

@@ -3,7 +3,27 @@
  * Consolidates domain errors and application errors into proper MCP SDK responses
  */
 
-import { McpError, ErrorCode as MCPErrorCode } from '@modelcontextprotocol/sdk/types';
+import { McpError } from '@modelcontextprotocol/sdk/types';
+
+// Type assertion for McpError constructor to fix unsafe construction warnings
+const createMcpError = (code: number, message: string, data?: unknown): McpError => {
+  return new (McpError as unknown as new (
+    code: number,
+    message: string,
+    data?: unknown
+  ) => McpError)(code, message, data);
+};
+
+// Define MCP error codes as constants to avoid 'any' type issues from SDK
+const MCPErrorCode = {
+  InvalidParams: -32602,
+  InternalError: -32603,
+  ParseError: -32700,
+  InvalidRequest: -32600,
+  MethodNotFound: -32601
+} as const;
+
+type MCPErrorCodeType = typeof MCPErrorCode[keyof typeof MCPErrorCode];
 import {
   ErrorCode as DomainErrorCode,
   DomainError,
@@ -15,7 +35,7 @@ import { ApplicationError } from '../../errors/index';
 /**
  * Mapping from domain error codes to MCP SDK error codes
  */
-export const ERROR_CODE_MAPPING: Record<DomainErrorCode, MCPErrorCode> = {
+export const ERROR_CODE_MAPPING: Record<DomainErrorCode, MCPErrorCodeType> = {
   // Domain validation errors
   [DomainErrorCode.ValidationFailed]: MCPErrorCode.InvalidParams,
   [DomainErrorCode.VALIDATION_ERROR]: MCPErrorCode.InvalidParams,
@@ -82,7 +102,7 @@ export const ERROR_CODE_MAPPING: Record<DomainErrorCode, MCPErrorCode> = {
 export function toMcpError(error: DomainError): McpError {
   const mcpCode = ERROR_CODE_MAPPING[error.code] || MCPErrorCode.InternalError;
 
-  return new McpError(mcpCode, error.message, {
+  return createMcpError(mcpCode, error.message, {
     code: error.code,
     metadata: error.metadata,
     timestamp: new Date().toISOString(),
@@ -101,7 +121,7 @@ export function toMcpError(error: DomainError): McpError {
 export function infrastructureErrorToMcp(error: InfrastructureError): McpError {
   const mcpCode = ERROR_CODE_MAPPING[error.code] || MCPErrorCode.InternalError;
 
-  return new McpError(mcpCode, error.message, {
+  return createMcpError(mcpCode, error.message, {
     code: error.code,
     layer: 'infrastructure',
     metadata: error.metadata,
@@ -121,7 +141,7 @@ export function infrastructureErrorToMcp(error: InfrastructureError): McpError {
 export function serviceErrorToMcp(error: ServiceError): McpError {
   const mcpCode = ERROR_CODE_MAPPING[error.code] || MCPErrorCode.InternalError;
 
-  return new McpError(mcpCode, error.message, {
+  return createMcpError(mcpCode, error.message, {
     code: error.code,
     layer: 'service',
     metadata: error.metadata,
@@ -143,7 +163,7 @@ export function applicationErrorToMcp(error: ApplicationError): McpError {
   const domainCode = mapApplicationCodeToDomain(error.code);
   const mcpCode = domainCode != null ? ERROR_CODE_MAPPING[domainCode] : MCPErrorCode.InternalError;
 
-  return new McpError(mcpCode, error.message, {
+  return createMcpError(mcpCode, error.message, {
     code: error.code,
     layer: 'application',
     context: error.context,
@@ -171,7 +191,7 @@ function mapApplicationCodeToDomain(appCode: string): DomainErrorCode | null {
     UNKNOWN_ERROR: DomainErrorCode.UnknownError
   };
 
-  return mapping[appCode] != null;
+  return mapping[appCode] ?? null;
 }
 
 /**
@@ -224,7 +244,7 @@ export function convertToMcpError(error: unknown): McpError {
       domainCode = DomainErrorCode.KubernetesError;
     }
 
-    return new McpError(code, error.message, {
+    return createMcpError(code, error.message, {
       code: domainCode,
       originalError: error.name,
       stack: error.stack,
@@ -233,7 +253,7 @@ export function convertToMcpError(error: unknown): McpError {
   }
 
   // Handle non-Error objects
-  return new McpError(
+  return createMcpError(
     MCPErrorCode.InternalError,
     typeof error === 'string' ? error : 'Unknown error occurred',
     {
@@ -248,10 +268,10 @@ export function convertToMcpError(error: unknown): McpError {
  * Check if an error is retryable based on its type and code
  */
 export function isRetryableError(error: McpError): boolean {
-  const details = error.data as unknown;
+  const details = (error as { data?: { code?: DomainErrorCode } }).data;
   const code = details?.code;
 
-  if (!code) return false;
+  if (code == null) return false;
 
   // Retryable error codes
   const retryableCodes = [
@@ -270,10 +290,10 @@ export function isRetryableError(error: McpError): boolean {
  * Get error severity level
  */
 export function getErrorSeverity(error: McpError): 'low' | 'medium' | 'high' | 'critical' {
-  const details = error.data as unknown;
+  const details = (error as { data?: { code?: DomainErrorCode } }).data;
   const code = details?.code;
 
-  if (!code) return 'high';
+  if (code == null) return 'high';
 
   switch (code) {
     case DomainErrorCode.ValidationFailed:

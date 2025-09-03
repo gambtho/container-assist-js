@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach } from '@jest/globals'
-import { KubernetesClient } from '../../../../src/infrastructure/external/kubernetes/client.js'
+import { KubernetesClient } from '../../../../src/infrastructure/kubernetes-client.js'
 import { createTestLogger } from '../../../utils/test-logger.js'
 import type { Logger, KubernetesManifest } from '../../../../src/domain/types/index.js'
 

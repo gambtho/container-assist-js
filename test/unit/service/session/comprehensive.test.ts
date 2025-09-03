@@ -280,7 +280,7 @@ describe('Comprehensive Session Management', () => {
     expect(results).toHaveLength(5);
     expect(mockSessionManager.createSession).toHaveBeenCalledTimes(5);
     results.forEach((result, i) => {
-      expect(result.metadata?.index).toBe(i);
+      expect(result?.metadata?.index).toBe(i);
     });
   });
 });

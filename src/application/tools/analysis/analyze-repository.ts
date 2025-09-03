@@ -489,7 +489,7 @@ const analyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOutput> =
               // Try to parse structured response
               const parsed = JSON.parse(result.data);
               aiEnhancements = {
-                aiInsights: parsed.insights || result.data,
+                aiInsights: parsed.insights ?? result.data,
                 suggestedOptimizations: parsed.optimizations || [],
                 securityRecommendations: parsed.security || [],
                 recommendedBaseImage: parsed.baseImage,
@@ -574,7 +574,7 @@ const analyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOutput> =
               dependencies,
               ports,
               has_tests: dependencies.some((dep) => dep.type === 'test') || false,
-              docker_compose_exists: dockerInfo.hasDockerCompose || false,
+              docker_compose_exists: dockerInfo.hasDockerCompose ?? false,
               ...dockerInfo,
               recommendations
             }

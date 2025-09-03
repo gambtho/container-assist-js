@@ -17,6 +17,7 @@ export interface SecurityIssue {
   description: string;
   location?: string;
   recommendation?: string;
+}
 
 /**
  * Validation result for structured output
@@ -26,6 +27,7 @@ export interface ValidationResult {
   errors?: string[];
   warnings?: string[];
   securityIssues?: SecurityIssue[];
+}
 
 /**
  * Options for structured sampling
@@ -37,6 +39,7 @@ export interface StructuredSampleOptions {
   maxRetries?: number;
   temperature?: number;
   maxTokens?: number;
+}
 
 /**
  * Result from structured sampling
@@ -52,6 +55,7 @@ export interface StructuredSampleResult<T = any> {
     model?: string;
     tokensUsed?: number;
   };
+}
 
 /**
  * Structured Sampler implementation
@@ -115,7 +119,7 @@ export class StructuredSampler {
         if (schema) {
           const parseResult = schema.safeParse(parsed);
           if (!parseResult.success) {
-            lastError = `Schema validation failed: ${parseResult.error.message}`;`
+            lastError = `Schema validation failed: ${parseResult.error.message}`;
             this.logger.warn(
               {
                 attempt: attempts,
@@ -187,7 +191,7 @@ export class StructuredSampler {
     if (schema) {
       const schemaDescription = this.describeSchema(schema);
       if (schemaDescription) {
-        prompt += `\n\nThe response must conform to this structure:\n${schemaDescription}`;`
+        prompt += `\n\nThe response must conform to this structure:\n${schemaDescription}`;
       }
     }
 
@@ -305,7 +309,7 @@ Follow best practices for:
 - Multi-stage builds
 - Layer caching
 - Security (non-root user, minimal base images)
-- Size optimization`;``
+- Size optimization`;
 
     return this.generateStructured(prompt, {
       format: 'text',
@@ -331,7 +335,7 @@ Include:
 - Deployment
 - Service
 - ConfigMap (if needed)
-- Ingress (if specified)`;``
+- Ingress (if specified)`;
 
     return this.generateStructured(prompt, {
       format: 'yaml',

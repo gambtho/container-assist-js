@@ -274,7 +274,7 @@ async function validateBaseImageRecommendation(
   }
 
   // Check for empty alternatives array
-  if (!recommendation.alternatives || recommendation.alternatives.length === 0) {
+  if (!recommendation.alternatives ?? recommendation.alternatives.length === 0) {
     issues.push('Missing alternative recommendations');
   }
 

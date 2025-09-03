@@ -32,10 +32,10 @@ const DeployApplicationInput = z
     rollbackOnFailure: z.boolean().optional()
   })
   .transform((data) => ({
-    sessionId: data.session_id ?? data.sessionId || undefined,
-    manifestsPath: data.manifests_path ?? data.manifestsPath || undefined,
+    sessionId: data.session_id ?? data.sessionId ?? undefined,
+    manifestsPath: data.manifests_path ?? data.manifestsPath ?? undefined,
     namespace: data.namespace,
-    clusterContext: data.cluster_context ?? data.clusterContext || undefined,
+    clusterContext: data.cluster_context ?? data.clusterContext ?? undefined,
     dryRun: data.dry_run ?? data.dryRun ?? false,
     wait: data.wait,
     timeout: data.timeout,

@@ -160,7 +160,7 @@ async function generateEnhancedDockerfile(
 async function analyzeRepositoryStructured(
   repoPath: string,
   context: MCPToolContext
- Promise<RepositoryAnalysis> {
+): Promise<RepositoryAnalysis> {
   const { structuredSampler, logger } = context;
 
   if (!structuredSampler) {
@@ -220,6 +220,7 @@ async function readConfigFiles(_repoPath: string): Promise<Record<string, string
   return {
     'package.json': '{"name": "example", "dependencies": {"express": "^4.18.0"}}'
   };
+}
 
 async function getDirectoryStructure(_repoPath: string): Promise<string> {
   // Implementation would return tree structure
@@ -303,3 +304,4 @@ export const enhancedGenerateDockerfileHandler: MCPToolDescriptor = {
       throw new Error(`Enhanced Dockerfile generation failed: ${(error as Error).message}`);
     }
   }
+};

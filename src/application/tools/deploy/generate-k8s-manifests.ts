@@ -61,28 +61,28 @@ const GenerateKubernetesManifestsInput = z
     outputPath: z.string().optional()
   })
   .transform((data) => ({
-    sessionId: data.session_id ?? data.sessionId || undefined,
-    appName: data.app_name ?? data.appName || 'app',
+    sessionId: data.session_id ?? data.sessionId ?? undefined,
+    appName: data.app_name ?? data.appName ?? 'app',
     image: data.image ?? undefined,
     namespace: data.namespace,
     replicas: data.replicas,
     port: data.port ?? undefined,
-    serviceType: data.service_type ?? data.serviceType || 'ClusterIP',
+    serviceType: data.service_type ?? data.serviceType ?? 'ClusterIP',
     ingressEnabled: data.ingress_enabled ?? data.ingressEnabled ?? false,
-    ingressHost: data.ingress_host ?? data.ingressHost || undefined,
+    ingressHost: data.ingress_host ?? data.ingressHost ?? undefined,
     resources: data.resources ?? {
       requests: { memory: '128Mi', cpu: '100m' },
       limits: { memory: '512Mi', cpu: '500m' }
     },
     environment: data.environment,
-    configMap: data.config_map ?? data.configMap || {},
+    configMap: data.config_map ?? data.configMap ?? {},
     secrets: data.secrets ?? {},
-    healthCheckPath: data.health_check_path ?? data.healthCheckPath || '/health',
+    healthCheckPath: data.health_check_path ?? data.healthCheckPath ?? '/health',
     autoscaling: data.autoscaling,
-    minReplicas: data.min_replicas ?? data.minReplicas || 2,
-    maxReplicas: data.max_replicas ?? data.maxReplicas || 10,
-    targetCPU: data.target_cpu ?? data.targetCPU || 70,
-    outputPath: data.output_path ?? data.outputPath || './k8s'
+    minReplicas: data.min_replicas ?? data.minReplicas ?? 2,
+    maxReplicas: data.max_replicas ?? data.maxReplicas ?? 10,
+    targetCPU: data.target_cpu ?? data.targetCPU ?? 70,
+    outputPath: data.output_path ?? data.outputPath ?? './k8s'
   }));
 
 // Output schema
@@ -149,7 +149,7 @@ function generateDeployment(input: KubernetesManifestsInput): KubernetesManifest
             {
               name: appName,
               image,
-              ports: port
+              ports: port != null
                 ? [
                   {
                     containerPort: port,

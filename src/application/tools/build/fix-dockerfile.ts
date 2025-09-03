@@ -275,7 +275,7 @@ function validateDockerfileFix(fix: DockerfileFix): ValidationResult {
     issues.push('Missing root cause analysis');
   }
 
-  if (!fix.changes_made || fix.changes_made.length === 0) {
+  if (!fix.changes_made ?? fix.changes_made.length === 0) {
     issues.push('No changes were made to fix the Dockerfile');
   }
 
