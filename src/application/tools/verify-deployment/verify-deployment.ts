@@ -5,6 +5,17 @@
 import { z } from 'zod';
 import { ErrorCode, DomainError } from '../../../contracts/types/index.js';
 import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import {
+  checkDeploymentHealth,
+  getPodInfo,
+  getServiceEndpoints,
+  analyzeIssues,
+  getTargetResources,
+  checkAllDeployments,
+  checkAllPods,
+  getAllEndpoints,
+  determineOverallHealth
+} from './helper';
 
 // Input schema
 const VerifyDeploymentInput = z
@@ -93,161 +104,6 @@ const VerifyDeploymentOutput = z.object({
 export type VerifyInput = z.infer<typeof VerifyDeploymentInput>;
 export type VerifyOutput = z.infer<typeof VerifyDeploymentOutput>;
 
-/**
- * Check deployment health
- */
-async function checkDeploymentHealth(
-  deploymentName: string,
-  namespace: string,
-  context: MCPToolContext
-): Promise<{
-  name: string;
-  endpoint: string;
-  status?: 'healthy' | 'unhealthy' | 'degraded';
-  response_time_ms?: number;
-}> {
-  const { kubernetesService, logger } = context;
-
-  if (kubernetesService && 'getStatus' in kubernetesService) {
-    const result = await (kubernetesService as unknown).getStatus(
-      `deployment/${deploymentName}`,
-      namespace
-    );
-
-    if (result.success && result.data) {
-      return result.data;
-    }
-
-    throw new Error(result.error?.message ?? 'Failed to get deployment status');
-  }
-
-  // Mock health check for testing
-  logger.warn('Kubernetes service not available - simulating health check');
-
-  return {
-    name: deploymentName,
-    endpoint: `http://${deploymentName}.${namespace}`,
-    status: 'healthy' as const,
-    response_time_ms: 50
-  };
-}
-
-/**
- * Get pod information
- */
-async function getPodInfo(
-  namespace: string,
-  deploymentName: string,
-  context: MCPToolContext
-): Promise<
-  Array<{ name: string; ready: boolean; status: string; restarts?: number; node?: string }>
-> {
-  const { logger } = context;
-
-  // This would typically use kubectl or K8s API to get pod info
-  logger.info({ namespace, deployment: deploymentName }); // Fixed logger call
-
-  // Mock pod info for testing
-  return [
-    {
-      name: `${deploymentName}-abc123`,
-      ready: true,
-      status: 'Running',
-      restarts: 0,
-      node: 'node-1'
-    },
-    {
-      name: `${deploymentName}-def456`,
-      ready: true,
-      status: 'Running',
-      restarts: 0,
-      node: 'node-2'
-    }
-  ];
-}
-
-/**
- * Get service endpoints
- */
-async function getServiceEndpoints(
-  namespace: string,
-  serviceName: string,
-  context: MCPToolContext
-): Promise<
-  Array<{ service: string; type: string; url?: string; port?: number; external: boolean }>
-> {
-  const { kubernetesService, logger } = context;
-
-  if (kubernetesService && 'getEndpoints' in kubernetesService) {
-    const result = await (kubernetesService as unknown).getEndpoints(namespace);
-
-    if (result.success && result.data) {
-      return result.data
-        .filter((e: unknown) => !serviceName || e.service === serviceName)
-        .map((e: unknown) => ({
-          service: e.service,
-          type: 'ClusterIP',
-          url: e.url,
-          port: 80,
-          external: !!e.url && !e.url.includes('cluster.local')
-        }));
-    }
-  }
-
-  // Mock endpoints for testing
-  logger.warn('Kubernetes service not available - simulating endpoints');
-
-  return [
-    {
-      service: serviceName ?? 'app',
-      type: 'LoadBalancer',
-      url: 'http://app.example.com',
-      port: 80,
-      external: true
-    }
-  ];
-}
-
-/**
- * Analyze deployment issues
- */
-function analyzeIssues(
-  deployments: Array<{ name: string; ready?: boolean; replicas?: unknown }>,
-  pods: Array<{ ready: boolean; status?: string; restarts?: number }>,
-  minReadyPods: number
-): string[] {
-  const issues: string[] = [];
-
-  // Check deployment issues
-  for (const deployment of deployments) {
-    if (!deployment.ready) {
-      issues.push(`Deployment ${deployment.name} is not ready`);
-    }
-
-    if (deployment.replicas.ready < deployment.replicas.desired) {
-      issues.push(
-        `Deployment ${deployment.name}: Only ${deployment.replicas.ready}/${deployment.replicas.desired} replicas ready`
-      );
-    }
-
-    if (deployment.replicas.ready < minReadyPods) {
-      issues.push(`Deployment ${deployment.name}: Less than minimum ${minReadyPods} pods ready`);
-    }
-  }
-
-  // Check pod issues
-  const unhealthyPods = pods.filter((p) => !p.ready ?? p.status !== 'Running');
-  if (unhealthyPods.length > 0) {
-    issues.push(`${unhealthyPods.length} pods are not healthy`);
-  }
-
-  const restartingPods = pods.filter((p) => (p.restarts ?? 0) > 3);
-  if (restartingPods.length > 0) {
-    issues.push(`${restartingPods.length} pods have excessive restarts`);
-  }
-
-  return issues;
-}
 
 /**
  * Main handler implementation
@@ -277,28 +133,13 @@ const verifyDeploymentHandler: MCPToolDescriptor<VerifyInput, VerifyOutput> = {
     const startTime = Date.now();
 
     try {
-      // Get deployments from session if not provided
-      let targetDeployments = deployments;
-      let targetServices = services;
-
-      if (targetDeployments.length === 0 && sessionId && sessionService) {
-        const session = await sessionService.get(sessionId);
-        if (!session) {
-          throw new DomainError(ErrorCode.SessionNotFound, 'Session not found');
-        }
-
-        // Get deployed resources from session
-        const deploymentResult = session.workflow_state?.deployment_result;
-        if (deploymentResult) {
-          // Use deployment_name and service_name from the schema
-          if (deploymentResult.deployment_name != null) {
-            targetDeployments = [deploymentResult.deployment_name];
-          }
-          if (deploymentResult.service_name != null) {
-            targetServices = [deploymentResult.service_name];
-          }
-        }
-      }
+      // Get target resources from session if not provided
+      const { targetDeployments, targetServices } = await getTargetResources(
+        deployments,
+        services,
+        sessionId,
+        sessionService
+      );
 
       if (targetDeployments.length === 0 && targetServices.length === 0) {
         throw new DomainError(ErrorCode.VALIDATION_ERROR, 'No deployments or services to verify');
@@ -315,47 +156,11 @@ const verifyDeploymentHandler: MCPToolDescriptor<VerifyInput, VerifyOutput> = {
         });
       }
 
-      // Check deployment health
-      const deploymentResults: Array<{
-        name: string;
-        ready: boolean;
-        replicas: unknown;
-        conditions?: any[];
-      }> = [];
+      // Check all deployments
+      const deploymentResults = await checkAllDeployments(targetDeployments, namespace, context);
 
-      for (const deploymentName of targetDeployments) {
-        logger.info(`Checking deployment ${deploymentName}`);
-
-        try {
-          const health = await checkDeploymentHealth(deploymentName, namespace, context);
-
-          deploymentResults.push({
-            name: deploymentName,
-            ready: health.status === 'healthy',
-            replicas: {
-              desired: 3,
-              current: 3,
-              ready: 3
-            },
-            conditions: []
-          });
-        } catch (error) {
-          logger.error({ error }, `Failed to check deployment ${deploymentName}`);
-
-          deploymentResults.push({
-            name: deploymentName,
-            ready: false,
-            replicas: {
-              desired: 0,
-              current: 0,
-              ready: 0
-            }
-          });
-        }
-      }
-
-      // Check pods if requested
-      const podResults: Array<{
+      // Check all pods if requested
+      let podResults: Array<{
         name: string;
         ready: boolean;
         status: string;
@@ -373,15 +178,11 @@ const verifyDeploymentHandler: MCPToolDescriptor<VerifyInput, VerifyOutput> = {
             progress: 0.5
           });
         }
-
-        for (const deploymentName of targetDeployments) {
-          const pods = await getPodInfo(namespace, deploymentName, context);
-          podResults.push(...pods);
-        }
+        podResults = await checkAllPods(targetDeployments, namespace, context);
       }
 
-      // Get endpoints if requested
-      const endpointResults: Array<{
+      // Get all endpoints if requested
+      let endpointResults: Array<{
         service: string;
         type: string;
         url?: string;
@@ -389,7 +190,7 @@ const verifyDeploymentHandler: MCPToolDescriptor<VerifyInput, VerifyOutput> = {
         external: boolean;
       }> = [];
 
-      if (checkEndpoints && checkEndpoints.length > 0) {
+      if (checkEndpoints) {
         if (progressEmitter && sessionId) {
           await progressEmitter.emit({
             sessionId,
@@ -399,29 +200,14 @@ const verifyDeploymentHandler: MCPToolDescriptor<VerifyInput, VerifyOutput> = {
             progress: 0.7
           });
         }
-
-        if (targetServices.length > 0) {
-          for (const serviceName of targetServices) {
-            const endpoints = await getServiceEndpoints(namespace, serviceName, context);
-            endpointResults.push(...endpoints);
-          }
-        } else if (targetDeployments.length > 0) {
-          // Try to find services based on deployment names
-          for (const deploymentName of targetDeployments) {
-            const endpoints = await getServiceEndpoints(namespace, deploymentName, context);
-            endpointResults.push(...endpoints);
-          }
-        }
+        endpointResults = await getAllEndpoints(targetServices, targetDeployments, namespace, context);
       }
 
       // Analyze issues
       const issues = analyzeIssues(deploymentResults, podResults, minReadyPods);
 
       // Determine overall health
-      const healthy =
-        deploymentResults.every((d) => d.ready) &&
-        podResults.every((p) => p.ready) &&
-        issues.length === 0;
+      const healthy = determineOverallHealth(deploymentResults, podResults, issues);
 
       // Update session with verification results
       if (sessionId && sessionService) {

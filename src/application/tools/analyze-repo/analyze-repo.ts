@@ -1,4 +1,39 @@
 /**
+ * Analyze Repository - Main Orchestration Logic
+ */
+
+import path from 'node:path';
+import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
+import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import {
+  AnalyzeRepositoryInput as AnalyzeRepositoryInputSchema,
+  AnalysisResultSchema,
+  AnalyzeRepositoryParams,
+  AnalysisResult
+} from '../schemas.js';
+import {
+  validateRepositoryPath,
+  detectLanguage,
+  detectFramework,
+  detectBuildSystem,
+  analyzeDependencies,
+  detectPorts,
+  checkDockerFiles,
+  getRecommendedBaseImage,
+  getSecurityRecommendations,
+  gatherFileStructure
+} from './helper';
+
+// Use consolidated schemas
+const AnalyzeRepositoryInput = AnalyzeRepositoryInputSchema;
+const AnalyzeRepositoryOutput = AnalysisResultSchema;
+
+// Type aliases
+export type AnalyzeInput = AnalyzeRepositoryParams;
+export type AnalyzeOutput = AnalysisResult;
+
+/**
  * Main handler implementation
  */
 const analyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
@@ -268,3 +303,6 @@ const analyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOutput> =
     })
   }
 };
+
+// Default export for registry
+export default analyzeRepositoryHandler;

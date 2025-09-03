@@ -1,26 +1,9 @@
 /**
- * Analyze Repository - Enhanced with AI Optimization
+ * Analyze Repository - Helper Functions
  */
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
-import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
-import {
-  AnalyzeRepositoryInput as AnalyzeRepositoryInputSchema,
-  AnalysisResultSchema,
-  AnalyzeRepositoryParams,
-  AnalysisResult
-} from '../schemas.js';
-
-// Use consolidated schemas
-const AnalyzeRepositoryInput = AnalyzeRepositoryInputSchema;
-const AnalyzeRepositoryOutput = AnalysisResultSchema;
-
-// Type aliases
-export type AnalyzeInput = AnalyzeRepositoryParams;
-export type AnalyzeOutput = AnalysisResult;
 
 // Language detection configuration
 interface LanguageSignature {
@@ -106,7 +89,7 @@ const BUILD_SYSTEMS = {
 /**
  * Validate repository path exists and is accessible
  */
-async function validateRepositoryPath(
+export async function validateRepositoryPath(
   repoPath: string
 ): Promise<{ valid: boolean; error?: string }> {
   try {
@@ -124,7 +107,7 @@ async function validateRepositoryPath(
 /**
  * Detect primary programming language
  */
-async function detectLanguage(repoPath: string): Promise<{ language: string; version?: string }> {
+export async function detectLanguage(repoPath: string): Promise<{ language: string; version?: string }> {
   const files = await fs.readdir(repoPath);
   const fileStats = await Promise.all(
     files.map(async (file) => {
@@ -176,7 +159,7 @@ async function detectLanguage(repoPath: string): Promise<{ language: string; ver
 /**
  * Detect framework
  */
-async function detectFramework(
+export async function detectFramework(
   repoPath: string,
   language: string
 ): Promise<{ framework?: string; version?: string }> {
@@ -227,7 +210,7 @@ async function detectFramework(
 /**
  * Detect build system
  */
-async function detectBuildSystem(
+export async function detectBuildSystem(
   repoPath: string
 ): Promise<((typeof BUILD_SYSTEMS)[keyof typeof BUILD_SYSTEMS] & { type: string }) | undefined> {
   const files = await fs.readdir(repoPath);
@@ -244,7 +227,7 @@ async function detectBuildSystem(
 /**
  * Analyze dependencies
  */
-async function analyzeDependencies(
+export async function analyzeDependencies(
   repoPath: string,
   language: string
 ): Promise<Array<{ name: string; version?: string; type?: 'runtime' | 'dev' | 'test' }>> {
@@ -302,7 +285,7 @@ async function analyzeDependencies(
 /**
  * Detect exposed ports
  */
-async function detectPorts(repoPath: string, language: string): Promise<number[]> {
+export async function detectPorts(repoPath: string, language: string): Promise<number[]> {
   const ports: Set<number> = new Set();
 
   // Check for environment configuration
@@ -336,7 +319,7 @@ async function detectPorts(repoPath: string, language: string): Promise<number[]
 /**
  * Check for Docker files
  */
-async function checkDockerFiles(
+export async function checkDockerFiles(
   repoPath: string
 ): Promise<{ hasDockerfile: boolean; hasDockerCompose: boolean; hasKubernetes: boolean }> {
   const files = await fs.readdir(repoPath);
@@ -348,12 +331,10 @@ async function checkDockerFiles(
   };
 }
 
-
-
 /**
  * Get recommended base image for language/framework
  */
-function getRecommendedBaseImage(language: string, framework?: string): string {
+export function getRecommendedBaseImage(language: string, framework?: string): string {
   const imageMap: Record<string, string> = {
     javascript: 'node:18-alpine',
     typescript: 'node:18-alpine',
@@ -376,7 +357,7 @@ function getRecommendedBaseImage(language: string, framework?: string): string {
 /**
  * Get security recommendations based on dependencies
  */
-function getSecurityRecommendations(
+export function getSecurityRecommendations(
   dependencies: Array<{ name: string; version?: string; type?: 'runtime' | 'dev' | 'test' }>
 ): string[] {
   const recommendations: string[] = [];
@@ -407,7 +388,7 @@ function getSecurityRecommendations(
 /**
  * Gather file structure for AI context
  */
-async function gatherFileStructure(repoPath: string, maxDepth: number = 2): Promise<string[]> {
+export async function gatherFileStructure(repoPath: string, maxDepth: number = 2): Promise<string[]> {
   const files: string[] = [];
 
   async function walkDir(dir: string, currentDepth: number) {
@@ -480,6 +461,3 @@ function getFileIcon(extension: string): string {
 
   return iconMap[extension.toLowerCase()] || '📄';
 }
-
-// Default export for registry
-export default analyzeRepositoryHandler;
