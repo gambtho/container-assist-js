@@ -71,6 +71,7 @@ export class KubernetesService {
 
   async close(): Promise<void> {
     // Client doesn't need explicit closing for k8s'
+    await Promise.resolve(); // Satisfy async requirement
     this.logger.info('Kubernetes service closed');
   }
 

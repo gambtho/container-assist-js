@@ -7,6 +7,33 @@
 import type { Logger } from 'pino';
 import type { SessionService } from '../../services/session.js';
 
+// Type definitions for session data
+interface SessionData {
+  id: string;
+  status: string;
+  stage?: string;
+  progress?: number;
+  workflow_state?: unknown;
+  created_at: string;
+  updated_at?: string;
+  repo_path?: string;
+  metadata?: unknown;
+}
+
+// Type guard for SessionData
+function isSessionData(obj: unknown): obj is SessionData {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'id' in obj &&
+    'status' in obj &&
+    'created_at' in obj &&
+    typeof (obj as { id: unknown; status: unknown; created_at: unknown }).id === 'string' &&
+    typeof (obj as { id: unknown; status: unknown; created_at: unknown }).status === 'string' &&
+    typeof (obj as { id: unknown; status: unknown; created_at: unknown }).created_at === 'string'
+  );
+}
+
 export class WorkflowResourceProvider {
   constructor(
     private sessionService: SessionService,
@@ -18,7 +45,7 @@ export class WorkflowResourceProvider {
   /**
    * Register workflow-related MCP resources
    */
-  getResources(): Array<any> {
+  getResources(): Array<unknown> {
     return [
       // Current workflow resource
       {
@@ -33,7 +60,7 @@ export class WorkflowResourceProvider {
               status: 'active'
             });
 
-            if (!sessions || sessions.length === 0) {
+            if (sessions == null || sessions.length === 0) {
               return {
                 content: [
                   {
@@ -129,22 +156,32 @@ export class WorkflowResourceProvider {
               limit: 20
             });
 
-            if (!sessions) {
+            if (sessions == null) {
               throw new Error('Failed to retrieve workflow history');
             }
 
-            const history = sessions.map((session: unknown) => ({
-              id: session.id,
-              status: session.status,
-              stage: session.stage,
-              created: session.created_at,
-              updated: session.updated_at,
-              duration: session.updated_at
-                ? new Date(session.updated_at).getTime() - new Date(session.created_at).getTime()
-                : null,
-              repoPath: session.repo_path,
-              metadata: session.metadata
-            }));
+            const history = sessions
+              .map((session: unknown) => {
+                if (!isSessionData(session)) {
+                  this.logger.warn({ session }, 'Invalid session format in history');
+                  return null;
+                }
+                return {
+                  id: session.id,
+                  status: session.status,
+                  stage: session.stage,
+                  created: session.created_at,
+                  updated: session.updated_at,
+                  duration:
+                    session.updated_at != null && session.updated_at !== ''
+                      ? new Date(session.updated_at).getTime() -
+                        new Date(session.created_at).getTime()
+                      : null,
+                  repoPath: session.repo_path,
+                  metadata: session.metadata
+                };
+              })
+              .filter((s): s is NonNullable<typeof s> => s !== null);
 
             return {
               content: [
@@ -193,7 +230,7 @@ export class WorkflowResourceProvider {
           try {
             const sessions = await this.sessionService.list({});
 
-            if (!sessions) {
+            if (sessions == null) {
               throw new Error('Failed to retrieve workflow statistics');
             }
 
@@ -212,15 +249,15 @@ export class WorkflowResourceProvider {
 
             for (const session of sessions ?? []) {
               // Count by status
-              stats.byStatus[session.status] = (stats.byStatus[session.status] || 0) + 1;
+              stats.byStatus[session.status] = (stats.byStatus[session.status] ?? 0) + 1;
 
               // Count by stage
-              if (session.stage) {
-                stats.byStage[session.stage] = (stats.byStage[session.stage] || 0) + 1;
+              if (session.stage != null && session.stage !== '') {
+                stats.byStage[session.stage] = (stats.byStage[session.stage] ?? 0) + 1;
               }
 
               // Calculate durations
-              if (session.updated_at) {
+              if (session.updated_at != null && session.updated_at !== '') {
                 const duration =
                   new Date(session.updated_at).getTime() - new Date(session.created_at).getTime();
                 totalDuration += duration;

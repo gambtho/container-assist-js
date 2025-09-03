@@ -52,7 +52,7 @@ export class DockerService {
   }
 
   async pushImage(tag: string, registry?: string): Promise<{ digest?: string }> {
-    const fullTag = registry ? `${registry}/${tag}` : tag;
+    const fullTag = registry != null && registry !== '' ? `${registry}/${tag}` : tag;
     return await this.client.push(fullTag, registry);
   }
 
@@ -64,7 +64,14 @@ export class DockerService {
       Created?: number;
     }>
   > {
-    return this.client.listImages();
+    return this.client.listImages() as Promise<
+      Array<{
+        Id: string;
+        RepoTags?: string[];
+        Size?: number;
+        Created?: number;
+      }>
+    >;
   }
 
   async removeImage(imageId: string): Promise<void> {
@@ -90,14 +97,32 @@ export class DockerService {
       throw new DockerError('Docker not available', 'DOCKER_HEALTH_CHECK_FAILED', 'health');
     }
 
-    return {
+    const result: {
+      available: boolean;
+      status?: string;
+      version?: string;
+      trivyAvailable?: boolean;
+      systemInfo?: unknown;
+      client?: DockerClient;
+    } = {
       available: healthStatus.available,
-      status: 'healthy',
-      version: healthStatus.version,
-      trivyAvailable: healthStatus.trivyAvailable,
-      systemInfo: healthStatus.systemInfo,
-      client: healthStatus.client
+      status: 'healthy'
     };
+
+    if (healthStatus.version !== undefined) {
+      result.version = healthStatus.version;
+    }
+    if (healthStatus.trivyAvailable !== undefined) {
+      result.trivyAvailable = healthStatus.trivyAvailable;
+    }
+    if (healthStatus.systemInfo !== undefined) {
+      result.systemInfo = healthStatus.systemInfo;
+    }
+    if (healthStatus.client !== undefined) {
+      result.client = healthStatus.client;
+    }
+
+    return result;
   }
 
   // Additional methods needed by resource providers
@@ -117,9 +142,14 @@ export class DockerService {
     await this.client.tag(source, target);
   }
 
-  async getSystemInfo(): Promise<Record<string, unknown>> {
+  async getSystemInfo(): Promise<Record<string, unknown> | null> {
     const health = await this.health();
-    return health.systemInfo ?? {};
+    const systemInfo = health.systemInfo;
+    if (systemInfo && typeof systemInfo === 'object') {
+      return systemInfo as Record<string, unknown>;
+    }
+    // Return null when no system info is available instead of empty object
+    return null;
   }
 
   async listContainers(options?: Record<string, unknown>): Promise<
@@ -139,6 +169,7 @@ export class DockerService {
    */
   async close(): Promise<void> {
     // Docker client doesn't need explicit cleanup, but log the shutdown'
+    await Promise.resolve(); // Satisfy async requirement
     this.logger.info('Docker service closed');
   }
 }

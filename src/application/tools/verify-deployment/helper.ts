@@ -2,7 +2,7 @@
  * Verify Deployment - Helper Functions
  */
 
-import type { MCPToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types.js';
 
 /**
  * Check deployment health
@@ -10,7 +10,7 @@ import type { MCPToolContext } from '../tool-types.js';
 export async function checkDeploymentHealth(
   deploymentName: string,
   namespace: string,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<{
   name: string;
   endpoint: string;
@@ -19,17 +19,17 @@ export async function checkDeploymentHealth(
 }> {
   const { kubernetesService, logger } = context;
 
-  if (kubernetesService && 'getStatus' in kubernetesService) {
+  if (kubernetesService != null && 'getStatus' in kubernetesService) {
     const result = await (kubernetesService as any).getStatus(
       `deployment/${deploymentName}`,
       namespace
     );
 
-    if (result.success && result.data) {
+    if (result?.success === true && result?.data != null) {
       return result.data;
     }
 
-    throw new Error(result.error?.message ?? 'Failed to get deployment status');
+    throw new Error(String(result?.error?.message) ?? 'Failed to get deployment status');
   }
 
   // Mock health check for testing
@@ -46,10 +46,10 @@ export async function checkDeploymentHealth(
 /**
  * Get pod information
  */
-export async function getPodInfo(
+export function getPodInfo(
   namespace: string,
   deploymentName: string,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<
   Array<{ name: string; ready: boolean; status: string; restarts?: number; node?: string }>
 > {
@@ -59,7 +59,7 @@ export async function getPodInfo(
   logger.info({ namespace, deployment: deploymentName }, 'Getting pod information');
 
   // Mock pod info for testing
-  return [
+  return Promise.resolve([
     {
       name: `${deploymentName}-abc123`,
       ready: true,
@@ -74,7 +74,7 @@ export async function getPodInfo(
       restarts: 0,
       node: 'node-2'
     }
-  ];
+  ]);
 }
 
 /**
@@ -83,24 +83,24 @@ export async function getPodInfo(
 export async function getServiceEndpoints(
   namespace: string,
   serviceName: string,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<
   Array<{ service: string; type: string; url?: string; port?: number; external: boolean }>
 > {
   const { kubernetesService, logger } = context;
 
-  if (kubernetesService && 'getEndpoints' in kubernetesService) {
+  if (kubernetesService != null && 'getEndpoints' in kubernetesService) {
     const result = await (kubernetesService as any).getEndpoints(namespace);
 
-    if (result.success && result.data) {
-      return result.data
-        .filter((e: any) => !serviceName || e.service === serviceName)
+    if (result?.success === true && result?.data != null) {
+      return (result.data as any[])
+        .filter((e: any) => serviceName == null || serviceName === '' || e.service === serviceName)
         .map((e: any) => ({
           service: e.service,
           type: 'ClusterIP',
           url: e.url,
           port: 80,
-          external: !!e.url && !e.url.includes('cluster.local')
+          external: Boolean(e.url) && !String(e.url).includes('cluster.local')
         }));
     }
   }
@@ -200,19 +200,21 @@ export async function getTargetResources(
 export async function checkAllDeployments(
   targetDeployments: string[],
   namespace: string,
-  context: MCPToolContext
-): Promise<Array<{
-  name: string;
-  ready: boolean;
-  replicas: any;
-  conditions?: any[];
-}>> {
+  context: ToolContext
+): Promise<
+  Array<{
+    name: string;
+    ready: boolean;
+    replicas: any;
+    conditions?: unknown[];
+  }>
+> {
   const { logger } = context;
   const deploymentResults: Array<{
     name: string;
     ready: boolean;
     replicas: any;
-    conditions?: any[];
+    conditions?: unknown[];
   }> = [];
 
   for (const deploymentName of targetDeployments) {
@@ -255,14 +257,16 @@ export async function checkAllDeployments(
 export async function checkAllPods(
   targetDeployments: string[],
   namespace: string,
-  context: MCPToolContext
-): Promise<Array<{
-  name: string;
-  ready: boolean;
-  status: string;
-  restarts?: number;
-  node?: string;
-}>> {
+  context: ToolContext
+): Promise<
+  Array<{
+    name: string;
+    ready: boolean;
+    status: string;
+    restarts?: number;
+    node?: string;
+  }>
+> {
   const podResults: Array<{
     name: string;
     ready: boolean;
@@ -286,14 +290,16 @@ export async function getAllEndpoints(
   targetServices: string[],
   targetDeployments: string[],
   namespace: string,
-  context: MCPToolContext
-): Promise<Array<{
-  service: string;
-  type: string;
-  url?: string;
-  port?: number;
-  external: boolean;
-}>> {
+  context: ToolContext
+): Promise<
+  Array<{
+    service: string;
+    type: string;
+    url?: string;
+    port?: number;
+    external: boolean;
+  }>
+> {
   const endpointResults: Array<{
     service: string;
     type: string;

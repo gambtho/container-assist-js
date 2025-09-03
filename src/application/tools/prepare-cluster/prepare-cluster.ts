@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { ErrorCode, InfrastructureError } from '../../../contracts/types/errors.js';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 
 // Input schema
 const PrepareClusterInputRaw = z.object({
@@ -72,7 +72,7 @@ export type PrepareClusterOutput = z.infer<typeof PrepareClusterOutput>;
 /**
  * Prepare Cluster Handler Implementation
  */
-const prepareClusterHandler: MCPTool<PrepareClusterInput, PrepareClusterOutput> = {
+const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterOutput> = {
   name: 'prepare_cluster',
   description: 'Prepare and validate Kubernetes cluster for application deployment',
   category: 'workflow',
@@ -82,7 +82,7 @@ const prepareClusterHandler: MCPTool<PrepareClusterInput, PrepareClusterOutput> 
 
   handler: async (
     input: PrepareClusterInput,
-    context: MCPToolContext
+    context: ToolContext
   ): Promise<PrepareClusterOutput> => {
     const {
       logger,
@@ -223,7 +223,7 @@ async function simulateClusterPreparation(
   validation: PrepareClusterOutput['validation'];
   recommendations?: string[];
 }> {
-  logger.info({ context, namespace, dryRun, validateOnly }); // Fixed logger call
+  (logger as any).info({ context, namespace, dryRun, validateOnly }); // Fixed logger call
 
   // Simulate cluster information
   const cluster = {

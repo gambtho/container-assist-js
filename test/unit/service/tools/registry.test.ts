@@ -1,20 +1,35 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { ToolRegistry } from '../../../../../src/application/tools/ops/registry.js';
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { ToolRegistry } from '../../../../src/application/tools/ops/registry.js';
 import { z } from 'zod';
-import { ok, fail } from '../../../../../src/domain/types/result.js';
-import { ErrorCode, ServiceError } from '../../../../../src/domain/types/errors.js';
+import { ok, fail } from '../../../../src/domain/types/result.js';
+import { ErrorCode } from '../../../../src/domain/types/errors.js';
+import { ServiceError } from '../../../../src/contracts/types/errors.js';
 import { createTestContext, cleanupTestContext, createMockLogger } from '../../../utils/test-helpers.js';
-import type { ToolDescriptor, ToolContext } from '../../../../../src/application/tools/tool-types.js';
+import type { ToolDescriptor, ToolContext } from '../../../../src/application/tools/tool-types.js';
 
 describe('ToolRegistry', () => {
   let registry: ToolRegistry;
   let testContext: ReturnType<typeof createTestContext>;
   let mockLogger = createMockLogger();
+  let mockServices: any;
   
   beforeEach(() => {
     testContext = createTestContext();
     mockLogger = createMockLogger();
-    registry = new ToolRegistry(testContext.deps, mockLogger);
+    mockServices = {
+      dockerService: {},
+      kubernetesService: {},
+      sessionService: {},
+      ai: {
+        isAvailable: jest.fn().mockReturnValue(false)
+      },
+      session: {},
+      docker: {},
+      kubernetes: {},
+      progress: {},
+      events: {}
+    };
+    registry = new ToolRegistry(mockServices, mockLogger);
   });
   
   afterEach(async () => {
@@ -314,8 +329,8 @@ describe('ToolRegistry', () => {
         })
       };
       
-      testContext.deps.mcpSampler = mockSampler;
-      registry = new ToolRegistry(testContext.deps, mockLogger);
+      mockServices.mcpSampler = mockSampler;
+      registry = new ToolRegistry(mockServices, mockLogger);
       
       const request = { templateId: 'test', variables: {} };
       const response = await registry.handleSamplingRequest(request);
@@ -330,8 +345,8 @@ describe('ToolRegistry', () => {
     });
     
     it('should handle sampling when not available', async () => {
-      testContext.deps.mcpSampler = undefined;
-      registry = new ToolRegistry(testContext.deps, mockLogger);
+      mockServices.mcpSampler = undefined;
+      registry = new ToolRegistry(mockServices, mockLogger);
       
       const response = await registry.handleSamplingRequest({});
       
@@ -344,8 +359,8 @@ describe('ToolRegistry', () => {
         sample: jest.fn().mockRejectedValue(new Error('Sampling failed'))
       };
       
-      testContext.deps.mcpSampler = mockSampler;
-      registry = new ToolRegistry(testContext.deps, mockLogger);
+      mockServices.mcpSampler = mockSampler;
+      registry = new ToolRegistry(mockServices, mockLogger);
       
       const response = await registry.handleSamplingRequest({});
       

@@ -2,7 +2,7 @@
  * Push Image - Helper Functions
  */
 
-import type { MCPToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types.js';
 
 /**
  * Authenticate with registry
@@ -10,7 +10,7 @@ import type { MCPToolContext } from '../tool-types.js';
 export async function authenticateRegistry(
   registry: string,
   credentials: { username?: string; password?: string; authToken?: string },
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<boolean> {
   const { logger } = context;
 
@@ -45,7 +45,7 @@ export async function pushImage(
   tag: string,
   registry: string,
   auth: { username?: string; password?: string },
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<{ digest: string; size?: number; pushTime?: number }> {
   const { dockerService, logger } = context;
   const startTime = Date.now();
@@ -90,7 +90,7 @@ export async function pushWithRetry(
   tag: string,
   registry: string,
   auth: { username?: string; password?: string },
-  context: MCPToolContext,
+  context: ToolContext,
   maxRetries: number = 3
 ): Promise<{ digest: string; size?: number; pushTime?: number }> {
   const { logger } = context;
@@ -137,8 +137,7 @@ export async function getImagesToPush(
       imagesToPush = session.workflow_state.tag_result.tags ?? [];
     } else if (session.workflow_state?.build_result) {
       const tag =
-        session.workflow_state.build_result.tag ??
-        session.workflow_state.build_result.tags?.[0];
+        session.workflow_state.build_result.tag ?? session.workflow_state.build_result.tags?.[0];
       imagesToPush = tag ? [tag] : [];
     }
   }
@@ -154,7 +153,7 @@ export async function pushImagesParallel(
   targetRegistry: string,
   auth: { username?: string; password?: string },
   retryOnFailure: boolean,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<{
   pushed: Array<{ tag: string; digest: string; size?: number; pushTime?: number }>;
   failed: Array<{ tag: string; error?: string }>;
@@ -190,7 +189,7 @@ export async function pushImagesSequential(
   targetRegistry: string,
   auth: { username?: string; password?: string },
   retryOnFailure: boolean,
-  context: MCPToolContext,
+  context: ToolContext,
   progressCallback?: (index: number, tag: string) => Promise<void>
 ): Promise<{
   pushed: Array<{ tag: string; digest: string; size?: number; pushTime?: number }>;

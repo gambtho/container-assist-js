@@ -106,7 +106,7 @@ export class MockSampler implements MCPSampler {
           ? request.prompt.includes(template.pattern)
           : template.pattern.test(request.prompt);
 
-      if (matches && matches.length > 0) {
+      if (matches) {
         // Check for artificial failure
         if (template.failureRate && Math.random() < template.failureRate) {
           return {
@@ -184,7 +184,7 @@ export class MockSampler implements MCPSampler {
     this.addTemplate({
       pattern: /dockerfile|docker|container/i,
       response: {
-        text: `FROM node:18-alpine``
+        text: `FROM node:18-alpine
 
 WORKDIR /app
 

@@ -5,7 +5,7 @@
 import path from 'node:path';
 import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
 import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 import {
   AnalyzeRepositoryInput as AnalyzeRepositoryInputSchema,
   AnalysisResultSchema,
@@ -36,14 +36,14 @@ export type AnalyzeOutput = AnalysisResult;
 /**
  * Main handler implementation
  */
-export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
+const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
   name: 'analyze_repository',
   description: 'Analyze repository structure and detect language, framework, and build system',
   category: 'workflow',
   inputSchema: AnalyzeRepositoryInput,
   outputSchema: AnalyzeRepositoryOutput,
 
-  handler: async (input: AnalyzeInput, context: MCPToolContext): Promise<AnalyzeOutput> => {
+  handler: async (input: AnalyzeInput, context: ToolContext): Promise<AnalyzeOutput> => {
     const { logger, sessionService, progressEmitter } = context;
     const { repoPath, sessionId: inputSessionId, depth, includeTests } = input;
 
@@ -62,13 +62,15 @@ export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOu
       if (!validation.valid) {
         throw new DomainError(
           ErrorCode.InvalidInput,
-          validation.error || 'Invalid repository path'
+          validation.error != null && validation.error !== ''
+            ? validation.error
+            : 'Invalid repository path'
         );
       }
 
       // Create or get session
       let sessionId = inputSessionId;
-      if (!sessionId && sessionService) {
+      if ((sessionId == null || sessionId === '') && sessionService != null) {
         const session = await sessionService.create({
           projectName: path.basename(repoPath),
           metadata: {
@@ -81,7 +83,7 @@ export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOu
       }
 
       // Emit progress
-      if (progressEmitter && sessionId) {
+      if (progressEmitter != null && sessionId != null && sessionId !== '') {
         await progressEmitter.emit({
           sessionId,
           step: 'analyze_repository',
@@ -100,9 +102,23 @@ export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOu
       const dockerInfo = await checkDockerFiles(repoPath);
 
       // Enhanced AI analysis if available
-      let aiEnhancements: any = {};
+      interface AIEnhancements {
+        aiInsights?: string | any;
+        aiTokenUsage?: {
+          inputTokens: number;
+          outputTokens: number;
+          totalTokens: number;
+        };
+        suggestedOptimizations?: any;
+        securityRecommendations?: any;
+        recommendedBaseImage?: string;
+        recommendedBuildStrategy?: string;
+        fromCache?: boolean;
+        tokensUsed?: number;
+      }
+      let aiEnhancements: AIEnhancements = {};
       try {
-        if (context.aiService) {
+        if (context.aiService != null) {
           // Gather file structure for AI context
           const fileList = await gatherFileStructure(repoPath, depth === 'deep' ? 3 : 1);
 
@@ -120,24 +136,24 @@ export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOu
               }),
               directoryTree: fileList.slice(0, 20).join('\n'),
               language: languageInfo.language,
-              framework: frameworkInfo.framework || 'none',
+              framework: frameworkInfo?.framework ?? 'none',
               dependencies: dependencies
                 .map((d) => d.name)
                 .slice(0, 20)
                 .join(', '),
-              buildSystem: buildSystemRaw?.type || 'none'
+              buildSystem: buildSystemRaw?.type ?? 'none'
             });
 
-          const result = await context.aiService.generate<string>(requestBuilder);
+          const result = await (context.aiService as any).generate(requestBuilder);
 
-          if (result.data) {
+          if (result?.data != null) {
             try {
               // Try to parse structured response
               const parsed = JSON.parse(result.data);
               aiEnhancements = {
                 aiInsights: parsed.insights ?? result.data,
-                suggestedOptimizations: parsed.optimizations || [],
-                securityRecommendations: parsed.security || [],
+                suggestedOptimizations: parsed.optimizations ?? [],
+                securityRecommendations: parsed.security ?? [],
                 recommendedBaseImage: parsed.baseImage,
                 recommendedBuildStrategy: parsed.buildStrategy
               };
@@ -145,18 +161,18 @@ export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOu
               // Fallback to raw content
               aiEnhancements = {
                 aiInsights: result.data,
-                fromCache: result.metadata.fromCache,
-                tokensUsed: result.metadata.tokensUsed
+                fromCache: result.metadata?.fromCache,
+                tokensUsed: result.metadata?.tokensUsed
               };
             }
 
             // Log AI analysis metadata
             logger.info(
               {
-                model: result.metadata.model,
-                tokensUsed: result.metadata.tokensUsed,
-                fromCache: result.metadata.fromCache,
-                durationMs: result.metadata.durationMs
+                model: result.metadata?.model,
+                tokensUsed: result.metadata?.tokensUsed,
+                fromCache: result.metadata?.fromCache,
+                durationMs: result.metadata?.durationMs
               },
               'AI-enhanced repository analysis completed'
             );
@@ -171,15 +187,15 @@ export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOu
       // Transform buildSystem to match schema structure
       const buildSystem = buildSystemRaw
         ? {
-          type: buildSystemRaw.type,
-          build_file: buildSystemRaw.file,
-          build_command: buildSystemRaw.buildCmd,
-          test_command: buildSystemRaw.testCmd
-        }
+            type: buildSystemRaw.type,
+            build_file: buildSystemRaw.file,
+            build_command: buildSystemRaw.buildCmd,
+            test_command: buildSystemRaw.testCmd
+          }
         : undefined;
 
       // Emit progress
-      if (progressEmitter && sessionId) {
+      if (progressEmitter != null && sessionId != null && sessionId !== '') {
         await progressEmitter.emit({
           sessionId,
           step: 'analyze_repository',
@@ -191,35 +207,35 @@ export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOu
 
       // Build enhanced recommendations
       const baseRecommendations = {
-        baseImage: getRecommendedBaseImage(languageInfo.language, frameworkInfo.framework),
-        buildStrategy: buildSystem ? 'multi-stage' : 'single-stage',
+        baseImage: getRecommendedBaseImage(languageInfo.language, frameworkInfo?.framework),
+        buildStrategy: buildSystem != null ? 'multi-stage' : 'single-stage',
         securityNotes: getSecurityRecommendations(dependencies)
       };
 
       // Merge with AI enhancements
       const recommendations = {
         ...baseRecommendations,
-        ...(aiEnhancements.suggestedOptimizations && {
+        ...(aiEnhancements.suggestedOptimizations != null && {
           aiOptimizations: aiEnhancements.suggestedOptimizations
         }),
-        ...(aiEnhancements.securityRecommendations && {
+        ...(aiEnhancements.securityRecommendations != null && {
           aiSecurity: aiEnhancements.securityRecommendations
         })
       };
 
       // Store analysis in session
-      if (sessionService && sessionId) {
+      if (sessionService != null && sessionId != null && sessionId !== '') {
         await sessionService.updateAtomic(sessionId, (session) => ({
           ...session,
           workflow_state: {
             ...session.workflow_state,
             analysis_result: {
               language: languageInfo.language,
-              framework: frameworkInfo.framework,
+              framework: frameworkInfo?.framework,
               build_system: buildSystem,
               dependencies,
               ports,
-              has_tests: dependencies.some((dep) => dep.type === 'test') || false,
+              has_tests: dependencies.some((dep) => dep.type === 'test'),
               docker_compose_exists: dockerInfo.hasDockerCompose ?? false,
               ...dockerInfo,
               recommendations
@@ -229,7 +245,7 @@ export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOu
       }
 
       // Emit completion
-      if (progressEmitter && sessionId) {
+      if (progressEmitter != null && sessionId != null && sessionId !== '') {
         await progressEmitter.emit({
           sessionId,
           step: 'analyze_repository',
@@ -242,7 +258,7 @@ export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOu
       // Construct response carefully to handle exactOptionalPropertyTypes
       const response: AnalyzeOutput = {
         success: true,
-        sessionId: sessionId || 'temp-session',
+        sessionId: sessionId ?? 'temp-session',
         language: languageInfo.language,
         dependencies,
         ports,
@@ -254,11 +270,11 @@ export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOu
         response.languageVersion = languageInfo.version;
       }
 
-      if (frameworkInfo.framework !== undefined) {
+      if (frameworkInfo?.framework !== undefined) {
         response.framework = frameworkInfo.framework;
       }
 
-      if (frameworkInfo.version !== undefined) {
+      if (frameworkInfo?.version !== undefined) {
         response.frameworkVersion = frameworkInfo.version;
       }
 
@@ -281,8 +297,8 @@ export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOu
         depth,
         includeTests,
         timestamp: new Date().toISOString(),
-        ...(aiEnhancements.aiInsights && { aiInsights: aiEnhancements.aiInsights }),
-        ...(aiEnhancements.aiTokenUsage && { aiTokenUsage: aiEnhancements.aiTokenUsage })
+        ...(aiEnhancements.aiInsights != null && { aiInsights: aiEnhancements.aiInsights }),
+        ...(aiEnhancements.aiTokenUsage != null && { aiTokenUsage: aiEnhancements.aiTokenUsage })
       };
 
       return response;

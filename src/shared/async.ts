@@ -9,7 +9,7 @@ export interface RetryOptions {
   maxDelayMs?: number;
 }
 
-export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+export const sleep = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
 
 export async function retry<T>(
   fn: () => Promise<T>,

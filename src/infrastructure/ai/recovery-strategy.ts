@@ -4,7 +4,7 @@
  */
 
 import type { AIRequest } from '../ai-request-builder.js';
-import type { ErrorContext } from './error-context';
+import type { ErrorContext, FailurePattern } from './error-context';
 
 /**
  * Base interface for all recovery strategies
@@ -164,7 +164,7 @@ export abstract class BaseRecoveryStrategy implements RecoveryStrategy {
   /**
    * Helper method to get the most confident pattern of a specific type
    */
-  protected getPattern(context: ErrorContext, patternType: string) {
+  protected getPattern(context: ErrorContext, patternType: string): FailurePattern | undefined {
     return context.patterns?.find((p) => p.type === patternType);
   }
 }
@@ -183,7 +183,7 @@ export class RecoveryStrategySelector {
     // Insert strategy in priority order
     const insertIndex = this.strategies.findIndex((s) => s.priority > strategy.priority);
     if (insertIndex === -1) {
-      await this.strategies.push(strategy);
+      this.strategies.push(strategy);
     } else {
       this.strategies.splice(insertIndex, 0, strategy);
     }
@@ -375,13 +375,13 @@ export class RecoveryCoordinator {
     // Add pattern-specific instructions
     context.patterns?.forEach((pattern) => {
       if (pattern.suggestedFix) {
-        await instructions.push(pattern.suggestedFix);
+        instructions.push(pattern.suggestedFix);
       }
     });
 
     // Add context-specific instructions
     if (context.suggestions && context.suggestions.length > 0) {
-      await instructions.push(...context.suggestions);
+      instructions.push(...context.suggestions);
     }
 
     return instructions;

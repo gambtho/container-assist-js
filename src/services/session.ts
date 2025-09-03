@@ -46,6 +46,7 @@ export class SessionService implements ISessionService {
 
   async initialize(): Promise<void> {
     // SessionStore doesn't have initialize method - it's ready to use
+    await Promise.resolve(); // Satisfy async requirement
     this.logger.info('Session service initialized');
   }
 

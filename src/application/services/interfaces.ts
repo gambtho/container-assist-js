@@ -19,7 +19,7 @@ export interface DockerService {
   /**
    * Scan Docker image for vulnerabilities
    */
-  scan(options: { image: string; severity?: string; format?: string }): Promise<any>;
+  scan(options: { image: string; severity?: string; format?: string }): Promise<unknown>;
 
   /**
    * Push image to registry
@@ -49,12 +49,12 @@ export interface KubernetesService {
   /**
    * Deploy application to cluster
    */
-  deploy(manifests: any[]): Promise<{ success: boolean; resources: any[] }>;
+  deploy(manifests: unknown[]): Promise<{ success: boolean; resources: unknown[] }>;
 
   /**
    * Generate Kubernetes manifests from application spec
    */
-  generateManifests(spec: unknown): Promise<any[]>;
+  generateManifests(spec: unknown): Promise<unknown[]>;
 
   /**
    * Check cluster connectivity and access
@@ -64,7 +64,7 @@ export interface KubernetesService {
   /**
    * Verify deployment status
    */
-  verifyDeployment(options: { namespace: string; name: string }): Promise<any>;
+  verifyDeployment(options: { namespace: string; name: string }): Promise<unknown>;
 
   /**
    * Prepare cluster (create namespaces, etc.)
@@ -89,12 +89,12 @@ export interface AIService {
   /**
    * Enhance Kubernetes manifests with best practices
    */
-  enhanceManifests(manifests: any[]): Promise<any[]>;
+  enhanceManifests(manifests: unknown[]): Promise<unknown[]>;
 
   /**
    * Analyze repository structure and dependencies
    */
-  analyzeRepository(path: string): Promise<any>;
+  analyzeRepository(path: string): Promise<unknown>;
 
   /**
    * Fix Dockerfile issues

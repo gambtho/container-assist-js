@@ -8,10 +8,11 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
 import { z } from 'zod';
 import { ToolFactory } from '../src/application/tools/factory.js';
-import type { CoreServices } from '../src/application/services/interfaces.js';
+import type { Services } from '../src/services/index.js';
 import { createPinoLogger } from '../src/infrastructure/logger.js';
 import { config as applicationConfig, type ApplicationConfig } from '../src/config/index.js';
 import process from 'node:process';
+import { EventEmitter } from 'events';
 import type { Logger } from 'pino';
 
 // Import service implementations directly
@@ -23,7 +24,7 @@ import { ResourceManager } from '../src/application/resources/index.js';
 
 export class ContainerKitMCPServerV2 {
   private server: Server;
-  private services: CoreServices;
+  private services: Services;
   private toolFactory: ToolFactory;
   private resourceManager!: ResourceManager; // Initialize later
   private logger: Logger;
@@ -43,7 +44,7 @@ export class ContainerKitMCPServerV2 {
     this.services = this.createServices();
     
     // Create tool factory with injected services
-    this.toolFactory = new ToolFactory(this.services);
+    this.toolFactory = new ToolFactory(this.services, this.logger);
 
     // Initialize resource manager - needs to be done after services are created
     // Will initialize later in start() method when we have a tool registry
@@ -74,16 +75,8 @@ export class ContainerKitMCPServerV2 {
    * Create services directly with constructor injection
    * No service locator, no factories - just direct instantiation
    */
-  private createServices(): CoreServices {
-    // Create progress emitter
-    const progressEmitter = {
-      emit: async (update: any) => {
-        // Progress notifications should be sent via the notification method
-        // The SDK doesn't have a sendProgressNotification method
-        // Progress is handled through the progressToken in requests
-        this.logger.info({ update }, 'Progress update');
-      }
-    };
+  private createServices(): Services {
+    // Progress notifications handled via MCP SDK progressToken
 
     // Direct service instantiation with explicit dependencies
     const dockerConfig: any = {
@@ -131,14 +124,8 @@ export class ContainerKitMCPServerV2 {
       kubernetes: kubernetesService as any,
       ai: aiService as any,
       session: sessionService as any,
-      logger: this.logger,
-      progress: progressEmitter,
-      events: {
-        emit: async (event: string, data: any) => {
-          this.logger.info({ event, data }, 'Event emitted');
-        }
-      }
-    } as CoreServices;
+      events: new EventEmitter()
+    } as Services;
   }
 
   /**
@@ -214,6 +201,12 @@ export class ContainerKitMCPServerV2 {
       // Initialize services
       await this.initialize();
 
+      // Set server on tool factory
+      this.toolFactory.setServer(this.server);
+      
+      // Register all tools
+      await this.toolFactory.registerAll();
+
       // Initialize resource manager with services
       this.resourceManager = new ResourceManager(
         this.appConfig,
@@ -263,7 +256,7 @@ export class ContainerKitMCPServerV2 {
     this.server.setRequestHandler(
       { method: z.literal('tools/list') } as any,
       async () => {
-        const tools = this.toolFactory.getAllTools();
+        const tools = await this.toolFactory.getAllTools();
         return {
           tools: tools.map(tool => ({
             name: (tool as any).config.name,
@@ -348,7 +341,7 @@ export class ContainerKitMCPServerV2 {
 
     try {
       const dockerHealth = await this.services.docker.health();
-      services.docker = dockerHealth.healthy;
+      services.docker = dockerHealth.available ?? false;
     } catch (error) {
       this.logger.warn({ error }, 'Docker health check failed');
     }
@@ -414,7 +407,7 @@ export class ContainerKitMCPServerV2 {
   /**
    * Get services for external access if needed
    */
-  getServices(): CoreServices {
+  getServices(): Services {
     return this.services;
   }
 

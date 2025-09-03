@@ -37,7 +37,12 @@ export function ok<T>(value: T): Ok<T> {
  * Create a failure result
  */
 export function fail(error: string, code?: string, details?: unknown): Fail {
-  return { kind: 'fail', error, code, details };
+  return {
+    kind: 'fail',
+    error,
+    ...(code !== undefined && { code }),
+    ...(details !== undefined && { details })
+  };
 }
 
 /**

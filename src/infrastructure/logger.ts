@@ -2,7 +2,7 @@
  * Pino logger configuration and factory functions
  */
 
-import * as pino from 'pino';
+import pino from 'pino';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Logger, LoggerOptions } from 'pino';

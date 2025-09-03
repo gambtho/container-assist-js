@@ -411,8 +411,9 @@ export class AIRequestBuilder {
       result.port = analysis.ports[0];
     }
 
-    if ((analysis as unknown).entry_points?.[0]) {
-      result.entryPoint = (analysis as unknown).entry_points[0];
+    const analysisWithEntryPoints = analysis as AnalysisResult & { entry_points?: string[] };
+    if (analysisWithEntryPoints.entry_points?.[0]) {
+      result.entryPoint = analysisWithEntryPoints.entry_points[0];
     }
 
     return result;

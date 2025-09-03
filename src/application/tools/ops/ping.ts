@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 
 // Input schema
 const PingInputSchema = z.object({
@@ -36,14 +36,14 @@ type PingOutput = z.infer<typeof PingOutputSchema>;
 /**
  * Ping tool implementation using MCP SDK pattern
  */
-const pingTool: MCPTool<PingInput, PingOutput> = {
+const pingTool: ToolDescriptor<PingInput, PingOutput> = {
   name: 'ping',
   description: 'Test MCP server connectivity and health',
   category: 'utility',
   inputSchema: PingInputSchema,
   outputSchema: PingOutputSchema,
 
-  handler: async (input: PingInput, context: MCPToolContext): Promise<PingOutput> => {
+  handler: async (input: PingInput, context: ToolContext): Promise<PingOutput> => {
     const { logger } = context;
     const { message } = input;
 

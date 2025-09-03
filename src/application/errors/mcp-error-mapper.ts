@@ -34,6 +34,7 @@ import {
   ServiceError
 } from '../../contracts/types/errors.js';
 import { ApplicationError } from '../../errors/index.js';
+import { ToolNotImplementedError, ToolValidationError, ToolExecutionError } from './tool-errors.js';
 
 /**
  * Mapping from domain error codes to MCP SDK error codes
@@ -204,6 +205,33 @@ export function convertToMcpError(error: unknown): MCPError {
   // Handle already converted MCP errors
   if (typeof error === 'object' && error != null && 'code' in error && 'message' in error) {
     return error as MCPError;
+  }
+
+  // Handle tool-specific errors
+  if (error instanceof ToolNotImplementedError) {
+    return createMcpError(MCPErrorCode.MethodNotFound, error.message, {
+      toolName: error.toolName,
+      availableTools: error.availableTools,
+      suggestedAlternatives: error.suggestedAlternatives,
+      timestamp: error.timestamp
+    });
+  }
+
+  if (error instanceof ToolValidationError) {
+    return createMcpError(MCPErrorCode.InvalidParams, error.message, {
+      toolName: error.toolName,
+      validationErrors: error.validationErrors,
+      timestamp: error.timestamp
+    });
+  }
+
+  if (error instanceof ToolExecutionError) {
+    return createMcpError(MCPErrorCode.InternalError, error.message, {
+      toolName: error.toolName,
+      operation: error.operation,
+      originalError: error.originalError,
+      timestamp: error.timestamp
+    });
   }
 
   // Handle our typed errors

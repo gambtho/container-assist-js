@@ -6,6 +6,7 @@
 // import type { Server } from '@modelcontextprotocol/sdk/server/index';
 import type { Logger } from 'pino';
 import type { SessionService } from '../../services/session.js';
+import type { Session } from '../../contracts/types/session.js';
 
 export class SessionResourceProvider {
   constructor(
@@ -18,7 +19,7 @@ export class SessionResourceProvider {
   /**
    * Register session-related MCP resources
    */
-  getResources(): Array<any> {
+  getResources(): Array<unknown> {
     // Active sessions resource
     return [
       {
@@ -33,24 +34,27 @@ export class SessionResourceProvider {
               limit: 50
             });
 
-            if (!activeSessions) {
+            if (activeSessions == null) {
               throw new Error('Failed to query active sessions');
             }
 
-            const sessions = activeSessions.map((session: unknown) => ({
-              id: session.id,
-              status: session.status,
-              stage: session.stage,
-              progress: {
-                percentage: session.progress?.percentage ?? 0,
-                message: session.progress?.message ?? '',
-                step: session.progress?.step ?? ''
-              },
-              repoPath: session.repo_path,
-              created: session.created_at,
-              updated: session.updated_at,
-              timeActive: new Date().getTime() - new Date(session.created_at).getTime()
-            }));
+            const sessions = activeSessions.map((session: unknown) => {
+              const sessionData = session as Session;
+              return {
+                id: sessionData.id,
+                status: sessionData.status,
+                stage: sessionData.stage,
+                progress: {
+                  percentage: sessionData.progress?.percentage ?? 0,
+                  message: '', // Not available in schema, set default
+                  step: sessionData.progress?.current_step?.toString() ?? ''
+                },
+                repoPath: sessionData.repo_path,
+                created: sessionData.created_at,
+                updated: sessionData.updated_at,
+                timeActive: new Date().getTime() - new Date(sessionData.created_at).getTime()
+              };
+            });
 
             return {
               content: [
@@ -203,32 +207,33 @@ export class SessionResourceProvider {
             };
 
             for (const session of allSessions) {
-              const age = now.getTime() - new Date(session.created_at).getTime();
-              const lastActivity = session.updated_at
-                ? now.getTime() - new Date(session.updated_at).getTime()
+              const sessionData = session;
+              const age = now.getTime() - new Date(sessionData.created_at).getTime();
+              const lastActivity = sessionData.updated_at
+                ? now.getTime() - new Date(sessionData.updated_at).getTime()
                 : age;
 
               // Count by status
-              switch (session.status) {
+              switch (sessionData.status) {
                 case 'active':
                   management.active++;
                   if (lastActivity > staleThreshold) {
                     management.stale++;
-                    management.cleanupCandidates.push(session.id);
+                    management.cleanupCandidates.push(sessionData.id);
                   }
                   break;
                 case 'completed':
                   management.completed++;
                   if (age > expiredThreshold) {
                     management.expired++;
-                    management.cleanupCandidates.push(session.id);
+                    management.cleanupCandidates.push(sessionData.id);
                   }
                   break;
                 case 'failed':
                 case 'expired':
                   management.failed++;
                   if (age > staleThreshold) {
-                    management.cleanupCandidates.push(session.id);
+                    management.cleanupCandidates.push(sessionData.id);
                   }
                   break;
               }

@@ -116,7 +116,7 @@ export class ContentValidator {
     }
 
     // Best practices validation
-    if (checkBestPractices && checkBestPractices.length > 0) {
+    if (checkBestPractices) {
       const practicesResult = this.validateBestPractices(content, contentType);
       if (practicesResult.warnings && practicesResult.warnings.length > 0) {
         warnings.push(...practicesResult.warnings);
@@ -134,7 +134,7 @@ export class ContentValidator {
         ? rule.pattern.test(content)
         : (rule.validator?.(content) ?? false);
 
-      if (matches && matches.length > 0) {
+      if (matches) {
         const severity = rule.severity ?? 'error';
         if (severity === 'error') {
           errors.push(rule.message);
@@ -327,7 +327,7 @@ export class ContentValidator {
         // Find all matches with line numbers
         const lines = content.split('\n');
         lines.forEach((line, index) => {
-          if (rule.pattern!.test(line)) {
+          if (rule.pattern && rule.pattern.test(line)) {
             securityIssues.push({
               type: this.categorizeSecurityIssue(key),
               severity: this.determineSeverity(key),

@@ -1,26 +1,18 @@
 /**
- * Deploy Application - Main Orchestration Logic
+ * Deploy Application - MCP SDK Compatible Version
  */
 
 import { z } from 'zod';
-import { access } from 'node:fs/promises';
+import * as path from 'node:path';
+import { promises as fs } from 'node:fs';
+import * as yaml from 'js-yaml';
 import {
   ErrorCode,
-  DomainError
+  DomainError,
+  KubernetesManifest,
+  KubernetesDeploymentResult
 } from '../../../contracts/types/index.js';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
-import {
-  loadManifests,
-  orderManifests,
-  deployToCluster,
-  rollbackDeployment,
-  waitForAllDeployments,
-  getEndpoints,
-  getTargetPath,
-  validatePath,
-  type DeployInput as HelperDeployInput,
-  type KubernetesDeploymentResult
-} from './helper';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 
 // Input schema
 const DeployApplicationInput = z
@@ -91,18 +83,208 @@ const DeployApplicationOutput = z.object({
 export type DeployInput = z.infer<typeof DeployApplicationInput>;
 export type DeployOutput = z.infer<typeof DeployApplicationOutput>;
 
+/**
+ * Load manifests from directory
+ */
+async function loadManifests(manifestsPath: string): Promise<KubernetesManifest[]> {
+  const manifests: KubernetesManifest[] = [];
+
+  const files = await fs.readdir(manifestsPath);
+  const yamlFiles = files.filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
+
+  for (const file of yamlFiles) {
+    if (file === 'kustomization.yaml') continue; // Skip kustomization file
+
+    const filepath = path.join(manifestsPath, file);
+    const content = await fs.readFile(filepath, 'utf-8');
+
+    try {
+      const docs = yaml.loadAll(content) as KubernetesManifest[];
+      manifests.push(
+        ...docs.filter((d: KubernetesManifest | null): d is KubernetesManifest => d?.kind != null)
+      ); // Filter out null docs
+    } catch (error) {
+      throw new Error(`Failed to parse ${file}: ${String(error)}`);
+    }
+  }
+
+  return manifests;
+}
+
+/**
+ * Order manifests for deployment (dependencies first)
+ */
+function orderManifests(manifests: KubernetesManifest[]): KubernetesManifest[] {
+  const order = [
+    'Namespace',
+    'ResourceQuota',
+    'LimitRange',
+    'ServiceAccount',
+    'Secret',
+    'ConfigMap',
+    'PersistentVolumeClaim',
+    'Service',
+    'Deployment',
+    'StatefulSet',
+    'DaemonSet',
+    'Job',
+    'CronJob',
+    'HorizontalPodAutoscaler',
+    'PodDisruptionBudget',
+    'Ingress',
+    'NetworkPolicy'
+  ];
+
+  return manifests.sort((a, b) => {
+    const aIndex = order.indexOf(a.kind) !== -1 ? order.indexOf(a.kind) : 999;
+    const bIndex = order.indexOf(b.kind) !== -1 ? order.indexOf(b.kind) : 999;
+    return aIndex - bIndex;
+  });
+}
+
+/**
+ * Deploy manifests to cluster
+ */
+async function deployToCluster(
+  manifests: KubernetesManifest[],
+  input: DeployInput,
+  context: ToolContext
+): Promise<KubernetesDeploymentResult> {
+  const { kubernetesService, logger } = context;
+
+  if (kubernetesService != null && 'deploy' in kubernetesService) {
+    const k8sService = kubernetesService as any;
+    const result = await k8sService.deploy({
+      manifests,
+      namespace: input.namespace,
+      wait: input.wait,
+      timeout: input.timeout * 1000,
+      dryRun: input.dryRun
+    });
+
+    if (result != null && typeof result === 'object') {
+      if (
+        'success' in result &&
+        result.success === true &&
+        'data' in result &&
+        result.data != null
+      ) {
+        return result.data;
+      }
+      const errorMsg =
+        'error' in result &&
+        result.error != null &&
+        typeof result.error === 'object' &&
+        'message' in result.error
+          ? String(result.error.message)
+          : 'Deployment failed';
+      throw new Error(errorMsg);
+    }
+    throw new Error('Deployment failed');
+  }
+
+  // Mock deployment for testing
+  logger.warn('Kubernetes service not available, simulating deployment');
+
+  return {
+    success: true,
+    resources: manifests.map((m) => ({
+      kind: m.kind,
+      name: m.metadata.name,
+      namespace: input.namespace,
+      status: 'created' as const
+    })),
+    deployed: manifests.map((m) => `${m.kind}/${m.metadata.name}`),
+    failed: [],
+    endpoints: [
+      {
+        service: manifests.find((m) => m.kind === 'Service')?.metadata.name ?? 'app',
+        type: 'ClusterIP',
+        port: 80
+      }
+    ]
+  };
+}
+
+/**
+ * Perform rollback on failure
+ */
+async function rollbackDeployment(
+  deployed: string[],
+  namespace: string,
+  context: ToolContext
+): Promise<void> {
+  const { kubernetesService, logger } = context;
+
+  logger.info({ resources: deployed.length }, 'Starting rollback'); // Fixed logger call
+
+  if (kubernetesService) {
+    for (const resource of deployed.reverse()) {
+      // Delete in reverse order
+      try {
+        if ('delete' in kubernetesService) {
+          const k8s = kubernetesService as any;
+          await k8s.delete(resource, namespace);
+        }
+        logger.info(`Rolled back ${resource}`);
+      } catch (error) {
+        logger.error({ error }, `Failed to rollback ${resource}`);
+      }
+    }
+  }
+}
+
+/**
+ * Wait for deployment to be ready
+ */
+async function waitForDeployment(
+  deploymentName: string,
+  namespace: string,
+  timeout: number,
+  context: ToolContext
+): Promise<boolean> {
+  const { kubernetesService, logger } = context;
+  const startTime = Date.now();
+
+  if (!kubernetesService) {
+    return true; // Skip in test mode
+  }
+
+  while (Date.now() - startTime < timeout * 1000) {
+    if ('getStatus' in kubernetesService) {
+      const k8s = kubernetesService as any;
+      const status = await k8s.getStatus(`deployment/${deploymentName}`, namespace);
+
+      if (status.success && status.data?.ready) {
+        return true;
+      }
+    }
+
+    logger.info(
+      {
+        deployment: deploymentName,
+        elapsed: Math.round((Date.now() - startTime) / 1000)
+      },
+      'Waiting for deployment to be ready'
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+
+  return false;
+}
 
 /**
  * Main handler implementation
  */
-const deployApplicationHandler: MCPTool<DeployInput, DeployOutput> = {
+const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
   name: 'deploy_application',
   description: 'Deploy application to Kubernetes cluster',
   category: 'workflow',
   inputSchema: DeployApplicationInput,
   outputSchema: DeployApplicationOutput,
 
-  handler: async (input: DeployInput, context: MCPToolContext): Promise<DeployOutput> => {
+  handler: async (input: DeployInput, context: ToolContext): Promise<DeployOutput> => {
     const { logger, sessionService, progressEmitter, kubernetesService } = context;
     const { sessionId, manifestsPath, namespace, dryRun, wait, timeout, rollbackOnFailure } = input;
 
@@ -137,7 +319,7 @@ const deployApplicationHandler: MCPTool<DeployInput, DeployOutput> = {
 
       // Check if path exists
       try {
-        await access(targetPath);
+        await fs.access(targetPath);
       } catch {
         throw new DomainError(
           ErrorCode.VALIDATION_ERROR,
@@ -220,14 +402,42 @@ const deployApplicationHandler: MCPTool<DeployInput, DeployOutput> = {
 
       // Wait for deployment to be ready
       if (wait && !dryRun && deploymentResult.deployed.length > 0) {
-        await waitForAllDeployments(deploymentResult, input, context, progressEmitter, sessionId);
+        const deployments = deploymentResult.deployed.filter((d) => d.startsWith('Deployment/'));
+
+        for (const deployment of deployments) {
+          const deploymentName = deployment.split('/')[1];
+          if (!deploymentName) continue;
+
+          if (progressEmitter && sessionId) {
+            await progressEmitter.emit({
+              sessionId,
+              step: 'deploy_application',
+              status: 'in_progress',
+              message: `Waiting for ${deploymentName} to be ready`,
+              progress: 0.6
+            });
+          }
+
+          const ready = await waitForDeployment(deploymentName, namespace, timeout, context);
+
+          if (!ready) {
+            logger.warn(`Deployment ${deploymentName} not ready after ${timeout}s`);
+
+            if (rollbackOnFailure) {
+              await rollbackDeployment(deploymentResult.deployed, namespace, context);
+
+              throw new DomainError(ErrorCode.TIMEOUT, `Deployment timeout and was rolled back`);
+            }
+          }
+        }
       }
 
       // Get endpoints if available
       let endpoints = deploymentResult.endpoints;
 
       if (!endpoints && kubernetesService && 'getEndpoints' in kubernetesService && !dryRun) {
-        const endpointResult = await (kubernetesService as any).getEndpoints(namespace);
+        const k8s = kubernetesService as any;
+        const endpointResult = await k8s.getEndpoints(namespace);
         if (endpointResult.success && endpointResult.data) {
           endpoints = endpointResult.data.map((e: { service: string; url?: string }) => ({
             service: e.service,

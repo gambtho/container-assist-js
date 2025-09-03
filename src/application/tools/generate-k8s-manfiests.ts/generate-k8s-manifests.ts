@@ -4,12 +4,17 @@
 
 import { z } from 'zod';
 import * as path from 'node:path';
+import { promises as fs } from 'node:fs';
 import * as yaml from 'js-yaml';
-import { ErrorCode, DomainError, KubernetesManifest } from '../../../contracts/types/index.js';
+import {
+  ErrorCode,
+  DomainError,
+  KubernetesManifest,
+  AnalysisResult
+} from '../../../contracts/types/index.js';
 import { executeWithRecovery } from '../error-recovery.js';
 import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
-import { getEnhancedAIService } from '../ai-migration-helper.js';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 
 // Input schema with support for both snake_case and camelCase
 const GenerateKubernetesManifestsInput = z
@@ -544,7 +549,7 @@ function generateWarnings(input: KubernetesManifestsInput): string[] {
 /**
  * Main handler implementation
  */
-const generateKubernetesManifestsHandler: MCPTool<
+const generateKubernetesManifestsHandler: ToolDescriptor<
   KubernetesManifestsInput,
   KubernetesManifestsOutput
 > = {
@@ -556,10 +561,9 @@ const generateKubernetesManifestsHandler: MCPTool<
 
   handler: async (
     input: KubernetesManifestsInput,
-    context: MCPToolContext
+    context: ToolContext
   ): Promise<KubernetesManifestsOutput> => {
-    const { logger, sessionService, progressEmitter } = context;
-    const aiService = getEnhancedAIService(context);
+    const { logger, sessionService, progressEmitter, aiService } = context;
     const { sessionId, outputPath } = input;
 
     logger.info(
@@ -644,15 +648,20 @@ const generateKubernetesManifestsHandler: MCPTool<
         logger.info('Enhancing manifests with AI recommendations');
 
         // Get analysis from session for AI context
-        let analysis = null;
+        let analysis: AnalysisResult | undefined;
         if (sessionId && sessionService) {
           const session = await sessionService.get(sessionId);
           analysis = session?.workflow_state?.analysis_result;
         }
 
         const aiResult = await executeWithRecovery(async () => {
+          const defaultAnalysis: AnalysisResult = {
+            language: 'unknown',
+            has_tests: false,
+            docker_compose_exists: false
+          };
           const builder = AIRequestBuilder.for('k8s-generation')
-            .withContext(analysis ?? ({} as unknown))
+            .withContext(analysis ?? defaultAnalysis)
             .withSession(input.sessionId ?? '')
             .withVariables({
               image: input.image ?? 'app:latest',
@@ -673,10 +682,7 @@ const generateKubernetesManifestsHandler: MCPTool<
               ...(Object.keys(input.secrets).length > 0 && { secrets: Object.keys(input.secrets) })
             });
 
-          const result = await aiService.generate<string>(builder, {
-            complexity: input.environment === 'production' ? 'high' : 'medium',
-            timeConstraint: 'thorough'
-          });
+          const result = await aiService.generate(builder);
 
           if (result.data) {
             return result.data;
@@ -748,7 +754,7 @@ const generateKubernetesManifestsHandler: MCPTool<
         apiVersion: 'kustomize.config.k8s.io/v1beta1',
         kind: 'Kustomization',
         namespace: input.namespace,
-        resources: outputManifests.map((m) => path.basename(m.path!)),
+        resources: outputManifests.filter((m) => m.path).map((m) => path.basename(m.path!)),
         commonLabels: {
           app: input.appName,
           environment: input.environment

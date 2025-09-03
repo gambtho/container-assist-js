@@ -113,7 +113,7 @@ export interface HealthStatus {
   component: string;
   status: 'healthy' | 'unhealthy' | 'degraded' | 'unknown';
   message?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   lastCheck: string;
   checkDuration: number;
 }

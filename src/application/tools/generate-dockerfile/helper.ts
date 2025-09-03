@@ -2,10 +2,8 @@
  * Generate Dockerfile - Helper Functions
  */
 
-import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
 import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
-import type { MCPToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types.js';
 import type { AnalysisResult } from '../../../contracts/types/session.js';
 
 interface DockerfileStage {
@@ -131,7 +129,7 @@ CMD ["./main"]
 export async function generateDockerfileContent(
   analysis: AnalysisResult,
   options: DockerfileInput,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<DockerfileGenerationResult> {
   const { logger, aiService } = context;
 
@@ -474,7 +472,11 @@ export function analyzeDockerfileSecurity(content: string): string[] {
 /**
  * Estimate image size based on language and dependencies
  */
-export function estimateImageSize(language: string, dependencies: string[], multistage: boolean): string {
+export function estimateImageSize(
+  language: string,
+  dependencies: string[],
+  multistage: boolean
+): string {
   const baseSizes: Record<string, number> = {
     'node:18-alpine': 50,
     'python:3.11-slim': 120,

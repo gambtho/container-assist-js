@@ -3,7 +3,7 @@
  */
 
 import { DockerBuildOptions, DockerBuildResult } from '../../../contracts/types/index.js';
-import type { MCPToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types.js';
 
 /**
  * Prepare build arguments with defaults
@@ -37,17 +37,14 @@ export function prepareBuildArgs(
  */
 export async function buildDockerImage(
   options: DockerBuildOptions,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<DockerBuildResult> {
   const { dockerService, logger } = context;
 
   // Use Docker service if available
   if (dockerService && 'build' in dockerService) {
-    const result = await (dockerService as any).build(options);
-    if (result.success && result.data) {
-      return result.data;
-    }
-    throw new Error(result.error ?? 'Docker build failed');
+    const result = await dockerService.build(options);
+    return result;
   }
 
   // Fallback to CLI implementation
@@ -68,7 +65,10 @@ export async function buildDockerImage(
 /**
  * Analyze build for security issues
  */
-export function analyzeBuildSecurity(dockerfile: string, buildArgs: Record<string, string>): string[] {
+export function analyzeBuildSecurity(
+  dockerfile: string,
+  buildArgs: Record<string, string>
+): string[] {
   const warnings: string[] = [];
 
   // Check for secrets in build args

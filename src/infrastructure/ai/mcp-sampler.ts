@@ -145,6 +145,9 @@ export class MockMCPSampler implements MCPSampler {
 // Define legacy sampler interface
 interface LegacySampler {
   sample(request: unknown): Promise<unknown>;
+  isAvailable?(): boolean;
+  getDefaultModel?(): string;
+  getSupportedModels?(): string[];
 }
 
 export class LegacyMCPSamplerAdapter implements MCPSampler {
@@ -172,7 +175,7 @@ export class LegacyMCPSamplerAdapter implements MCPSampler {
       };
 
       // Call legacy sampler
-      const result = await this.legacySampler.sample(legacyRequest);
+      const result = (await this.legacySampler.sample(legacyRequest)) as any;
 
       // Convert response
       if (result.success && result.content) {

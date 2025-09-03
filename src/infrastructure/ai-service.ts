@@ -13,10 +13,7 @@ import { AIServiceError } from '../errors/index.js';
 import type { MCPSampler } from '../application/interfaces.js';
 import { AIRequestBuilder, type AIRequest } from './ai-request-builder';
 import { AIResponseCache, type CacheOptions, type CacheStats } from './ai/response-cache';
-import {
-  type EnhancedRecoveryOptions,
-  executeWithEnhancedRecovery
-} from './ai/enhanced-error-recovery';
+import { type EnhancedRecoveryOptions, executeWithEnhancedRecovery } from './ai/error-recovery.js';
 
 /**
  * Enhanced AI service configuration
@@ -330,7 +327,7 @@ export class EnhancedAIService {
         if (cached !== null) {
           // Validate cached result against schema
           const validation = schema.safeParse(cached);
-          if (validation.success && validation.success.length > 0) {
+          if (validation.success) {
             return this.createSuccessResult(validation.data, {
               durationMs: Date.now() - startTime,
               fromCache: true,
@@ -344,7 +341,9 @@ export class EnhancedAIService {
       }
 
       // Execute structured generation with enhanced error recovery
-      const executor = async (req: AIRequest) => {
+      const executor = async (
+        req: AIRequest
+      ): Promise<{ data: T; tokensUsed?: number; model?: string }> => {
         if (!this.sampler) {
           throw new AIServiceError(
             'AI sampler not available',
@@ -378,8 +377,8 @@ export class EnhancedAIService {
 
         return {
           data: validation.data,
-          tokensUsed: result.tokenCount,
-          model: req.model
+          ...(result.tokenCount !== undefined && { tokensUsed: result.tokenCount }),
+          ...(req.model !== undefined && { model: req.model })
         };
       };
 
@@ -581,7 +580,7 @@ export class EnhancedAIService {
         builder.withVariables(options.additionalContext);
       }
 
-      request = await builder.build();
+      request = builder.build();
     } else {
       request = { ...builder };
     }
@@ -616,7 +615,9 @@ export class EnhancedAIService {
   ): Promise<GenerationResult<T>> {
     const startTime = Date.now();
 
-    const executor = async (req: AIRequest) => {
+    const executor = async (
+      req: AIRequest
+    ): Promise<{ data: T; tokensUsed?: number; model?: string }> => {
       if (!this.sampler) {
         throw new AIServiceError(
           'AI sampler not available',
@@ -635,8 +636,8 @@ export class EnhancedAIService {
 
       return {
         data: result.text as T,
-        tokensUsed: result.tokenCount,
-        model: req.model
+        ...(result.tokenCount !== undefined && { tokensUsed: result.tokenCount }),
+        ...(req.model !== undefined && { model: req.model })
       };
     };
 
@@ -729,19 +730,35 @@ export class EnhancedAIService {
    */
   private getModelPreference(templateId: string): string {
     if (templateId.includes('dockerfile')) {
-      return this.config.modelPreferences.dockerfile!;
+      return (
+        this.config.modelPreferences.dockerfile ??
+        this.config.modelPreferences.default ??
+        'claude-3-5-sonnet-latest'
+      );
     }
     if (templateId.includes('k8s') || templateId.includes('kubernetes')) {
-      return this.config.modelPreferences.kubernetes!;
+      return (
+        this.config.modelPreferences.kubernetes ??
+        this.config.modelPreferences.default ??
+        'claude-3-5-sonnet-latest'
+      );
     }
     if (templateId.includes('analysis')) {
-      return this.config.modelPreferences.analysis!;
+      return (
+        this.config.modelPreferences.analysis ??
+        this.config.modelPreferences.default ??
+        'claude-3-5-sonnet-latest'
+      );
     }
     if (templateId.includes('optimization')) {
-      return this.config.modelPreferences.optimization!;
+      return (
+        this.config.modelPreferences.optimization ??
+        this.config.modelPreferences.default ??
+        'claude-3-5-sonnet-latest'
+      );
     }
 
-    return this.config.modelPreferences.default!;
+    return this.config.modelPreferences.default ?? 'claude-3-5-sonnet-latest';
   }
 
   /**
@@ -773,18 +790,43 @@ export function migrateToEnhancedAIService(
   sampler: MCPSampler | undefined,
   logger: Logger
 ): EnhancedAIService {
+  // Type the legacy config properly
+  interface LegacyConfig {
+    modelPreferences?: Record<string, string>;
+    temperature?: number;
+    maxTokens?: number;
+    cacheEnabled?: boolean;
+  }
+
+  const typedConfig = legacyConfig as LegacyConfig;
+
   const enhancedConfig: EnhancedAIConfig = {
-    modelPreferences: legacyConfig.modelPreferences,
-    defaultSampling: {
-      temperature: legacyConfig.temperature,
-      maxTokens: legacyConfig.maxTokens
-    },
+    defaultSampling: {},
     cache: {
-      enabled: legacyConfig.cacheEnabled !== false
+      enabled: typedConfig.cacheEnabled !== false
     },
     enableMetrics: true,
     enableDetailedLogging: false
   };
+
+  // Only add optional properties if they have defined values
+  if (typedConfig.modelPreferences !== undefined) {
+    enhancedConfig.modelPreferences = typedConfig.modelPreferences;
+  }
+
+  if (typedConfig.temperature !== undefined) {
+    if (!enhancedConfig.defaultSampling) {
+      enhancedConfig.defaultSampling = {};
+    }
+    enhancedConfig.defaultSampling.temperature = typedConfig.temperature;
+  }
+
+  if (typedConfig.maxTokens !== undefined) {
+    if (!enhancedConfig.defaultSampling) {
+      enhancedConfig.defaultSampling = {};
+    }
+    enhancedConfig.defaultSampling.maxTokens = typedConfig.maxTokens;
+  }
 
   return createEnhancedAIService(enhancedConfig, sampler, logger);
 }

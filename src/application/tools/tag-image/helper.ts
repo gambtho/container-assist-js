@@ -2,7 +2,7 @@
  * Tag Image - Helper Functions
  */
 
-import type { MCPToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types.js';
 
 /**
  * Generate semantic version tags
@@ -79,13 +79,13 @@ export function generateStandardTags(
 export async function tagDockerImage(
   source: string,
   target: string,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<boolean> {
   const { dockerService, logger } = context;
 
   if (dockerService && 'tag' in dockerService) {
-    const result = await (dockerService as any).tag(source, target);
-    return result.success;
+    await dockerService.tag(source, target);
+    return true;
   }
 
   // CLI fallback would go here
@@ -171,7 +171,7 @@ export function generateAllTags(
 export async function applyTags(
   source: string,
   allTags: string[],
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<Array<{ tag: string; fullTag?: string; created?: boolean }>> {
   const { logger } = context;
   const tagResults: Array<{ tag: string; fullTag?: string; created?: boolean }> = [];

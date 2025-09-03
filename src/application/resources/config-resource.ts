@@ -17,14 +17,14 @@ export class ConfigResourceProvider {
   /**
    * Get configuration-related MCP resources
    */
-  getResources(): Array<any> {
+  getResources(): Array<unknown> {
     return [
       {
         uri: 'config://current',
         name: 'Current Server Configuration',
         description: 'Current server configuration and settings (sanitized)',
         mimeType: 'application/json',
-        handler: async () => {
+        handler: () => {
           try {
             // Create sanitized configuration (remove sensitive data)
             const sanitizedConfig = this.sanitizeConfiguration(this.config);
@@ -73,7 +73,7 @@ export class ConfigResourceProvider {
         name: 'Server Capabilities',
         description: 'Server capabilities and feature flags',
         mimeType: 'application/json',
-        handler: async () => {
+        handler: () => {
           try {
             const capabilities = {
               mcp: {
@@ -89,13 +89,13 @@ export class ConfigResourceProvider {
               },
               containerization: {
                 docker: {
-                  enabled: !!this.config.infrastructure?.docker,
+                  enabled: this.config.infrastructure?.docker != null,
                   buildSupport: true,
                   imageManagement: true,
                   registryPush: true
                 },
                 kubernetes: {
-                  enabled: !!this.config.infrastructure?.kubernetes,
+                  enabled: this.config.infrastructure?.kubernetes != null,
                   manifestGeneration: true,
                   deployment: true,
                   monitoring: true
@@ -165,7 +165,7 @@ export class ConfigResourceProvider {
         name: 'Server Environment',
         description: 'Server runtime environment and platform information',
         mimeType: 'application/json',
-        handler: async () => {
+        handler: () => {
           try {
             const environment = {
               runtime: {
@@ -228,7 +228,7 @@ export class ConfigResourceProvider {
         name: 'Configuration Validation',
         description: 'Validate current server configuration',
         mimeType: 'application/json',
-        handler: async () => {
+        handler: () => {
           try {
             const validation = {
               valid: true,
@@ -286,8 +286,8 @@ export class ConfigResourceProvider {
   /**
    * Sanitize configuration to remove sensitive data
    */
-  private sanitizeConfiguration(config: ApplicationConfig): any {
-    const sanitized = JSON.parse(JSON.stringify(config));
+  private sanitizeConfiguration(config: ApplicationConfig): Record<string, unknown> {
+    const sanitized = JSON.parse(JSON.stringify(config)) as Record<string, unknown>;
 
     // Remove sensitive fields
     const sensitiveKeys = ['password', 'token', 'secret', 'key', 'credential', 'auth'];
@@ -295,7 +295,7 @@ export class ConfigResourceProvider {
     const removeSensitive = (obj: unknown): void => {
       if (typeof obj !== 'object' || obj === null) return;
 
-      const record = obj as Record<string, any>;
+      const record = obj as Record<string, unknown>;
       for (const key in record) {
         if (sensitiveKeys.some((k) => key.toLowerCase().includes(k))) {
           record[key] = '[REDACTED]';
@@ -316,13 +316,13 @@ export class ConfigResourceProvider {
     const issues: string[] = [];
     const warnings: string[] = [];
 
-    if (!this.config.server) {
+    if (this.config.server == null) {
       issues.push('Server configuration is missing');
       return { valid: false, issues };
     }
 
     if (
-      !this.config.server.port ||
+      this.config.server.port == null ||
       this.config.server.port < 1 ||
       this.config.server.port > 65535
     ) {
@@ -359,7 +359,7 @@ export class ConfigResourceProvider {
     const issues: string[] = [];
     const warnings: string[] = [];
 
-    if (!this.config.infrastructure) {
+    if (this.config.infrastructure == null) {
       warnings.push('Infrastructure configuration is missing, using defaults');
       return { valid: true, warnings };
     }
@@ -367,7 +367,7 @@ export class ConfigResourceProvider {
     // Validate Docker config
     if (this.config.infrastructure.docker != null) {
       if (
-        !this.config.infrastructure.docker.socketPath &&
+        this.config.infrastructure.docker.socketPath == null &&
         !this.config.infrastructure.docker.host
       ) {
         warnings.push('Docker connection not configured, will attempt default socket');
@@ -407,7 +407,7 @@ export class ConfigResourceProvider {
     const issues: string[] = [];
     const warnings: string[] = [];
 
-    if (!this.config.session) {
+    if (this.config.session == null) {
       warnings.push('Session configuration is missing, using defaults');
       return { valid: true, warnings };
     }
@@ -445,7 +445,7 @@ export class ConfigResourceProvider {
   private validateFeatureConfig(): { valid: boolean; issues?: string[]; warnings?: string[] } {
     const warnings: string[] = [];
 
-    if (!this.config.features) {
+    if (this.config.features == null) {
       warnings.push('Feature flags not configured, using defaults');
       return { valid: true, warnings };
     }

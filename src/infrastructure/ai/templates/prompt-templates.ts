@@ -232,14 +232,15 @@ export class PromptTemplates {
 
     if (typeof value === 'object') {
       // For objects, provide a compact representation
-      const keys = Object.keys(value);
+      const objValue = value as Record<string, unknown>;
+      const keys = Object.keys(objValue);
       if (keys.length === 0) return '[empty]';
 
       if (keys.length <= 5) {
-        return JSON.stringify(value, null, 0);
+        return JSON.stringify(objValue, null, 0);
       } else {
         const sample: Record<string, any> = {};
-        keys.slice(0, 3).forEach((key) => ((sample as unknown)[key] = value[key]));
+        keys.slice(0, 3).forEach((key) => (sample[key] = objValue[key]));
         return JSON.stringify(sample, null, 0).replace('}', `, ...${keys.length - 3} more}`);
       }
     }

@@ -131,7 +131,7 @@ export class CacheKeyGenerator {
     } = {
       variableCount: Object.keys(normalized.context ?? {}).length,
       promptLength: normalized.prompt.length,
-      hasContext: !!normalized.context && Object.keys(normalized.context).length > 0
+      hasContext: normalized.context != null && Object.keys(normalized.context).length > 0
     };
 
     const templateId = this.extractTemplateId(request);

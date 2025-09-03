@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 
 // Input schema
 const ServerStatusInputSchema = z
@@ -85,7 +85,19 @@ type ServerStatusOutput = z.infer<typeof ServerStatusOutputSchema>;
 /**
  * Get system information
  */
-function getSystemInfo() {
+function getSystemInfo(): {
+  platform: NodeJS.Platform;
+  arch: string;
+  memory: {
+    used: number;
+    total: number;
+    free: number;
+  };
+  cpu: {
+    cores: number;
+    loadAverage?: number[];
+  };
+} {
   const memUsage = process.memoryUsage();
 
   return {
@@ -106,7 +118,7 @@ function getSystemInfo() {
 /**
  * Check dependency health
  */
-function checkDependencyHealth(context: MCPToolContext): {
+function checkDependencyHealth(context: ToolContext): {
   sessionService: boolean;
   dockerService: boolean;
   kubernetesService: boolean;
@@ -141,7 +153,7 @@ function assessHealth(
     issues.push('High memory usage (>90%)');
   }
 
-  if (system.cpu.loadAverage && system.cpu.loadAverage[0] > system.cpu.cores * 2) {
+  if (system.cpu.loadAverage?.[0] && system.cpu.loadAverage[0] > system.cpu.cores * 2) {
     issues.push('High CPU load');
   }
 
@@ -166,17 +178,14 @@ function assessHealth(
 /**
  * Server status tool implementation using MCP SDK pattern
  */
-const serverStatusTool: MCPTool<ServerStatusInput, ServerStatusOutput> = {
+const serverStatusTool: ToolDescriptor<ServerStatusInput, ServerStatusOutput> = {
   name: 'server_status',
   description: 'Get MCP server status and system information',
   category: 'utility',
   inputSchema: ServerStatusInputSchema,
   outputSchema: ServerStatusOutputSchema,
 
-  handler: async (
-    input: ServerStatusInput,
-    context: MCPToolContext
-  ): Promise<ServerStatusOutput> => {
+  handler: async (input: ServerStatusInput, context: ToolContext): Promise<ServerStatusOutput> => {
     const { logger, sessionService } = context;
     const { includeSystem, includeSessions, includeDependencies } = input;
 
@@ -228,7 +237,7 @@ const serverStatusTool: MCPTool<ServerStatusInput, ServerStatusOutput> = {
 
       // Dependencies info
       let dependencies;
-      if (includeDependencies && includeDependencies.length > 0) {
+      if (includeDependencies === true) {
         dependencies = checkDependencyHealth(context);
       }
 

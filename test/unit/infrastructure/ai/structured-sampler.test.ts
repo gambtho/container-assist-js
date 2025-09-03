@@ -7,6 +7,8 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { z } from 'zod';
 import { StructuredSampler } from '../../../../src/infrastructure/ai/structured-sampler.js';
 import type { MCPSampler, AIResponse } from '../../../../src/infrastructure/ai/types.js';
+import { createMockLogger } from '../../../utils/test-helpers.js';
+import type { Logger } from 'pino';
 
 // Test schema for validation
 const TestSchema = z.object({
@@ -44,10 +46,12 @@ class MockMCPSampler implements MCPSampler {
 describe('StructuredSampler', () => {
   let mockSampler: MockMCPSampler;
   let structuredSampler: StructuredSampler;
+  let mockLogger: Logger;
 
   beforeEach(() => {
     mockSampler = new MockMCPSampler();
-    structuredSampler = new StructuredSampler(mockSampler);
+    mockLogger = createMockLogger();
+    structuredSampler = new StructuredSampler(mockSampler, mockLogger);
   });
 
   describe('sampleJSON', () => {

@@ -71,8 +71,7 @@ export class AIServiceFactory {
     // Use the existing factory
     return MCPSamplerFactory.create(
       {
-        type: samplerConfig.type,
-        ...samplerConfig.config
+        ...(samplerConfig.config as Record<string, unknown>)
       },
       logger
     );
@@ -101,7 +100,11 @@ export class AIServiceFactory {
   ): AIServiceBundle {
     const config: AIFactoryConfig = {
       sampler: {
-        type: (legacyConfig.provider as string) || 'mock',
+        type: ((legacyConfig.provider as string) || 'mock') as
+          | 'custom'
+          | 'mock'
+          | 'anthropic'
+          | 'openai',
         config: legacyConfig
       },
       validation: {

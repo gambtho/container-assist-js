@@ -3,7 +3,7 @@
  */
 
 import { DockerScanResult } from '../../../contracts/types/index.js';
-import type { MCPToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types.js';
 
 /**
  * Severity level priority for sorting
@@ -141,7 +141,7 @@ export async function getScanTarget(
 export async function performDockerScan(
   scanTarget: string,
   dockerService: any,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<DockerScanResult> {
   const { logger } = context;
 
@@ -149,7 +149,7 @@ export async function performDockerScan(
     // Use Docker service for scanning
     logger.info('Using Docker service for vulnerability scan');
     if ('scan' in dockerService) {
-      const result = await (dockerService as any).scan(scanTarget);
+      const result = await dockerService.scan(scanTarget);
 
       if (!result.success ?? !result.data) {
         throw new Error(result.error?.message ?? 'Scan failed');
@@ -177,10 +177,7 @@ export function processScanResults(
   fixableCount: number;
 } {
   // Filter vulnerabilities based on threshold
-  const filteredVulnerabilities = filterBySeverity(
-    scanResult.vulnerabilities,
-    severityThreshold
-  );
+  const filteredVulnerabilities = filterBySeverity(scanResult.vulnerabilities, severityThreshold);
 
   // Filter unfixed if requested
   const finalVulnerabilities = ignoreUnfixed
@@ -207,12 +204,15 @@ export function processScanResults(
 export async function getImageDetails(
   sessionId: string | undefined,
   sessionService: any
-): Promise<{
-  size?: number;
-  layers?: number;
-  os?: string;
-  architecture?: string;
-} | undefined> {
+): Promise<
+  | {
+      size?: number;
+      layers?: number;
+      os?: string;
+      architecture?: string;
+    }
+  | undefined
+> {
   if (!sessionId || !sessionService) {
     return undefined;
   }

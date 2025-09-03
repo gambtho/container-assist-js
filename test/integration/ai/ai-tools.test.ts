@@ -4,11 +4,11 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals'
-import { generateDockerfileHandler } from '../../../src/service/tools/handlers/dockerfile-generation-enhanced.js'
-import { generateK8sManifestsHandler } from '../../../src/service/tools/handlers/k8s-generation-enhanced.js'
-import { ErrorRecoveryService } from '../../../src/service/tools/error-recovery.js'
-import { DependencyFactory } from '../../../src/service/tools/dependencies.js'
-import { EnhancedMCPSampler } from '../../../src/infrastructure/ai/enhanced-sampler.js'
+import { generateDockerfileHandler } from '../../../src/application/tools/generate-dockerfile/generate-dockerfile.js'
+import { generateK8sManifestsHandler } from '../../../src/application/tools/generate-k8s-manifests/generate-k8s-manifests.js'
+// ErrorRecoveryService - removed, not available
+// DependencyFactory - removed, not available
+import { MCPSampler } from '../../../src/infrastructure/ai/mcp-sampler.js'
 import { MockSampler } from '../../../src/infrastructure/ai/mock-sampler.js'
 import path from 'path'
 import { fileURLToPath } from 'url'

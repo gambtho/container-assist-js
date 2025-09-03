@@ -70,7 +70,7 @@ export class CircuitBreaker {
 
   async execute<T>(operation: () => Promise<T>): Promise<T> {
     if (this.state === 'open') {
-      if (Date.now() - this.lastFailureTime < this.options.timeout!) {
+      if (Date.now() - this.lastFailureTime < (this.options.timeout ?? 60000)) {
         throw new Error('Circuit breaker is open');
       } else {
         this.state = 'half-open';
@@ -93,7 +93,7 @@ export class CircuitBreaker {
     this.lastSuccessTime = Date.now();
 
     if (this.state === 'half-open') {
-      if (this.successes >= this.options.successThreshold!) {
+      if (this.successes >= (this.options.successThreshold ?? 3)) {
         this.state = 'closed';
         this.failures = 0;
         this.successes = 0;
@@ -101,7 +101,7 @@ export class CircuitBreaker {
       }
     } else if (this.state === 'closed') {
       // Reset failure count after successful operations
-      if (Date.now() - this.lastFailureTime > this.options.monitoringWindow!) {
+      if (Date.now() - this.lastFailureTime > (this.options.monitoringWindow ?? 300000)) {
         this.failures = 0;
       }
     }
@@ -112,7 +112,7 @@ export class CircuitBreaker {
     this.lastFailureTime = Date.now();
 
     if (this.state === 'closed' || this.state === 'half-open') {
-      if (this.failures >= this.options.failureThreshold!) {
+      if (this.failures >= (this.options.failureThreshold ?? 5)) {
         this.state = 'open';
         this.successes = 0;
         this.logger?.warn(
@@ -130,7 +130,13 @@ export class CircuitBreaker {
     return this.state;
   }
 
-  getMetrics() {
+  getMetrics(): {
+    state: CircuitBreakerState;
+    failures: number;
+    successes: number;
+    lastFailureTime: number;
+    lastSuccessTime: number;
+  } {
     return {
       state: this.state,
       failures: this.failures,
@@ -265,8 +271,8 @@ export async function withTimeout<T>(
 export class Bulkhead {
   private active = 0;
   private queue: Array<{
-    operation: () => Promise<any>;
-    resolve: (value: any) => void;
+    operation: () => Promise<unknown>;
+    resolve: (value: unknown) => void;
     reject: (error: unknown) => void;
   }> = [];
 
@@ -278,10 +284,14 @@ export class Bulkhead {
 
   async execute<T>(operation: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      const task = { operation, resolve, reject };
+      const task = {
+        operation: async () => operation() as unknown,
+        resolve: (value: unknown) => resolve(value as T),
+        reject: (error: unknown) => reject(error)
+      };
 
       if (this.active < this.maxConcurrent) {
-        this.executeTask(task);
+        void this.executeTask(task);
       } else if (this.queue.length < this.maxQueue) {
         this.queue.push(task);
         this.logger?.debug(
@@ -299,8 +309,8 @@ export class Bulkhead {
   }
 
   private async executeTask(task: {
-    operation: () => Promise<any>;
-    resolve: (value: any) => void;
+    operation: () => Promise<unknown>;
+    resolve: (value: unknown) => void;
     reject: (error: unknown) => void;
   }): Promise<void> {
     this.active++;
@@ -318,12 +328,19 @@ export class Bulkhead {
 
   private processQueue(): void {
     if (this.queue.length > 0 && this.active < this.maxConcurrent) {
-      const task = this.queue.shift()!;
-      this.executeTask(task);
+      const task = this.queue.shift();
+      if (task != null) {
+        void this.executeTask(task);
+      }
     }
   }
 
-  getMetrics() {
+  getMetrics(): {
+    active: number;
+    queued: number;
+    maxConcurrent: number;
+    maxQueue: number;
+  } {
     return {
       active: this.active,
       queued: this.queue.length,
@@ -464,7 +481,7 @@ export class GracefulDegradation {
     }
   }
 
-  getServiceMetrics() {
+  getServiceMetrics(): Record<string, unknown> {
     const metrics: Record<string, unknown> = {};
 
     this.serviceLevels.forEach((service, name) => {
@@ -503,20 +520,23 @@ export function withErrorRecovery<T>(
 
     // Apply bulkhead if provided
     if (options.bulkhead) {
+      const bulkhead = options.bulkhead;
       const originalOp = wrappedOperation;
-      wrappedOperation = () => options.bulkhead!.execute(originalOp);
+      wrappedOperation = () => bulkhead.execute(originalOp);
     }
 
     // Apply circuit breaker if provided
     if (options.circuitBreaker) {
+      const circuitBreaker = options.circuitBreaker;
       const originalOp = wrappedOperation;
-      wrappedOperation = () => options.circuitBreaker!.execute(originalOp);
+      wrappedOperation = () => circuitBreaker.execute(originalOp);
     }
 
     // Apply timeout if specified
-    if (options.timeout) {
+    if (options.timeout != null && options.timeout > 0) {
       const originalOp = wrappedOperation;
-      wrappedOperation = () => withTimeout(originalOp, options.timeout!, options.fallback, logger);
+      wrappedOperation = () =>
+        withTimeout(originalOp, options.timeout ?? 0, options.fallback, logger);
     }
 
     // Apply graceful degradation if provided
@@ -558,25 +578,27 @@ export function createResilientOperation<T>(
     ? new Bulkhead(options.bulkhead.maxConcurrent, options.bulkhead.maxQueue, logger)
     : undefined;
 
-  const gracefulDegradation = options.serviceName ? new GracefulDegradation(logger) : undefined;
+  const gracefulDegradation =
+    options.serviceName != null && options.serviceName !== ''
+      ? new GracefulDegradation(logger)
+      : undefined;
 
-  if (gracefulDegradation && options.serviceName) {
+  if (gracefulDegradation && options.serviceName != null && options.serviceName !== '') {
+    const fallbackFn = options.fallback;
     gracefulDegradation.registerService(options.serviceName, [
       { level: 0 },
-      ...(options.fallback
-        ? [{ level: 1, fallback: async () => Promise.resolve(options.fallback!()) }]
-        : [])
+      ...(fallbackFn ? [{ level: 1, fallback: async () => Promise.resolve(fallbackFn()) }] : [])
     ]);
   }
 
   const recoveryOptions: Parameters<typeof withErrorRecovery>[1] = {};
 
   if (options.retry) recoveryOptions.retry = options.retry;
-  if (options.timeout) recoveryOptions.timeout = options.timeout;
+  if (options.timeout != null && options.timeout > 0) recoveryOptions.timeout = options.timeout;
   if (options.fallback) recoveryOptions.fallback = options.fallback;
   if (circuitBreaker) recoveryOptions.circuitBreaker = circuitBreaker;
   if (bulkhead) recoveryOptions.bulkhead = bulkhead;
-  if (gracefulDegradation && options.serviceName) {
+  if (gracefulDegradation && options.serviceName != null && options.serviceName !== '') {
     recoveryOptions.gracefulDegradation = {
       manager: gracefulDegradation,
       serviceName: options.serviceName

@@ -4,7 +4,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals'
-import { EnhancedMCPSampler } from '../../../src/infrastructure/ai/enhanced-sampler.js'
+import { MCPSampler } from '../../../src/infrastructure/ai/mcp-sampler.js'
 import { MockSampler } from '../../../src/infrastructure/ai/mock-sampler.js'
 import { MCPSamplingError } from '../../../src/infrastructure/ai/types.js'
 import path from 'path'
@@ -31,7 +31,7 @@ describe('MCP Sampling Infrastructure', () => {
       child: jest.fn(() => logger)
     }
     
-    sampler = new EnhancedMCPSampler(mockServer, logger, {
+    sampler = new MCPSampler(mockServer, logger, {
       templateDir: path.join(__dirname, '../../../src/infrastructure/ai/prompts/templates'),
       cacheEnabled: true,
       retryAttempts: 2,

@@ -187,7 +187,7 @@ export class AIResponseCache {
     this.stats.hitCount++;
     this.logCacheHit(key, cached.metadata.templateId);
 
-    return cached.response;
+    return cached.response as T | null;
   }
 
   /**

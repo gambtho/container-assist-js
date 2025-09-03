@@ -557,7 +557,11 @@ export class PromptValidator {
   }
 
   // Get configuration for external use
-  getConfig() {
+  getConfig(): {
+    maxSystemPromptTokens: number;
+    maxUserPromptTokens: number;
+    maxTotalTokens: number;
+  } {
     return {
       maxSystemPromptTokens: this.maxSystemPromptTokens,
       maxUserPromptTokens: this.maxUserPromptTokens,
@@ -572,7 +576,7 @@ export class PromptValidator {
       maxUserPromptTokens: number;
       maxTotalTokens: number;
     }>
-  ) {
+  ): void {
     if (config.maxSystemPromptTokens != null)
       this.maxSystemPromptTokens = config.maxSystemPromptTokens;
     if (config.maxUserPromptTokens != null) this.maxUserPromptTokens = config.maxUserPromptTokens;

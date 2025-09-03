@@ -23,16 +23,51 @@ export function getSessionBuildResult(session: Session): DockerBuildResult | nul
   const buildResult = session.workflow_state?.build_result;
   if (!buildResult) return null;
 
+  // Type for the build result from workflow state
+  interface WorkflowBuildResult {
+    image_id?: string;
+    imageId?: string;
+    tags?: string[];
+    image_tag?: string;
+    logs?: string[];
+    size_bytes?: number;
+    size?: number;
+    layers?: number | any[]; // Can be number or array from different sources
+    build_duration_ms?: number;
+    buildTime?: number;
+    success?: boolean;
+  }
+
+  const result = buildResult as WorkflowBuildResult;
+
   // Transform snake_case properties to camelCase to match DockerBuildResult interface
-  return {
-    imageId: (buildResult as unknown).image_id ?? ((buildResult as unknown).imageId || ''),
-    tags: (buildResult as unknown).tags ?? [(buildResult as unknown).image_tag].filter(Boolean),
-    logs: (buildResult as unknown).logs ?? [],
-    size: (buildResult as unknown).size_bytes ?? (buildResult as unknown).size,
-    layers: (buildResult as unknown).layers,
-    buildTime: (buildResult as unknown).build_duration_ms ?? (buildResult as unknown).buildTime,
-    success: (buildResult as unknown).success !== false
+  // Handle layers - convert array length to number if needed
+  const layersValue = result.layers;
+  const layersCount = Array.isArray(layersValue) ? layersValue.length : layersValue;
+
+  const dockerResult: DockerBuildResult = {
+    imageId: result.image_id ?? (result.imageId || ''),
+    tags: result.tags ?? (result.image_tag ? [result.image_tag] : []),
+    logs: result.logs ?? [],
+    success: result.success !== false
   };
+
+  // Only add optional properties if they have defined values
+  const size = result.size_bytes ?? result.size;
+  if (size !== undefined) {
+    dockerResult.size = size;
+  }
+
+  if (layersCount !== undefined) {
+    dockerResult.layers = layersCount;
+  }
+
+  const buildTime = result.build_duration_ms ?? result.buildTime;
+  if (buildTime !== undefined) {
+    dockerResult.buildTime = buildTime;
+  }
+
+  return dockerResult;
 }
 
 /**
@@ -61,7 +96,7 @@ export function hasBuildCompleted(session: Session): boolean {
  */
 export function getWorkflowProperty(session: Session, property: string): unknown {
   const parts = property.split('.');
-  let current: any = session.workflow_state;
+  let current: unknown = session.workflow_state;
 
   for (const part of parts) {
     if (!current || typeof current !== 'object') {

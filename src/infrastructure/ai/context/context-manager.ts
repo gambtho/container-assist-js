@@ -219,24 +219,24 @@ export class AIContextManager {
         const match = trimmed.match(/class\s+(\w+)/);
         if (match?.[1]) {
           currentClass = match[1];
-          await summary.push(`class ${currentClass} { /* ... */ }`);
+          summary.push(`class ${currentClass} { /* ... */ }`);
         }
       } else if (trimmed.includes('interface ')) {
         const match = trimmed.match(/interface\s+(\w+)/);
         if (match) {
-          await summary.push(`interface ${match[1]} { /* ... */ }`);
+          summary.push(`interface ${match[1]} { /* ... */ }`);
         }
       } else if (trimmed.includes('function ') && !trimmed.includes('{')) {
         const match = trimmed.match(
           /((?:export\s+)?(?:async\s+)?function\s+\w+\([^)]*\)(?:\s*:\s*[^{]+)?)/
         );
         if (match) {
-          await summary.push(`${match[1]} { /* ... */ }`);
+          summary.push(`${match[1]} { /* ... */ }`);
         }
       } else if (trimmed.includes('enum ')) {
         const match = trimmed.match(/enum\s+(\w+)/);
         if (match) {
-          await summary.push(`enum ${match[1]} { /* ... */ }`);
+          summary.push(`enum ${match[1]} { /* ... */ }`);
         }
       }
     }
@@ -331,17 +331,17 @@ export class AIContextManager {
       const lineTokens = this.tokenEstimator.estimate(line);
 
       if (currentTokens + lineTokens > maxTokens && currentChunk.length > 0) {
-        await chunks.push(currentChunk.join('\n'));
+        chunks.push(currentChunk.join('\n'));
         currentChunk = [line];
         currentTokens = lineTokens;
       } else {
-        await currentChunk.push(line);
+        currentChunk.push(line);
         currentTokens += lineTokens;
       }
     }
 
     if (currentChunk.length > 0) {
-      await chunks.push(currentChunk.join('\n'));
+      chunks.push(currentChunk.join('\n'));
     }
 
     return chunks;

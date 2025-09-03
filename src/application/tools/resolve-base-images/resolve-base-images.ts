@@ -6,17 +6,20 @@ import {
   BaseImageRecommendation,
   BaseImageRecommendationSchema,
   BaseImageResolutionInput,
-  BaseImageResolutionInputSchema,
+  BaseImageResolutionInputSchema
 } from '../../../contracts/types/index.js';
-import { MCPTool, MCPToolContext } from '../tool-types.js';
 import { executeWithRetry } from '../error-recovery.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 import {
   getSuggestedImagesForReference,
   validateBaseImageRecommendation,
   buildBaseImageAIRequest
 } from './helper';
 
-const resolveBaseImagesHandler: MCPTool = {
+/**
+ * Main handler implementation
+ */
+const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseImageRecommendation> = {
   name: 'resolve-base-images',
   description: 'AI-powered Docker base image resolution with security and performance optimization',
   category: 'workflow',
@@ -25,7 +28,7 @@ const resolveBaseImagesHandler: MCPTool = {
 
   handler: async (
     input: BaseImageResolutionInput,
-    context: MCPToolContext
+    context: ToolContext
   ): Promise<BaseImageRecommendation> => {
     return executeWithRetry(
       async () => {
@@ -101,6 +104,5 @@ const resolveBaseImagesHandler: MCPTool = {
     );
   }
 };
-
 
 export default resolveBaseImagesHandler;

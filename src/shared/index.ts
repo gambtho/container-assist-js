@@ -97,14 +97,17 @@ export function deepMerge<T extends Record<string, unknown>>(
     if (sourceValue === undefined) continue;
 
     if (
-      sourceValue &&
+      sourceValue != null &&
       typeof sourceValue === 'object' &&
       !Array.isArray(sourceValue) &&
-      targetValue &&
+      targetValue != null &&
       typeof targetValue === 'object' &&
       !Array.isArray(targetValue)
     ) {
-      target[key] = deepMerge(targetValue, sourceValue);
+      target[key] = deepMerge(
+        targetValue as Record<string, unknown>,
+        sourceValue as Record<string, unknown>
+      ) as T[Extract<keyof T, string>];
     } else {
       target[key] = sourceValue as T[Extract<keyof T, string>];
     }

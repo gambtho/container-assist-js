@@ -11,8 +11,8 @@ import { nanoid } from 'nanoid';
 
 import { UniversalRepositoryAnalyzer } from '../../../src/infrastructure/ai/repository-analyzer.js';
 import { executeWithRecovery } from '../../../src/infrastructure/ai/error-recovery.js';
-import { generateDockerfileHandler } from '../../../src/service/tools/handlers/generate-dockerfile.js';
-import { generateKubernetesManifestsHandler } from '../../../src/service/tools/handlers/generate-k8s-manifests.js';
+import { generateDockerfileHandler } from '../../../src/application/tools/generate-dockerfile/generate-dockerfile.js';
+import { generateKubernetesManifestsHandler } from '../../../src/application/tools/generate-k8s-manifests/generate-k8s-manifests.js';
 import { MockMCPSampler } from '../../../src/infrastructure/ai/mock-sampler.js';
 import { createLogger } from '../../utils/logger.js';
 import { createMockSession, createMockContext } from '../../utils/mocks.js';

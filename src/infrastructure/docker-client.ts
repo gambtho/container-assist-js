@@ -12,6 +12,8 @@ import {
   DockerScanResult,
   ScanOptions
 } from '../contracts/types/index.js';
+import { TrivyScanner } from './scanners/trivy-scanner.js';
+import { isOk } from '../domain/types/result.js';
 
 interface DockerSystemInfo {
   os?: string;
@@ -32,9 +34,9 @@ interface DockerBuildEvent {
 
 interface DockerImageInfo {
   Id: string;
-  RepoTags?: string[];
-  Size?: number;
-  Created?: number;
+  RepoTags?: string[] | undefined;
+  Size?: number | undefined;
+  Created?: number | undefined;
 }
 
 interface DockerContainerInfo {
@@ -70,6 +72,7 @@ export interface DockerClientConfig {
 export class DockerClient {
   private docker: Docker;
   private logger: Logger;
+  private trivyScanner?: TrivyScanner;
 
   constructor(config: DockerClientConfig, logger: Logger) {
     this.logger = logger.child({ component: 'DockerClient' });
@@ -85,12 +88,30 @@ export class DockerClient {
     }
 
     this.docker = new Docker(dockerOptions);
+
+    // Initialize Trivy scanner if configured
+    if (config.trivy !== undefined) {
+      this.trivyScanner = new TrivyScanner(this.logger, config.trivy);
+    }
   }
 
   async initialize(): Promise<void> {
     try {
       await this.docker.ping();
       this.logger.info('Docker client initialized successfully');
+
+      // Initialize Trivy scanner if available
+      if (this.trivyScanner) {
+        const trivyResult = await this.trivyScanner.initialize();
+        if (trivyResult.kind === 'fail') {
+          this.logger.warn(
+            { error: trivyResult.error },
+            'Trivy scanner initialization failed, scanning will be disabled'
+          );
+          // Delete the scanner instead of setting to undefined
+          delete this.trivyScanner;
+        }
+      }
     } catch (error) {
       throw new DockerError(
         'Failed to connect to Docker daemon',
@@ -111,7 +132,7 @@ export class DockerClient {
       const tarStream = pack(contextPath);
 
       // Prepare build options
-      const buildOptions: Docker.BuildImageOptions = {
+      const buildOptions: Docker.ImageBuildOptions = {
         t: options.tags?.[0] || options.tag,
         dockerfile: options.dockerfile ?? (options.dockerfilePath || 'Dockerfile'),
         buildargs: options.buildArgs,
@@ -126,17 +147,18 @@ export class DockerClient {
       };
 
       // Remove undefined values
-      Object.keys(buildOptions).forEach((key) => {
-        if (buildOptions[key] === undefined) {
-          delete buildOptions[key];
+      const cleanBuildOptions: Record<string, unknown> = {};
+      Object.entries(buildOptions).forEach(([key, value]) => {
+        if (value !== undefined) {
+          cleanBuildOptions[key] = value;
         }
       });
 
       // Build the image
-      const stream = (await this.docker.buildImage(
+      const stream = await this.docker.buildImage(
         tarStream,
-        buildOptions
-      )) as NodeJS.ReadableStream;
+        cleanBuildOptions as Docker.ImageBuildOptions
+      );
 
       // Process build output
       const logs: string[] = [];
@@ -202,32 +224,59 @@ export class DockerClient {
     }
   }
 
-  async scan(image: string, _options?: ScanOptions): Promise<DockerScanResult> {
-    // For now, return a basic scan result
-    // In a real implementation, this would integrate with Trivy or another scanner
-    this.logger.warn('Docker scan not implemented, returning mock result');
-    return {
-      vulnerabilities: [],
-      summary: {
-        critical: 0,
-        high: 0,
-        medium: 0,
-        low: 0,
-        unknown: 0,
-        total: 0
-      },
-      scanTime: new Date().toISOString(),
-      metadata: {
-        image
-      }
-    };
+  async scan(image: string, options?: ScanOptions): Promise<DockerScanResult> {
+    // Check if Trivy scanner is available
+    if (!this.trivyScanner) {
+      this.logger.warn(
+        'Security scanning is not available. Install Trivy to enable vulnerability scanning.'
+      );
+
+      // Return empty scan result with metadata indicating scanning is disabled
+      return {
+        vulnerabilities: [],
+        summary: {
+          critical: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          unknown: 0,
+          total: 0
+        },
+        scanTime: new Date().toISOString(),
+        metadata: {
+          image,
+          // Note: scanner not available - metadata only includes standard fields
+          lastScanned: new Date().toISOString()
+        }
+      };
+    }
+
+    // Perform actual scan using Trivy
+    this.logger.info({ image, options }, 'Performing security scan with Trivy');
+
+    const scanResult = await this.trivyScanner.scan(image, options);
+
+    if (isOk(scanResult)) {
+      return scanResult.value;
+    } else {
+      // Log the error and throw with proper context
+      this.logger.error({ error: scanResult.error, code: scanResult.code }, 'Security scan failed');
+
+      throw new DockerError(
+        `Security scan failed: ${scanResult.error}`,
+        scanResult.code || 'SCAN_FAILED',
+        'scan',
+        undefined,
+        { image, options }
+      );
+    }
   }
 
   async tag(imageId: string, tag: string): Promise<void> {
     try {
       const [repo, tagName] = tag.includes(':') ? tag.split(':') : [tag, 'latest'];
       const image = this.docker.getImage(imageId);
-      await image.tag({ repo, tag: tagName });
+      await image.tag({ repo, tag: tagName } as any);
       this.logger.debug({ imageId, tag }, 'Image tagged successfully');
     } catch (error) {
       throw new DockerError(
@@ -283,7 +332,13 @@ export class DockerClient {
 
   async listImages(): Promise<DockerImageInfo[]> {
     try {
-      return await this.docker.listImages();
+      const images = await this.docker.listImages();
+      return images.map((img) => ({
+        Id: img.Id,
+        RepoTags: img.RepoTags ?? undefined,
+        Size: img.Size ?? undefined,
+        Created: img.Created ?? undefined
+      }));
     } catch (error) {
       throw new DockerError(
         `Failed to list images: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -341,7 +396,7 @@ export class DockerClient {
       return {
         available: true,
         version: version.Version,
-        trivyAvailable: false, // Would need actual Trivy check
+        trivyAvailable: this.trivyScanner ? await this.trivyScanner.isAvailable() : false,
         systemInfo: {
           os: info.OperatingSystem,
           arch: info.Architecture,
@@ -362,7 +417,7 @@ export class DockerClient {
   /**
    * List Docker containers
    */
-  async listContainers(options: Docker.ListContainersOptions = {}): Promise<DockerContainerInfo[]> {
+  async listContainers(options: Docker.ContainerListOptions = {}): Promise<DockerContainerInfo[]> {
     try {
       const containers = (await this.docker.listContainers(options)) as DockerContainerInfo[];
       return containers ?? [];

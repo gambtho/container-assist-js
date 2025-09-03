@@ -46,14 +46,17 @@ export function createSingleton<T>(factory: () => T | Promise<T>): () => Promise
   let initializing = false;
 
   return async () => {
-    if (instance) return instance;
+    if (instance != null) return instance;
 
     if (initializing) {
       // Wait for initialization
       while (initializing) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
-      return instance!;
+      if (instance == null) {
+        throw new Error('Instance should be initialized after waiting');
+      }
+      return instance;
     }
 
     initializing = true;

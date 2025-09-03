@@ -1,9 +1,16 @@
 /**
- * Analyze Repository - Helper Functions
+ * Analyze Repository - Enhanced with AI Optimization
  */
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
+import { AnalyzeRepositoryParams, AnalysisResult } from '../schemas.js';
+
+// Use consolidated schemas
+
+// Type aliases
+export type AnalyzeInput = AnalyzeRepositoryParams;
+export type AnalyzeOutput = AnalysisResult;
 
 // Language detection configuration
 interface LanguageSignature {
@@ -107,7 +114,9 @@ export async function validateRepositoryPath(
 /**
  * Detect primary programming language
  */
-export async function detectLanguage(repoPath: string): Promise<{ language: string; version?: string }> {
+export async function detectLanguage(
+  repoPath: string
+): Promise<{ language: string; version?: string }> {
   const files = await fs.readdir(repoPath);
   const fileStats = await Promise.all(
     files.map(async (file) => {
@@ -162,7 +171,7 @@ export async function detectLanguage(repoPath: string): Promise<{ language: stri
 export async function detectFramework(
   repoPath: string,
   language: string
-): Promise<{ framework?: string; version?: string }> {
+): Promise<{ framework?: string; version?: string } | null> {
   const files = await fs.readdir(repoPath);
 
   // Check for framework-specific files
@@ -194,7 +203,10 @@ export async function detectFramework(
           const firstDep = signature.dependencies?.[0];
           const result: { framework: string; version?: string } = { framework };
           if (firstDep != null && allDeps[firstDep] != null) {
-            result.version = allDeps[firstDep];
+            const version = allDeps[firstDep];
+            if (typeof version === 'string') {
+              result.version = version;
+            }
           }
           return result;
         }
@@ -204,7 +216,8 @@ export async function detectFramework(
     }
   }
 
-  return {};
+  // Return null when no framework is detected instead of empty object
+  return null;
 }
 
 /**
@@ -388,10 +401,13 @@ export function getSecurityRecommendations(
 /**
  * Gather file structure for AI context
  */
-export async function gatherFileStructure(repoPath: string, maxDepth: number = 2): Promise<string[]> {
+export async function gatherFileStructure(
+  repoPath: string,
+  maxDepth: number = 2
+): Promise<string[]> {
   const files: string[] = [];
 
-  async function walkDir(dir: string, currentDepth: number) {
+  async function walkDir(dir: string, currentDepth: number): Promise<void> {
     if (currentDepth > maxDepth) return;
 
     try {

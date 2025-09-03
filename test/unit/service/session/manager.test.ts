@@ -159,7 +159,7 @@ describe('SessionService', () => {
           ...current.metadata,
           updatedCount: (current.metadata?.updatedCount || 0) + 1
         }
-      });
+      }));
       
       const updated = await sessionService.getSession(session.id);
       expect(updated.metadata?.updatedCount).toBe(1);

@@ -59,7 +59,7 @@ export class AIClient {
   ) {
     this.logger = logger.child({ component: 'AIClient' });
     this.sampler = sampler;
-    this.available = !!sampler;
+    this.available = sampler != null;
 
     if (this.available) {
       this.logger.info('AI client initialized with MCP sampler');
@@ -69,7 +69,7 @@ export class AIClient {
   }
 
   async generateText(options: AIGenerationOptions): Promise<AIGenerationResult> {
-    if (!this.available ?? !this.sampler) {
+    if (!this.available || this.sampler == null) {
       throw new AIServiceError(
         'AI sampler not available',
         'AI_SAMPLER_UNAVAILABLE',

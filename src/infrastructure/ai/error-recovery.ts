@@ -216,7 +216,7 @@ export class EnhancedErrorRecovery {
       });
 
       // If successful, return result
-      if (attemptResult.success && attemptResult.success.length > 0) {
+      if (attemptResult.success && attemptResult.data) {
         this.logger.info(
           {
             strategy: attemptResult.strategy?.name,
@@ -345,7 +345,7 @@ export class EnhancedErrorRecovery {
       return {
         success: true,
         data: result,
-        context: updatedContext,
+        context: updatedContext as ErrorContext,
         strategy: recoveryResult.strategy,
         metadata: {
           attemptDurationMs: Date.now() - attemptStart,

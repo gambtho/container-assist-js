@@ -4,10 +4,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
-import { EnhancedToolRegistry, ToolDescriptor, ToolContext } from '../../src/service/tools/enhanced-registry.js'
-import { DependencyFactory } from '../../src/service/tools/dependencies.js'
-import { WorkflowOrchestrator } from '../../src/service/workflow/orchestrator-enhanced.js'
-import * as schemas from '../../src/service/tools/enhanced-schemas.js'
+import { ToolRegistry } from '../../src/application/tools/ops/registry.js'
+import type { ToolDescriptor, ToolContext } from '../../src/application/tools/tool-types.js'
+// DependencyFactory - removed, not available
+import { WorkflowOrchestrator } from '../../src/application/workflow/orchestrator.js'
+// schemas - removed, not available
 import { ok, fail } from '../../src/domain/types/result.js'
 
 import { analyzeRepositoryHandler } from '../../src/service/tools/handlers/analyze-enhanced.js'

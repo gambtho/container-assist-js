@@ -328,7 +328,7 @@ describe('.NET Workflow Integration', () => {
         expect(analysis.framework).toBe(testCase.expectedFramework);
         
         if (testCase.expectedPorts.length > 0) {
-          expect(analysis.suggestedPorts).toEqual(expect.arrayContaining(testCase.expectedPorts);
+          expect(analysis.suggestedPorts).toEqual(expect.arrayContaining(testCase.expectedPorts));
         } else {
           expect(analysis.suggestedPorts.length).toBe(0);
         }

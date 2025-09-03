@@ -173,7 +173,7 @@ const BASE_CONFIG: ApplicationConfig = {
 };
 
 // Simple value parsing without over-engineering
-function parseValue(value: string, type: string): any {
+function parseValue(value: string, type: string): unknown {
   switch (type) {
     case 'string':
       return value;
@@ -191,12 +191,12 @@ function parseValue(value: string, type: string): any {
 // Simple nested object path setting
 function setPath(obj: unknown, path: string, value: unknown): void {
   const keys = path.split('.');
-  let current = obj;
+  let current = obj as Record<string, any>;
 
   for (let i = 0; i < keys.length - 1; i++) {
     const key = keys[i]!;
     if (!(key in current)) current[key] = {};
-    current = current[key];
+    current = current[key] as Record<string, any>;
   }
 
   current[keys[keys.length - 1]!] = value;

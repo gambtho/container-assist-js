@@ -56,16 +56,16 @@ export function getBuildErrorSuggestions(error: string): ErrorSuggestions {
   const suggestions: string[] = [];
 
   if (error.includes('dockerfile')) {
-    await suggestions.push('Check Dockerfile syntax');
-    await suggestions.push('Ensure all base images are accessible');
+    suggestions.push('Check Dockerfile syntax');
+    suggestions.push('Ensure all base images are accessible');
   }
   if (error.includes('permission')) {
-    await suggestions.push('Check Docker daemon permissions');
-    await suggestions.push('Ensure Docker socket is accessible');
+    suggestions.push('Check Docker daemon permissions');
+    suggestions.push('Ensure Docker socket is accessible');
   }
   if (error.includes('space')) {
-    await suggestions.push('Check available disk space');
-    await suggestions.push('Clean up unused Docker images');
+    suggestions.push('Check available disk space');
+    suggestions.push('Clean up unused Docker images');
   }
 
   return {
@@ -81,16 +81,16 @@ export function getDeploymentErrorSuggestions(error: string): ErrorSuggestions {
   const suggestions: string[] = [];
 
   if (error.includes('kubernetes') || error.includes('k8s')) {
-    await suggestions.push('Check Kubernetes cluster connectivity');
-    await suggestions.push('Verify kubeconfig is valid');
+    suggestions.push('Check Kubernetes cluster connectivity');
+    suggestions.push('Verify kubeconfig is valid');
   }
   if (error.includes('namespace')) {
-    await suggestions.push('Ensure namespace exists');
-    await suggestions.push('Check namespace permissions');
+    suggestions.push('Ensure namespace exists');
+    suggestions.push('Check namespace permissions');
   }
   if (error.includes('resource')) {
-    await suggestions.push('Check resource quotas');
-    await suggestions.push('Verify manifest syntax');
+    suggestions.push('Check resource quotas');
+    suggestions.push('Verify manifest syntax');
   }
 
   return {
@@ -106,16 +106,16 @@ export function getScanErrorSuggestions(error: string): ErrorSuggestions {
   const suggestions: string[] = [];
 
   if (error.includes('trivy')) {
-    await suggestions.push('Ensure Trivy is installed');
-    await suggestions.push('Update Trivy vulnerability database');
+    suggestions.push('Ensure Trivy is installed');
+    suggestions.push('Update Trivy vulnerability database');
   }
   if (error.includes('timeout')) {
-    await suggestions.push('Increase scan timeout');
-    await suggestions.push('Try scanning with reduced scope');
+    suggestions.push('Increase scan timeout');
+    suggestions.push('Try scanning with reduced scope');
   }
   if (error.includes('image')) {
-    await suggestions.push('Verify image exists locally');
-    await suggestions.push('Pull image if necessary');
+    suggestions.push('Verify image exists locally');
+    suggestions.push('Pull image if necessary');
   }
 
   return {
@@ -131,16 +131,16 @@ export function getGenericErrorSuggestions(error: string): ErrorSuggestions {
   const suggestions: string[] = [];
 
   if (error.includes('network')) {
-    await suggestions.push('Check network connectivity');
-    await suggestions.push('Verify proxy settings if applicable');
+    suggestions.push('Check network connectivity');
+    suggestions.push('Verify proxy settings if applicable');
   }
   if (error.includes('auth')) {
-    await suggestions.push('Check authentication credentials');
-    await suggestions.push('Verify registry access');
+    suggestions.push('Check authentication credentials');
+    suggestions.push('Verify registry access');
   }
   if (error.includes('timeout')) {
-    await suggestions.push('Increase timeout values');
-    await suggestions.push('Check system resources');
+    suggestions.push('Increase timeout values');
+    suggestions.push('Check system resources');
   }
 
   return {

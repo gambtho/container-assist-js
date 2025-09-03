@@ -306,7 +306,9 @@ export class ToolParameterBuilder {
    * Add a boolean parameter
    */
   boolean(name: string, defaultValue?: boolean, description?: string): this {
-    let schema: any = z.boolean().describe(description ?? name);
+    let schema: z.ZodDefault<z.ZodBoolean> | z.ZodBoolean = z
+      .boolean()
+      .describe(description ?? name);
     if (defaultValue !== undefined) {
       schema = schema.default(defaultValue);
     }
@@ -336,7 +338,7 @@ export class ToolParameterBuilder {
   /**
    * Build the final schema
    */
-  build(): z.ZodObject<any> {
+  build(): z.ZodObject<Record<string, z.ZodTypeAny>> {
     return z.object(this.schema);
   }
 }

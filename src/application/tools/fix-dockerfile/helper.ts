@@ -3,7 +3,7 @@
  */
 
 import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
-import type { MCPToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types.js';
 
 export interface DockerfileIssue {
   type: string;
@@ -31,7 +31,7 @@ export interface DockerfileValidationResult {
 export async function analyzeDockerfile(
   dockerfileContent: string,
   knownIssues: DockerfileIssue[] = [],
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<DockerfileAnalysisResult> {
   const { logger } = context;
 
@@ -47,7 +47,10 @@ export async function analyzeDockerfile(
     const trimmedLine = line.trim();
 
     // Check for running as root
-    if (trimmedLine.startsWith('USER root') || (!dockerfileContent.includes('USER ') && !trimmedLine.startsWith('#'))) {
+    if (
+      trimmedLine.startsWith('USER root') ||
+      (!dockerfileContent.includes('USER ') && !trimmedLine.startsWith('#'))
+    ) {
       detectedIssues.push({
         type: 'security',
         message: 'Running as root user - consider using a non-root user',
@@ -77,7 +80,10 @@ export async function analyzeDockerfile(
     }
 
     // Check for apt-get without --no-install-recommends
-    if (trimmedLine.includes('apt-get install') && !trimmedLine.includes('--no-install-recommends')) {
+    if (
+      trimmedLine.includes('apt-get install') &&
+      !trimmedLine.includes('--no-install-recommends')
+    ) {
       detectedIssues.push({
         type: 'optimization',
         message: 'Consider using --no-install-recommends with apt-get to reduce image size',
@@ -130,7 +136,7 @@ export async function analyzeDockerfile(
 export async function generateFixedDockerfile(
   originalContent: string,
   analysisResult: DockerfileAnalysisResult,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<string> {
   const { logger } = context;
 
@@ -144,27 +150,27 @@ export async function generateFixedDockerfile(
         .template('dockerfile-fix' as any)
         .withModel('claude-3-haiku-20240307')
         .withSampling(0.3, 3000)
-        .withContext({
+        .withVariables({
           originalDockerfile: originalContent,
-          issues: analysisResult.issues,
-          recommendations: analysisResult.recommendations,
-          securityImprovements: analysisResult.securityImprovements
+          issues: JSON.stringify(analysisResult.issues),
+          recommendations: analysisResult.recommendations.join(', '),
+          securityImprovements: analysisResult.securityImprovements.join(', ')
         });
 
       const result = await context.aiService.generate<string>(requestBuilder);
 
       if (result.data) {
         let fixedContent = result.data;
-        
+
         // If response includes markdown, extract the dockerfile content
         const dockerfileMatch = fixedContent.match(/```dockerfile\n([\s\S]*?)\n```/);
-        if (dockerfileMatch) {
+        if (dockerfileMatch?.[1]) {
           fixedContent = dockerfileMatch[1];
         }
 
         // Update analysis result with fixed issues
-        analysisResult.fixedIssues = analysisResult.issues.filter(issue => 
-          issue.severity === 'error' || issue.severity === 'warning'
+        analysisResult.fixedIssues = analysisResult.issues.filter(
+          (issue) => issue.severity === 'error' || issue.severity === 'warning'
         );
 
         // Log AI generation with metadata
@@ -185,7 +191,6 @@ export async function generateFixedDockerfile(
     // Fallback to basic fix approach if AI service not available
     logger.info('Using basic fix approach (AI service not available)');
     return generateBasicDockerfileFix(originalContent, analysisResult);
-
   } catch (error) {
     logger.error({ error }, 'AI-enhanced fixing failed, using basic fix approach');
     // Fall back to basic fixing
@@ -203,7 +208,7 @@ function generateBasicDockerfileFix(
   let fixedContent = originalContent;
 
   // Apply basic fixes for common issues
-  analysisResult.issues.forEach(issue => {
+  analysisResult.issues.forEach((issue) => {
     switch (issue.type) {
       case 'security':
         if (issue.message.includes('root user')) {
@@ -247,8 +252,8 @@ RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser`;
   });
 
   // Mark issues as fixed
-  analysisResult.fixedIssues = analysisResult.issues.filter(issue => 
-    issue.severity === 'error' || issue.severity === 'warning'
+  analysisResult.fixedIssues = analysisResult.issues.filter(
+    (issue) => issue.severity === 'error' || issue.severity === 'warning'
   );
 
   return fixedContent;
@@ -259,7 +264,7 @@ RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser`;
  */
 export async function validateDockerfileFix(
   fixedContent: string,
-  analysisResult: DockerfileAnalysisResult
+  _analysisResult: DockerfileAnalysisResult
 ): Promise<DockerfileValidationResult> {
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -276,8 +281,10 @@ export async function validateDockerfileFix(
   }
 
   // Check for basic structure
-  const lines = fixedContent.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'));
-  
+  const lines = fixedContent
+    .split('\n')
+    .filter((line) => line.trim() && !line.trim().startsWith('#'));
+
   if (lines.length < 2) {
     warnings.push('Dockerfile seems very simple - ensure all necessary instructions are included');
   }

@@ -255,7 +255,7 @@ describe('Full Containerization Workflow Integration', () => {
   
   describe('Performance and Scalability', () => {
     it('should handle multiple concurrent workflows', async () => {
-      const sessionIds = Array.from({ length: 5 }, () => nanoid();
+      const sessionIds = Array.from({ length: 5 }, () => nanoid());
       
       // Start multiple workflows concurrently
       const promises = sessionIds.map(id => 
@@ -286,7 +286,7 @@ describe('Full Containerization Workflow Integration', () => {
     
     it('should maintain performance under load', async () => {
       const iterations = 20;
-      const sessionIds = Array.from({ length: iterations }, () => nanoid();
+      const sessionIds = Array.from({ length: iterations }, () => nanoid());
       
       const { duration } = await measureTime(async () => {
         const promises = sessionIds.map(id => 

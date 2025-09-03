@@ -269,7 +269,7 @@ describe('Service Interface Contracts', () => {
   describe('Service Interface Contracts', () => {
     test('should define proper Docker service contract', () => {
       // Type-level test for DockerService interface (commented out - belongs in application layer)
-      // const mockDockerService: Partial<DockerService> = {
+      const mockDockerService = {
         buildImage: async () => ({ success: true, data: {} as any }),
         scanImage: async () => ({ success: true, data: {} as any })
       };

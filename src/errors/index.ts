@@ -8,13 +8,13 @@
  */
 export abstract class ApplicationError extends Error {
   public readonly timestamp: Date;
-  public readonly context?: Record<string, any> | undefined;
+  public readonly context?: Record<string, unknown> | undefined;
   public override readonly cause?: Error | undefined;
 
   constructor(
     message: string,
     public readonly code: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -23,7 +23,14 @@ export abstract class ApplicationError extends Error {
     Error.captureStackTrace(this, this.constructor);
   }
 
-  toJSON() {
+  toJSON(): {
+    name: string;
+    message: string;
+    code: string;
+    timestamp: Date;
+    context?: Record<string, unknown>;
+    stack?: string;
+  } {
     return {
       name: this.name,
       message: this.message,
@@ -44,7 +51,7 @@ export class DockerError extends ApplicationError {
     code: string = 'DOCKER_ERROR',
     public readonly operation?: string | undefined,
     public override readonly cause?: Error | undefined,
-    context?: Record<string, any> | undefined
+    context?: Record<string, unknown> | undefined
   ) {
     super(message, code, { ...context, operation });
     this.name = 'DockerError';
@@ -61,7 +68,7 @@ export class KubernetesError extends ApplicationError {
     public readonly resource?: string | undefined,
     public readonly namespace?: string | undefined,
     public override readonly cause?: Error | undefined,
-    context?: Record<string, any> | undefined
+    context?: Record<string, unknown> | undefined
   ) {
     super(message, code, { ...context, resource, namespace });
     this.name = 'KubernetesError';
@@ -77,7 +84,7 @@ export class AIServiceError extends ApplicationError {
     code: string = 'AI_ERROR',
     public readonly model?: string | undefined,
     public override readonly cause?: Error | undefined,
-    context?: Record<string, any> | undefined
+    context?: Record<string, unknown> | undefined
   ) {
     super(message, code, { ...context, model });
     this.name = 'AIServiceError';
@@ -92,7 +99,7 @@ export class ValidationError extends ApplicationError {
     message: string,
     public readonly fields?: string[],
     public readonly violations?: Array<{ field: string; message: string }>,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, 'VALIDATION_ERROR', { ...context, fields, violations });
     this.name = 'ValidationError';
@@ -108,7 +115,7 @@ export class ConfigurationError extends ApplicationError {
     public readonly configKey?: string,
     public readonly expectedType?: string,
     public readonly actualValue?: unknown,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, 'CONFIG_ERROR', { ...context, configKey, expectedType, actualValue });
     this.name = 'ConfigurationError';
@@ -124,7 +131,7 @@ export class WorkflowError extends ApplicationError {
     public readonly workflowId?: string | undefined,
     public readonly step?: string | undefined,
     public override readonly cause?: Error | undefined,
-    context?: Record<string, any> | undefined
+    context?: Record<string, unknown> | undefined
   ) {
     super(message, 'WORKFLOW_ERROR', { ...context, workflowId, step });
     this.name = 'WorkflowError';
@@ -140,7 +147,7 @@ export class StorageError extends ApplicationError {
     public readonly key?: string | undefined,
     public readonly operation?: 'get' | 'set' | 'delete' | 'list' | undefined,
     public override readonly cause?: Error | undefined,
-    context?: Record<string, any> | undefined
+    context?: Record<string, unknown> | undefined
   ) {
     super(message, 'STORAGE_ERROR', { ...context, key, operation });
     this.name = 'StorageError';
@@ -155,7 +162,7 @@ export class NotFoundError extends ApplicationError {
     message: string,
     public readonly resourceType?: string,
     public readonly resourceId?: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, 'NOT_FOUND', { ...context, resourceType, resourceId });
     this.name = 'NotFoundError';
@@ -170,7 +177,7 @@ export class TimeoutError extends ApplicationError {
     message: string,
     public readonly timeoutMs?: number,
     public readonly operation?: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, 'TIMEOUT', { ...context, timeoutMs, operation });
     this.name = 'TimeoutError';
@@ -185,7 +192,7 @@ export class RateLimitError extends ApplicationError {
     message: string,
     public readonly limit?: number,
     public readonly resetAt?: Date,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, 'RATE_LIMIT', { ...context, limit, resetAt });
     this.name = 'RateLimitError';
@@ -265,7 +272,7 @@ export function isNotFoundError(error: unknown): error is NotFoundError {
 /**
  * Error serialization for MCP responses
  */
-export function serializeErrorForMCP(error: ApplicationError): Record<string, any> {
+export function serializeErrorForMCP(error: ApplicationError): Record<string, unknown> {
   return {
     error: {
       code: error.code,

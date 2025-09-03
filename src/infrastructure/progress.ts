@@ -24,7 +24,7 @@ export class ProgressReporter {
   private logger: Logger;
 
   constructor(
-    private server: Server,
+    _server: Server, // Intentionally unused parameter
     logger: Logger
   ) {
     this.logger = logger.child({ component: 'ProgressReporter' });
@@ -90,11 +90,16 @@ export class ProgressReporter {
   ): Promise<void> {
     const clampedPercentage = Math.max(0, Math.min(100, percentage));
 
-    await this.reportProgress(progressToken, {
+    const update: ProgressUpdate = {
       current: clampedPercentage,
-      total: 100,
-      message
-    });
+      total: 100
+    };
+
+    if (message !== undefined) {
+      update.message = message;
+    }
+
+    await this.reportProgress(progressToken, update);
   }
 
   /**
@@ -134,6 +139,10 @@ export class StepProgressTracker {
     }
 
     const step = this.steps[this.currentStep];
+    if (!step) {
+      return; // Safety check
+    }
+
     const stepMessage = message ?? `Starting ${step.name}`;
 
     await this.reporter.reportProgress(this.progressToken, {
@@ -157,6 +166,9 @@ export class StepProgressTracker {
     }
 
     const step = this.steps[this.currentStep];
+    if (!step) {
+      return;
+    }
     const stepWeight = step.weight ?? 1;
     this.completedWeight += stepWeight;
     this.currentStep++;
@@ -184,6 +196,9 @@ export class StepProgressTracker {
     }
 
     const step = this.steps[this.currentStep];
+    if (!step) {
+      return;
+    }
     const stepWeight = step.weight ?? 1;
     const currentStepProgress = Math.max(0, Math.min(1, stepProgress));
     const totalProgress = this.completedWeight + stepWeight * currentStepProgress;

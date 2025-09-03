@@ -6,7 +6,7 @@
 import type { Logger } from 'pino';
 import { createDockerService, type DockerServiceConfig } from './docker';
 import { createKubernetesService, type KubernetesConfig } from './kubernetes';
-import { type AIConfig } from './ai';
+import { type AIConfig, AIService, createAIService } from './ai';
 import { createSessionService, SessionService } from './session.js';
 import { EventEmitter } from 'events';
 import type { MCPSampler } from '../application/interfaces.js';
@@ -21,7 +21,7 @@ export interface ServicesConfig {
 export interface Services {
   docker: Awaited<ReturnType<typeof createDockerService>>;
   kubernetes: Awaited<ReturnType<typeof createKubernetesService>>;
-  ai: any; // Will be updated when AI service is fixed
+  ai: AIService;
   session: SessionService;
   events: EventEmitter;
 }
@@ -47,14 +47,14 @@ export async function initializeServices(
     createSessionService(config.session ?? {}, logger)
   ]);
 
-  // AI service placeholder - will be updated when fixed
-  const ai = null;
+  // Create AI service
+  const ai = createAIService(config.ai ?? {}, sampler, logger);
 
   logger.info(
     {
       docker: true,
       kubernetes: true,
-      ai: false,
+      ai: ai.isAvailable(),
       session: true
     },
     'Services initialized'

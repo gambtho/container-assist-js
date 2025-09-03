@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { executeWithRetry } from '../error-recovery.js';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 
 // Define Zod schema for repository analysis result
 const RepositoryAnalysisSchema = z.object({
@@ -51,7 +51,7 @@ const EnhancedDockerfileInput = z.object({
 async function generateEnhancedDockerfile(
   analysis: RepositoryAnalysis,
   input: z.infer<typeof EnhancedDockerfileInput>,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<string> {
   const { structuredSampler, contentValidator, logger } = context;
 
@@ -116,11 +116,9 @@ async function generateEnhancedDockerfile(
 
         // Log security warnings if any
         if (validation.issues && validation.issues.length > 0) {
-          const highSeverityIssues = validation.issues.filter(
-            (i: unknown) => i.severity === 'high'
-          );
+          const highSeverityIssues = validation.issues.filter((i: any) => i.severity === 'high');
           const mediumSeverityIssues = validation.issues.filter(
-            (i: unknown) => i.severity === 'medium'
+            (i: any) => i.severity === 'medium'
           );
 
           if (highSeverityIssues.length === 0) {
@@ -161,7 +159,7 @@ async function generateEnhancedDockerfile(
  */
 async function analyzeRepositoryStructured(
   repoPath: string,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<RepositoryAnalysis> {
   const { structuredSampler, logger } = context;
 
@@ -238,7 +236,7 @@ README.md
 /**
  * Example enhanced tool handler
  */
-export const enhancedGenerateDockerfileHandler: MCPTool = {
+export const enhancedGenerateDockerfileHandler: ToolDescriptor = {
   name: 'enhanced-generate-dockerfile',
   description: 'Generate Dockerfile with AI reliability features and security validation',
   category: 'workflow' as const,
@@ -258,29 +256,37 @@ export const enhancedGenerateDockerfileHandler: MCPTool = {
   }),
 
   handler: async (input: unknown, context: unknown) => {
-    const { sessionService, logger } = context;
+    const ctx = context as ToolContext;
+    const { sessionService, logger } = ctx;
 
     try {
-      const repoPath = input.repo_path ?? process.cwd();
+      const validatedInput = EnhancedDockerfileInput.parse(input);
+      const repoPath = validatedInput.repo_path ?? process.cwd();
 
       // Step 1: Analyze repository with structured sampling
-      const analysisResult = await analyzeRepositoryStructured(repoPath, context);
+      const analysisResult = await analyzeRepositoryStructured(repoPath, ctx);
 
       // Step 2: Generate Dockerfile with validation
-      const dockerfileResult = await generateEnhancedDockerfile(analysisResult, input, context);
+      const dockerfileResult = await generateEnhancedDockerfile(
+        analysisResult,
+        validatedInput,
+        ctx
+      );
 
       // Step 3: Final validation check
-      const finalValidation = await context.contentValidator!.validateContent(dockerfileResult, {
-        contentType: 'dockerfile',
-        checkSecurity: true,
-        checkBestPractices: true
-      });
+      const finalValidation = ctx.contentValidator
+        ? await ctx.contentValidator.validateContent(dockerfileResult, {
+            contentType: 'dockerfile',
+            checkSecurity: true,
+            checkBestPractices: true
+          })
+        : null;
 
       // Update session state
-      await sessionService.updateAtomic(input.session_id, (session: unknown) => ({
+      await sessionService.updateAtomic(validatedInput.session_id, (session: any) => ({
         ...session,
         workflow_state: {
-          ...session.workflow_state,
+          ...(session.workflow_state || {}),
           dockerfileContent: dockerfileResult,
           analysisResult,
           validationResult: finalValidation
@@ -290,15 +296,17 @@ export const enhancedGenerateDockerfileHandler: MCPTool = {
       return {
         success: true,
         dockerfile: dockerfileResult,
-        securitySummary: await context.contentValidator!.validateContent(dockerfileResult, {
-          contentType: 'dockerfile',
-          checkSecurity: true
-        }),
+        securitySummary: ctx.contentValidator
+          ? await ctx.contentValidator.validateContent(dockerfileResult, {
+              contentType: 'dockerfile',
+              checkSecurity: true
+            })
+          : null,
         metadata: {
           language: analysisResult.language,
           framework: analysisResult.framework,
-          validationPassed: finalValidation.valid,
-          securityIssues: finalValidation.errors?.length ?? 0
+          validationPassed: finalValidation?.valid ?? false,
+          securityIssues: finalValidation?.errors?.length ?? 0
         }
       };
     } catch (error) {
@@ -307,3 +315,6 @@ export const enhancedGenerateDockerfileHandler: MCPTool = {
     }
   }
 };
+
+// Default export for registry
+export default enhancedGenerateDockerfileHandler;

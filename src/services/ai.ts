@@ -36,6 +36,12 @@ export class AIService {
     this.client = new AIClient(config, sampler, this.logger);
   }
 
+  async initialize(): Promise<void> {
+    // AI service initialization (no-op for now as client is ready in constructor)
+    await Promise.resolve(); // Satisfy async requirement
+    this.logger.debug('AI service initialized');
+  }
+
   async generateDockerfile(context: {
     language?: string;
     dependencies?: string[];

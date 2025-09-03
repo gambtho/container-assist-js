@@ -11,6 +11,7 @@ import { getWorkflowConfig, validateWorkflowConfig } from '../../workflow/config
 import { runContainerizationWorkflow } from '../../workflow/containerization.js';
 import type { Logger } from 'pino';
 import type { ProgressCallback } from '../../workflow/types.js';
+import type { Session } from '../../../domain/types/index.js';
 
 export interface StartWorkflowInput {
   repo_path?: string;
@@ -373,9 +374,9 @@ async function validateInput(
 async function createNewSession(
   sessionService: SessionService,
   sessionId: string,
-  validated: unknown,
+  validated: any,
   logger: Logger
-) {
+): Promise<Session> {
   try {
     const session = await sessionService.createSession(validated.repo_path, {
       id: sessionId,
@@ -398,7 +399,7 @@ async function createNewSession(
 /**
  * Estimate workflow duration based on configuration and options
  */
-function estimateWorkflowDuration(workflowConfig: unknown, validated: unknown): number {
+function estimateWorkflowDuration(workflowConfig: any, validated: any): number {
   // Step duration estimates (ms)
   const stepEstimates: Record<string, number> = {
     analyze: 15000, // 15 seconds
@@ -424,15 +425,15 @@ function estimateWorkflowDuration(workflowConfig: unknown, validated: unknown): 
   }
 
   // Adjust for options
-  if (validated.options.skip_tests && validated.options.skip_tests.length > 0) {
+  if (validated.options?.skip_tests && validated.options.skip_tests.length > 0) {
     totalEstimate *= 0.8; // 20% faster
   }
 
-  if (validated.options.skip_security) {
+  if (validated.options?.skip_security) {
     totalEstimate *= 0.9; // 10% faster
   }
 
-  if (validated.options.parallel_steps && validated.options.parallel_steps.length > 0) {
+  if (validated.options?.parallel_steps && validated.options.parallel_steps.length > 0) {
     totalEstimate *= 0.7; // 30% faster with parallelism
   }
 

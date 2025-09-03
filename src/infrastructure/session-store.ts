@@ -26,9 +26,11 @@ export class SessionStore {
     // Start cleanup timer
     const cleanupInterval = options.cleanupIntervalMs ?? 5 * 60 * 1000; // 5 minutes
     this.cleanup = setInterval(() => {
-      this.cleanExpired().catch((err) =>
-        this.logger.warn({ error: err }, 'Session cleanup failed')
-      );
+      try {
+        this.cleanExpired();
+      } catch (err) {
+        this.logger.warn({ error: err }, 'Session cleanup failed');
+      }
     }, cleanupInterval);
 
     // Don't keep process alive for cleanup
@@ -40,7 +42,7 @@ export class SessionStore {
   /**
    * Get a session by ID
    */
-  async get(id: string): Promise<Session | null> {
+  get(id: string): Session | null {
     const session = this.sessions.get(id);
 
     if (!session) {
@@ -85,7 +87,7 @@ export class SessionStore {
 
     // Enforce session limit
     if (!this.sessions.has(id) && this.sessions.size >= this.maxSessions) {
-      await this.evictOldest();
+      this.evictOldest();
     }
 
     this.sessions.set(id, validated);
@@ -125,7 +127,7 @@ export class SessionStore {
   /**
    * Delete a session
    */
-  async delete(id: string): Promise<boolean> {
+  delete(id: string): boolean {
     const deleted = this.sessions.delete(id);
     if (deleted) {
       this.logger.debug({ sessionId: id }, 'Session deleted');
@@ -136,11 +138,7 @@ export class SessionStore {
   /**
    * List sessions with optional filtering
    */
-  async list(filter?: {
-    status?: Session['status'];
-    limit?: number;
-    createdAfter?: Date;
-  }): Promise<Session[]> {
+  list(filter?: { status?: Session['status']; limit?: number; createdAfter?: Date }): Session[] {
     let sessions = Array.from(this.sessions.values());
 
     // Remove expired sessions during listing
@@ -152,7 +150,8 @@ export class SessionStore {
     }
 
     if (filter?.createdAfter) {
-      sessions = sessions.filter((s) => new Date(s.created_at) > filter.createdAfter!);
+      const createdAfter = filter.createdAfter;
+      sessions = sessions.filter((s) => new Date(s.created_at) > createdAfter);
     }
 
     // Sort by updated_at desc
@@ -169,14 +168,14 @@ export class SessionStore {
   /**
    * Get active session count
    */
-  async getActiveCount(): Promise<number> {
-    return (await this.list({ status: 'active' })).length;
+  getActiveCount(): number {
+    return this.list({ status: 'active' }).length;
   }
 
   /**
    * Clean up expired sessions
    */
-  private async cleanExpired(): Promise<number> {
+  private cleanExpired(): number {
     let removed = 0;
     const now = Date.now();
 
@@ -205,7 +204,7 @@ export class SessionStore {
   /**
    * Evict oldest session to make room
    */
-  private async evictOldest(): Promise<void> {
+  private evictOldest(): void {
     let oldest: [string, Session] | null = null;
 
     for (const [id, session] of Array.from(this.sessions)) {
@@ -239,7 +238,7 @@ export class SessionStore {
   /**
    * Shutdown and cleanup
    */
-  async close(): Promise<void> {
+  close(): void {
     if (this.cleanup) {
       clearInterval(this.cleanup);
     }
@@ -257,7 +256,7 @@ export class SessionStore {
   /**
    * Import sessions from backup/migration
    */
-  async importSessions(sessions: Session[]): Promise<void> {
+  importSessions(sessions: Session[]): void {
     for (const session of sessions) {
       if (!this.isExpired(session)) {
         this.sessions.set(session.id, session);

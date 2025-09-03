@@ -81,7 +81,18 @@ export class DomainError extends Error {
     }
   }
 
-  toJSON() {
+  toJSON(): {
+    name: string;
+    code: ErrorCode;
+    message: string;
+    metadata?: Record<string, unknown>;
+    stack?: string;
+    cause?: {
+      name: string;
+      message: string;
+      stack?: string;
+    };
+  } {
     return {
       name: this.name,
       code: this.code,
@@ -123,7 +134,18 @@ export class InfrastructureError extends Error {
     }
   }
 
-  toJSON() {
+  toJSON(): {
+    name: string;
+    code: ErrorCode;
+    message: string;
+    metadata?: Record<string, unknown>;
+    stack?: string;
+    cause?: {
+      name: string;
+      message: string;
+      stack?: string;
+    };
+  } {
     return {
       name: this.name,
       code: this.code,
@@ -165,7 +187,18 @@ export class ServiceError extends Error {
     }
   }
 
-  toJSON() {
+  toJSON(): {
+    name: string;
+    code: ErrorCode;
+    message: string;
+    metadata?: Record<string, unknown>;
+    stack?: string;
+    cause?: {
+      name: string;
+      message: string;
+      stack?: string;
+    };
+  } {
     return {
       name: this.name,
       code: this.code,
@@ -303,8 +336,9 @@ export function getErrorSeverity(error: Error): 'low' | 'medium' | 'high' | 'cri
  */
 export function normalizeError(error: unknown): DomainError | InfrastructureError | ServiceError {
   if (
-    error instanceof DomainError ??
-    (error instanceof InfrastructureError || error instanceof ServiceError)
+    error instanceof DomainError ||
+    error instanceof InfrastructureError ||
+    error instanceof ServiceError
   ) {
     return error;
   }

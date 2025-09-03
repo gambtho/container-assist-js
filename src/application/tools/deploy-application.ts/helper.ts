@@ -5,13 +5,10 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 // import * as yaml from 'js-yaml'; // TODO: Add js-yaml dependency
-import {
-  KubernetesManifest,
-  KubernetesDeploymentResult
-} from '../../../contracts/types/index.js';
+import { KubernetesManifest, KubernetesDeploymentResult } from '../../../contracts/types/index.js';
 
 export type { KubernetesDeploymentResult };
-import type { MCPToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types.js';
 
 export type DeployInput = {
   sessionId?: string | undefined;
@@ -93,12 +90,13 @@ export function orderManifests(manifests: KubernetesManifest[]): KubernetesManif
 export async function deployToCluster(
   manifests: KubernetesManifest[],
   input: DeployInput,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<KubernetesDeploymentResult> {
   const { kubernetesService, logger } = context;
 
   if (kubernetesService && 'deploy' in kubernetesService) {
-    const result = await (kubernetesService as any).deploy({
+    const deployMethod = (kubernetesService as any).deploy;
+    const result = await deployMethod({
       manifests,
       namespace: input.namespace,
       wait: input.wait,
@@ -142,7 +140,7 @@ export async function deployToCluster(
 export async function rollbackDeployment(
   deployed: string[],
   namespace: string,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<void> {
   const { kubernetesService, logger } = context;
 
@@ -170,7 +168,7 @@ export async function waitForDeployment(
   deploymentName: string,
   namespace: string,
   timeout: number,
-  context: MCPToolContext
+  context: ToolContext
 ): Promise<boolean> {
   const { kubernetesService, logger } = context;
   const startTime = Date.now();
@@ -248,7 +246,7 @@ export async function validatePath(targetPath: string): Promise<void> {
 export async function waitForAllDeployments(
   deploymentResult: KubernetesDeploymentResult,
   input: DeployInput,
-  context: MCPToolContext,
+  context: ToolContext,
   progressEmitter: any,
   sessionId: string | undefined
 ): Promise<void> {

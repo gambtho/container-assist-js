@@ -46,7 +46,7 @@ export interface ChainHint<TOutput = any> {
  * Abstract base class for all tool handlers
  * Uses constructor injection instead of service locator
  */
-export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
+export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
   protected readonly logger: Logger;
   protected readonly config: SimpleToolConfig;
 
@@ -92,7 +92,7 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
     this.logger.info(
       {
         tool: this.config.name,
-        hasSession: !!(args.session_id ?? args.sessionId)
+        hasSession: (args.session_id ?? args.sessionId) != null
       },
       'Handling tool request'
     );
@@ -106,7 +106,8 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
 
       // Validate output if schema provided
       if (this.outputSchema) {
-        this.outputSchema.parse(result);
+        const schema = this.outputSchema as { parse: (input: unknown) => void };
+        schema.parse(result);
       }
 
       // Format successful response
@@ -144,7 +145,8 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
    */
   private validateInput(args: Record<string, unknown>): TInput {
     try {
-      return this.inputSchema.parse(args);
+      const schema = this.inputSchema as { parse: (input: unknown) => TInput };
+      return schema.parse(args);
     } catch (error) {
       throw new ValidationError(
         `Input validation failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -199,14 +201,21 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
    */
   private extractSessionId(args: Record<string, unknown>, result?: TOutput): string | undefined {
     // Try multiple common field names
-    return (
-      (args.session_id as string) ||
-      (args.sessionId as string) ||
-      (result &&
-        typeof result === 'object' &&
-        result !== null &&
-        ((result as unknown).sessionId ?? (result as unknown).session_id))
-    );
+    const sessionFromArgs = args.session_id ?? args.sessionId;
+    if (typeof sessionFromArgs === 'string') {
+      return sessionFromArgs;
+    }
+
+    // Check result object for session ID
+    if (result && typeof result === 'object' && result !== null) {
+      const resultObj = result as Record<string, unknown>;
+      const sessionFromResult = resultObj.sessionId ?? resultObj.session_id;
+      if (typeof sessionFromResult === 'string') {
+        return sessionFromResult;
+      }
+    }
+
+    return undefined;
   }
 
   /**
@@ -220,7 +229,7 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
     progress: number;
     data?: unknown;
   }): Promise<void> {
-    if (this.services.progress && this.services.progress.length > 0) {
+    if (this.services.progress && typeof this.services.progress.emit === 'function') {
       try {
         await this.services.progress.emit(update);
       } catch (error) {
@@ -253,4 +262,4 @@ export interface ToolHandlerConfig {
 }
 
 // Export alias for backward compatibility
-export { BaseMCPToolDescriptor as BaseToolHandler };
+export { BaseToolDescriptor as BaseToolHandler };

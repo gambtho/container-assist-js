@@ -4,16 +4,17 @@
 
 import {
   BaseImageRecommendation,
-  BaseImageRecommendationSchema,
   ValidationResult,
   SuggestedImage
 } from '../../../contracts/types/index.js';
-import type { MCPToolContext } from '../tool-types.js';
 
 /**
  * Provide reference images as context, NOT hardcoded decisions
  */
-export function getSuggestedImagesForReference(language: string, _framework?: string): SuggestedImage[] {
+export function getSuggestedImagesForReference(
+  language: string,
+  _framework?: string
+): SuggestedImage[] {
   const currentYear = new Date().getFullYear();
   const references: Record<string, SuggestedImage[]> = {
     nodejs: [
@@ -203,7 +204,21 @@ export function buildBaseImageAIRequest(
   analysis: any,
   input: any,
   suggestedImages: SuggestedImage[]
-) {
+): {
+  purpose: string;
+  format: string;
+  context: any;
+  sessionId: any;
+  sampling: { temperature: number; maxTokens: number };
+  variables: {
+    targetEnvironment: any;
+    securityLevel: any;
+    performancePriority: any;
+    architectures: any;
+    complianceRequirements: any;
+    suggestedImages: string;
+  };
+} {
   return {
     purpose: 'dockerfile-generation',
     format: 'json',
