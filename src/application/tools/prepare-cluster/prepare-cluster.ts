@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { ErrorCode, InfrastructureError } from '../../../contracts/types/errors.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 
 // Input schema
 const PrepareClusterInputRaw = z.object({
@@ -72,7 +72,7 @@ export type PrepareClusterOutput = z.infer<typeof PrepareClusterOutput>;
 /**
  * Prepare Cluster Handler Implementation
  */
-const prepareClusterHandler: MCPToolDescriptor<PrepareClusterInput, PrepareClusterOutput> = {
+const prepareClusterHandler: MCPTool<PrepareClusterInput, PrepareClusterOutput> = {
   name: 'prepare_cluster',
   description: 'Prepare and validate Kubernetes cluster for application deployment',
   category: 'workflow',

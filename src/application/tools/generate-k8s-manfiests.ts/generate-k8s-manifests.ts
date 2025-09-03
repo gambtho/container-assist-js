@@ -9,7 +9,7 @@ import { ErrorCode, DomainError, KubernetesManifest } from '../../../contracts/t
 import { executeWithRecovery } from '../error-recovery.js';
 import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
 import { getEnhancedAIService } from '../ai-migration-helper.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 
 // Input schema with support for both snake_case and camelCase
 const GenerateKubernetesManifestsInput = z
@@ -544,7 +544,7 @@ function generateWarnings(input: KubernetesManifestsInput): string[] {
 /**
  * Main handler implementation
  */
-const generateKubernetesManifestsHandler: MCPToolDescriptor<
+const generateKubernetesManifestsHandler: MCPTool<
   KubernetesManifestsInput,
   KubernetesManifestsOutput
 > = {

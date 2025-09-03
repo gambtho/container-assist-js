@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 import {
   getSourceImage,
   generateAllTags,
@@ -71,7 +71,7 @@ export type TagOutput = z.infer<typeof TagImageOutput>;
 /**
  * Main handler implementation
  */
-const tagImageHandler: MCPToolDescriptor<TagInput, TagOutput> = {
+const tagImageHandler: MCPTool<TagInput, TagOutput> = {
   name: 'tag_image',
   description: 'Tag Docker image with version and registry information',
   category: 'workflow',

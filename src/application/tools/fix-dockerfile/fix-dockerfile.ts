@@ -6,7 +6,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
 import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 import {
   FixDockerfileInput as FixDockerfileInputSchema,
   FixResultSchema,
@@ -29,9 +29,16 @@ export type FixOutput = FixResult;
 /**
  * Main handler implementation
  */
+<<<<<<< Updated upstream
 const fixDockerfileHandler: MCPToolDescriptor<FixInput, FixOutput> = {
   name: 'fix_dockerfile',
   description: 'Fix issues in existing Dockerfile with AI assistance',
+=======
+export const fixDockerfileHandler: MCPTool<FixDockerfileInputType, FixDockerfileOutputType> = {
+  name: 'fix-dockerfile',
+  description:
+    'AI-powered Dockerfile error analysis and intelligent fixing with comprehensive solutions',
+>>>>>>> Stashed changes
   category: 'workflow',
   inputSchema: FixDockerfileInput,
   outputSchema: FixDockerfileOutput,

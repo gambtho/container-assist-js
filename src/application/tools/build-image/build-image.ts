@@ -13,7 +13,7 @@ import {
   BuildImageParams,
   BuildResult
 } from '../schemas.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 import { fileExists } from '../utils.js';
 import {
   prepareBuildArgs,
@@ -31,7 +31,7 @@ export type BuildOutput = BuildResult;
 /**
  * Main handler implementation
  */
-const buildImageHandler: MCPToolDescriptor<BuildInput, BuildOutput> = {
+const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
   name: 'build_image',
   description: 'Build Docker image from Dockerfile with progress tracking',
   category: 'workflow',
@@ -107,7 +107,7 @@ const buildImageHandler: MCPToolDescriptor<BuildInput, BuildOutput> = {
 
       // Prepare tags
       const projectName = session.metadata?.projectName ?? path.basename(repoPath);
-      const imageTags = (tags && tags.length > 0) ? tags : [`${projectName}:latest`];
+      const imageTags = tags && tags.length > 0 ? tags : [`${projectName}:latest`];
 
       // Add registry prefix if specified
       const fullTags = input.registry

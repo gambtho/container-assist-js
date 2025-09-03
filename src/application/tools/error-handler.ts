@@ -8,7 +8,7 @@ import type { Logger } from 'pino';
 import { convertToMcpError } from '../errors/mcp-error-mapper.js';
 import { createValidationHandler } from '../errors/validation.js';
 // import { withRetry as recoveryWithRetry, withTimeout as recoveryWithTimeout } from '../errors/recovery.js''; // Unused imports'
-import type { MCPToolDescriptor, MCPToolContext, MCPToolHandler } from './tool-types';
+import type { MCPTool, MCPToolContext, MCPToolHandler } from './tool-types';
 
 /**
  * Tool execution options
@@ -91,7 +91,7 @@ export function createProgressContext(
  * Execute a tool with comprehensive error handling
  */
 export async function executeToolSafely<TInput, TOutput>(
-  tool: MCPToolDescriptor<TInput, TOutput>,
+  tool: MCPTool<TInput, TOutput>,
   params: TInput,
   context: MCPToolContext,
   options: ToolExecutionOptions = {}
@@ -194,11 +194,11 @@ export async function executeToolSafely<TInput, TOutput>(
  * Create a validated tool handler with built-in error handling
  */
 export function createValidatedTool<TInput, TOutput>(
-  descriptor: Omit<MCPToolDescriptor<TInput, TOutput>, 'handler'> & {
+  descriptor: Omit<MCPTool<TInput, TOutput>, 'handler'> & {
     handler: MCPToolHandler<TInput, TOutput>;
   },
   options: ToolExecutionOptions = {}
-): MCPToolDescriptor<TInput, TOutput> {
+): MCPTool<TInput, TOutput> {
   return {
     ...descriptor,
     handler: async (params: TInput, context: MCPToolContext): Promise<TOutput> => {
@@ -359,13 +359,13 @@ function isRetryableError(error: unknown): boolean {
  * Create a complete tool with all safety measures
  */
 export function createSafeTool<TInput, TOutput>(
-  descriptor: Omit<MCPToolDescriptor<TInput, TOutput>, 'handler'> & {
+  descriptor: Omit<MCPTool<TInput, TOutput>, 'handler'> & {
     handler: MCPToolHandler<TInput, TOutput>;
   },
   options: ToolExecutionOptions & {
     progressStages?: string[];
   } = {}
-): MCPToolDescriptor<TInput, TOutput> {
+): MCPTool<TInput, TOutput> {
   const {
     timeout = 30000,
     retries = 2,

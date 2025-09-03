@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { executeWithRetry } from '../error-recovery.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 
 // Define Zod schema for repository analysis result
 const RepositoryAnalysisSchema = z.object({
@@ -238,7 +238,7 @@ README.md
 /**
  * Example enhanced tool handler
  */
-export const enhancedGenerateDockerfileHandler: MCPToolDescriptor = {
+export const enhancedGenerateDockerfileHandler: MCPTool = {
   name: 'enhanced-generate-dockerfile',
   description: 'Generate Dockerfile with AI reliability features and security validation',
   category: 'workflow' as const,

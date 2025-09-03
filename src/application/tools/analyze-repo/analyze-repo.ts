@@ -36,7 +36,7 @@ export type AnalyzeOutput = AnalysisResult;
 /**
  * Main handler implementation
  */
-const analyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
+export const AnalyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
   name: 'analyze_repository',
   description: 'Analyze repository structure and detect language, framework, and build system',
   category: 'workflow',

@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 import {
   authenticateRegistry,
   getImagesToPush,
@@ -75,7 +75,7 @@ export type PushOutput = z.infer<typeof PushImageOutput>;
 /**
  * Main handler implementation
  */
-const pushImageHandler: MCPToolDescriptor<PushInput, PushOutput> = {
+const pushImageHandler: MCPTool<PushInput, PushOutput> = {
   name: 'push_image',
   description: 'Push Docker images to container registry',
   category: 'workflow',

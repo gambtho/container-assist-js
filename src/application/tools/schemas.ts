@@ -11,17 +11,9 @@ export const SessionIdInput = z.object({
   sessionId: z.string().min(1, 'Session ID is required')
 });
 
-export const RepoPathInput = z.object({
-  repoPath: z.string().min(1, 'Repository path is required')
-});
-
 // ============= Tool Input Schemas =============
 
-export const AnalyzeRepositoryInput = RepoPathInput.extend({
-  sessionId: z.string().optional(),
-  depth: z.enum(['shallow', 'deep']).default('deep'),
-  includeTests: z.boolean().default(true)
-});
+
 
 export const ResolveBaseImagesInput = SessionIdInput;
 
@@ -98,36 +90,6 @@ export const BaseSessionResultSchema = BaseSuccessSchema.extend({
 });
 
 // ============= Tool Output Schemas =============
-
-export const AnalysisResultSchema = BaseSessionResultSchema.extend({
-  language: z.string(),
-  languageVersion: z.string().optional(),
-  framework: z.string().optional(),
-  frameworkVersion: z.string().optional(),
-  buildSystem: z.object({
-    type: z.string(),
-    buildFile: z.string(),
-    buildCommand: z.string().optional(),
-    testCommand: z.string().optional()
-  }).optional(),
-  dependencies: z.array(
-    z.object({
-      name: z.string(),
-      version: z.string().optional(),
-      type: z.enum(['runtime', 'dev', 'test']).optional()
-    })
-  ),
-  ports: z.array(z.number()),
-  hasDockerfile: z.boolean(),
-  hasDockerCompose: z.boolean(),
-  hasKubernetes: z.boolean(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-  recommendations: z.object({
-    baseImage: z.string().optional(),
-    buildStrategy: z.string().optional(),
-    securityNotes: z.array(z.string()).optional()
-  }).optional()
-});
 
 export const DockerfileResultSchema = BaseSessionResultSchema.extend({
   dockerfile: z.string(),
@@ -316,17 +278,4 @@ export function validateInput<T>(
  */
 export function validateOutput<T>(schema: z.ZodSchema<T>, data: unknown): T {
   return schema.parse(data);
-}
-
-/**
- * Export schema as JSON Schema for MCP
- * Note: This is a simplified implementation. Consider using zod-to-json-schema for full compatibility
- */
-export function exportJsonSchema(_schema: z.ZodSchema): Record<string, unknown> {
-  // Simple fallback implementation
-  return {
-    type: 'object',
-    properties: {},
-    additionalProperties: true
-  };
 }

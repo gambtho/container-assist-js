@@ -8,7 +8,7 @@ import {
   BaseImageResolutionInput,
   BaseImageResolutionInputSchema,
 } from '../../../contracts/types/index.js';
-import { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import { MCPTool, MCPToolContext } from '../tool-types.js';
 import { executeWithRetry } from '../error-recovery.js';
 import {
   getSuggestedImagesForReference,
@@ -16,7 +16,7 @@ import {
   buildBaseImageAIRequest
 } from './helper';
 
-const resolveBaseImagesHandler: MCPToolDescriptor = {
+const resolveBaseImagesHandler: MCPTool = {
   name: 'resolve-base-images',
   description: 'AI-powered Docker base image resolution with security and performance optimization',
   category: 'workflow',
