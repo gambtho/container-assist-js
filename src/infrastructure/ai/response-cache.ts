@@ -5,7 +5,7 @@
 
 import type { Logger } from 'pino';
 import { createHash } from 'crypto';
-import type { AIRequest } from '../ai-request-builder';
+import type { AIRequest } from '../ai-request-builder.js';
 
 /**
  * Cached response with metadata

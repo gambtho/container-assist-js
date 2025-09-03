@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import resolveBaseImagesHandler from '../../src/service/tools/handlers/resolve-base-images.js';
-import { ToolContext } from '../../src/service/tools/types.js';
+import resolveBaseImagesHandler from '../../src/application/tools/build/resolve-base-images.js';
+import { ToolContext } from '../../src/application/tools/tool-types.js';
 import { ok } from '../../src/domain/types/index.js';
 
 describe('Resolve Base Images Handler', () => {

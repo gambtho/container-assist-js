@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { ErrorCode, DomainError } from '../../contracts/types/index';
+import { ErrorCode, DomainError } from '../../contracts/types/index.js';
 import type { MCPToolContext } from './tool-types';
 import type { Logger } from 'pino';
 
@@ -48,7 +48,7 @@ export async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): 
 export function handleError(error: unknown, context?: string): never {
   const message = context
     ? `${context}: ${error?.message ?? String(error)}`
-    : error?.message ?? String(error);
+    : (error?.message ?? String(error));
 
   throw new DomainError(ErrorCode.OPERATION_FAILED, message, error);
 }

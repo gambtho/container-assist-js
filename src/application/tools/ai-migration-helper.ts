@@ -4,14 +4,14 @@
  */
 
 import type { Logger } from 'pino';
-import { AIRequestBuilder } from '../../infrastructure/ai-request-builder';
+import { AIRequestBuilder } from '../../infrastructure/ai-request-builder.js';
 import {
   EnhancedAIService,
   createEnhancedAIService,
   type EnhancedAIConfig,
   type GenerationOptions
-} from '../../infrastructure/enhanced-ai-service';
-import type { MCPSampler } from '../../infrastructure/ai/mcp-sampler';
+} from '../../infrastructure/enhanced-ai-service.js';
+import type { MCPSampler } from '../../infrastructure/ai/mcp-sampler.js';
 import type { ToolContext, MCPToolContext } from './tool-types';
 
 /**

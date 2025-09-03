@@ -8,17 +8,17 @@ import type { Logger } from 'pino';
 import type { Tool } from '@modelcontextprotocol/sdk/types';
 // Server type not exported from SDK
 import { McpError, ErrorCode as MCPErrorCode } from '@modelcontextprotocol/sdk/types';
-import { ServiceError, ErrorCode } from '../../../contracts/types/errors';
-import type { Services } from '../../../services/index';
+import { ServiceError, ErrorCode } from '../../../contracts/types/errors.js';
+import type { Services } from '../../../services/index.js';
 import type {
   ToolHandler,
   ToolContext as HandlerContext,
   ToolDescriptor,
   MCPToolDescriptor,
   MCPToolContext
-} from '../tool-types';
-import { convertToMcpError } from '../../errors/mcp-error-mapper';
-import { withValidationAndLogging } from '../../errors/validation';
+} from '../tool-types.js';
+import { convertToMcpError } from '../../errors/mcp-error-mapper.js';
+import { withValidationAndLogging } from '../../errors/validation.js';
 
 // Re-export types for compatibility
 export type { ToolHandler, ToolDescriptor };

@@ -90,10 +90,10 @@ export class DomainError extends Error {
       stack: this.stack,
       cause: this.cause
         ? {
-          name: this.cause.name,
-          message: this.cause.message,
-          stack: this.cause.stack
-        }
+            name: this.cause.name,
+            message: this.cause.message,
+            stack: this.cause.stack
+          }
         : undefined
     };
   }
@@ -132,10 +132,10 @@ export class InfrastructureError extends Error {
       stack: this.stack,
       cause: this.cause
         ? {
-          name: this.cause.name,
-          message: this.cause.message,
-          stack: this.cause.stack
-        }
+            name: this.cause.name,
+            message: this.cause.message,
+            stack: this.cause.stack
+          }
         : undefined
     };
   }
@@ -174,10 +174,10 @@ export class ServiceError extends Error {
       stack: this.stack,
       cause: this.cause
         ? {
-          name: this.cause.name,
-          message: this.cause.message,
-          stack: this.cause.stack
-        }
+            name: this.cause.name,
+            message: this.cause.message,
+            stack: this.cause.stack
+          }
         : undefined
     };
   }
@@ -303,8 +303,8 @@ export function getErrorSeverity(error: Error): 'low' | 'medium' | 'high' | 'cri
  */
 export function normalizeError(error: unknown): DomainError | InfrastructureError | ServiceError {
   if (
-    error instanceof DomainError ?? error instanceof InfrastructureError ||
-    error instanceof ServiceError
+    error instanceof DomainError ??
+    (error instanceof InfrastructureError || error instanceof ServiceError)
   ) {
     return error;
   }

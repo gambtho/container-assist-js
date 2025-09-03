@@ -4,7 +4,7 @@
 
 import type { ToolConfig } from './config';
 import type { MCPToolContext } from './tool-types';
-import type { Logger } from '../interfaces';
+import type { Logger } from '../interfaces.js';
 
 // Analysis tools
 import analyzeRepositoryHandler from './analysis/analyze-repository';
@@ -197,7 +197,10 @@ export class ToolHandler {
     }
   }
 
-  private async executeHandler(handler: unknown, args: Record<string, unknown>): Promise<ToolResult> {
+  private async executeHandler(
+    handler: unknown,
+    args: Record<string, unknown>
+  ): Promise<ToolResult> {
     try {
       // Parse input using handler's schema'
       const input = handler.inputSchema.parse(args);

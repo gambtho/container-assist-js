@@ -6,11 +6,11 @@
 import type { Server } from '@modelcontextprotocol/sdk/server/index';
 import type { Logger } from 'pino';
 import { z } from 'zod';
-import type { ApplicationConfig } from '../../config/index';
-import type { SessionService } from '../../services/session';
-import type { DockerService } from '../../services/docker';
-import type { ToolRegistry } from '../tools/ops/registry';
-import type { ToolFactory } from '../tools/factory';
+import type { ApplicationConfig } from '../../config/index.js';
+import type { SessionService } from '../../services/session.js';
+import type { DockerService } from '../../services/docker.js';
+import type { ToolRegistry } from '../tools/ops/registry.js';
+import type { ToolFactory } from '../tools/factory.js';
 
 import { WorkflowResourceProvider } from './workflow-resource';
 import { SessionResourceProvider } from './session-resource';

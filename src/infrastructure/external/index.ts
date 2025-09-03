@@ -4,20 +4,20 @@
  */
 
 // Docker-related exports
-export * from '../docker-client';
+export * from '../docker-client.js';
 
 // Kubernetes-related exports
-export * from '../kubernetes-client';
+export * from '../kubernetes-client.js';
 
 // AI service exports
-export * from '../ai-client';
-export * from '../enhanced-ai-service';
+export * from '../ai-client.js';
+export * from '../enhanced-ai-service.js';
 
 // Request builder
-export * from '../ai-request-builder';
+export * from '../ai-request-builder.js';
 
 // Sampling strategy
-export * from '../sampling-strategy';
+export * from '../sampling-strategy.js';
 
 // Types and interfaces
-export type { AIServiceConfig, AIAnalysisResult, AIGenerationResult } from '../ai/ai-types';
+export type { AIServiceConfig, AIAnalysisResult, AIGenerationResult } from '../ai/ai-types.js';

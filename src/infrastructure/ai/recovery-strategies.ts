@@ -4,7 +4,7 @@
  */
 
 import { BaseRecoveryStrategy, type RecoveryStrategy } from './recovery-strategy';
-import type { AIRequest } from '../ai-request-builder';
+import type { AIRequest } from '../ai-request-builder.js';
 import type { ErrorContext } from './error-context';
 import { ErrorType } from './error-context';
 
@@ -92,10 +92,10 @@ export class JSONRepairStrategy extends BaseRecoveryStrategy {
     // Try to extract from error message
     const lastError = context.previousErrors[context.previousErrors.length - 1];
     if (!lastError) {
-      return ';'
+      return ';';
     }
     const jsonMatch = lastError.match(/(?:JSON|json)[\s\S]*?(\{[\s\S]*?\}|\[[\s\S]*?\])/);
-    return jsonMatch?.[1] || ';'
+    return jsonMatch?.[1] || ';';
   }
 
   /**
@@ -112,7 +112,7 @@ export class JSONRepairStrategy extends BaseRecoveryStrategy {
       issues.push('Incomplete JSON - response may have been truncated');
     }
 
-    if (content.includes('```')) {``
+    if (content.includes('```')) {
       issues.push('Remove markdown code fences from JSON output');
     }
 
@@ -120,13 +120,13 @@ export class JSONRepairStrategy extends BaseRecoveryStrategy {
     const openBraces = (content.match(/\{/g) || []).length;
     const closeBraces = (content.match(/\}/g) || []).length;
     if (openBraces !== closeBraces) {
-      issues.push(`Mismatched braces: ${openBraces} opening, ${closeBraces} closing`);`
+      issues.push(`Mismatched braces: ${openBraces} opening, ${closeBraces} closing`);
     }
 
     const openBrackets = (content.match(/\[/g) || []).length;
     const closeBrackets = (content.match(/\]/g) || []).length;
     if (openBrackets !== closeBrackets) {
-      issues.push(`Mismatched brackets: ${openBrackets} opening, ${closeBrackets} closing`);`
+      issues.push(`Mismatched brackets: ${openBrackets} opening, ${closeBrackets} closing`);
     }
 
     return issues;
@@ -144,15 +144,15 @@ export class JSONRepairStrategy extends BaseRecoveryStrategy {
   ): string {
     const urgency = attempt > 1 ? 'CRITICAL: ' : '';
 
-    return `${urgency}Fix this malformed JSON and return ONLY valid JSON:``
+    return `${urgency}Fix this malformed JSON and return ONLY valid JSON:
 
 BROKEN JSON:
-malformedContent}
+${malformedContent}
 
 ERROR: ${errorMessage}
 
 ISSUES FOUND:
-syntaxIssues.map((issue) => `- ${issue}`).join('\n')}`
+${syntaxIssues.map((issue) => `- ${issue}`).join('\n')}
 
 RULES:
 1. Output ONLY valid JSON - no markdown, no explanations
@@ -161,7 +161,7 @@ RULES:
 4. Preserve all data where possible
 5. Follow the original request intent: ${originalPrompt.split('\n')[0]}
 
-FIXED JSON:`;``
+FIXED JSON:`;
   }
 
   /**
@@ -198,6 +198,7 @@ FIXED JSON:`;``
 
     return insights;
   }
+}
 
 /**
  * Simplification Strategy
@@ -317,10 +318,10 @@ export class SimplificationStrategy extends BaseRecoveryStrategy {
     // Simplify arrays by taking only first few items
     Object.entries(variables).forEach(([key, value]) => {
       if (Array.isArray(value) && value.length > 3) {
-        simplified[key] = `${value.slice(0, 3).join(', ')}...`;`
+        simplified[key] = `${value.slice(0, 3).join(', ')}...`;
       } else if (typeof value === 'string' && value.length > 100) {
         // Truncate long strings
-        simplified[key] = `${value.substring(0, 100)}...`;`
+        simplified[key] = `${value.substring(0, 100)}...`;
       } else if (!essentialKeys.includes(key) && Object.keys(simplified).length < 8) {
         // Include non-essential variables up to limit
         simplified[key] = value;
@@ -329,6 +330,7 @@ export class SimplificationStrategy extends BaseRecoveryStrategy {
 
     return simplified;
   }
+}
 
 /**
  * Alternative Template Strategy
@@ -470,11 +472,11 @@ export class AlternativeTemplateStrategy extends BaseRecoveryStrategy {
     // Extract core intent from original prompt
     const coreIntent = this.extractCoreIntent(originalRequest.prompt);
 
-    const alternativePrompt = `${coreIntent}``
+    const alternativePrompt = `${coreIntent}
 
 Requirements: Simple, clear, direct response only.
 Format: ${this.inferRequiredFormat(context)}
-No explanations, just the requested content.`;``
+No explanations, just the requested content.`;
 
     return {
       ...originalRequest,
@@ -529,11 +531,12 @@ No explanations, just the requested content.`;``
 
     // Handle {{var}}
     result = result.replace(/\{\{(\w+)\}\}/g, (_match, varName) => {
-      return variables[varName] || ';'
+      return variables[varName] || '';
     });
 
     return result;
   }
+}
 
 /**
  * Fallback Default Strategy
@@ -585,23 +588,23 @@ export class FallbackDefaultStrategy extends BaseRecoveryStrategy {
 
     // Ultra-simple prompts by category
     const fallbacks: Record<string, string> = {
-      dockerfile: `FROM node:16\nWORKDIR /app\nCOPY . .\nRUN npm install\nEXPOSE ${port}\nCMD ["npm", "start"]`,`
-      analysis: `{"language": "${language}", "framework": "unknown", "buildSystem": {"type": "npm"}, "ports": [${port}]}`,`
-      k8s: `apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: app\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: app\n  template:\n    spec:\n      containers:\n      - name: app\n        image: app:latest\n        ports:\n        - containerPort: ${port}`,`
+      dockerfile: `FROM node:16\nWORKDIR /app\nCOPY . .\nRUN npm install\nEXPOSE ${port}\nCMD ["npm", "start"]`,
+      analysis: `{"language": "${language}", "framework": "unknown", "buildSystem": {"type": "npm"}, "ports": [${port}]}`,
+      k8s: `apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: app\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: app\n  template:\n    spec:\n      containers:\n      - name: app\n        image: app:latest\n        ports:\n        - containerPort: ${port}`,
       error: 'Check syntax and fix formatting issues.',
       optimization: '["Use multi-stage build", "Minimize image size", "Add health checks"]'
     };
 
     // Determine fallback type
     const templateId = (context.templateId ?? 'general').toLowerCase();
-    if (templateId.includes('dockerfile')) return fallbacks.dockerfile ?? ';'
-    if (templateId.includes('analysis')) return fallbacks.analysis ?? ';'
-    if (templateId.includes('k8s') || templateId.includes('kubernetes')) return fallbacks.k8s ?? ';'
-    if (templateId.includes('error')) return fallbacks.error ?? ';'
-    if (templateId.includes('optimization')) return fallbacks.optimization ?? ';'
+    if (templateId.includes('dockerfile')) return fallbacks.dockerfile ?? '';
+    if (templateId.includes('analysis')) return fallbacks.analysis ?? '';
+    if (templateId.includes('k8s') || templateId.includes('kubernetes')) return fallbacks.k8s ?? '';
+    if (templateId.includes('error')) return fallbacks.error ?? '';
+    if (templateId.includes('optimization')) return fallbacks.optimization ?? '';
 
     // Generic fallback
-    return `Simple ${language ?? 'application'} configuration completed.`;`
+    return `Simple ${language ?? 'application'} configuration completed.`;
   }
 
   /**
@@ -610,6 +613,7 @@ export class FallbackDefaultStrategy extends BaseRecoveryStrategy {
   validateResult(result: unknown, _context: ErrorContext): boolean {
     return typeof result === 'string' && result.trim().length > 0;
   }
+}
 
 /**
  * Export all strategies for easy registration
@@ -619,3 +623,4 @@ export const DEFAULT_RECOVERY_STRATEGIES: RecoveryStrategy[] = [
   new SimplificationStrategy(),
   new AlternativeTemplateStrategy(),
   new FallbackDefaultStrategy()
+];

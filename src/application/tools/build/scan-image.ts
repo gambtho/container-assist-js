@@ -3,9 +3,9 @@
  */
 
 import { z } from 'zod';
-import { DockerScanResult } from '../../../contracts/types/index';
-import { DomainError, ErrorCode } from '../../../contracts/types/errors';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import { DockerScanResult } from '../../../contracts/types/index.js';
+import { DomainError, ErrorCode } from '../../../contracts/types/errors.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema with support for both snake_case and camelCase
 const ScanImageInput = z
@@ -30,7 +30,7 @@ const ScanImageInput = z
     imageId: data.image_id ?? data.imageId,
     imageTag: data.image_tag ?? data.imageTag,
     scanner: data.scanner,
-    severityThreshold: data.severity_threshold ?? data.severityThreshold || 'high',
+    severityThreshold: data.severity_threshold ?? (data.severityThreshold || 'high'),
     format: data.format,
     ignoreUnfixed: data.ignore_unfixed ?? data.ignoreUnfixed ?? false,
     scanLayers: data.scan_layers ?? data.scanLayers ?? true
@@ -322,21 +322,21 @@ const scanImageHandler: MCPToolDescriptor<ScanInput, ScanOutput> = {
             ? scanResult.scanTime
             : parseInt(String(scanResult.scanTime), 10)) || 0
         ),
-        scanner: scanner === 'auto' ? 'trivy' : scanner ?? 'trivy',
+        scanner: scanner === 'auto' ? 'trivy' : (scanner ?? 'trivy'),
         imageDetails:
           sessionId && sessionService
             ? await (async () => {
-              const session = await sessionService.get(sessionId);
-              const buildResult = session?.workflow_state?.build_result;
-              return buildResult
-                ? {
-                  size: buildResult.size ?? 0,
-                  layers: Array.isArray(buildResult.layers) ? buildResult.layers.length : 0,
-                  os: 'linux',
-                  architecture: 'amd64'
-                }
-                : undefined;
-            })()
+                const session = await sessionService.get(sessionId);
+                const buildResult = session?.workflow_state?.build_result;
+                return buildResult
+                  ? {
+                      size: buildResult.size ?? 0,
+                      layers: Array.isArray(buildResult.layers) ? buildResult.layers.length : 0,
+                      os: 'linux',
+                      architecture: 'amd64'
+                    }
+                  : undefined;
+              })()
             : undefined,
         recommendations
       };

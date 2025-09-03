@@ -2,15 +2,15 @@
  * Simplified Docker Service - No unnecessary abstractions
  */
 
-import { DockerClient } from '../infrastructure/docker-client';
+import { DockerClient } from '../infrastructure/docker-client.js';
 import type { Logger } from 'pino';
-import { DockerError } from '../errors/index';
+import { DockerError } from '../errors/index.js';
 import {
   DockerBuildOptions,
   DockerBuildResult,
   DockerScanResult,
   ScanOptions
-} from '../contracts/types/index';
+} from '../contracts/types/index.js';
 
 export interface DockerServiceConfig {
   socketPath?: string;
@@ -63,7 +63,7 @@ export class DockerService {
       Size?: number;
       Created?: number;
     }>
-    > {
+  > {
     return this.client.listImages();
   }
 

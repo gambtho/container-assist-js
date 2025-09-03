@@ -10,8 +10,8 @@ import {
   DomainError,
   KubernetesManifest,
   KubernetesDeploymentResult
-} from '../../../contracts/types/index';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+} from '../../../contracts/types/index.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema
 const DeployApplicationInput = z
@@ -493,7 +493,7 @@ const deployApplicationHandler: MCPToolDescriptor<DeployInput, DeployOutput> = {
       // Transform endpoints to match the expected schema format
       const transformedEndpoints = endpoints
         ?.map((endpoint) => ({
-          service: endpoint.service ?? endpoint.name || 'unknown',
+          service: endpoint.service ?? (endpoint.name || 'unknown'),
           type: endpoint.type,
           url: endpoint.url,
           port: endpoint.port

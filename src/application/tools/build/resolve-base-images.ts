@@ -10,10 +10,10 @@ import {
   BaseImageResolutionInputSchema,
   ValidationResult,
   SuggestedImage
-} from '../../../contracts/types/index';
-import { MCPToolDescriptor, MCPToolContext } from '../tool-types';
-import { executeWithRetry } from '../error-recovery';
-// import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder''; // Not available'
+} from '../../../contracts/types/index.js';
+import { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import { executeWithRetry } from '../error-recovery.js';
+// import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js''; // Not available'
 
 const resolveBaseImagesHandler: MCPToolDescriptor = {
   name: 'resolve-base-images',

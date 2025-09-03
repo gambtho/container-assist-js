@@ -3,8 +3,8 @@
  */
 
 import type { Logger } from 'pino';
-import { AIServiceError } from '../errors/index';
-import type { MCPSampler } from '../application/interfaces';
+import { AIServiceError } from '../errors/index.js';
+import type { MCPSampler } from '../application/interfaces.js';
 
 export interface AIClientConfig {
   modelPreferences?: {
@@ -82,8 +82,8 @@ export class AIClient {
     try {
       const result = await this.sampler.sample({
         prompt: options.prompt,
-        maxTokens: options.maxTokens ?? this.config.maxTokens || 2000,
-        temperature: options.temperature ?? this.config.temperature || 0.7
+        maxTokens: options.maxTokens ?? (this.config.maxTokens || 2000),
+        temperature: options.temperature ?? (this.config.temperature || 0.7)
       });
 
       if ('error' in result) {
@@ -192,7 +192,8 @@ export class AIClient {
   getModelPreference(taskType: string): string {
     const preferences = this.config.modelPreferences ?? {};
     return (
-      preferences[taskType as keyof typeof preferences] || preferences.default ?? 'claude-3-sonnet'
+      (preferences[taskType as keyof typeof preferences] || preferences.default) ??
+      'claude-3-sonnet'
     );
   }
 

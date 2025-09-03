@@ -69,12 +69,14 @@ export const DockerfileResultSchema = z.object({
  * Scan result schema
  */
 export const ScanResultSchema = z.object({
-  vulnerabilities: z.array(z.object({
-    id: z.string(),
-    severity: z.enum(['low', 'medium', 'high', 'critical']),
-    description: z.string(),
-    fix: z.string().optional()
-  })),
+  vulnerabilities: z.array(
+    z.object({
+      id: z.string(),
+      severity: z.enum(['low', 'medium', 'high', 'critical']),
+      description: z.string(),
+      fix: z.string().optional()
+    })
+  ),
   totalCount: z.number(),
   criticalCount: z.number(),
   success: z.boolean()
@@ -84,15 +86,17 @@ export const ScanResultSchema = z.object({
  * Kubernetes manifest result schema
  */
 export const K8sManifestResultSchema = z.object({
-  manifests: z.array(z.object({
-    apiVersion: z.string(),
-    kind: z.string(),
-    metadata: z.object({
-      name: z.string(),
-      namespace: z.string().optional()
-    }),
-    spec: z.unknown()
-  })),
+  manifests: z.array(
+    z.object({
+      apiVersion: z.string(),
+      kind: z.string(),
+      metadata: z.object({
+        name: z.string(),
+        namespace: z.string().optional()
+      }),
+      spec: z.unknown()
+    })
+  ),
   success: z.boolean()
 });
 

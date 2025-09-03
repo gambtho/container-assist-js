@@ -4,8 +4,7 @@
  */
 
 import { z } from 'zod';
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types';
-import { convertToMcpError } from './mcp-error-mapper';
+import { convertToMcpError, type MCPError } from './mcp-error-mapper.js';
 import type { Logger } from 'pino';
 
 /**
@@ -18,7 +17,7 @@ export type ValidationResult<T> =
     }
   | {
       success: false;
-      error: McpError;
+      error: MCPError;
     };
 
 /**
@@ -28,14 +27,7 @@ export function createValidationHandler<T>(schema: z.ZodSchema<T>) {
   return (input: unknown): T => {
     const result = schema.safeParse(input);
     if (!result.success) {
-      throw new McpError(ErrorCode.InvalidParams, 'Input validation failed', {
-        issues: result.error.issues.map((issue) => ({
-          path: issue.path.join('.'),
-          message: issue.message,
-          code: issue.code
-        })),
-        inputReceived: input
-      });
+      throw convertToMcpError(new Error('Input validation failed'));
     }
     return result.data;
   };
@@ -47,18 +39,12 @@ export function createValidationHandler<T>(schema: z.ZodSchema<T>) {
 export function createSafeValidationHandler<T>(schema: z.ZodSchema<T>) {
   return (input: unknown): ValidationResult<T> => {
     const result = schema.safeParse(input);
-    if (result.success && result.success.length > 0) {
+    if (result.success) {
       return { success: true, data: result.data };
     } else {
       return {
         success: false,
-        error: new McpError(ErrorCode.InvalidParams, 'Input validation failed', {
-          issues: result.error.issues.map((issue) => ({
-            path: issue.path.join('.'),
-            message: issue.message,
-            code: issue.code
-          }))
-        })
+        error: convertToMcpError(new Error('Input validation failed'))
       };
     }
   };

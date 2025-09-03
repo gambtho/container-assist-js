@@ -210,7 +210,7 @@ export class AIContextManager {
     const lines = content.split('\n');
     const summary: string[] = [];
 
-    let currentClass = ';'
+    let currentClass = ';';
 
     for (const line of lines) {
       const trimmed = line.trim();

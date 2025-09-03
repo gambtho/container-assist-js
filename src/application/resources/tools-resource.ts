@@ -5,7 +5,7 @@
 
 // import type { Server } from '@modelcontextprotocol/sdk/server/index';
 import type { Logger } from 'pino';
-import type { ToolRegistry } from '../tools/ops/registry';
+import type { ToolRegistry } from '../tools/ops/registry.js';
 
 export class ToolsResourceProvider {
   private toolUsageStats = new Map<

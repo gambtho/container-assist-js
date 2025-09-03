@@ -3,9 +3,9 @@
  * Provides high-level operations on top of the session store
  */
 
-import { Session, WorkflowState, ServiceError, ErrorCode } from '../../contracts/types/index';
+import { Session, WorkflowState, ServiceError, ErrorCode } from '../../contracts/types/index.js';
 import type { Logger } from 'pino';
-import { SessionStore, SessionFilter } from '../../contracts/types/session-store';
+import { SessionStore, SessionFilter } from '../../contracts/types/session-store.js';
 import { SessionUtils } from './utils';
 import { EventEmitter } from 'events';
 import path from 'path';
@@ -254,7 +254,8 @@ export class SessionService extends EventEmitter {
     const session = SessionUtils.createSession(repoPath, {
       ...data,
       expires_at:
-        data?.expires_at ?? new Date(Date.now() + this.config.defaultTTL * MILLISECONDS_PER_SECOND).toISOString()
+        data?.expires_at ??
+        new Date(Date.now() + this.config.defaultTTL * MILLISECONDS_PER_SECOND).toISOString()
     });
 
     await this.store.create(session);

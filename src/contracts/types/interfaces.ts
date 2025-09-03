@@ -5,14 +5,12 @@
 
 import { Session } from './session';
 
-// Simple Result type for legacy compatibility
 export type Result<T> = {
   success: boolean;
   data?: T;
   error?: string;
 };
 
-// Progress update structure (aligned with infrastructure)
 export interface ProgressUpdate {
   sessionId: string;
   step: string;
@@ -23,12 +21,10 @@ export interface ProgressUpdate {
   timestamp: string;
 }
 
-// Progress listener interface
 export interface ProgressListener {
   onProgress(update: ProgressUpdate): void | Promise<void>;
 }
 
-// Progress filter interface
 export interface ProgressFilter {
   sessionId?: string;
   step?: string;
@@ -37,9 +33,6 @@ export interface ProgressFilter {
   limit?: number;
 }
 
-// Progress emitter interface for workflow tracking (DEPRECATED - Phase 5)
-// Being replaced with callback-based progress reporting
-// @deprecated Use ProgressCallback from application/workflow/types.ts instead
 export interface ProgressEmitter {
   emit(update: Partial<ProgressUpdate>): Promise<void>;
   addListener(listener: ProgressListener): void;
@@ -63,16 +56,6 @@ export interface ProgressData {
   timestamp: string;
 }
 
-// NOTE: RepositoryAnalyzer interface removed
-// Had single implementation, replaced by concrete RepoAnalyzer class
-
-// NOTE: DockerService, BuildService, and ScanningService interfaces removed
-// These had single implementations and are replaced by concrete classes:
-// - DockerService -> DockerService class in src/services/docker.ts
-// - BuildService -> Functionality merged into DockerService
-// - ScanningService -> Functionality merged into DockerService
-
-// Session store interface - domain contract
 export interface SessionStore {
   create(session: Session): Promise<Result<Session>>;
   get(sessionId: string): Promise<Result<Session>>;
@@ -83,13 +66,6 @@ export interface SessionStore {
   cleanup(olderThan: Date): Promise<Result<number>>;
 }
 
-// NOTE: WorkflowManager, AIService, and KubernetesService interfaces removed
-// These had single implementations and are replaced by concrete classes:
-// - WorkflowManager -> WorkflowOrchestrator class in src/application/workflow/orchestrator.ts
-// - AIService -> AIService class in src/services/ai.ts
-// - KubernetesService -> KubernetesService class in src/services/kubernetes.ts
-
-// File system interface - domain contract
 export interface FileSystem {
   readFile(path: string): Promise<Result<string>>;
   writeFile(path: string, content: string): Promise<Result<void>>;
@@ -101,7 +77,6 @@ export interface FileSystem {
   remove(path: string): Promise<Result<void>>;
 }
 
-// Command executor interface - domain contract
 export interface CommandExecutor {
   execute(
     command: string,
@@ -117,10 +92,8 @@ export interface CommandExecutor {
   spawn(command: string, args?: string[], options?: unknown): Promise<Result<any>>;
 }
 
-// Event handler type
 export type EventHandler<T = any> = (data: T) => void;
 
-// Event publisher interface - aligned with infrastructure
 export interface EventPublisher {
   publish<T = any>(eventType: string, data: T): void;
   subscribe<T = any>(eventType: string, handler: EventHandler<T>): void;
@@ -129,7 +102,6 @@ export interface EventPublisher {
   getSubscriberCount(eventType: string): number;
 }
 
-// Configuration interface - domain contract
 export interface Configuration {
   get<T>(key: string): T;
   set<T>(key: string, value: T): void;
@@ -137,10 +109,3 @@ export interface Configuration {
   getAll(): Record<string, any>;
   validate(): Result<void>;
 }
-
-// NOTE: MetricsService, CacheService, RegistryService, and BaseService interfaces removed
-// These were over-engineered abstractions not needed for current implementation:
-// - MetricsService -> Simple logging used instead
-// - CacheService -> Not currently implemented
-// - RegistryService -> Registry operations handled by DockerService
-// - BaseService -> Eliminated inheritance pattern, use composition

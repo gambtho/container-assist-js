@@ -1,10 +1,8 @@
 /**
- * Pino Logger Configuration Factory
- * Single configuration factory for consistent Pino usage across the codebase
- * DIRECT PINO USAGE - No wrapper interface, import pino directly where needed
+ * Pino logger configuration and factory functions
  */
 
-import pino from 'pino';
+import * as pino from 'pino';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Logger, LoggerOptions } from 'pino';
@@ -26,14 +24,13 @@ export interface PinoConfig {
 }
 
 /**
- * Create a standardized Pino logger instance
- * Use this factory to ensure consistent configuration across all services
+ * Create a configured Pino logger instance
  */
 export function createPinoLogger(config?: PinoConfig): Logger {
   const isDevelopment =
     config?.environment === 'development' || process.env.NODE_ENV === 'development';
 
-  const level = config?.level ?? process.env.LOG_LEVEL || 'info';
+  const level = config?.level ?? (process.env.LOG_LEVEL || 'info');
 
   const options: LoggerOptions = {
     level,
@@ -107,8 +104,7 @@ export function createPinoLogger(config?: PinoConfig): Logger {
 }
 
 /**
- * Default logger instance for immediate use
- * Use this for services that need a logger but don't need custom configuration
+ * Default logger instance
  */
 export const defaultPinoLogger = createPinoLogger({
   environment: process.env.NODE_ENV ?? 'development'
@@ -116,7 +112,6 @@ export const defaultPinoLogger = createPinoLogger({
 
 /**
  * Backward compatibility exports
- * @deprecated Use createPinoLogger and import Logger from pino directly
  */
 export const createLogger = createPinoLogger;
 export const logger = defaultPinoLogger;

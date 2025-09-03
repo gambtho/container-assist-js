@@ -5,9 +5,9 @@
 
 import type { Logger } from 'pino';
 // import type { Server } from '@modelcontextprotocol/sdk/types''; // Server not exported'
-import { convertToMcpError } from '../errors/mcp-error-mapper';
-import { createValidationHandler } from '../errors/validation';
-// import { withRetry as recoveryWithRetry, withTimeout as recoveryWithTimeout } from '../errors/recovery''; // Unused imports'
+import { convertToMcpError } from '../errors/mcp-error-mapper.js';
+import { createValidationHandler } from '../errors/validation.js';
+// import { withRetry as recoveryWithRetry, withTimeout as recoveryWithTimeout } from '../errors/recovery.js''; // Unused imports'
 import type { MCPToolDescriptor, MCPToolContext, MCPToolHandler } from './tool-types';
 
 /**

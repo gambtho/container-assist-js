@@ -3,7 +3,7 @@
  */
 
 import { BaseMCPToolDescriptor } from './base-handler';
-import type { CoreServices } from '../services/interfaces';
+import type { CoreServices } from '../services/interfaces.js';
 import { getSimpleToolConfig, type SimpleToolConfig } from './simple-config';
 
 // Import tools

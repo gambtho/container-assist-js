@@ -4,9 +4,9 @@
  */
 
 import { z } from 'zod';
-import { DockerfileFix, DockerfileFixSchema } from '../../../contracts/types/index';
-import { withRetry } from '../error-recovery';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import { DockerfileFix, DockerfileFixSchema } from '../../../contracts/types/index.js';
+import { withRetry } from '../error-recovery.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema with support for both snake_case and camelCase
 const FixDockerfileInput = z
@@ -21,10 +21,10 @@ const FixDockerfileInput = z
     buildContext: z.string().optional()
   })
   .transform((data) => ({
-    sessionId: data.session_id ?? data.sessionId || '',
-    errorMessage: data.error_message ?? data.errorMessage || '',
+    sessionId: data.session_id ?? (data.sessionId || ''),
+    errorMessage: data.error_message ?? (data.errorMessage || ''),
     dockerfileContent: data.dockerfile_content ?? data.dockerfileContent,
-    buildContext: data.build_context ?? data.buildContext || 'standard build context'
+    buildContext: data.build_context ?? (data.buildContext || 'standard build context')
   }));
 type FixDockerfileInputType = z.infer<typeof FixDockerfileInput>;
 

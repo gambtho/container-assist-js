@@ -37,6 +37,7 @@ export const RepositoryAnalysisSchema = z.object({
     })
     .optional(),
   confidence: z.number().min(0).max(1)
+});
 
 export type RepositoryAnalysis = z.infer<typeof RepositoryAnalysisSchema>;
 
@@ -340,3 +341,4 @@ Format the response as valid JSON matching the expected schema.`;
 
     return prompt;
   }
+}

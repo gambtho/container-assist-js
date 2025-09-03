@@ -9,8 +9,8 @@ import {
   ErrorContextFactory,
   ErrorContextUtils,
   type FailurePattern
-} from '../error-context';
-import type { AIRequest } from '../../ai-request-builder';
+} from '../error-context.js';
+import type { AIRequest } from '../../ai-request-builder.js';
 
 describe('ErrorContextFactory', () => {
   const sampleRequest: Partial<AIRequest> = {

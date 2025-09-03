@@ -5,9 +5,9 @@
 import { z } from 'zod';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { ErrorCode, DomainError } from '../../../contracts/types/errors';
-import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
+import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema with support for both snake_case and camelCase
 const AnalyzeRepositoryInput = z
@@ -250,7 +250,10 @@ async function detectFramework(
       };
 
       for (const [framework, signature] of Object.entries(FRAMEWORK_SIGNATURES)) {
-        if (signature.dependencies != null && signature.dependencies.some((dep) => dep in allDeps)) {
+        if (
+          signature.dependencies != null &&
+          signature.dependencies.some((dep) => dep in allDeps)
+        ) {
           const firstDep = signature.dependencies?.[0];
           return { framework, version: firstDep != null ? allDeps[firstDep] : undefined };
         }
@@ -525,11 +528,11 @@ const analyzeRepositoryHandler: MCPToolDescriptor<AnalyzeInput, AnalyzeOutput> =
       // Transform buildSystem to match schema structure
       const buildSystem = buildSystemRaw
         ? {
-          type: buildSystemRaw.type,
-          build_file: buildSystemRaw.file,
-          build_command: buildSystemRaw.buildCmd,
-          test_command: buildSystemRaw.testCmd
-        }
+            type: buildSystemRaw.type,
+            build_file: buildSystemRaw.file,
+            build_command: buildSystemRaw.buildCmd,
+            test_command: buildSystemRaw.testCmd
+          }
         : undefined;
 
       // Emit progress

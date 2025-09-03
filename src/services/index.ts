@@ -7,30 +7,23 @@ import type { Logger } from 'pino';
 import { createDockerService, type DockerServiceConfig } from './docker';
 import { createKubernetesService, type KubernetesConfig } from './kubernetes';
 import { type AIConfig } from './ai';
-import {
-  createEnhancedAIService,
-  type EnhancedAIConfig
-} from '../infrastructure/enhanced-ai-service';
-import { SessionService, type SessionServiceConfig } from '../application/session/manager';
-import { InMemorySessionStore } from '../runtime/persistence/memory-store';
+import { createSessionService, SessionService } from './session.js';
 import { EventEmitter } from 'events';
-import { ProgressChannel } from '../runtime/messaging/progress-channel';
-import type { MCPSampler } from '../application/interfaces';
+import type { MCPSampler } from '../application/interfaces.js';
 
 export interface ServicesConfig {
   docker?: DockerServiceConfig;
   kubernetes?: KubernetesConfig;
-  ai?: EnhancedAIConfig;
-  session?: SessionServiceConfig;
+  ai?: AIConfig;
+  session?: { ttl?: number };
 }
 
 export interface Services {
   docker: Awaited<ReturnType<typeof createDockerService>>;
   kubernetes: Awaited<ReturnType<typeof createKubernetesService>>;
-  ai: ReturnType<typeof createEnhancedAIService>;
+  ai: any; // Will be updated when AI service is fixed
   session: SessionService;
   events: EventEmitter;
-  progress: ProgressChannel;
 }
 
 /**
@@ -46,26 +39,22 @@ export async function initializeServices(
 
   // Create shared event infrastructure
   const events = new EventEmitter();
-  const progress = new ProgressChannel(events, logger);
 
   // Initialize services in parallel where possible
-  const [docker, kubernetes] = await Promise.all([
+  const [docker, kubernetes, session] = await Promise.all([
     createDockerService(config.docker ?? {}, logger),
-    createKubernetesService(config.kubernetes ?? {}, logger)
+    createKubernetesService(config.kubernetes ?? {}, logger),
+    createSessionService(config.session ?? {}, logger)
   ]);
 
-  // Create application SessionService with memory store
-  const sessionStore = new InMemorySessionStore(logger);
-  const session = new SessionService(sessionStore, logger, config.session);
-
-  // Use enhanced AI service with optimization features
-  const ai = createEnhancedAIService(config.ai ?? {}, sampler, logger);
+  // AI service placeholder - will be updated when fixed
+  const ai = null;
 
   logger.info(
     {
       docker: true,
       kubernetes: true,
-      ai: ai.isAvailable(),
+      ai: false,
       session: true
     },
     'Services initialized'
@@ -76,8 +65,7 @@ export async function initializeServices(
     kubernetes,
     ai,
     session,
-    events,
-    progress
+    events
   };
 }
 
@@ -107,8 +95,7 @@ export async function cleanupServices(services: Services, logger: Logger): Promi
 export { DockerService } from './docker';
 export { KubernetesService } from './kubernetes';
 export { AIService } from './ai';
-export { EnhancedAIService } from '../infrastructure/enhanced-ai-service';
 export { SessionService } from './session';
 
 // Re-export config types
-export type { DockerServiceConfig, KubernetesConfig, AIConfig, EnhancedAIConfig };
+export type { DockerServiceConfig, KubernetesConfig, AIConfig };

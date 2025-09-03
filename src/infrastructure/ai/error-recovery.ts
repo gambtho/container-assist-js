@@ -4,7 +4,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { AIRequest } from '../ai-request-builder';
+import type { AIRequest } from '../ai-request-builder.js';
 import { ErrorContext, ErrorContextFactory, ErrorContextUtils } from './error-context';
 import { RecoveryCoordinator, type RecoveryStrategy } from './recovery-strategy';
 import { DEFAULT_RECOVERY_STRATEGIES } from './recovery-strategies';

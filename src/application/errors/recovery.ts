@@ -265,8 +265,8 @@ export async function withTimeout<T>(
 export class Bulkhead {
   private active = 0;
   private queue: Array<{
-    operation: () => Promise<unknown>;
-    resolve: (value: unknown) => void;
+    operation: () => Promise<any>;
+    resolve: (value: any) => void;
     reject: (error: unknown) => void;
   }> = [];
 
@@ -283,7 +283,7 @@ export class Bulkhead {
       if (this.active < this.maxConcurrent) {
         this.executeTask(task);
       } else if (this.queue.length < this.maxQueue) {
-        await this.queue.push(task);
+        this.queue.push(task);
         this.logger?.debug(
           {
             active: this.active,
@@ -299,8 +299,8 @@ export class Bulkhead {
   }
 
   private async executeTask(task: {
-    operation: () => Promise<unknown>;
-    resolve: (value: unknown) => void;
+    operation: () => Promise<any>;
+    resolve: (value: any) => void;
     reject: (error: unknown) => void;
   }): Promise<void> {
     this.active++;
@@ -406,7 +406,7 @@ export class GracefulDegradation {
         );
 
         try {
-          return await service.fallback();
+          return (await service.fallback()) as T;
         } catch (fallbackError) {
           this.logger?.error(
             {
@@ -523,7 +523,7 @@ export function withErrorRecovery<T>(
     if (options.gracefulDegradation) {
       const originalOp = wrappedOperation;
       const { manager, serviceName } = options.gracefulDegradation;
-      wrappedOperation = () => await manager.execute(serviceName, originalOp);
+      wrappedOperation = async () => await manager.execute(serviceName, originalOp);
     }
 
     // Apply retry logic if specified
@@ -583,5 +583,5 @@ export function createResilientOperation<T>(
     };
   }
 
-  return withErrorRecovery(operation, recoveryOptions, logger);
+  return withErrorRecovery(operation, recoveryOptions, logger) as () => Promise<T>;
 }

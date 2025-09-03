@@ -9,8 +9,8 @@
 
 import { z } from 'zod';
 import type { Logger } from 'pino';
-import { AIServiceError } from '../errors/index';
-import type { MCPSampler } from '../application/interfaces';
+import { AIServiceError } from '../errors/index.js';
+import type { MCPSampler } from '../application/interfaces.js';
 import { AIRequestBuilder, type AIRequest } from './ai-request-builder';
 import { AIResponseCache, type CacheOptions, type CacheStats } from './ai/response-cache';
 import {
@@ -721,7 +721,7 @@ export class EnhancedAIService {
    * Extract template ID from request
    */
   private extractTemplateId(request: AIRequest): string {
-    return request.context?._templateId ?? request.context?._originalTemplate || 'unknown';
+    return request.context?._templateId ?? (request.context?._originalTemplate || 'unknown');
   }
 
   /**

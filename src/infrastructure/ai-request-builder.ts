@@ -3,7 +3,7 @@
  * Eliminates boilerplate AI request construction with fluent interface
  */
 
-import type { AnalysisResult } from '../contracts/types/session';
+import type { AnalysisResult } from '../contracts/types/session.js';
 import { SamplingStrategy, type SamplingContext } from './sampling-strategy';
 
 /**
@@ -39,55 +39,55 @@ const PROMPT_TEMPLATES = {
   'dockerfile-generation': {
     defaultTemp: 0.2,
     defaultMaxTokens: 1500,
-    promptTemplate: `Dockerfile for {{language}}{{#if languageVersion}} {{languageVersion}}{{/if}}{{#if framework}} + {{framework}}{{/if}}`
+    promptTemplate: `Dockerfile for {{language}}{{#if languageVersion}} {{languageVersion}}{{/if}}{{#if framework}} + {{framework}}{{/if}}
 Build: {{buildSystemType}}, Entry: {{entryPoint}}, Port: {{port}}
 
 Requirements: {{optimization}} optimization{{#if multistage}}, multi-stage{{/if}}{{#if securityHardening}}, security-hardened{{/if}}{{#if includeHealthcheck}}, health check{{/if}}
 {{#if baseImage}}Base: {{baseImage}}{{/if}}{{#if customInstructions}}
 Custom: {{customInstructions}}{{/if}}
 
-Output: Production Dockerfile only``
+Output: Production Dockerfile only`
   },
 
   'repository-analysis': {
     defaultTemp: 0.2,
     defaultMaxTokens: 800, // Reduced from 1200
-    promptTemplate: `Analyze repository. Return JSON only:`
+    promptTemplate: `Analyze repository. Return JSON only:
 
 Files: {{fileList}}
 Config: {{configFiles}}
 Tree: {{directoryTree}}
 
-Output: JSON format: {"language":"<lang>","framework":"<fw>","buildSystem":{"type":"<type>","buildFile":"<file>"},"dependencies":["<deps>"],"ports":[<nums>],"entryPoint":"<file>"}``
+Output: JSON format: {"language":"<lang>","framework":"<fw>","buildSystem":{"type":"<type>","buildFile":"<file>"},"dependencies":["<deps>"],"ports":[<nums>],"entryPoint":"<file>"}`
   },
 
   'dockerfile-fix': {
     defaultTemp: 0.3,
     defaultMaxTokens: 1000, // Reduced from 1200
-    promptTemplate: `Fix Dockerfile error:`
+    promptTemplate: `Fix Dockerfile error:
 
 Current: {{dockerfile}}
 Error: {{error_message}}
 
 Requirements: Fix error, maintain security, keep functionality
-Output: Corrected Dockerfile only``
+Output: Corrected Dockerfile only`
   },
 
   'optimization-suggestion': {
     defaultTemp: 0.4,
     defaultMaxTokens: 800,
-    promptTemplate: `Suggest Docker optimizations for:`
+    promptTemplate: `Suggest Docker optimizations for:
 
 {{dockerfile}}
 
 Focus: Size, security, performance, caching
-Output: JSON array of suggestions with impact/effort ratings``
+Output: JSON array of suggestions with impact/effort ratings`
   },
 
   'k8s-generation': {
     defaultTemp: 0.2,
     defaultMaxTokens: 2000,
-    promptTemplate: `Generate Kubernetes manifests for:`
+    promptTemplate: `Generate Kubernetes manifests for:
 
 App: {{appName}}, Image: {{image}}, Port: {{port}}
 Environment: {{environment}}, Namespace: {{namespace}}
@@ -95,31 +95,31 @@ Service Type: {{serviceType}}, Replicas: {{replicas}}
 {{#if ingressEnabled}}Ingress: {{ingressHost}}{{/if}}
 {{#if autoscaling}}Autoscaling: {{minReplicas}}-{{maxReplicas}} @ {{targetCPU}}%{{/if}}
 
-Output: Complete K8s YAML manifests (Deployment, Service, Ingress, ConfigMap, HPA as needed)``
+Output: Complete K8s YAML manifests (Deployment, Service, Ingress, ConfigMap, HPA as needed)`
   },
 
   'error-analysis': {
     defaultTemp: 0.3,
     defaultMaxTokens: 600,
-    promptTemplate: `Analyze build error:`
+    promptTemplate: `Analyze build error:
 
 Command: {{command}}
 Error: {{error_output}}
 Context: {{build_context}}
 
-Output: JSON with root cause, fix steps, prevention tips``
+Output: JSON with root cause, fix steps, prevention tips`
   },
 
   'json-repair': {
     defaultTemp: 0.1,
     defaultMaxTokens: 500,
-    promptTemplate: `Fix malformed JSON:`
+    promptTemplate: `Fix malformed JSON:
 
 {{malformed_content}}
 
 Error: {{error_message}}
 
-Output: Valid JSON only``
+Output: Valid JSON only`
   }
 };
 

@@ -8,7 +8,7 @@ import { program } from 'commander';
 import { ContainerKitMCPServerV2 as ContainerKitMCPServer } from './server.js';
 import { createConfig } from '../src/config/index';
 import { logConfigSummaryIfDev } from '../src/config/index';
-import { createPinoLogger } from '../src/runtime/logger';
+import { createPinoLogger } from '../src/infrastructure/logger.js';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';

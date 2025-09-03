@@ -14,15 +14,14 @@
  */
 export interface DockerBuildOptions {
   dockerfile?: string;
-  dockerfilePath?: string; // Alternative to dockerfile for file path
+  dockerfilePath?: string;
   context: string;
-  tag?: string; // Single tag for compatibility
+  tag?: string;
   tags?: string[];
   buildArgs?: Record<string, string>;
   target?: string;
   noCache?: boolean;
   platform?: string;
-  // Extended build options
   pull?: boolean;
   compress?: boolean;
   squash?: boolean;
@@ -49,13 +48,12 @@ export interface DockerBuildOptions {
  */
 export interface DockerBuildResult {
   imageId: string;
-  tag?: string; // Single tag for backward compatibility
+  tag?: string;
   tags: string[];
   size?: number;
   layers?: number;
   buildTime?: number;
   logs: string[];
-  // Extended result fields
   digest?: string;
   warnings?: string[];
   buildId?: string;
@@ -63,7 +61,7 @@ export interface DockerBuildResult {
   error?: string;
   stream?: string;
   aux?: Record<string, unknown>;
-  method?: string; // Build method used (e.g., 'docker', 'buildkit')
+  method?: string;
 }
 
 /**
@@ -92,7 +90,7 @@ export interface DockerScanResult {
     package: string;
     version: string;
     fixedVersion?: string;
-    fixed_version?: string; // snake_case variant for compatibility
+    fixed_version?: string;
     description?: string;
     score?: number;
     vector?: string;
@@ -118,7 +116,6 @@ export interface DockerScanResult {
   };
 }
 
-// Docker image interface
 export interface DockerImage {
   id: string;
   repository: string;
@@ -127,7 +124,6 @@ export interface DockerImage {
   size?: number;
   created: string;
   labels?: Record<string, string>;
-  // Extended result fields
   repoTags?: string[];
   repoDigests?: string[];
   parentId?: string;
@@ -145,7 +141,6 @@ export interface DockerImage {
   };
 }
 
-// Image info type for detailed Docker image information
 export interface ImageInfo {
   id: string;
   repoTags: string[];
@@ -171,20 +166,17 @@ export interface ImageInfo {
   };
 }
 
-// Docker registry authentication interface
 export interface DockerRegistry {
   url: string;
   username?: string;
   password?: string;
   token?: string;
-  // Additional auth options
   email?: string;
   serveraddress?: string;
   identitytoken?: string;
   registrytoken?: string;
 }
 
-// Docker push operation result
 export interface DockerPushResult {
   registry: string;
   repository: string;
@@ -210,7 +202,6 @@ export interface DockerPushResult {
   };
 }
 
-// Docker tag result interface
 export interface DockerTagResult {
   tags: string[];
   registry?: string;
@@ -219,7 +210,6 @@ export interface DockerTagResult {
   error?: string;
 }
 
-// Docker system info types
 export interface DockerSystemInfo {
   Containers?: number;
   ContainersRunning?: number;
@@ -235,7 +225,7 @@ export interface DockerSystemInfo {
   NCPU?: number;
   Driver?: string;
   LoggingDriver?: string;
-  [key: string]: unknown; // Allow additional properties
+  [key: string]: unknown;
 }
 
 export interface DockerVersionInfo {
@@ -258,7 +248,6 @@ export interface DockerVersionInfo {
   };
 }
 
-// Scan options for security scanning
 export interface ScanOptions {
   severity?: string;
   ignoreUnfixed?: boolean;
@@ -300,9 +289,6 @@ export interface DockerfileFixHistory {
 
 import { z } from 'zod';
 
-// Zod schemas for runtime validation
-
-// Core Docker type schemas
 export const DockerBuildOptionsSchema = z.object({
   dockerfile: z.string().optional(),
   dockerfilePath: z.string().optional(),
@@ -410,7 +396,6 @@ export const DockerTagResultSchema = z.object({
   error: z.string().optional()
 });
 
-// Zod Schemas for DockerfileFix
 export const DockerfileChangeSchema = z.object({
   line_changed: z.string(),
   old_content: z.string(),

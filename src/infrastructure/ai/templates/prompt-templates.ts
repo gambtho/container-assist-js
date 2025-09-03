@@ -1,4 +1,4 @@
-import { TaskType } from '../strategies/sampling-strategy';
+import { TaskType } from '../strategies/sampling-strategy.js';
 
 export interface PromptTemplate {
   system: string;

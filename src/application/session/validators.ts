@@ -3,7 +3,7 @@
  * Provides safe access to session workflow state
  */
 
-import type { Session, AnalysisResult, DockerBuildResult } from '../../contracts/types/index';
+import type { Session, AnalysisResult, DockerBuildResult } from '../../contracts/types/index.js';
 
 /**
  * Get analysis result from session workflow state
@@ -25,7 +25,7 @@ export function getSessionBuildResult(session: Session): DockerBuildResult | nul
 
   // Transform snake_case properties to camelCase to match DockerBuildResult interface
   return {
-    imageId: (buildResult as unknown).image_id ?? (buildResult as unknown).imageId || '',
+    imageId: (buildResult as unknown).image_id ?? ((buildResult as unknown).imageId || ''),
     tags: (buildResult as unknown).tags ?? [(buildResult as unknown).image_tag].filter(Boolean),
     logs: (buildResult as unknown).logs ?? [],
     size: (buildResult as unknown).size_bytes ?? (buildResult as unknown).size,

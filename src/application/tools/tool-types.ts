@@ -6,18 +6,18 @@ import { z } from 'zod';
 import type { Logger } from 'pino';
 // import type { Server, Tool } from '@modelcontextprotocol/sdk/types';
 // Server not exported from SDK, Tool unused
-import type { AnalysisResult, WorkflowState } from '../../contracts/types/index';
-import type { SessionService } from '../session/manager';
-import type { WorkflowOrchestrator } from '../workflow/orchestrator';
-import type { WorkflowManager } from '../workflow/manager';
-import type { DockerService } from '../../services/docker';
-import type { KubernetesService } from '../../services/kubernetes';
-import type { EnhancedAIService } from '../../infrastructure/enhanced-ai-service';
-import type { ProgressEmitter, EventPublisher, DependenciesConfig } from '../interfaces';
-import type { ProgressCallback } from '../workflow/types';
-import type { MCPSampler } from '../../infrastructure/ai/ai-types';
-import type { StructuredSampler } from '../../infrastructure/ai/structured-sampler';
-import type { ContentValidator } from '../../infrastructure/ai/content-validator';
+import type { AnalysisResult, WorkflowState } from '../../contracts/types/index.js';
+import type { SessionService } from '../session/manager.js';
+import type { WorkflowOrchestrator } from '../workflow/orchestrator.js';
+import type { WorkflowManager } from '../workflow/manager.js';
+import type { DockerService } from '../../services/docker.js';
+import type { KubernetesService } from '../../services/kubernetes.js';
+import type { EnhancedAIService } from '../../infrastructure/enhanced-ai-service.js';
+import type { ProgressEmitter, EventPublisher, DependenciesConfig } from '../interfaces.js';
+import type { ProgressCallback } from '../workflow/types.js';
+import type { MCPSampler } from '../../infrastructure/ai/ai-types.js';
+import type { StructuredSampler } from '../../infrastructure/ai/structured-sampler.js';
+import type { ContentValidator } from '../../infrastructure/ai/content-validator.js';
 
 /**
  * Context provided to tool handlers (Modernized)

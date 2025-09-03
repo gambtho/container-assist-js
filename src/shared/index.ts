@@ -4,7 +4,7 @@
  */
 
 // Re-export session utilities
-export { SessionUtils } from '../application/session/shared';
+export { SessionUtils } from '../application/session/shared.js';
 
 // Common utility types
 export interface RetryOptions {

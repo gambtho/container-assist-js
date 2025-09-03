@@ -3,7 +3,7 @@
  * Provides rich context propagation for error recovery scenarios
  */
 
-import type { AIRequest } from '../ai-request-builder';
+import type { AIRequest } from '../ai-request-builder.js';
 
 /**
  * Comprehensive error context for AI recovery operations

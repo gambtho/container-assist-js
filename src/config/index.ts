@@ -38,11 +38,7 @@ export {
 } from './config';
 
 // Import configuration
-import {
-  createConfiguration,
-  createConfigurationForEnv,
-  getConfigurationSummary
-} from './config';
+import { createConfiguration, createConfigurationForEnv, getConfigurationSummary } from './config';
 import type { ApplicationConfig } from './types';
 
 /**
@@ -109,8 +105,6 @@ export const getConfigSummary = getConfigurationSummary;
  */
 export function logConfigSummaryIfDev(configInstance: ApplicationConfig): void {
   if (configInstance.server.nodeEnv === 'development' && configInstance.features.enableDebugLogs) {
-    // TODO: Replace with SDK logging once server instance is available
-    // For now, keep console.log for development configuration debugging
     console.log('Configuration loaded:', getConfigurationSummary(configInstance));
   }
 }

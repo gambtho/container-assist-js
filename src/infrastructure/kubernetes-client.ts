@@ -4,13 +4,13 @@
 
 import * as k8s from '@kubernetes/client-node';
 import type { Logger } from 'pino';
-import { KubernetesError } from '../errors/index';
+import { KubernetesError } from '../errors/index.js';
 import type {
   K8sManifest,
   K8sDeploymentOptions,
   K8sDeploymentResult,
   K8sServiceStatus
-} from '../contracts/types/index';
+} from '../contracts/types/index.js';
 
 export interface KubernetesClientConfig {
   kubeconfig?: string;
@@ -137,7 +137,7 @@ export class KubernetesClient {
       throw new KubernetesError('Kubernetes cluster not available', 'K8S_NOT_AVAILABLE');
     }
 
-    const targetNamespace = namespace ?? manifest.metadata?.namespace || 'default';
+    const targetNamespace = namespace ?? (manifest.metadata?.namespace || 'default');
 
     try {
       switch (manifest.kind?.toLowerCase()) {

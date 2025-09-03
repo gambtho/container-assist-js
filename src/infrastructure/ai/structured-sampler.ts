@@ -6,7 +6,7 @@
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import type { MCPSampler } from './mcp-sampler';
-import type { AIRequest } from '../ai-request-builder';
+import type { AIRequest } from '../ai-request-builder.js';
 
 /**
  * Security issue detected during generation
@@ -206,7 +206,7 @@ export class StructuredSampler {
     text = text.trim();
 
     // Remove markdown code blocks if present
-    const codeBlockRegex = /^``(?:json|yaml|text)?\n?([\s\S]*?)\n?``$/;`
+    const codeBlockRegex = /^``(?:json|yaml|text)?\n?([\s\S]*?)\n?``$/;
     const match = text.match(codeBlockRegex);
     if (match?.[1]) {
       text = match[1];
@@ -248,10 +248,10 @@ export class StructuredSampler {
 
     // Check for potential credentials
     const credentialPatterns = [
-      /api[_-]?key\s*[:=]\s*["']?[\w-]{20,}/gi,'
+      /api[_-]?key\s*[:=]\s*["']?[\w-]{20,}/gi,
       /password\s*[:=]\s*["']?[^"'\s]+/gi,
-      /token\s*[:=]\s*["']?[\w-]{20,}/gi,'
-      /secret\s*[:=]\s*["']?[\w-]{20,}/gi'
+      /token\s*[:=]\s*["']?[\w-]{20,}/gi,
+      /secret\s*[:=]\s*["']?[\w-]{20,}/gi
     ];
 
     for (const pattern of credentialPatterns) {
@@ -300,10 +300,10 @@ export class StructuredSampler {
     requirements: string,
     constraints?: Record<string, any>
   ): Promise<StructuredSampleResult<string>> {
-    const prompt = `Generate a production-ready Dockerfile based on these requirements:``
-requirements}
+    const prompt = `Generate a production-ready Dockerfile based on these requirements:
+${requirements}
 
-constraints ? `Constraints: ${JSON.stringify(constraints, null, 2)}` : ''}`
+${constraints ? `Constraints: ${JSON.stringify(constraints, null, 2)}` : ''}
 
 Follow best practices for:
 - Multi-stage builds
@@ -326,10 +326,10 @@ Follow best practices for:
     appDescription: string,
     options?: Record<string, unknown>
   ): Promise<StructuredSampleResult<unknown>> {
-    const prompt = `Generate Kubernetes manifests for:``
-appDescription}
+    const prompt = `Generate Kubernetes manifests for:
+${appDescription}
 
-options ? `Options: ${JSON.stringify(options, null, 2)}` : ''}`
+${options ? `Options: ${JSON.stringify(options, null, 2)}` : ''}
 
 Include:
 - Deployment
@@ -367,3 +367,4 @@ Include:
       format: 'json'
     });
   }
+}

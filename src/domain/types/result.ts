@@ -57,10 +57,7 @@ export function isFail<T>(result: Result<T>): result is Fail {
 /**
  * Map over a successful result
  */
-export function map<T, U>(
-  result: Result<T>,
-  fn: (value: T) => U
-): Result<U> {
+export function map<T, U>(result: Result<T>, fn: (value: T) => U): Result<U> {
   if (isOk(result)) {
     return ok(fn(result.value));
   }
@@ -70,10 +67,7 @@ export function map<T, U>(
 /**
  * Flat map (chain) over a successful result
  */
-export function chain<T, U>(
-  result: Result<T>,
-  fn: (value: T) => Result<U>
-): Result<U> {
+export function chain<T, U>(result: Result<T>, fn: (value: T) => Result<U>): Result<U> {
   if (isOk(result)) {
     return fn(result.value);
   }
@@ -103,10 +97,7 @@ export function unwrapOr<T>(result: Result<T>, defaultValue: T): T {
 /**
  * Execute a side effect on success
  */
-export function tap<T>(
-  result: Result<T>,
-  fn: (value: T) => void
-): Result<T> {
+export function tap<T>(result: Result<T>, fn: (value: T) => void): Result<T> {
   if (isOk(result)) {
     fn(result.value);
   }
@@ -129,9 +120,7 @@ export function tapError<T>(
 /**
  * Convert a Promise to a Result
  */
-export async function fromPromise<T>(
-  promise: Promise<T>
-): Promise<Result<T>> {
+export async function fromPromise<T>(promise: Promise<T>): Promise<Result<T>> {
   try {
     const value = await promise;
     return ok(value);
@@ -146,14 +135,14 @@ export async function fromPromise<T>(
  */
 export function combine<T>(results: Result<T>[]): Result<T[]> {
   const values: T[] = [];
-  
+
   for (const result of results) {
     if (isFail(result)) {
       return result;
     }
     values.push(result.value);
   }
-  
+
   return ok(values);
 }
 

@@ -3,7 +3,7 @@
  * Defines the steps and execution flow for different containerization workflows
  */
 
-import type { DockerBuildResult, WorkflowState } from '../../contracts/types/index';
+import type { DockerBuildResult, WorkflowState } from '../../contracts/types/index.js';
 import { WorkflowConfig } from './orchestrator';
 import { mapWorkflowStateProperties } from './property-mappers';
 
@@ -489,7 +489,7 @@ export function validateWorkflowConfig(config: WorkflowConfig): {
   const errors: string[] = [];
 
   // Basic validation
-  if (!config.id ?? !config.name || !config.steps?.length) {
+  if (!config.id ?? (!config.name || !config.steps?.length)) {
     errors.push('Workflow must have id, name, and at least one step');
   }
 

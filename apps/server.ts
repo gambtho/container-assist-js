@@ -9,7 +9,7 @@ import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
 import { z } from 'zod';
 import { ToolFactory } from '../src/application/tools/factory.js';
 import type { CoreServices } from '../src/application/services/interfaces.js';
-import { createPinoLogger } from '../src/runtime/logger.js';
+import { createPinoLogger } from '../src/infrastructure/logger.js';
 import { config as applicationConfig, type ApplicationConfig } from '../src/config/index.js';
 import process from 'node:process';
 import type { Logger } from 'pino';
