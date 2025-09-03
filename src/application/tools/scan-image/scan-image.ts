@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { DomainError, ErrorCode } from '../../../contracts/types/errors.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 import {
   getScanTarget,
   performDockerScan,
@@ -92,7 +92,7 @@ export type ScanOutput = z.infer<typeof ScanImageOutput>;
 /**
  * Main handler implementation
  */
-const scanImageHandler: MCPToolDescriptor<ScanInput, ScanOutput> = {
+const scanImageHandler: MCPTool<ScanInput, ScanOutput> = {
   name: 'scan_image',
   description: 'Scan Docker image for security vulnerabilities',
   category: 'workflow',

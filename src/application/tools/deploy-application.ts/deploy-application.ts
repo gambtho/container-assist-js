@@ -8,7 +8,7 @@ import {
   ErrorCode,
   DomainError
 } from '../../../contracts/types/index.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 import {
   loadManifests,
   orderManifests,
@@ -95,7 +95,7 @@ export type DeployOutput = z.infer<typeof DeployApplicationOutput>;
 /**
  * Main handler implementation
  */
-const deployApplicationHandler: MCPToolDescriptor<DeployInput, DeployOutput> = {
+const deployApplicationHandler: MCPTool<DeployInput, DeployOutput> = {
   name: 'deploy_application',
   description: 'Deploy application to Kubernetes cluster',
   category: 'workflow',

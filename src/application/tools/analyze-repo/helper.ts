@@ -272,12 +272,12 @@ export async function analyzeDependencies(
               dependencies.push(entry);
             }
           });
-      } catch { }
+      } catch {}
     } else if (language === 'java') {
       // Parse pom.xml or build.gradle for dependencies
       // This would require XML/Gradle parsing
     }
-  } catch { }
+  } catch {}
 
   return dependencies;
 }
@@ -296,7 +296,7 @@ export async function detectPorts(repoPath: string, language: string): Promise<n
     if (portMatch?.[1]) {
       ports.add(parseInt(portMatch[1]));
     }
-  } catch { }
+  } catch {}
 
   // Check package.json scripts
   if (language === 'javascript' || language === 'typescript') {
@@ -310,7 +310,7 @@ export async function detectPorts(repoPath: string, language: string): Promise<n
           ports.add(parseInt(match[1]));
         }
       }
-    } catch { }
+    } catch {}
   }
 
   return Array.from(ports);

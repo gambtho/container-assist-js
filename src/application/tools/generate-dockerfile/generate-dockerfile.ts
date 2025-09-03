@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
 import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 import type { AnalysisResult } from '../../../contracts/types/session.js';
 import {
   generateDockerfileContent,
@@ -87,7 +87,7 @@ export type DockerfileOutput = z.infer<typeof GenerateDockerfileOutput>;
 /**
  * Main handler implementation
  */
-const generateDockerfileHandler: MCPToolDescriptor<DockerfileInput, DockerfileOutput> = {
+const generateDockerfileHandler: MCPTool<DockerfileInput, DockerfileOutput> = {
   name: 'generate_dockerfile',
   description: 'Generate optimized Dockerfile using AI with security best practices',
   category: 'workflow',

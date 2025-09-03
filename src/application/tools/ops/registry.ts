@@ -1,23 +1,8 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
-import type { Services } from '../../../services/index.js';
-
-// Simplified tool interface - no context needed!
-export interface SimpleTool<TInput = unknown, TOutput = unknown> {
-  name: string;
-  description: string;
-  inputSchema: any; // Zod schema
-  execute: (input: TInput, workstate?: WorkState) => Promise<TOutput>;
-}
-
-// Work state that gets passed between tools
-export interface WorkState {
-  sessionId: string;
-  projectName?: string;
-  currentStep?: string;
-  artifacts: Record<string, unknown>;
-  metadata: Record<string, unknown>;
-}
+import type { MCPTool, MCPToolContext } from '../tool-types';
+import { ServerCapabilitiesSchema } from '@modelcontextprotocol/sdk/types.js';
+import { Services } from '../../../services';
 
 export enum ToolName {
   ANALYZE_REPOSITORY = 'analyze-repository',
@@ -62,94 +47,62 @@ const AVAILABLE_TOOLS = [
 ];
 
 export class ToolRegistry {
-  private tools = new Map<string, SimpleTool>();
-  private workStates = new Map<string, WorkState>();
+  private tools = new Map<string, MCPTool>();
 
   constructor(
     private readonly services: Services,
+    private readonly context: MCPToolContext,
     private readonly logger: Logger,
     private server: McpServer
   ) {
     this.logger = logger.child({ component: 'ToolRegistry' });
   }
 
-  /**
-   * Get or create work state for a session
-   */
-  private getWorkState(sessionId: string = 'default'): WorkState {
-    if (!this.workStates.has(sessionId)) {
-      this.workStates.set(sessionId, {
-        sessionId,
-        artifacts: {},
-        metadata: {}
-      });
-    }
-    return this.workStates.get(sessionId)!;
-  }
-
-  register(tool: SimpleTool): void {
+  register(tool: MCPTool): void {
     this.tools.set(tool.name, tool);
-
-    // Extract Zod shape for MCP SDK compatibility
-    const inputSchema = ('shape' in tool.inputSchema) ? tool.inputSchema.shape : {};
-
-    // Use the correct MCP SDK registerTool method
     this.server.registerTool(
       tool.name,
       {
         title: tool.name,
         description: tool.description,
-        inputSchema,
+        inputSchema: tool.inputSchema.shape
       },
       async (input: Record<string, unknown>) => {
         const startTime = Date.now();
         const toolLogger = this.logger.child({ tool: tool.name });
-        
+
         try {
           toolLogger.info({ input }, 'Tool execution started');
 
-          // Validate input with the tool's schema
           const validatedInput = tool.inputSchema.parse(input);
 
-          // Get work state for this session (could extract sessionId from input later)
-          const workState = this.getWorkState();
-
-          // Update work state
-          workState.currentStep = tool.name;
-          workState.metadata.lastExecuted = new Date().toISOString();
-
-          // Tool executes with clean interface - just input and workstate
-          const result = await tool.execute(validatedInput, workState);
-
-          // Update work state with result
-          workState.metadata.lastResult = result;
+          const result = await tool.handler(validatedInput, this.services, this.context);
 
           const duration = Date.now() - startTime;
           toolLogger.info({ duration, success: true }, 'Tool execution completed');
 
-          // Format response
           const responseText = `✅ **${tool.name} completed** (${duration}ms)\n${JSON.stringify(result, null, 2)}`;
 
           return {
             content: [
               {
-                type: "text" as const,
-                text: responseText,
-              },
-            ],
+                type: 'text' as const,
+                text: responseText
+              }
+            ]
           };
         } catch (error) {
           const duration = Date.now() - startTime;
           toolLogger.error({ error, duration }, 'Tool execution failed');
 
-          const errorMessage = error instanceof Error ? error.message : "Unknown error";
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           return {
             content: [
               {
-                type: "text" as const,
-                text: `❌ **${tool.name} failed** (${duration}ms): ${errorMessage}`,
-              },
-            ],
+                type: 'text' as const,
+                text: `❌ **${tool.name} failed** (${duration}ms): ${errorMessage}`
+              }
+            ]
           };
         }
       }
@@ -158,48 +111,38 @@ export class ToolRegistry {
     this.logger.info({ tool: tool.name }, 'Tool registered');
   }
 
-
   async registerAll(): Promise<void> {
     let registered = 0;
-    
+
     for (const toolName of AVAILABLE_TOOLS) {
       try {
         const module = await import(`./${toolName}/${toolName}.js`);
-        const tool = module.default as SimpleTool;
-        
-        if (tool && typeof tool.execute === 'function') {
+        const tool = module.default as MCPTool;
+
+        if (tool) {
           this.register(tool);
           registered++;
         } else {
           this.logger.warn({ tool: toolName }, 'Invalid tool - no execute function found');
         }
       } catch (error) {
-        this.logger.warn({ 
-          tool: toolName, 
-          error: error instanceof Error ? error.message : String(error) 
-        }, 'Failed to load tool');
+        this.logger.warn(
+          {
+            tool: toolName,
+            error: error instanceof Error ? error.message : String(error)
+          },
+          'Failed to load tool'
+        );
       }
     }
 
     this.logger.info(
-      { 
-        registered, 
+      {
+        registered,
         total: AVAILABLE_TOOLS.length,
         tools: Array.from(this.tools.keys())
-      }, 
+      },
       'Tool registration completed'
     );
-  }
-
-  getToolCount(): number {
-    return this.tools.size;
-  }
-
-  getTool(name: string): SimpleTool | undefined {
-    return this.tools.get(name);
-  }
-
-  getToolNames(): string[] {
-    return Array.from(this.tools.keys());
   }
 }

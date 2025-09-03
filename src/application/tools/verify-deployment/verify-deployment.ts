@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { ErrorCode, DomainError } from '../../../contracts/types/index.js';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 import {
   checkDeploymentHealth,
   getPodInfo,
@@ -108,7 +108,7 @@ export type VerifyOutput = z.infer<typeof VerifyDeploymentOutput>;
 /**
  * Main handler implementation
  */
-const verifyDeploymentHandler: MCPToolDescriptor<VerifyInput, VerifyOutput> = {
+const verifyDeploymentHandler: MCPTool<VerifyInput, VerifyOutput> = {
   name: 'verify_deployment',
   description: 'Verify Kubernetes deployment health and get endpoints',
   category: 'workflow',

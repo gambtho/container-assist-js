@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { MCPTool, MCPToolContext } from '../tool-types.js';
 
 // Input schema
 const ServerStatusInputSchema = z
@@ -166,7 +166,7 @@ function assessHealth(
 /**
  * Server status tool implementation using MCP SDK pattern
  */
-const serverStatusTool: MCPToolDescriptor<ServerStatusInput, ServerStatusOutput> = {
+const serverStatusTool: MCPTool<ServerStatusInput, ServerStatusOutput> = {
   name: 'server_status',
   description: 'Get MCP server status and system information',
   category: 'utility',
