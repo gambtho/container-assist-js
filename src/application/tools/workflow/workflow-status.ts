@@ -3,10 +3,10 @@
  * Provides workflow status with progress tracking and metrics
  */
 
-import { SessionService } from '../../session/manager';
-import { WorkflowManager } from '../../workflow/manager';
-import { Session } from '../../../contracts/types/index';
-import { getWorkflowSteps } from '../../workflow/configs';
+import { SessionService } from '../../session/manager.js';
+import { WorkflowManager } from '../../workflow/manager.js';
+import { Session } from '../../../contracts/types/index.js';
+import { getWorkflowSteps } from '../../workflow/configs.js';
 import type { Logger } from 'pino';
 
 export interface WorkflowStatusInput {

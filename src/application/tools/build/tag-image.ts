@@ -3,8 +3,8 @@
  */
 
 import { z } from 'zod';
-import { ErrorCode, DomainError } from '../../../contracts/types/errors';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema with support for both snake_case and camelCase
 const TagImageInput = z
@@ -29,12 +29,13 @@ const TagImageInput = z
     sessionId: data.session_id ?? data.sessionId,
     sourceImage: data.source_tag ?? data.sourceTag ?? data.source_image ?? data.sourceImage,
     targetTags:
-      data.target_tags ?? data.targetTags ||
-      (data.target_tag ? [data.target_tag] : data.targetTag ? [data.targetTag] : []),
+      data.target_tags ??
+      (data.targetTags ||
+        (data.target_tag ? [data.target_tag] : data.targetTag ? [data.targetTag] : [])),
     registry: data.registry,
     version: data.version,
     latest: data.latest,
-    customTags: data.custom_tags ?? data.customTags || []
+    customTags: data.custom_tags ?? (data.customTags || [])
   }));
 
 // Output schema

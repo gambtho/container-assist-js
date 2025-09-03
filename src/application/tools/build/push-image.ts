@@ -3,8 +3,8 @@
  */
 
 import { z } from 'zod';
-import { ErrorCode, DomainError } from '../../../contracts/types/errors';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema with support for both snake_case and camelCase
 const PushImageInput = z
@@ -218,7 +218,8 @@ const pushImageHandler: MCPToolDescriptor<PushInput, PushOutput> = {
           targetRegistry = targetRegistry ?? session.workflow_state.tag_result.registry;
         } else if (session.workflow_state?.build_result) {
           const tag =
-            session.workflow_state.build_result.tag ?? session.workflow_state.build_result.tags?.[0];
+            session.workflow_state.build_result.tag ??
+            session.workflow_state.build_result.tags?.[0];
           imagesToPush = tag ? [tag] : [];
         }
       }

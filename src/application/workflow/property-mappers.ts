@@ -9,7 +9,7 @@ import type {
   DockerBuildResult,
   Session,
   DeploymentResult
-} from '../../contracts/types/index';
+} from '../../contracts/types/index.js';
 
 /**
  * Maps workflow state properties to handle naming inconsistencies

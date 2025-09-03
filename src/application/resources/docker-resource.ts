@@ -5,7 +5,7 @@
 
 // import type { Server } from '@modelcontextprotocol/sdk/server/index';
 import type { Logger } from 'pino';
-import type { DockerService } from '../../services/docker';
+import type { DockerService } from '../../services/docker.js';
 
 export class DockerResourceProvider {
   constructor(
@@ -51,15 +51,15 @@ export class DockerResourceProvider {
                       version: health.version ?? null,
                       systemInfo: systemInfo
                         ? {
-                          containers: systemInfo.containers ?? 0,
-                          images: systemInfo.images ?? 0,
-                          serverVersion: systemInfo.serverVersion,
-                          architecture: systemInfo.architecture,
-                          os: systemInfo.os,
-                          kernelVersion: systemInfo.kernelVersion,
-                          memTotal: systemInfo.memTotal,
-                          cpus: systemInfo.ncpu
-                        }
+                            containers: systemInfo.containers ?? 0,
+                            images: systemInfo.images ?? 0,
+                            serverVersion: systemInfo.serverVersion,
+                            architecture: systemInfo.architecture,
+                            os: systemInfo.os,
+                            kernelVersion: systemInfo.kernelVersion,
+                            memTotal: systemInfo.memTotal,
+                            cpus: systemInfo.ncpu
+                          }
                         : null,
                       timestamp: new Date().toISOString()
                     },
@@ -124,8 +124,8 @@ export class DockerResourceProvider {
 
             const imageList = images.map((image: unknown) => ({
               id: image.Id ?? image.id,
-              tags: image.RepoTags ?? image.tags || [],
-              size: image.Size ?? image.size || 0,
+              tags: image.RepoTags ?? (image.tags || []),
+              size: image.Size ?? (image.size || 0),
               created: image.Created ?? image.created,
               parentId: image.ParentId ?? image.parentId ?? null
             }));
@@ -200,12 +200,12 @@ export class DockerResourceProvider {
 
             const containerList = containers.map((container: unknown) => ({
               id: container.Id ?? container.id,
-              names: container.Names ?? container.names || [],
+              names: container.Names ?? (container.names || []),
               image: container.Image ?? container.image,
               state: container.State ?? container.state,
               status: container.Status ?? container.status,
               created: container.Created ?? container.created,
-              ports: container.Ports ?? container.ports || []
+              ports: container.Ports ?? (container.ports || [])
             }));
 
             const stats = {

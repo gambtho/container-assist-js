@@ -217,8 +217,6 @@ export function createConfiguration(): ApplicationConfig {
         const parsedValue = parseValue(value, mapping.type);
         setPath(config, mapping.path, parsedValue);
       } catch (error) {
-        // TODO: Replace with SDK logging once server instance is available
-        // For now, keep console.warn for configuration parsing errors during startup
         console.warn(`Invalid ${envVar}: ${error instanceof Error ? error.message : error}`);
       }
     }

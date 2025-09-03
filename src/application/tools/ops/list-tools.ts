@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema
 const ListToolsInputSchema = z
@@ -214,9 +214,9 @@ const listToolsTool: MCPToolDescriptor<ListToolsInput, ListToolsOutput> = {
         category: tool.category,
         chainHint: tool.chainHint
           ? {
-            nextTool: tool.chainHint.nextTool,
-            reason: tool.chainHint.reason ?? ''
-          }
+              nextTool: tool.chainHint.nextTool,
+              reason: tool.chainHint.reason ?? ''
+            }
           : undefined
       })),
       totalCount: tools.length,

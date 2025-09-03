@@ -3,8 +3,8 @@
  * Provides retry and error recovery functionality for tools
  */
 
-import { retry as retryAsync, type RetryOptions as AsyncRetryOptions } from '../../shared/async';
-import { normalizeError } from '../../errors/index';
+import { retry as retryAsync, type RetryOptions as AsyncRetryOptions } from '../../shared/async.js';
+import { normalizeError } from '../../errors/index.js';
 
 // Re-export and alias types
 export type RetryOptions = AsyncRetryOptions;

@@ -5,7 +5,7 @@
 
 import type { Logger } from 'pino';
 import type { MCPSampler, MCPSampleResponse, MCPSampleError } from './mcp-sampler';
-import type { AIRequest } from '../ai-request-builder';
+import type { AIRequest } from '../ai-request-builder.js';
 
 /**
  * Mock response template
@@ -14,7 +14,8 @@ export interface MockResponseTemplate {
   pattern: string | RegExp;
   response: MCPSampleResponse;
   delay?: number;
-  failureRate?: number; // 0-1, chance of failure
+  failureRate?: number;
+}
 
 /**
  * Mock Sampler implementation
@@ -199,7 +200,7 @@ USER nextjs
 
 EXPOSE 3000
 
-CMD ["npm", "start"]`,``
+CMD ["npm", "start"]`,
         tokenCount: 150,
         model: 'mock-model'
       }
@@ -209,7 +210,7 @@ CMD ["npm", "start"]`,``
     this.addTemplate({
       pattern: /kubernetes|k8s|deployment|service/i,
       response: {
-        text: `apiVersion: apps/v1``
+        text: `apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: my-app
@@ -238,7 +239,7 @@ spec:
     app: my-app
   ports:
   - port: 80
-    targetPort: 3000`,``
+    targetPort: 3000`,
         tokenCount: 200,
         model: 'mock-model'
       }
@@ -251,7 +252,7 @@ spec:
         text: JSON.stringify(
           {
             language: 'typescript',
-            framework: 'node'','
+            framework: 'node',
             dependencies: ['express', 'typescript', 'jest'],
             buildTool: 'npm',
             hasDockerfile: false,
@@ -320,3 +321,4 @@ spec:
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+}

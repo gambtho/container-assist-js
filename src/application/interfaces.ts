@@ -17,13 +17,13 @@ import type {
   // Service interfaces (essential only)
   SessionStore,
   EventPublisher
-} from '../contracts/types/index';
+} from '../contracts/types/index.js';
 
 // Import Logger from pino
 import type { Logger } from 'pino';
 
 // Import additional types for AI integration (if needed)
-// import type { AIRequest, AIResponse } from '../infrastructure/ai/mcp-sampler'
+// import type { AIRequest, AIResponse } from '../infrastructure/ai/mcp-sampler.js'
 
 // Re-export only essential types that are commonly used by services
 export type {
@@ -43,9 +43,9 @@ export type {
 };
 
 // Configuration types - unified in the main config module
-export type { ApplicationConfig } from '../config/index';
+export type { ApplicationConfig } from '../config/index.js';
 // DependenciesConfig is deprecated - use ApplicationConfig instead
-export type { ApplicationConfig as DependenciesConfig } from '../config/index';
+export type { ApplicationConfig as DependenciesConfig } from '../config/index.js';
 
 // Workflow step parameters (service-specific)
 export interface StepParams {
@@ -84,7 +84,7 @@ export type {
   MCPSampler,
   MCPSampleResponse,
   MCPSampleError
-} from '../infrastructure/ai/mcp-sampler';
+} from '../infrastructure/ai/mcp-sampler.js';
 
 // Service aggregation types for dependency injection
 export interface AIServices {

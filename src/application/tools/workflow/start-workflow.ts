@@ -4,13 +4,13 @@
  */
 
 import { nanoid } from 'nanoid';
-import { SessionService } from '../../session/manager';
-import { WorkflowOrchestrator } from '../../workflow/orchestrator';
-import { WorkflowManager } from '../../workflow/manager';
-import { getWorkflowConfig, validateWorkflowConfig } from '../../workflow/configs';
-import { runContainerizationWorkflow } from '../../workflow/containerization';
+import { SessionService } from '../../session/manager.js';
+import { WorkflowOrchestrator } from '../../workflow/orchestrator.js';
+import { WorkflowManager } from '../../workflow/manager.js';
+import { getWorkflowConfig, validateWorkflowConfig } from '../../workflow/configs.js';
+import { runContainerizationWorkflow } from '../../workflow/containerization.js';
 import type { Logger } from 'pino';
-import type { ProgressCallback } from '../../workflow/types';
+import type { ProgressCallback } from '../../workflow/types.js';
 
 export interface StartWorkflowInput {
   repo_path?: string;

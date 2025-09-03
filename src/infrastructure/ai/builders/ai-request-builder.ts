@@ -18,8 +18,8 @@ export class AIRequestBuilder {
   private topP: number = 0.9;
   private frequencyPenalty: number = 0;
   private presencePenalty: number = 0;
-  private systemPrompt: string = ';'
-  private userPrompt: string = ';'
+  private systemPrompt: string = ';';
+  private userPrompt: string = ';';
   private contextWindow: Array<{ role: string; content: string }> = [];
   private samplingParams: Record<string, any> = {};
 

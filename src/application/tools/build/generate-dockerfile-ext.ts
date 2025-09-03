@@ -3,8 +3,8 @@
  */
 
 import { z } from 'zod';
-import { executeWithRetry } from '../error-recovery';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import { executeWithRetry } from '../error-recovery.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Define Zod schema for repository analysis result
 const RepositoryAnalysisSchema = z.object({
@@ -72,12 +72,12 @@ async function generateEnhancedDockerfile(
           frameworkVersion: analysis.frameworkVersion ?? '',
           buildSystemType: analysis.buildSystem?.type ?? 'npm',
           entryPoint: analysis.entryPoint ?? 'index',
-          port: String(input.port ?? analysis.suggestedPorts[0] || 8080),
+          port: String(input.port ?? (analysis.suggestedPorts[0] || 8080)),
           dependencies: analysis.dependencies.join(' '),
           devDependencies: (analysis.devDependencies ?? []).join(' ')
         },
         dockerContext: {
-          baseImage: input.base_image ?? analysis.dockerConfig?.baseImage || 'node:18-alpine',
+          baseImage: input.base_image ?? (analysis.dockerConfig?.baseImage || 'node:18-alpine'),
           multistage: input.multistage,
           securityHardening: input.security_hardening,
           includeHealthcheck: input.include_healthcheck
@@ -116,7 +116,9 @@ async function generateEnhancedDockerfile(
 
         // Log security warnings if any
         if (validation.issues && validation.issues.length > 0) {
-          const highSeverityIssues = validation.issues.filter((i: unknown) => i.severity === 'high');
+          const highSeverityIssues = validation.issues.filter(
+            (i: unknown) => i.severity === 'high'
+          );
           const mediumSeverityIssues = validation.issues.filter(
             (i: unknown) => i.severity === 'medium'
           );

@@ -3,7 +3,7 @@
  * Common interfaces and types used across session management
  */
 
-import type { WorkflowState, Session } from '../../contracts/types/index';
+import type { WorkflowState, Session } from '../../contracts/types/index.js';
 
 /**
  * Session metadata

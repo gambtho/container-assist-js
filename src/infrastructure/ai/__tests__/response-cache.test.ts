@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { AIResponseCache, type CacheOptions } from '../response-cache';
+import { AIResponseCache, type CacheOptions } from '../response-cache.js';
 import type { Logger } from 'pino';
-import type { AIRequest } from '../../ai-request-builder';
+import type { AIRequest } from '../../ai-request-builder.js';
 
 // Mock logger
 const mockLogger: Logger = {

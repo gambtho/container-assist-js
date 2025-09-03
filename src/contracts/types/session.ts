@@ -12,7 +12,6 @@ import {
   DockerPushResultSchema
 } from './docker';
 
-// Analysis result schema matching Go structure
 export const AnalysisResultSchema = z.object({
   language: z.string(),
   language_version: z.string().optional(),
@@ -42,11 +41,9 @@ export const AnalysisResultSchema = z.object({
   env_variables: z.record(z.string(), z.string()).optional(),
   docker_compose_exists: z.boolean().default(false),
   ci_cd_platform: z.string().optional(),
-  // Java-specific fields
   java_version: z.string().optional(),
   build_tool_version: z.string().optional(),
   packaging: z.enum(['jar', 'war', 'ear']).optional(),
-  // AI recommendations
   recommendations: z
     .object({
       baseImage: z.string().optional(),
@@ -56,9 +53,6 @@ export const AnalysisResultSchema = z.object({
     .optional()
 });
 
-// Use consolidated DockerBuildResultSchema from docker.ts
-
-// Dockerfile generation result
 export const DockerfileResultSchema = z.object({
   content: z.string(),
   path: z.string(),
@@ -68,11 +62,8 @@ export const DockerfileResultSchema = z.object({
   multistage: z.boolean().default(false)
 });
 
-// Use consolidated ScanResultSchema from docker.ts
-// Alias for compatibility
 export const ScanResultSchema = DockerScanResultSchema;
 
-// K8s manifest result schema
 export const K8sManifestResultSchema = z.object({
   manifests: z.array(
     z.object({
@@ -104,7 +95,6 @@ export const K8sManifestResultSchema = z.object({
   output_path: z.string().optional()
 });
 
-// Deployment result schema
 export const DeploymentResultSchema = z.object({
   namespace: z.string(),
   deployment_name: z.string(),
@@ -136,9 +126,7 @@ export const DeploymentResultSchema = z.object({
   ready: z.boolean().default(false)
 });
 
-// Workflow state schema containing all results
 export const WorkflowStateSchema = z.object({
-  // Current workflow execution state
   current_step: z.string().nullable().optional(),
   completed_steps: z.array(z.string()).default([]),
 
@@ -192,13 +180,10 @@ export const WorkflowStateSchema = z.object({
     })
     .optional(),
 
-  // Error tracking
   errors: z.record(z.string(), z.unknown()).default({}),
 
-  // Additional metadata
   metadata: z.record(z.string(), z.unknown()).default({}),
 
-  // Registry configuration
   registry_url: z.string().optional(),
   registry_config: z
     .object({
@@ -207,7 +192,6 @@ export const WorkflowStateSchema = z.object({
     })
     .optional(),
 
-  // Dockerfile fix history
   dockerfile_fix_history: z
     .array(
       z.object({
@@ -220,14 +204,11 @@ export const WorkflowStateSchema = z.object({
     .default([])
 });
 
-// Main session schema
 export const SessionSchema = z.object({
-  // Core fields
   id: z.string(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 
-  // Session lifecycle
   expires_at: z.string().datetime().optional(),
   status: z
     .enum([
@@ -242,25 +223,20 @@ export const SessionSchema = z.object({
     ])
     .default('active'),
 
-  // Repository information
   repo_path: z.string(),
 
-  // Workflow tracking
   stage: z.string().optional(),
   labels: z.record(z.string(), z.string()).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 
-  // Workflow state
   workflow_state: WorkflowStateSchema.default(() => ({
     completed_steps: [],
     errors: {},
     metadata: {}
   })),
 
-  // Version for optimistic locking
   version: z.number().default(0),
 
-  // Configuration
   config: z
     .object({
       auto_push: z.boolean().default(false),
@@ -270,7 +246,6 @@ export const SessionSchema = z.object({
     })
     .optional(),
 
-  // Progress tracking
   progress: z
     .object({
       current_step: z.number(),
@@ -281,17 +256,14 @@ export const SessionSchema = z.object({
     .optional()
 });
 
-// Export types
 export type Session = z.infer<typeof SessionSchema>;
 export type WorkflowState = z.infer<typeof WorkflowStateSchema>;
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
-// Re-export consolidated types for compatibility
 export type { DockerBuildResult, DockerScanResult as ScanResult } from './docker';
 export type DockerfileResult = z.infer<typeof DockerfileResultSchema>;
 export type K8sManifestResult = z.infer<typeof K8sManifestResultSchema>;
 export type DeploymentResult = z.infer<typeof DeploymentResultSchema>;
 
-// Workflow step definitions
 export const WorkflowStep = {
   ANALYZE: 'analyze_repository',
   GENERATE_DOCKERFILE: 'generate_dockerfile',
@@ -307,7 +279,6 @@ export const WorkflowStep = {
 
 export type WorkflowStepType = (typeof WorkflowStep)[keyof typeof WorkflowStep];
 
-// Get all workflow steps in order
 export function getWorkflowSteps(): WorkflowStepType[] {
   return [
     WorkflowStep.ANALYZE,

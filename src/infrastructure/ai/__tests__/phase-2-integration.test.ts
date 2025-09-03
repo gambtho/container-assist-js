@@ -5,12 +5,12 @@
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import type { Logger } from 'pino';
-import { AIRequestBuilder } from '../../ai-request-builder';
-import { AIResponseCache } from '../response-cache';
-import { ErrorContextFactory } from '../error-context';
-import { JSONRepairStrategy, SimplificationStrategy } from '../recovery-strategies';
-import { EnhancedErrorRecovery } from '../enhanced-error-recovery';
-import type { AIRequest } from '../../ai-request-builder';
+import { AIRequestBuilder } from '../../ai-request-builder.js';
+import { AIResponseCache } from '../response-cache.js';
+import { ErrorContextFactory } from '../error-context.js';
+import { JSONRepairStrategy, SimplificationStrategy } from '../recovery-strategies.js';
+import { EnhancedErrorRecovery } from '../enhanced-error-recovery.js';
+import type { AIRequest } from '../../ai-request-builder.js';
 
 // Mock logger
 const mockLogger: Logger = {

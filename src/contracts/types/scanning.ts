@@ -5,7 +5,6 @@
 
 import { z } from 'zod';
 
-// Scanner types and configuration
 export type ScannerType = 'trivy' | 'grype' | 'snyk' | 'clair' | 'anchore';
 
 export interface ScannerConfig {
@@ -24,27 +23,21 @@ export interface ScannerConfig {
   clearCache?: boolean;
 }
 
-// Vulnerability severity levels
 export type SeverityLevel = 'critical' | 'high' | 'medium' | 'low' | 'unknown' | 'negligible';
 
-// Individual vulnerability information
 export interface Vulnerability {
-  // Core vulnerability data
   id: string;
   cve?: string;
   severity: SeverityLevel;
 
-  // Package information
   package: string;
   version: string;
   fixedVersion?: string;
   fixed_version?: string; // snake_case for compatibility
 
-  // Vulnerability details
   title?: string;
   description?: string;
 
-  // CVSS scoring
   score?: number;
   cvssVector?: string;
   cvssV2?: {
@@ -56,21 +49,17 @@ export interface Vulnerability {
     vector: string;
   };
 
-  // References and links
   references?: string[];
   urls?: string[];
   advisoryUrls?: string[];
 
-  // Classification
   cwe?: string[];
   category?: string;
   packageType?: string;
 
-  // Timing information
   publishedDate?: string;
   lastModifiedDate?: string;
 
-  // Additional metadata
   layer?: {
     digest: string;
     diffId?: string;
@@ -78,13 +67,11 @@ export interface Vulnerability {
   };
   primaryUrl?: string;
 
-  // Fix information
   fixState?: 'fixed' | 'not-fixed' | 'will-not-fix' | 'fix-deferred';
   installedVersion?: string;
   fixedIn?: string[];
 }
 
-// Vulnerability summary statistics
 export interface VulnerabilitySummary {
   critical: number;
   high: number;
@@ -94,23 +81,19 @@ export interface VulnerabilitySummary {
   negligible?: number;
   total: number;
 
-  // Additional statistics
   fixed?: number;
   unfixed?: number;
   ignored?: number;
 }
 
-// Scan options for different scanners
 export interface ScanOptions {
-  // Common options
   severity?: SeverityLevel[];
   format?: string;
   template?: string;
   timeout?: number;
-  ignoreUnfixed?: boolean; // Common option used across scanners
-  scanners?: string[]; // Which scanners to run
+  ignoreUnfixed?: boolean;
+  scanners?: string[];
 
-  // Trivy specific
   trivyOptions?: {
     skipUpdate?: boolean;
     skipFiles?: string[];
@@ -122,7 +105,6 @@ export interface ScanOptions {
     listAllPackages?: boolean;
   };
 
-  // Grype specific
   grypetOptions?: {
     scope?: 'squashed' | 'all-layers';
     configPath?: string;
@@ -130,7 +112,6 @@ export interface ScanOptions {
     onlyFixed?: boolean;
   };
 
-  // Snyk specific
   snykOptions?: {
     org?: string;
     file?: string;
@@ -139,26 +120,20 @@ export interface ScanOptions {
   };
 }
 
-// Security scan result interface
 export interface ScanResult {
-  // Scanner information
   scanner: ScannerType;
   scannerVersion?: string;
 
-  // Target information
   target: string;
   targetType: 'image' | 'filesystem' | 'repository';
 
-  // Vulnerabilities
   vulnerabilities: Vulnerability[];
   summary: VulnerabilitySummary;
 
-  // Scan metadata
   scanTime?: string;
   scan_duration_ms?: number;
   scanId?: string;
 
-  // Image/target metadata
   metadata?: {
     imageId?: string;
     size?: number;
@@ -172,20 +147,16 @@ export interface ScanResult {
     tags?: string[];
   };
 
-  // Scan configuration used
   config?: ScanOptions;
 
-  // Raw scanner output (for debugging/analysis)
   rawOutput?: unknown;
 
-  // Error information
   errors?: Array<{
     code?: string;
     message: string;
     details?: unknown;
   }>;
 
-  // Compliance and policy results
   compliance?: {
     passed: boolean;
     policies?: Array<{
@@ -197,7 +168,6 @@ export interface ScanResult {
   };
 }
 
-// Scan progress tracking
 export interface ScanProgress {
   phase: 'initializing' | 'downloading' | 'analyzing' | 'reporting' | 'complete';
   progress: number;
@@ -207,7 +177,6 @@ export interface ScanProgress {
   estimatedCompletion?: string;
 }
 
-// Scan history and tracking
 export interface ScanHistory {
   scanId: string;
   target: string;
@@ -219,7 +188,6 @@ export interface ScanHistory {
   error?: string;
 }
 
-// Policy definitions for compliance scanning
 export interface SecurityPolicy {
   name: string;
   description: string;
@@ -236,7 +204,6 @@ export interface SecurityPolicy {
   }>;
 }
 
-// Scan report generation
 export interface ScanReport {
   id: string;
   format: 'json' | 'html' | 'pdf' | 'sarif' | 'cyclonedx' | 'spdx';
@@ -250,7 +217,6 @@ export interface ScanReport {
   };
 }
 
-// Zod schemas for validation
 export const ScannerConfigSchema = z.object({
   type: z.enum(['trivy', 'grype', 'snyk', 'clair', 'anchore']),
   version: z.string().optional(),
@@ -401,7 +367,6 @@ export const SecurityPolicySchema = z.object({
     .optional()
 });
 
-// Type exports
 export type ScannerConfigType = z.infer<typeof ScannerConfigSchema>;
 export type VulnerabilityType = z.infer<typeof VulnerabilitySchema>;
 export type VulnerabilitySummaryType = z.infer<typeof VulnerabilitySummarySchema>;

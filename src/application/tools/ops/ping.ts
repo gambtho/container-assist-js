@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema
 const PingInputSchema = z.object({

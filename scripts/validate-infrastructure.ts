@@ -21,17 +21,14 @@ async function validateFile(filePath: string): Promise<void> {
     
     filesChecked++;
     
-    // Check 1: No path mapping imports
     if (content.includes('@domain/') || content.includes('@service/') || content.includes('@infrastructure/')) {
       errors.push(`${relativePath}: Contains path mapping imports (should use relative imports)`);
     }
     
-    // Check 2: Logger import consistency
     if (content.includes('import { logger }')) {
       errors.push(`${relativePath}: Direct logger import detected (should use dependency injection)`);
     }
     
-    // Check 3: Pino logger type imports (skip re-exports in logger.ts)
     if (!relativePath.includes('infrastructure/core/logger.ts')) {
       const pinoImportCount = (content.match(/import.*Logger.*from.*pino/g) || []).length;
       if (pinoImportCount > 1) {
@@ -39,10 +36,7 @@ async function validateFile(filePath: string): Promise<void> {
       }
     }
     
-    // Check 4: With ES2022/bundler resolution, .js extensions are optional in source
-    // This check is disabled for pure ESM with bundler resolution
     
-    // Check 5: Detect backup files (should be removed)
     if (filePath.includes('.backup') || filePath.endsWith('.backup')) {
       errors.push(`${relativePath}: Backup file detected (should be removed)`);
     }
@@ -60,8 +54,7 @@ async function walkDirectory(dir: string): Promise<void> {
     const stats = await stat(fullPath);
     
     if (stats.isDirectory()) {
-      // Skip node_modules, dist, coverage
-      if (!['node_modules', 'dist', 'coverage', '.git'].includes(entry)) {
+        if (!['node_modules', 'dist', 'coverage', '.git'].includes(entry)) {
         await walkDirectory(fullPath);
       }
     } else if (extname(entry) === '.ts') {
@@ -74,7 +67,6 @@ async function validatePackageJson(): Promise<void> {
   try {
     const pkg = JSON.parse(await readFile('package.json', 'utf-8'));
     
-    // Check required scripts
     const requiredScripts = ['build', 'test', 'lint', 'typecheck'];
     for (const script of requiredScripts) {
       if (!pkg.scripts[script]) {
@@ -82,7 +74,6 @@ async function validatePackageJson(): Promise<void> {
       }
     }
     
-    // Check if pino is in dependencies
     if (!pkg.dependencies?.pino) {
       errors.push('package.json: Missing pino logger dependency');
     }
@@ -97,12 +88,10 @@ async function validateTsConfig(): Promise<void> {
   try {
     const tsconfig = JSON.parse(await readFile('tsconfig.json', 'utf-8'));
     
-    // Check if path mappings are removed
     if (tsconfig.compilerOptions?.paths) {
       warnings.push('tsconfig.json: Path mappings still present (should be removed if using relative imports)');
     }
     
-    // Check ESM configuration - updated for pure ES2022/bundler
     if (tsconfig.compilerOptions.module !== 'ES2022') {
       errors.push('tsconfig.json: Module must be ES2022 for pure ESM support');
     }
@@ -111,7 +100,6 @@ async function validateTsConfig(): Promise<void> {
       errors.push('tsconfig.json: moduleResolution must be "bundler" for ES2022 support');
     }
     
-    // Check that baseUrl is removed (should use relative imports only)
     if (tsconfig.compilerOptions.baseUrl) {
       warnings.push('tsconfig.json: baseUrl should be removed for clean relative imports');
     }
@@ -122,7 +110,6 @@ async function validateTsConfig(): Promise<void> {
   }
 }
 
-// Run validation
 try {
   await validatePackageJson();
   await validateTsConfig();

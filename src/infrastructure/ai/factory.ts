@@ -95,7 +95,10 @@ export class AIServiceFactory {
   /**
    * Create AI service from legacy config
    */
-  static createFromLegacyConfig(legacyConfig: Record<string, unknown>, logger: Logger): AIServiceBundle {
+  static createFromLegacyConfig(
+    legacyConfig: Record<string, unknown>,
+    logger: Logger
+  ): AIServiceBundle {
     const config: AIFactoryConfig = {
       sampler: {
         type: (legacyConfig.provider as string) || 'mock',

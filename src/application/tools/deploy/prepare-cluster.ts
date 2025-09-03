@@ -3,8 +3,8 @@
  */
 
 import { z } from 'zod';
-import { ErrorCode, InfrastructureError } from '../../../contracts/types/errors';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import { ErrorCode, InfrastructureError } from '../../../contracts/types/errors.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema
 const PrepareClusterInputRaw = z.object({
@@ -27,7 +27,7 @@ const PrepareClusterInput = PrepareClusterInputRaw.transform((data) => {
 
   return {
     sessionId,
-    clusterContext: data.cluster_context ?? data.clusterContext || 'default',
+    clusterContext: data.cluster_context ?? (data.clusterContext || 'default'),
     namespace: data.namespace,
     dryRun: data.dry_run ?? data.dryRun ?? false,
     validateOnly: data.validate_only ?? data.validateOnly ?? false

@@ -3,8 +3,8 @@
  */
 
 import type { Logger } from 'pino';
-import { AIClient } from '../infrastructure/ai-client';
-import type { MCPSampler } from '../application/interfaces';
+import { AIClient } from '../infrastructure/ai-client.js';
+import type { MCPSampler } from '../application/interfaces.js';
 
 export interface AIConfig {
   modelPreferences?: {

@@ -4,7 +4,7 @@
  */
 
 import { createHash } from 'crypto';
-import type { AIRequest } from '../ai-request-builder';
+import type { AIRequest } from '../ai-request-builder.js';
 
 /**
  * Options for cache key generation
@@ -196,7 +196,7 @@ export class CacheKeyGenerator {
     totalKeys: number;
     uniqueNormalizedKeys: number;
     averageKeysPerNormalized: number;
-    } {
+  } {
     const totalKeys = Array.from(this.keyRegistry.values()).reduce(
       (sum, keys) => sum + keys.size,
       0
@@ -259,7 +259,7 @@ export class CacheKeyGenerator {
    */
   private hashContext(context?: Record<string, any>): string {
     if (!context || Object.keys(context).length === 0) {
-      return ';'
+      return ';';
     }
 
     const filtered = this.filterContext(context);
@@ -287,7 +287,7 @@ export class CacheKeyGenerator {
     }
 
     if (Object.keys(params).length === 0) {
-      return ';'
+      return ';';
     }
 
     return createHash('md5').update(JSON.stringify(params)).digest('hex').substring(0, 8);
@@ -416,8 +416,8 @@ export class CacheKeyGenerator {
    */
   private extractTemplateId(request: AIRequest): string | undefined {
     return (
-      request.context?._templateId ?? request.context?._originalTemplate ||
-      request.context?.templateId
+      request.context?._templateId ??
+      (request.context?._originalTemplate || request.context?.templateId)
     );
   }
 

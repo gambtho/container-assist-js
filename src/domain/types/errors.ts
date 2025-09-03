@@ -117,11 +117,13 @@ export function isRetryable(error: DomainError): boolean {
   }
 
   // Connection errors are typically retryable
-  if ([
-    ErrorCode.DOCKER_CONNECTION,
-    ErrorCode.KUBERNETES_CONNECTION,
-    ErrorCode.AI_SERVICE_ERROR
-  ].includes(error.code)) {
+  if (
+    [
+      ErrorCode.DOCKER_CONNECTION,
+      ErrorCode.KUBERNETES_CONNECTION,
+      ErrorCode.AI_SERVICE_ERROR
+    ].includes(error.code)
+  ) {
     return true;
   }
 

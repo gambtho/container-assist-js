@@ -2,11 +2,12 @@
  * Session Service
  */
 
+import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
-import type { Session, WorkflowState } from '../contracts/types/index';
-import { InMemorySessionStore } from '../runtime/persistence/memory-store';
-import type { SessionStore } from '../contracts/types/session-store';
-import type { SessionService as ISessionService } from '../application/services/interfaces';
+import type { Session, WorkflowState } from '../contracts/types/index.js';
+import type { SessionFilter } from '../contracts/types/session-store.js';
+import { SessionStore } from '../infrastructure/session-store.js';
+import type { SessionService as ISessionService } from '../application/services/interfaces.js';
 
 export interface SessionConfig {
   storeType?: 'memory' | 'file';
@@ -37,8 +38,10 @@ export class SessionService implements ISessionService {
     this.logger = logger.child({ service: 'session' });
     this.ttl = config.ttl ?? DEFAULT_TTL;
 
-    // Use memory store
-    this.store = new InMemorySessionStore(this.logger);
+    this.store = new SessionStore(this.logger, {
+      defaultTtlMs: this.ttl * 1000,
+      maxSessions: 1000
+    });
   }
 
   async initialize(): Promise<void> {
@@ -47,9 +50,10 @@ export class SessionService implements ISessionService {
   }
 
   async create(data: Partial<Session>): Promise<Session> {
+    const id = data.id ?? randomUUID();
     const now = new Date().toISOString();
     const session: Session = {
-      id: data.id ?? uuidv4(),
+      id,
       version: data.version ?? 1,
       status: data.status ?? 'pending',
       repo_path: data.repo_path ?? '',
@@ -64,8 +68,8 @@ export class SessionService implements ISessionService {
       ...data
     };
 
-    await this.store.create(session);
-    this.logger.info({ sessionId: session.id }, 'Session created');
+    await this.store.set(id, session);
+    this.logger.info({ sessionId: id }, 'Session created');
     return session;
   }
 
@@ -86,26 +90,24 @@ export class SessionService implements ISessionService {
       updated_at: new Date().toISOString()
     };
 
-    await this.store.update(id, updated);
+    await this.store.set(id, updated);
     this.logger.info({ sessionId: id }, 'Session updated');
   }
 
   async updateWorkflowState(id: string, state: Partial<WorkflowState>): Promise<Session> {
-    const session = await this.store.get(id);
-    if (!session) {
+    const updatedSession = await this.store.update(id, (session) => ({
+      workflow_state: {
+        ...session.workflow_state,
+        ...state
+      },
+      updated_at: new Date().toISOString()
+    }));
+
+    if (!updatedSession) {
       throw new Error('Session not found');
     }
 
-    const updatedState = {
-      ...session.workflow_state,
-      ...state
-    };
-
-    await this.update(id, { workflow_state: updatedState });
-    const updatedSession = await this.store.get(id);
-    if (!updatedSession) {
-      throw new Error('Failed to retrieve updated session');
-    }
+    this.logger.info({ sessionId: id }, 'Workflow state updated');
     return updatedSession;
   }
 

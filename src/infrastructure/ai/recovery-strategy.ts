@@ -3,7 +3,7 @@
  * Defines interfaces and base classes for pluggable error recovery strategies
  */
 
-import type { AIRequest } from '../ai-request-builder';
+import type { AIRequest } from '../ai-request-builder.js';
 import type { ErrorContext } from './error-context';
 
 /**
@@ -361,7 +361,8 @@ export class RecoveryCoordinator {
   ): string {
     // This would be strategy-specific, but provide a generic fallback
     return (
-      strategy.description ?? `Attempting to resolve ${context.errorType != null || 'unknown'} error`
+      strategy.description ??
+      `Attempting to resolve ${context.errorType != null || 'unknown'} error`
     );
   }
 

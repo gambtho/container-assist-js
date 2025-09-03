@@ -190,7 +190,7 @@ export class ContentValidator {
 
     patterns.set('password', {
       name: 'Password Detection',
-      pattern: /(?:password|passwd|pwd)\s*[:=]\s*["']?([^"'\s]{8,})["']?/gi,'
+      pattern: /(?:password|passwd|pwd)\s*[:=]\s*["']?([^"'\s]{8,})["']?/gi,
       message: 'Potential password exposed',
       severity: 'error'
     });
@@ -441,7 +441,7 @@ export class ContentValidator {
    */
   private validateShellSecurity(content: string, issues: SecurityIssue[]): void {
     // Check for unquoted variables
-    if (content.match(/\$[A-Z_][A-Z0-9_]*(?![A-Z0-9_"'])/)) {'
+    if (content.match(/\$[A-Z_][A-Z0-9_]*(?![A-Z0-9_"'])/)) {
       issues.push({
         type: 'vulnerability',
         severity: 'medium',

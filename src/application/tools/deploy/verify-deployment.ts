@@ -3,8 +3,8 @@
  */
 
 import { z } from 'zod';
-import { ErrorCode, DomainError } from '../../../contracts/types/index';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import { ErrorCode, DomainError } from '../../../contracts/types/index.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema
 const VerifyDeploymentInput = z
@@ -30,7 +30,7 @@ const VerifyDeploymentInput = z
     checkEndpoints: data.check_endpoints ?? data.checkEndpoints ?? true,
     checkPods: data.check_pods ?? data.checkPods ?? true,
     timeout: data.timeout,
-    minReadyPods: data.min_ready_pods ?? data.minReadyPods || 1
+    minReadyPods: data.min_ready_pods ?? (data.minReadyPods || 1)
   }));
 
 // Output schema

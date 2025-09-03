@@ -4,11 +4,11 @@
 
 import { z } from 'zod';
 import path from 'node:path';
-import { DockerBuildOptions, DockerBuildResult } from '../../../contracts/types/index';
-import { executeWithRetry } from '../error-recovery';
-import { ValidationError, NotFoundError } from '../../../errors/index';
-// import { SimpleProgressTracker } from '../../workflow/progress''; // Unused'
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import { DockerBuildOptions, DockerBuildResult } from '../../../contracts/types/index.js';
+import { executeWithRetry } from '../error-recovery.js';
+import { ValidationError, NotFoundError } from '../../../errors/index.js';
+// import { SimpleProgressTracker } from '../../workflow/progress.js''; // Unused'
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema with support for both snake_case and camelCase
 const BuildImageInput = z
@@ -34,11 +34,11 @@ const BuildImageInput = z
     pull: z.boolean().default(true)
   })
   .transform((data) => ({
-    sessionId: data.session_id ?? data.sessionId || '',
+    sessionId: data.session_id ?? (data.sessionId || ''),
     context: data.buildContext ?? data.context,
     dockerfile: data.dockerfilePath ?? data.dockerfile,
     tags: data.tags ?? (data.tag ? [data.tag] : []),
-    buildArgs: data.build_args ?? data.buildArgs || {},
+    buildArgs: data.build_args ?? (data.buildArgs || {}),
     target: data.target,
     noCache: data.no_cache ?? data.noCache ?? false,
     platform: data.platform ?? (data.platforms ? data.platforms.join(',') : undefined),
@@ -86,7 +86,10 @@ async function fileExists(path: string): Promise<boolean> {
 /**
  * Prepare build arguments with defaults
  */
-function prepareBuildArgs(buildArgs: Record<string, string>, session: unknown): Record<string, string> {
+function prepareBuildArgs(
+  buildArgs: Record<string, string>,
+  session: unknown
+): Record<string, string> {
   const defaults: Record<string, string> = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',
     BUILD_DATE: new Date().toISOString(),
@@ -356,7 +359,7 @@ const buildImageHandler: MCPToolDescriptor<BuildInput, BuildOutput> = {
             size: buildResult.size ?? 0,
             layers: Array.isArray(buildResult.layers)
               ? buildResult.layers.length
-              : buildResult.layers ?? 0,
+              : (buildResult.layers ?? 0),
             buildTime,
             logs: buildResult.logs ?? [],
             success: buildResult.success ?? true

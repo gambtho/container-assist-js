@@ -4,7 +4,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { AIRequest } from '../ai-request-builder';
+import type { AIRequest } from '../ai-request-builder.js';
 
 /**
  * Response from the MCP sampler
@@ -229,7 +229,10 @@ export class MCPSamplerFactory {
   /**
    * Create an MCP sampler based on configuration
    */
-  static create(config: { legacySampler?: LegacySampler; useMock?: boolean }, logger: Logger): MCPSampler {
+  static create(
+    config: { legacySampler?: LegacySampler; useMock?: boolean },
+    logger: Logger
+  ): MCPSampler {
     // If a legacy sampler is provided, wrap it
     if (config.legacySampler != null) {
       return new LegacyMCPSamplerAdapter(config.legacySampler, logger);
@@ -248,4 +251,4 @@ export class MCPSamplerFactory {
 }
 
 // Re-export types for convenience
-export type { AIRequest } from '../ai-request-builder';
+export type { AIRequest } from '../ai-request-builder.js';

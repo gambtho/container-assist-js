@@ -301,7 +301,7 @@ export function exportJsonSchema(schema: z.ZodSchema): Record<string, unknown> {
       properties[key] = { type: 'object' };
     }
 
-    if (!(value as unknown).isOptional()) {
+    if (!value.isOptional()) {
       required.push(key);
     }
   }

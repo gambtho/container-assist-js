@@ -5,11 +5,11 @@
 import { z } from 'zod';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
-import { ErrorCode, DomainError, KubernetesManifest } from '../../../contracts/types/index';
-import { executeWithRecovery } from '../error-recovery';
-import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder';
-import { getEnhancedAIService } from '../ai-migration-helper';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
+import { ErrorCode, DomainError, KubernetesManifest } from '../../../contracts/types/index.js';
+import { executeWithRecovery } from '../error-recovery.js';
+import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
+import { getEnhancedAIService } from '../ai-migration-helper.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
 
 // Input schema with support for both snake_case and camelCase
 const GenerateKubernetesManifestsInput = z
@@ -149,39 +149,40 @@ function generateDeployment(input: KubernetesManifestsInput): KubernetesManifest
             {
               name: appName,
               image,
-              ports: port != null
-                ? [
-                  {
-                    containerPort: port,
-                    name: 'http',
-                    protocol: 'TCP'
-                  }
-                ]
-                : [],
+              ports:
+                port != null
+                  ? [
+                      {
+                        containerPort: port,
+                        name: 'http',
+                        protocol: 'TCP'
+                      }
+                    ]
+                  : [],
               resources,
               livenessProbe: port
                 ? {
-                  httpGet: {
-                    path: healthCheckPath,
-                    port: 'http'
-                  },
-                  initialDelaySeconds: 30,
-                  periodSeconds: 10,
-                  timeoutSeconds: 5,
-                  failureThreshold: 3
-                }
+                    httpGet: {
+                      path: healthCheckPath,
+                      port: 'http'
+                    },
+                    initialDelaySeconds: 30,
+                    periodSeconds: 10,
+                    timeoutSeconds: 5,
+                    failureThreshold: 3
+                  }
                 : undefined,
               readinessProbe: port
                 ? {
-                  httpGet: {
-                    path: healthCheckPath,
-                    port: 'http'
-                  },
-                  initialDelaySeconds: 5,
-                  periodSeconds: 5,
-                  timeoutSeconds: 3,
-                  failureThreshold: 3
-                }
+                    httpGet: {
+                      path: healthCheckPath,
+                      port: 'http'
+                    },
+                    initialDelaySeconds: 5,
+                    periodSeconds: 5,
+                    timeoutSeconds: 3,
+                    failureThreshold: 3
+                  }
                 : undefined,
               env: [
                 ...Object.entries(input.configMap).map(([key, _value]) => ({
@@ -254,13 +255,13 @@ function generateService(input: KubernetesManifestsInput): KubernetesManifest {
       },
       ports: port
         ? [
-          {
-            port,
-            targetPort: 'http',
-            protocol: 'TCP',
-            name: 'http'
-          }
-        ]
+            {
+              port,
+              targetPort: 'http',
+              protocol: 'TCP',
+              name: 'http'
+            }
+          ]
         : [],
       sessionAffinity: 'None'
     }
@@ -334,7 +335,7 @@ function generateSecret(input: KubernetesManifestsInput): KubernetesManifest | n
 function generateIngress(input: KubernetesManifestsInput): KubernetesManifest | null {
   const { appName, namespace, port, ingressEnabled, ingressHost } = input;
 
-  if (!ingressEnabled ?? !ingressHost || !port) {
+  if (!ingressEnabled ?? (!ingressHost || !port)) {
     return null;
   }
 

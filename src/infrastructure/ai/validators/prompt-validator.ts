@@ -1,4 +1,4 @@
-import { TokenEstimator } from '../context/context-manager';
+import { TokenEstimator } from '../context/context-manager.js';
 
 export interface PromptValidationResult {
   valid: boolean;
@@ -21,10 +21,12 @@ export interface OptimizationSuggestion {
   description: string;
   impact: 'low' | 'medium' | 'high';
   example?: string;
+}
 
 export interface PromptPair {
   system: string;
   user: string;
+}
 
 export class PromptValidator {
   private maxSystemPromptTokens = 600;
@@ -122,7 +124,7 @@ export class PromptValidator {
     }
 
     if (userTokens > this.maxUserPromptTokens) {
-      errors.push(`User prompt too long: ${userTokens} tokens (max: ${this.maxUserPromptTokens})`);`
+      errors.push(`User prompt too long: ${userTokens} tokens (max: ${this.maxUserPromptTokens})`);
       suggestions.push({
         type: 'token_reduction',
         description: 'User prompt exceeds recommended length',
@@ -176,7 +178,7 @@ export class PromptValidator {
   } {
     const warnings: string[] = [];
     const suggestions: OptimizationSuggestion[] = [];
-    const combined = `${prompt.system} ${prompt.user};
+    const combined = `${prompt.system} ${prompt.user}`;
 
     // Check for inefficient patterns
     for (const [name, config] of this.inefficientPatterns) {
@@ -185,9 +187,9 @@ export class PromptValidator {
         const severity = config.severity as 'low' | 'medium' | 'high';
 
         if (matches.length > 5 && severity === 'low') {
-          warnings.push(`Excessive use of ${name}: ${matches.length} instances`);`
+          warnings.push(`Excessive use of ${name}: ${matches.length} instances`);
         } else if (matches.length > 2 && severity === 'medium') {
-          warnings.push(`Multiple instances of ${name}: ${matches.length} found`);`
+          warnings.push(`Multiple instances of ${name}: ${matches.length} found`);
         }
 
         suggestions.push({
@@ -222,12 +224,12 @@ export class PromptValidator {
   } {
     const warnings: string[] = [];
     const suggestions: OptimizationSuggestion[] = [];
-    const combined = `${prompt.system} ${prompt.user};
+    const combined = `${prompt.system} ${prompt.user}`;
 
     for (const [issue, config] of this.clarityIssues) {
       const matches = combined.match(config.pattern);
       if (matches && matches.length > 0) {
-        warnings.push(`${issue.replace('_', ' ')} detected: ${matches.length} instances`);`
+        warnings.push(`${issue.replace('_', ' ')} detected: ${matches.length} instances`);
         suggestions.push({
           type: 'clarity',
           description: this.getClarityMessage(issue),
@@ -240,7 +242,7 @@ export class PromptValidator {
     // Check sentence complexity
     const avgSentenceLength = this.calculateAverageSentenceLength(combined);
     if (avgSentenceLength > 25) {
-      warnings.push(`Average sentence length is high (${Math.round(avgSentenceLength)} words)`);`
+      warnings.push(`Average sentence length is high (${Math.round(avgSentenceLength)} words)`);
       suggestions.push({
         type: 'clarity',
         description: 'Break down long sentences for better clarity',
@@ -313,9 +315,9 @@ export class PromptValidator {
     }
 
     // Check for phrase repetition
-    const phraseRepetition = this.findRepeatedPhrases(`${prompt.system} ${prompt.user}`);`
+    const phraseRepetition = this.findRepeatedPhrases(`${prompt.system} ${prompt.user}`);
     if (phraseRepetition.length > 0) {
-      warnings.push(`Repeated phrases detected: ${phraseRepetition.length}`);`
+      warnings.push(`Repeated phrases detected: ${phraseRepetition.length}`);
       suggestions.push({
         type: 'redundancy',
         description: 'Remove or consolidate repeated phrases',
@@ -374,7 +376,7 @@ export class PromptValidator {
   ): { score: number; issues: string[] } {
     let score = 100;
     const issues: string[] = [];
-    const combined = `${prompt.system} ${prompt.user};
+    const combined = `${prompt.system} ${prompt.user}`;
 
     // Token efficiency (30% of score)
     const totalTokens = this.tokenEstimator.estimate(combined);
@@ -384,7 +386,7 @@ export class PromptValidator {
         ((totalTokens - this.maxTotalTokens) / this.maxTotalTokens) * 30
       );
       score -= penalty;
-      issues.push(`Token count exceeds recommendations (${totalTokens} tokens)`);`
+      issues.push(`Token count exceeds recommendations (${totalTokens} tokens)`);
     }
 
     // Redundancy penalty (25% of score)
@@ -392,7 +394,7 @@ export class PromptValidator {
     if (redundancySuggestions.length > 0) {
       const penalty = Math.min(25, redundancySuggestions.length * 8);
       score -= penalty;
-      issues.push(`Redundancy detected (${redundancySuggestions.length} issues)`);`
+      issues.push(`Redundancy detected (${redundancySuggestions.length} issues)`);
     }
 
     // Clarity penalty (25% of score)
@@ -400,7 +402,7 @@ export class PromptValidator {
     if (claritySuggestions.length > 0) {
       const penalty = Math.min(25, claritySuggestions.length * 6);
       score -= penalty;
-      issues.push(`Clarity issues detected (${claritySuggestions.length} issues)`);`
+      issues.push(`Clarity issues detected (${claritySuggestions.length} issues)`);
     }
 
     // Structure penalty (20% of score)
@@ -408,7 +410,7 @@ export class PromptValidator {
     if (structureSuggestions.length > 0) {
       const penalty = Math.min(20, structureSuggestions.length * 10);
       score -= penalty;
-      issues.push(`Structure improvements needed (${structureSuggestions.length} issues)`);`
+      issues.push(`Structure improvements needed (${structureSuggestions.length} issues)`);
     }
 
     return {
@@ -432,7 +434,7 @@ export class PromptValidator {
       .sort(([_, a], [__, b]) => b - a);
 
     const score = uniqueWords / totalWords;
-    const topRepeated = repeatedWords.slice(0, 5).map(([word, count]) => `${word}(${count})`);`
+    const topRepeated = repeatedWords.slice(0, 5).map(([word, count]) => `${word}(${count})`);
 
     return { score, topRepeated };
   }
@@ -522,7 +524,7 @@ export class PromptValidator {
       excessive_examples: 'Limit to 1-2 concise examples',
       filler_words: '"basically just generate" → "generate"'
     };
-    return examples[patternName] || ';'
+    return examples[patternName] || ';';
   }
 
   private getClarityMessage(issue: string): string {
@@ -538,11 +540,11 @@ export class PromptValidator {
   private getClarityExample(issue: string): string {
     const examples: Record<string, string> = {
       vague_instructions: '"something like" → "specifically", "various ways" → "using X, Y, Z"',
-      double_negatives: '"don\'t not include" → "include"','
+      double_negatives: '"don\'t not include" → "include"',
       passive_voice: '"should be generated" → "generate"',
       complex_sentences: 'Split sentences at conjunctions'
     };
-    return examples[issue] || ';'
+    return examples[issue] || ';';
   }
 
   // Quick validation for simple cases
@@ -571,7 +573,9 @@ export class PromptValidator {
       maxTotalTokens: number;
     }>
   ) {
-    if (config.maxSystemPromptTokens != null) this.maxSystemPromptTokens = config.maxSystemPromptTokens;
+    if (config.maxSystemPromptTokens != null)
+      this.maxSystemPromptTokens = config.maxSystemPromptTokens;
     if (config.maxUserPromptTokens != null) this.maxUserPromptTokens = config.maxUserPromptTokens;
     if (config.maxTotalTokens != null) this.maxTotalTokens = config.maxTotalTokens;
   }
+}

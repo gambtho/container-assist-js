@@ -4,7 +4,6 @@
 
 import { z } from 'zod';
 
-// .NET Project Type
 export const DotNetProjectTypeSchema = z.object({
   primary: z.enum(['web', 'console', 'library', 'desktop', 'service', 'blazor']),
   framework: z.enum(['aspnetcore', 'mvc', 'webapi', 'blazor', 'wpf', 'winforms', 'worker']),
@@ -14,7 +13,6 @@ export const DotNetProjectTypeSchema = z.object({
 
 export type DotNetProjectType = z.infer<typeof DotNetProjectTypeSchema>;
 
-// .NET Build System
 export const DotNetBuildSystemSchema = z.object({
   sdk_style: z.boolean(),
   package_management: z.enum(['packagereference', 'packagesconfig', 'paket']),
@@ -24,7 +22,6 @@ export const DotNetBuildSystemSchema = z.object({
 
 export type DotNetBuildSystem = z.infer<typeof DotNetBuildSystemSchema>;
 
-// .NET Dependencies
 export const DotNetDependenciesSchema = z.object({
   nuget_packages: z.array(z.string()),
   framework_dependencies: z.array(z.string()),
@@ -35,7 +32,6 @@ export const DotNetDependenciesSchema = z.object({
 
 export type DotNetDependencies = z.infer<typeof DotNetDependenciesSchema>;
 
-// Application Characteristics
 export const ApplicationCharacteristicsSchema = z.object({
   startup_type: z.enum(['fast', 'slow', 'lazy']),
   memory_profile: z.enum(['low', 'medium', 'high']),
@@ -47,7 +43,6 @@ export const ApplicationCharacteristicsSchema = z.object({
 
 export type ApplicationCharacteristics = z.infer<typeof ApplicationCharacteristicsSchema>;
 
-// Runtime Optimizations
 export const RuntimeOptimizationsSchema = z.object({
   gc_settings: z.string(),
   runtime_config: z.string(),
@@ -56,7 +51,6 @@ export const RuntimeOptimizationsSchema = z.object({
 
 export type RuntimeOptimizations = z.infer<typeof RuntimeOptimizationsSchema>;
 
-// Containerization Recommendations
 export const ContainerizationRecommendationsSchema = z.object({
   base_image_preferences: z.array(z.string()),
   runtime_optimizations: RuntimeOptimizationsSchema,
@@ -67,7 +61,6 @@ export const ContainerizationRecommendationsSchema = z.object({
 
 export type ContainerizationRecommendations = z.infer<typeof ContainerizationRecommendationsSchema>;
 
-// Security Considerations
 export const SecurityConsiderationsSchema = z.object({
   dotnet_security: z.array(z.string()),
   dependency_security: z.array(z.string()),
@@ -77,7 +70,6 @@ export const SecurityConsiderationsSchema = z.object({
 
 export type SecurityConsiderations = z.infer<typeof SecurityConsiderationsSchema>;
 
-// Performance Optimizations
 export const PerformanceOptimizationsSchema = z.object({
   build_time: z.array(z.string()),
   startup_time: z.array(z.string()),
@@ -87,7 +79,6 @@ export const PerformanceOptimizationsSchema = z.object({
 
 export type PerformanceOptimizations = z.infer<typeof PerformanceOptimizationsSchema>;
 
-// Cloud Native Features
 export const CloudNativeFeaturesSchema = z.object({
   configuration: z.array(z.string()),
   logging: z.array(z.string()),
@@ -98,7 +89,6 @@ export const CloudNativeFeaturesSchema = z.object({
 
 export type CloudNativeFeatures = z.infer<typeof CloudNativeFeaturesSchema>;
 
-// Migration Recommendations
 export const MigrationRecommendationsSchema = z.object({
   framework_migration: z.string(),
   modernization_opportunities: z.array(z.string()),
@@ -107,7 +97,6 @@ export const MigrationRecommendationsSchema = z.object({
 
 export type MigrationRecommendations = z.infer<typeof MigrationRecommendationsSchema>;
 
-// Complete .NET Analysis
 export const DotNetAnalysisSchema = z.object({
   dotnet_version: z.string(),
   target_framework: z.enum(['net6.0', 'net7.0', 'net8.0', 'netframework4.8']),

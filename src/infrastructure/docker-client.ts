@@ -4,14 +4,14 @@
  */
 
 import Docker from 'dockerode';
-import { DockerError } from '../errors/index';
+import { DockerError } from '../errors/index.js';
 import type { Logger } from 'pino';
 import {
   DockerBuildOptions,
   DockerBuildResult,
   DockerScanResult,
   ScanOptions
-} from '../contracts/types/index';
+} from '../contracts/types/index.js';
 
 interface DockerSystemInfo {
   os?: string;
@@ -113,7 +113,7 @@ export class DockerClient {
       // Prepare build options
       const buildOptions: Docker.BuildImageOptions = {
         t: options.tags?.[0] || options.tag,
-        dockerfile: options.dockerfile ?? options.dockerfilePath || 'Dockerfile',
+        dockerfile: options.dockerfile ?? (options.dockerfilePath || 'Dockerfile'),
         buildargs: options.buildArgs,
         target: options.target,
         nocache: options.noCache,

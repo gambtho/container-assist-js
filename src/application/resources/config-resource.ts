@@ -4,7 +4,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { ApplicationConfig } from '../../config/index';
+import type { ApplicationConfig } from '../../config/index.js';
 
 export class ConfigResourceProvider {
   constructor(
@@ -183,7 +183,7 @@ export class ConfigResourceProvider {
               paths: {
                 cwd: process.cwd(),
                 home: process.env.HOME ?? process.env.USERPROFILE,
-                temp: process.env.TMPDIR ?? process.env.TEMP || '/tmp'
+                temp: process.env.TMPDIR ?? process.env.TEMP ?? '/tmp'
               },
               memory: {
                 rss: process.memoryUsage().rss,
@@ -246,7 +246,8 @@ export class ConfigResourceProvider {
             // Aggregate issues and warnings
             for (const check of Object.values(validation.checks)) {
               if (check.issues && check.issues.length > 0) validation.issues.push(...check.issues);
-              if (check.warnings && check.warnings.length > 0) validation.warnings.push(...check.warnings);
+              if (check.warnings && check.warnings.length > 0)
+                validation.warnings.push(...check.warnings);
               if (!check.valid) validation.valid = false;
             }
 
@@ -292,11 +293,14 @@ export class ConfigResourceProvider {
     const sensitiveKeys = ['password', 'token', 'secret', 'key', 'credential', 'auth'];
 
     const removeSensitive = (obj: unknown): void => {
-      for (const key in obj) {
+      if (typeof obj !== 'object' || obj === null) return;
+
+      const record = obj as Record<string, any>;
+      for (const key in record) {
         if (sensitiveKeys.some((k) => key.toLowerCase().includes(k))) {
-          obj[key] = '[REDACTED]';
-        } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-          removeSensitive(obj[key]);
+          record[key] = '[REDACTED]';
+        } else if (typeof record[key] === 'object' && record[key] !== null) {
+          removeSensitive(record[key]);
         }
       }
     };
@@ -318,7 +322,8 @@ export class ConfigResourceProvider {
     }
 
     if (
-      !this.config.server.port ?? this.config.server.port < 1 ||
+      !this.config.server.port ||
+      this.config.server.port < 1 ||
       this.config.server.port > 65535
     ) {
       warnings.push('Server port is not configured or invalid, using default');
@@ -350,7 +355,7 @@ export class ConfigResourceProvider {
     valid: boolean;
     issues?: string[];
     warnings?: string[];
-    } {
+  } {
     const issues: string[] = [];
     const warnings: string[] = [];
 

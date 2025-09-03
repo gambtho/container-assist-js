@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { CoreServices } from '../services/interfaces';
+import type { CoreServices } from '../services/interfaces.js';
 import type { SimpleToolConfig } from './simple-config';
 
 /**

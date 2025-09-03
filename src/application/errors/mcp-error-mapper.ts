@@ -3,15 +3,18 @@
  * Consolidates domain errors and application errors into proper MCP SDK responses
  */
 
-import { McpError } from '@modelcontextprotocol/sdk/types';
+/**
+ * MCP Error structure for protocol compliance
+ */
+export interface MCPError {
+  code: number;
+  message: string;
+  data?: unknown;
+}
 
-// Type assertion for McpError constructor to fix unsafe construction warnings
-const createMcpError = (code: number, message: string, data?: unknown): McpError => {
-  return new (McpError as unknown as new (
-    code: number,
-    message: string,
-    data?: unknown
-  ) => McpError)(code, message, data);
+// Create MCP-compatible error objects
+const createMcpError = (code: number, message: string, data?: unknown): MCPError => {
+  return { code, message, data };
 };
 
 // Define MCP error codes as constants to avoid 'any' type issues from SDK
@@ -23,14 +26,14 @@ const MCPErrorCode = {
   MethodNotFound: -32601
 } as const;
 
-type MCPErrorCodeType = typeof MCPErrorCode[keyof typeof MCPErrorCode];
+type MCPErrorCodeType = (typeof MCPErrorCode)[keyof typeof MCPErrorCode];
 import {
   ErrorCode as DomainErrorCode,
   DomainError,
   InfrastructureError,
   ServiceError
-} from '../../contracts/types/errors';
-import { ApplicationError } from '../../errors/index';
+} from '../../contracts/types/errors.js';
+import { ApplicationError } from '../../errors/index.js';
 
 /**
  * Mapping from domain error codes to MCP SDK error codes
@@ -99,7 +102,7 @@ export const ERROR_CODE_MAPPING: Record<DomainErrorCode, MCPErrorCodeType> = {
 /**
  * Convert domain error to MCP Error
  */
-export function toMcpError(error: DomainError): McpError {
+export function toMcpError(error: DomainError): MCPError {
   const mcpCode = ERROR_CODE_MAPPING[error.code] || MCPErrorCode.InternalError;
 
   return createMcpError(mcpCode, error.message, {
@@ -108,9 +111,9 @@ export function toMcpError(error: DomainError): McpError {
     timestamp: new Date().toISOString(),
     cause: error.cause
       ? {
-        name: error.cause.name,
-        message: error.cause.message
-      }
+          name: error.cause.name,
+          message: error.cause.message
+        }
       : undefined
   });
 }
@@ -118,7 +121,7 @@ export function toMcpError(error: DomainError): McpError {
 /**
  * Convert infrastructure error to MCP Error
  */
-export function infrastructureErrorToMcp(error: InfrastructureError): McpError {
+export function infrastructureErrorToMcp(error: InfrastructureError): MCPError {
   const mcpCode = ERROR_CODE_MAPPING[error.code] || MCPErrorCode.InternalError;
 
   return createMcpError(mcpCode, error.message, {
@@ -128,9 +131,9 @@ export function infrastructureErrorToMcp(error: InfrastructureError): McpError {
     timestamp: new Date().toISOString(),
     cause: error.cause
       ? {
-        name: error.cause.name,
-        message: error.cause.message
-      }
+          name: error.cause.name,
+          message: error.cause.message
+        }
       : undefined
   });
 }
@@ -138,7 +141,7 @@ export function infrastructureErrorToMcp(error: InfrastructureError): McpError {
 /**
  * Convert service error to MCP Error
  */
-export function serviceErrorToMcp(error: ServiceError): McpError {
+export function serviceErrorToMcp(error: ServiceError): MCPError {
   const mcpCode = ERROR_CODE_MAPPING[error.code] || MCPErrorCode.InternalError;
 
   return createMcpError(mcpCode, error.message, {
@@ -148,9 +151,9 @@ export function serviceErrorToMcp(error: ServiceError): McpError {
     timestamp: new Date().toISOString(),
     cause: error.cause
       ? {
-        name: error.cause.name,
-        message: error.cause.message
-      }
+          name: error.cause.name,
+          message: error.cause.message
+        }
       : undefined
   });
 }
@@ -158,7 +161,7 @@ export function serviceErrorToMcp(error: ServiceError): McpError {
 /**
  * Convert application error to MCP Error (from legacy error system)
  */
-export function applicationErrorToMcp(error: ApplicationError): McpError {
+export function applicationErrorToMcp(error: ApplicationError): MCPError {
   // Map application error codes to domain error codes where possible
   const domainCode = mapApplicationCodeToDomain(error.code);
   const mcpCode = domainCode != null ? ERROR_CODE_MAPPING[domainCode] : MCPErrorCode.InternalError;
@@ -197,10 +200,10 @@ function mapApplicationCodeToDomain(appCode: string): DomainErrorCode | null {
 /**
  * Universal error converter - handles any error type and converts to McpError
  */
-export function convertToMcpError(error: unknown): McpError {
+export function convertToMcpError(error: unknown): MCPError {
   // Handle already converted MCP errors
-  if (error instanceof McpError) {
-    return error;
+  if (typeof error === 'object' && error != null && 'code' in error && 'message' in error) {
+    return error as MCPError;
   }
 
   // Handle our typed errors
@@ -224,7 +227,7 @@ export function convertToMcpError(error: unknown): McpError {
   if (error instanceof Error) {
     // Try to categorize based on message content
     const message = error.message.toLowerCase();
-    let code = MCPErrorCode.InternalError;
+    let code: MCPErrorCodeType = MCPErrorCode.InternalError;
     let domainCode = DomainErrorCode.UnknownError;
 
     if (message.includes('validation') || message.includes('invalid')) {
@@ -267,7 +270,7 @@ export function convertToMcpError(error: unknown): McpError {
 /**
  * Check if an error is retryable based on its type and code
  */
-export function isRetryableError(error: McpError): boolean {
+export function isRetryableError(error: MCPError): boolean {
   const details = (error as { data?: { code?: DomainErrorCode } }).data;
   const code = details?.code;
 
@@ -289,7 +292,7 @@ export function isRetryableError(error: McpError): boolean {
 /**
  * Get error severity level
  */
-export function getErrorSeverity(error: McpError): 'low' | 'medium' | 'high' | 'critical' {
+export function getErrorSeverity(error: MCPError): 'low' | 'medium' | 'high' | 'critical' {
   const details = (error as { data?: { code?: DomainErrorCode } }).data;
   const code = details?.code;
 

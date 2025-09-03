@@ -5,7 +5,7 @@
 
 // import type { Server } from '@modelcontextprotocol/sdk/server/index';
 import type { Logger } from 'pino';
-import type { SessionService } from '../../services/session';
+import type { SessionService } from '../../services/session.js';
 
 export class WorkflowResourceProvider {
   constructor(

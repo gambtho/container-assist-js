@@ -4,10 +4,11 @@
 
 import { z } from 'zod';
 import * as path from 'node:path';
-import { ErrorCode, DomainError } from '../../../contracts/types/errors';
-import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder';
-import type { MCPToolDescriptor, MCPToolContext } from '../tool-types';
-import type { AnalysisResult } from '../../../contracts/types/session';
+import { promises as fs } from 'node:fs';
+import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
+import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
+import type { MCPToolDescriptor, MCPToolContext } from '../tool-types.js';
+import type { AnalysisResult } from '../../../contracts/types/session.js';
 
 interface DockerfileStage {
   name: string;
@@ -46,8 +47,8 @@ const GenerateDockerfileInput = z
     forceRegenerate: z.boolean().optional()
   })
   .transform((data) => ({
-    sessionId: data.session_id ?? data.sessionId || '',
-    targetPath: data.target_path ?? data.targetPath || './Dockerfile',
+    sessionId: data.session_id ?? (data.sessionId || ''),
+    targetPath: data.target_path ?? (data.targetPath || './Dockerfile'),
     baseImage: data.base_image ?? data.baseImage ?? undefined,
     optimization: data.optimization,
     multistage: data.multistage,
@@ -55,7 +56,7 @@ const GenerateDockerfileInput = z
     securityHardening: data.security_hardening,
     includeHealthcheck: data.include_healthcheck ?? data.includeHealthcheck ?? true,
     includeSecurityScanning: data.include_security_scanning ?? data.includeSecurityScanning ?? true,
-    customCommands: data.custom_commands ?? data.customCommands || [],
+    customCommands: data.custom_commands ?? (data.customCommands || []),
     customInstructions: data.custom_instructions ?? data.customInstructions ?? undefined,
     forceRegenerate: data.force_regenerate ?? data.forceRegenerate ?? false
   }));
@@ -75,13 +76,15 @@ const GenerateDockerfileOutput = z.object({
   ),
   optimizations: z.array(z.string()),
   warnings: z.array(z.string()).optional(),
-  metadata: z.object({
-    estimatedSize: z.string().optional(),
-    layers: z.number().optional(),
-    securityFeatures: z.array(z.string()).optional(),
-    buildTime: z.string().optional(),
-    generated: z.string()
-  }).optional()
+  metadata: z
+    .object({
+      estimatedSize: z.string().optional(),
+      layers: z.number().optional(),
+      securityFeatures: z.array(z.string()).optional(),
+      buildTime: z.string().optional(),
+      generated: z.string()
+    })
+    .optional()
 });
 
 // Type aliases
@@ -252,9 +255,9 @@ async function generateDockerfileContent(
   }
 
   if (options.optimizeSize) {
-    await optimizations.push('Multi-stage build for smaller image');
-    await optimizations.push('Alpine base images where possible');
-    await optimizations.push('Combined RUN commands to reduce layers');
+    optimizations.push('Multi-stage build for smaller image');
+    optimizations.push('Alpine base images where possible');
+    optimizations.push('Combined RUN commands to reduce layers');
   }
 
   if (options.securityHardening) {
@@ -300,7 +303,7 @@ ${options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}`;
   while ((match = stageRegex.exec(content)) !== null) {
     const baseImage = match[0].split(' ')[1];
     if (match[1] && baseImage) {
-      await stages.push({
+      stages.push({
         name: match[1],
         baseImage,
         purpose: match[1] === 'builder' ? 'Build dependencies and compile' : 'Runtime environment'
@@ -312,7 +315,7 @@ ${options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}`;
   if (stages.length === 0) {
     const finalFrom = content.match(/FROM ([\w:.-]+)/);
     if (finalFrom?.[1]) {
-      await stages.push({
+      stages.push({
         name: 'runtime',
         baseImage: finalFrom[1],
         purpose: 'Single-stage runtime'
@@ -321,6 +324,7 @@ ${options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}`;
   }
 
   return { content, stages, optimizations };
+}
 
 /**
  * Generate optimized Dockerfile based on analysis and options
@@ -398,6 +402,7 @@ ${options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}
   dockerfile += getStartCommand(analysis);
 
   return dockerfile;
+}
 
 /**
  * Get build commands for different languages
@@ -439,6 +444,7 @@ function getBuildCommands(analysis: AnalysisResult, stage: 'build' | 'runtime' |
   }
 
   return 'COPY --chown=appuser:appuser . .\n';
+}
 
 /**
  * Get start command based on language/framework
@@ -463,6 +469,7 @@ function getStartCommand(analysis: AnalysisResult): string {
   }
 
   return 'CMD ["echo", "No start command defined"]';
+}
 
 /**
  * Get recommended base image for language
@@ -480,6 +487,7 @@ function getRecommendedBaseImage(language: string): string {
   };
 
   return imageMap[language] || 'alpine:latest';
+}
 
 /**
  * Analyze Dockerfile for security issues
@@ -489,17 +497,17 @@ function analyzeDockerfileSecurity(content: string): string[] {
 
   // Check for running as root
   if (!content.includes('USER ') || content.includes('USER root')) {
-    await warnings.push('Container runs as root user - consider adding a non-root user');
+    warnings.push('Container runs as root user - consider adding a non-root user');
   }
 
   // Check for latest tags
   if (content.includes(':latest')) {
-    await warnings.push('Using :latest tag - consider pinning to specific versions');
+    warnings.push('Using :latest tag - consider pinning to specific versions');
   }
 
   // Check for sudo usage
   if (content.includes('sudo ')) {
-    await warnings.push('Avoid using sudo in containers');
+    warnings.push('Avoid using sudo in containers');
   }
 
   // Check for exposed sensitive ports
@@ -512,14 +520,15 @@ function analyzeDockerfileSecurity(content: string): string[] {
 
   // Check for package manager cleanup
   if (content.includes('apt-get install') && !content.includes('rm -rf /var/lib/apt/lists')) {
-    await warnings.push('Consider cleaning apt cache after installation');
+    warnings.push('Consider cleaning apt cache after installation');
   }
 
   if (content.includes('yum install') && !content.includes('yum clean all')) {
-    await warnings.push('Consider cleaning yum cache after installation');
+    warnings.push('Consider cleaning yum cache after installation');
   }
 
   return warnings;
+}
 
 /**
  * Estimate image size based on language and dependencies
@@ -548,6 +557,7 @@ function estimateImageSize(language: string, dependencies: string[], multistage:
   } else {
     return `~${Math.round(estimatedSize / 100) / 10}GB`;
   }
+}
 
 /**
  * Main handler implementation
@@ -605,7 +615,7 @@ const generateDockerfileHandler: MCPToolDescriptor<DockerfileInput, DockerfileOu
             success: true,
             dockerfile: existingContent,
             path: dockerfilePath,
-            baseImage: input.baseImage ?? analysis.recommendations?.baseImage || 'alpine:latest',
+            baseImage: input.baseImage ?? (analysis.recommendations?.baseImage || 'alpine:latest'),
             stages: [],
             optimizations: ['Using existing Dockerfile'],
             warnings: analyzeDockerfileSecurity(existingContent),
@@ -656,7 +666,7 @@ const generateDockerfileHandler: MCPToolDescriptor<DockerfileInput, DockerfileOu
       await fs.writeFile(dockerfilePath, content, 'utf-8');
 
       // Determine base image
-      const baseImage = input.baseImage ?? analysis.recommendations?.baseImage || 'alpine:latest';
+      const baseImage = input.baseImage ?? (analysis.recommendations?.baseImage || 'alpine:latest');
 
       // Estimate size
       const estimatedSize = estimateImageSize(
@@ -760,6 +770,7 @@ const generateDockerfileHandler: MCPToolDescriptor<DockerfileInput, DockerfileOu
       tags: [`app:${Date.now()}`]
     })
   }
+};
 
 // Default export for registry
 export default generateDockerfileHandler;
