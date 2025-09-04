@@ -408,11 +408,11 @@ export class AIResponseCache {
   private extractTemplateId(request: AIRequest): string {
     // Try to get from context first
     if (request.context?._originalTemplate) {
-      return request.context._originalTemplate;
+      return request.context._originalTemplate as string;
     }
 
     if (request.context?._templateId) {
-      return request.context._templateId;
+      return request.context._templateId as string;
     }
 
     // Try to infer from prompt content

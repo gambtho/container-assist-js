@@ -416,8 +416,8 @@ export class CacheKeyGenerator {
    */
   private extractTemplateId(request: AIRequest): string | undefined {
     return (
-      request.context?._templateId ??
-      (request.context?._originalTemplate || request.context?.templateId)
+      (request.context?._templateId as string) ??
+      ((request.context?._originalTemplate as string) || (request.context?.templateId as string))
     );
   }
 

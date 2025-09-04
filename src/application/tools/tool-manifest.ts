@@ -192,15 +192,6 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     implementationPath: 'ops/ping.ts',
   },
 
-  list_tools: {
-    name: 'list_tools',
-    status: ToolStatus.IMPLEMENTED,
-    category: 'utility',
-    description: 'Lists all available tools and their status',
-    requiredServices: [],
-    implementationPath: 'list-tools.ts',
-  },
-
   server_status: {
     name: 'server_status',
     status: ToolStatus.IMPLEMENTED,

@@ -73,7 +73,7 @@ MCP Tools Available:
   • Registry: tag_image, push_image
   • Deploy: generate_k8s_manifests, deploy_application
   • Orchestration: start_workflow, workflow_status
-  • Utilities: ping, list_tools, server_status
+  • Utilities: ping, server_status
 
 For detailed documentation, see: docs/tools/README.md
 For examples and tutorials, see: examples/README.md

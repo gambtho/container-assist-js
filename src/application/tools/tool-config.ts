@@ -72,12 +72,6 @@ export function getToolConfig(toolName: string): ToolConfig {
       category: 'utility',
     },
 
-    list_tools: {
-      name: 'list_tools',
-      description: 'List all available tools',
-      category: 'utility',
-    },
-
     server_status: {
       name: 'server_status',
       description: 'Get server status and health',

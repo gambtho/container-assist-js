@@ -10,10 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Complete JavaScript Implementation**: Full rewrite of Go MCP server in JavaScript/Node.js
 - **MCP Sampling Integration**: AI operations powered by MCP's sampling API (Claude Code, Copilot)
-- **15 MCP Tools**: All workflow, orchestration, and utility tools implemented
+- **14 MCP Tools**: All workflow, orchestration, and utility tools implemented
   - 10 Workflow tools: analyze_repository, generate_dockerfile, build_image, scan_image, tag_image, push_image, generate_k8s_manifests, prepare_cluster, deploy_application, verify_deployment
   - 2 Orchestration tools: start_workflow, workflow_status  
-  - 3 Utility tools: list_tools, ping, server_status
+  - 2 Utility tools: ping, server_status
 - **In-Memory Session Management**: Fast session storage with atomic updates
 - **NPM Package Exports**: Individual tool handlers exportable for flexible usage
 - **Docker Integration**: Dockerode library with CLI fallback support

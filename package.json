@@ -59,7 +59,7 @@
     "format:check": "prettier --check 'src/**/*.ts'",
     "typecheck": "tsc --noEmit",
     "validate": "npm run lint && npm run typecheck && npm run test:unit",
-    "bundle:size": "npm run build:prod && find dist -name '*.js' -exec wc -c {} + | tail -1 | awk '{print \"Total bundle size: \" $1/1024 \" KB\"}' && ls -la dist/apps/cli.js | awk '{print \"CLI binary size: \" $5/1024 \" KB\"}'",
+    "bundle:size": "npm run build:prod && find dist -name '*.js' -print0 | xargs -0 wc -c | awk '{sum+=$1} END {print \"Total bundle size: \" sum/1024 \" KB\"}' && ls -la dist/apps/cli.js | awk '{print \"CLI binary size: \" $5/1024 \" KB\"}'",
     "bundle:check": "npm pack --dry-run",
     "prepublishOnly": "npm run validate && npm run build:prod",
     "release": "npm run validate && npm run build:prod && npm publish"

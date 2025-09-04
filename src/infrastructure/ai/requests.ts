@@ -20,7 +20,7 @@ export type AIRequest = {
   temperature?: number | undefined;
   maxTokens?: number | undefined;
   model?: string | undefined;
-  context?: Record<string, any> | undefined;
+  context?: Record<string, unknown> | undefined;
 };
 
 /**
@@ -83,7 +83,7 @@ export type K8sVariables = {
  */
 export function buildAIRequest(options: RequestOptions): AIRequest {
   const template = TEMPLATES[options.template];
-  const variables = options.variables || {};
+  const variables = options.variables ?? {};
 
   const prompt = renderTemplate(template.prompt, variables);
 
@@ -157,12 +157,12 @@ export function buildKustomizationRequest(
  */
 export function extractDockerfileVariables(analysis: AnalysisResult): DockerfileVariables {
   return {
-    language: analysis.language || 'unknown',
+    language: analysis.language ?? 'unknown',
     languageVersion: analysis.language_version,
     framework: analysis.framework,
-    buildSystemType: analysis.build_system?.type || 'unknown',
+    buildSystemType: analysis.build_system?.type ?? 'unknown',
     entryPoint: 'index', // Default entry point since entry_points doesn't exist in schema
-    port: analysis.ports?.[0] || analysis.required_ports?.[0] || 8080,
+    port: analysis.ports?.[0] ?? analysis.required_ports?.[0] ?? 8080,
     optimization: 'balanced',
   };
 }
@@ -302,23 +302,104 @@ Return only valid JSON.`,
   },
 } as const;
 
+type EscapeContext = 'yaml' | 'shell' | 'dockerfile' | 'none';
+
+type EscapeHook = (value: string) => string;
+
+const ESCAPE_HOOKS: Record<EscapeContext, EscapeHook> = {
+  yaml: (value: string) => {
+    // YAML-safe escaping: quote strings with special chars, escape quotes
+    if (typeof value !== 'string') return String(value);
+    if (/[\n\r\t"'\\:|>{}[\]@`]/.test(value) || value.trim() !== value) {
+      return JSON.stringify(value);
+    }
+    return value;
+  },
+  shell: (value: string) => {
+    // Shell-safe escaping: single quotes and escape embedded quotes
+    if (typeof value !== 'string') return String(value);
+    return `'${value.replace(/'/g, "'\\''")}'`;
+  },
+  dockerfile: (value: string) => {
+    // Dockerfile-safe: escape quotes and backslashes
+    if (typeof value !== 'string') return String(value);
+    return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  },
+  none: (value: string) => String(value),
+};
+
 /**
- * Simple template renderer - replaces {{variable}} and {{#if variable}}content{{/if}}
+ * Security-enhanced template renderer with context-aware escaping
+ * Supports dotted paths (user.name), hyphens (build-arg), and pluggable escaping
  */
-function renderTemplate(template: string, variables: Record<string, any>): string {
+function renderTemplate(
+  template: string,
+  variables: Record<string, unknown>,
+  context: EscapeContext = 'none',
+): string {
+  // Security validation: reject templates with triple backticks or non-printable chars
+  if (template.includes('```')) {
+    throw new Error('Template contains prohibited triple backticks');
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(template)) {
+    throw new Error('Template contains non-printable characters');
+  }
+
   let result = template;
+  const escapeHook = ESCAPE_HOOKS[context];
 
-  // Handle conditional blocks: {{#if variable}}content{{/if}}
-  result = result.replace(/\{\{#if\s+(\w+)\}\}(.*?)\{\{\/if\}\}/gs, (_match, varName, content) => {
-    const value = variables[varName];
-    return value && value !== '' ? content : '';
-  });
+  // Helper to resolve dotted/hyphenated paths
+  const resolveValue = (path: string): unknown => {
+    // First try the full path as a key (for hyphenated keys like 'build-arg')
+    if (path in variables) {
+      return variables[path];
+    }
 
-  // Handle simple variables: {{variable}}
-  result = result.replace(/\{\{(\w+)\}\}/g, (_match, varName) => {
-    const value = variables[varName];
-    return value != null ? String(value) : '';
+    // For mixed paths like 'app-config.database.host', we need to be smarter
+    // Split only on dots first, then handle hyphens within each segment
+    const dotParts = path.split('.');
+    let value: unknown = variables;
+
+    for (const part of dotParts) {
+      if (value && typeof value === 'object') {
+        // Try the part directly first (handles hyphenated keys)
+        if (part in (value as Record<string, unknown>)) {
+          value = (value as Record<string, unknown>)[part];
+        } else {
+          return undefined;
+        }
+      } else {
+        return undefined;
+      }
+    }
+
+    return value;
+  };
+
+  // Handle conditional blocks: {{#if variable.path}}content{{/if}}
+  result = result.replace(
+    /\{\{#if\s+([\w.-]+)\}\}(.*?)\{\{\/if\}\}/gs,
+    (_match, varName, content) => {
+      const value = resolveValue(varName);
+      return value && value !== '' ? content : '';
+    },
+  );
+
+  // Handle simple variables: {{variable.path}} or {{build-arg}}
+  result = result.replace(/\{\{([\w.-]+)\}\}/g, (_match, varName) => {
+    const value = resolveValue(varName);
+    if (value == null) return '';
+
+    const stringValue = String(value);
+    // Additional security: strip non-printable chars from output
+    // eslint-disable-next-line no-control-regex
+    const sanitized = stringValue.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    return escapeHook(sanitized);
   });
 
   return result.trim();
 }
+
+// Export the enhanced template renderer
+export { renderTemplate, type EscapeContext };

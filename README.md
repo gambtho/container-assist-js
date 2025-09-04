@@ -99,7 +99,6 @@ await server.start();
 | `verify_deployment` | Deploy | Verify deployment health and status |
 | `start_workflow` | Workflow | Start complete containerization workflow |
 | `workflow_status` | Workflow | Check workflow progress and status |
-| `list_tools` | Ops | List all available tools |
 | `ping` | Ops | Test server connectivity |
 | `server_status` | Ops | Get server health status |
 | `registry` | Ops | Tool registry operations |

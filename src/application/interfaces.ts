@@ -101,7 +101,7 @@ export interface HealthStatus {
   component: string;
   status: 'healthy' | 'unhealthy' | 'degraded' | 'unknown';
   message?: string;
-  details?: Record<string, unknown>;
+  details?: Readonly<Record<string, unknown>>;
   lastCheck: string;
   checkDuration: number;
 }

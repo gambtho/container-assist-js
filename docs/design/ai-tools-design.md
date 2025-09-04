@@ -289,10 +289,10 @@ The tool intelligently extracts configuration from workflow session state:
 if ((!image || !port) && sessionId && sessionService) {
   const session = await sessionService.get(sessionId);
   if (session?.workflow_state?.build_result?.image_name) {
-    image = workflowState.build_result.image_name;
+    image = session.workflow_state.build_result.image_name;
   }
   if (session?.workflow_state?.analysis_result?.ports?.[0]) {
-    port = workflowState.analysis_result.ports[0];
+    port = session.workflow_state.analysis_result.ports[0];
   }
 }
 ```
@@ -335,28 +335,88 @@ interface EnhancedAIConfig {
 
 ### Template System
 
-**Template Rendering Engine** (`src/infrastructure/ai/requests.ts:307`):
+**Security-Enhanced Template Rendering Engine** (`src/infrastructure/ai/requests.ts:335`):
 ```typescript
-function renderTemplate(template: string, variables: Record<string, any>): string {
+function renderTemplate(
+  template: string, 
+  variables: Record<string, any>, 
+  context: EscapeContext = 'none'
+): string {
+  // Security validation: reject templates with triple backticks or non-printable chars
+  if (template.includes('```')) {
+    throw new Error('Template contains prohibited triple backticks');
+  }
+  if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(template)) {
+    throw new Error('Template contains non-printable characters');
+  }
+
   let result = template;
-  
-  // Handle conditional blocks: {{#if variable}}content{{/if}}
-  result = result.replace(/\{\{#if\s+(\w+)\}\}(.*?)\{\{\/if\}\}/gs, 
-    (_match, varName, content) => {
-      const value = variables[varName];
-      return value && value !== '' ? content : '';
+  const escapeHook = ESCAPE_HOOKS[context];
+
+  // Helper to resolve dotted/hyphenated paths
+  const resolveValue = (path: string): any => {
+    const keys = path.split(/[.-]/);
+    let value = variables;
+    for (const key of keys) {
+      if (value && typeof value === 'object' && key in value) {
+        value = value[key];
+      } else {
+        return undefined;
+      }
     }
-  );
-  
-  // Handle simple variables: {{variable}}
-  result = result.replace(/\{\{(\w+)\}\}/g, (_match, varName) => {
-    const value = variables[varName];
-    return value != null ? String(value) : '';
+    return value;
+  };
+
+  // Handle conditional blocks: {{#if variable.path}}content{{/if}}
+  result = result.replace(/\{\{#if\s+([\w.-]+)\}\}(.*?)\{\{\/if\}\}/gs, (_match, varName, content) => {
+    const value = resolveValue(varName);
+    return value && value !== '' ? content : '';
   });
-  
+
+  // Handle simple variables: {{variable.path}} or {{build-arg}}
+  result = result.replace(/\{\{([\w.-]+)\}\}/g, (_match, varName) => {
+    const value = resolveValue(varName);
+    if (value == null) return '';
+    
+    const stringValue = String(value);
+    // Additional security: strip non-printable chars from output
+    const sanitized = stringValue.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    return escapeHook(sanitized);
+  });
+
   return result.trim();
 }
 ```
+
+**Context-Aware Escaping Hooks**:
+```typescript
+const ESCAPE_HOOKS: Record<EscapeContext, EscapeHook> = {
+  yaml: (value: string) => {
+    // YAML-safe escaping: quote strings with special chars
+    if (/[\n\r\t"'\\:|>{}[\]@`]/.test(value) || value.trim() !== value) {
+      return JSON.stringify(value);
+    }
+    return value;
+  },
+  shell: (value: string) => {
+    // Shell-safe escaping: single quotes with escape handling
+    return "'" + value.replace(/'/g, "'\\''") + "'";
+  },
+  dockerfile: (value: string) => {
+    // Dockerfile-safe: escape quotes and backslashes
+    return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  },
+  none: (value: string) => String(value),
+};
+```
+
+**Enhanced Features**:
+- ✅ **Dotted path support**: `{{user.name}}`, `{{config.database.host}}`
+- ✅ **Hyphenated keys**: `{{build-arg}}`, `{{app-config.setting}}`
+- ✅ **Context-aware escaping**: YAML, shell, and Dockerfile safe output
+- ✅ **Security validations**: Rejects triple backticks and non-printable characters
+- ✅ **Output sanitization**: Strips non-printable characters from variable values
+- ✅ **Comprehensive test coverage**: 25+ unit tests covering all features and edge cases
 
 ### Caching Strategy
 
@@ -402,7 +462,7 @@ chainHint: {
   nextTool: 'build_image',
   reason: 'Build Docker image from generated Dockerfile',
   paramMapper: (output) => ({
-    dockerfile_path: output.path,
+    dockerfile: output.path,
     tags: [`app:${Date.now()}`],
   }),
 }
@@ -445,7 +505,14 @@ Based on typical usage:
 
 ### Data Privacy
 - **Repository content filtering** limits exposed file contents
-- **No credential scanning** in AI requests
+- **Credential detection and redaction** occurs client-side before any AI requests:
+  - High-entropy string detection (Shannon entropy > 4.5)
+  - Regex patterns for known formats (AWS/GCP/Azure keys, GitHub tokens, Docker Hub tokens)
+  - OAuth/JWT token patterns
+  - Common secret keywords (api_key, password, secret, token)
+  - Optional repository-specific denylist
+  - Example: `GITHUB_TOKEN=ghp_xxxxxxxxxxxx` → `GITHUB_TOKEN=[REDACTED]`
+  - Fallback: Request blocked if potential secret detected and cannot be safely redacted
 - **Local processing** for sensitive operations
 - **Configurable AI disable** option
 

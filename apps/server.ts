@@ -149,6 +149,10 @@ export class ContainerKitMCPServer {
 
     // Skip AI service initialization here - it will be initialized in start()
     // after we have the proper MCP sampler
+    // Only initialize AI service if it exists
+    if (this.services.ai) {
+      initPromises.push(this.services.ai.initialize());
+    }
 
     await Promise.all(initPromises);
 
@@ -279,7 +283,7 @@ export class ContainerKitMCPServer {
       this.logger.warn({ error }, 'Kubernetes health check failed');
     }
 
-    services.ai = this.services.ai.isAvailable();
+    services.ai = this.services.ai ? this.services.ai.isAvailable() : false;
     services.session = true; // Session service is always available
 
     return {

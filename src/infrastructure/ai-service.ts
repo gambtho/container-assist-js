@@ -710,7 +710,10 @@ export class EnhancedAIService {
    * Extract template ID from request
    */
   private extractTemplateId(request: AIRequest): string {
-    return request.context?._templateId ?? (request.context?._originalTemplate || 'unknown');
+    return (
+      (request.context?._templateId as string) ??
+      ((request.context?._originalTemplate as string) || 'unknown')
+    );
   }
 
   /**
