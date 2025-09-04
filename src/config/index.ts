@@ -38,7 +38,11 @@ export {
 } from './config.js';
 
 // Import configuration
-import { createConfiguration, createConfigurationForEnv, getConfigurationSummary } from './config.js';
+import {
+  createConfiguration,
+  createConfigurationForEnv,
+  getConfigurationSummary,
+} from './config.js';
 import type { ApplicationConfig } from './types.js';
 
 /**

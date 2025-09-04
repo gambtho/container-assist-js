@@ -16,7 +16,12 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const packageJson = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8'));
+
+// Handle both development (apps/) and production (dist/apps/) paths
+const packageJsonPath = __dirname.includes('dist') 
+  ? join(__dirname, '../../package.json')  // dist/apps/ -> root
+  : join(__dirname, '../package.json');     // apps/ -> root
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
 const logger = createPinoLogger({ service: 'cli' });
 
