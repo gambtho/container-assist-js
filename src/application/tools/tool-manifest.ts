@@ -32,7 +32,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     category: 'analysis',
     description: 'Analyzes repository structure, language, framework, and dependencies',
     requiredServices: ['filesystem'],
-    implementationPath: 'analyze-repo/analyze-repo.ts'
+    implementationPath: 'analyze-repo/analyze-repo.ts',
   },
 
   resolve_base_images: {
@@ -41,7 +41,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     category: 'analysis',
     description: 'Determines optimal base images for containerization',
     requiredServices: ['ai'],
-    implementationPath: 'resolve-base-images/resolve-base-images.ts'
+    implementationPath: 'resolve-base-images/resolve-base-images.ts',
   },
 
   // Generation Tools - IMPLEMENTED
@@ -51,7 +51,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     category: 'generation',
     description: 'Generates optimized Dockerfile based on analysis',
     requiredServices: ['ai', 'filesystem'],
-    implementationPath: 'generate-dockerfile/generate-dockerfile.ts'
+    implementationPath: 'generate-dockerfile/generate-dockerfile.ts',
   },
 
   generate_k8s_manifests: {
@@ -60,7 +60,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     category: 'generation',
     description: 'Generates Kubernetes deployment manifests',
     requiredServices: ['filesystem'],
-    implementationPath: 'generate-k8s-manifests/generate-k8s-manifests.ts'
+    implementationPath: 'generate-k8s-manifests/generate-k8s-manifests.ts',
   },
 
   // Docker Operations - IMPLEMENTED
@@ -71,7 +71,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     description: 'Builds Docker image from Dockerfile',
     requiredServices: ['docker'],
     dependencies: ['generate_dockerfile'],
-    implementationPath: 'build-image/build-image.ts'
+    implementationPath: 'build-image/build-image.ts',
   },
 
   scan_image: {
@@ -82,7 +82,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     requiredServices: ['docker'],
     dependencies: ['build_image'],
     implementationPath: 'scan-image/scan-image.ts',
-    notes: 'Requires Trivy to be installed for real scanning'
+    notes: 'Requires Trivy to be installed for real scanning',
   },
 
   tag_image: {
@@ -92,7 +92,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     description: 'Tags Docker image with specified tags',
     requiredServices: ['docker'],
     dependencies: ['build_image'],
-    implementationPath: 'tag-image/tag-image.ts'
+    implementationPath: 'tag-image/tag-image.ts',
   },
 
   push_image: {
@@ -102,7 +102,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     description: 'Pushes Docker image to registry',
     requiredServices: ['docker'],
     dependencies: ['tag_image'],
-    implementationPath: 'push-image/push-image.ts'
+    implementationPath: 'push-image/push-image.ts',
   },
 
   // Kubernetes Operations - IMPLEMENTED
@@ -113,7 +113,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     description: 'Deploys application to Kubernetes cluster',
     requiredServices: ['kubernetes'],
     dependencies: ['generate_k8s_manifests', 'push_image'],
-    implementationPath: 'deploy-application/deploy-application.ts'
+    implementationPath: 'deploy-application/deploy-application.ts',
   },
 
   verify_deployment: {
@@ -123,7 +123,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     description: 'Verifies deployment health and readiness',
     requiredServices: ['kubernetes'],
     dependencies: ['deploy_application'],
-    implementationPath: 'verify-deployment/verify-deployment.ts'
+    implementationPath: 'verify-deployment/verify-deployment.ts',
   },
 
   // Workflow Tools - IMPLEMENTED
@@ -133,7 +133,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     category: 'workflow',
     description: 'Starts a complete containerization workflow',
     requiredServices: ['session'],
-    implementationPath: 'workflow/start-workflow.ts'
+    implementationPath: 'workflow/start-workflow.ts',
   },
 
   workflow_status: {
@@ -142,7 +142,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     category: 'workflow',
     description: 'Gets current workflow status and progress',
     requiredServices: ['session'],
-    implementationPath: 'workflow/workflow-status.ts'
+    implementationPath: 'workflow/workflow-status.ts',
   },
 
   // Error Recovery Tools - IMPLEMENTED
@@ -152,7 +152,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     category: 'utility',
     description: 'Attempts to recover from workflow errors',
     requiredServices: ['session', 'ai'],
-    implementationPath: 'error-recovery.ts'
+    implementationPath: 'error-recovery.ts',
   },
 
   fix_dockerfile: {
@@ -161,7 +161,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     category: 'utility',
     description: 'Fixes common Dockerfile issues',
     requiredServices: ['ai', 'filesystem'],
-    implementationPath: 'fix-dockerfile/fix-dockerfile.ts'
+    implementationPath: 'fix-dockerfile/fix-dockerfile.ts',
   },
 
   // Utility Tools - IMPLEMENTED
@@ -171,7 +171,7 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     category: 'utility',
     description: 'Lists all available tools and their status',
     requiredServices: [],
-    implementationPath: 'list-tools.ts'
+    implementationPath: 'list-tools.ts',
   },
 
   server_status: {
@@ -180,8 +180,8 @@ export const TOOL_MANIFEST: Record<string, ToolManifestEntry> = {
     category: 'utility',
     description: 'Gets MCP server status and health',
     requiredServices: [],
-    implementationPath: 'server-status.ts'
-  }
+    implementationPath: 'server-status.ts',
+  },
 };
 
 /**
@@ -238,7 +238,7 @@ export function getToolsByCategory(category: string): ToolManifestEntry[] {
  */
 export function getToolsByService(service: string): ToolManifestEntry[] {
   return Object.values(TOOL_MANIFEST).filter(
-    (entry) => entry.requiredServices?.includes(service) ?? false
+    (entry) => entry.requiredServices?.includes(service) ?? false,
   );
 }
 
@@ -255,7 +255,7 @@ export function getToolDependencies(toolName: string): string[] {
  */
 export function validateToolAvailability(
   toolName: string,
-  availableServices: string[]
+  availableServices: string[],
 ): { available: boolean; missingServices?: string[] } {
   const entry = TOOL_MANIFEST[toolName];
 
@@ -269,11 +269,11 @@ export function validateToolAvailability(
 
   const requiredServices = entry.requiredServices ?? [];
   const missingServices = requiredServices.filter(
-    (service) => !availableServices.includes(service)
+    (service) => !availableServices.includes(service),
   );
 
   const result: { available: boolean; missingServices?: string[] } = {
-    available: missingServices.length === 0
+    available: missingServices.length === 0,
   };
 
   if (missingServices.length > 0) {

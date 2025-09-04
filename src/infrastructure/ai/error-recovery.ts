@@ -128,7 +128,7 @@ export class EnhancedErrorRecovery {
       customStrategies: [],
       enableDetailedLogging: false,
       onRecoveryProgress: () => {},
-      ...options
+      ...options,
     };
 
     // Initialize coordinator with default + custom strategies
@@ -149,7 +149,7 @@ export class EnhancedErrorRecovery {
     initialError: Error,
     templateId: string,
     variables: Record<string, any>,
-    executor: (request: AIRequest) => Promise<T>
+    executor: (request: AIRequest) => Promise<T>,
   ): Promise<RecoverySessionResult<T>> {
     const sessionStartTime = Date.now();
     const attempts: RecoverySessionResult<T>['attempts'] = [];
@@ -160,7 +160,7 @@ export class EnhancedErrorRecovery {
       templateId,
       variables,
       originalRequest,
-      initialError
+      initialError,
     );
 
     this.logRecoveryStart(context);
@@ -174,9 +174,9 @@ export class EnhancedErrorRecovery {
         this.logger.warn(
           {
             reason: abandonReason,
-            context: ErrorContextUtils.getDebugInfo(context)
+            context: ErrorContextUtils.getDebugInfo(context),
           },
-          'Recovery abandoned'
+          'Recovery abandoned',
         );
 
         const result: RecoverySessionResult<T> = {
@@ -188,8 +188,8 @@ export class EnhancedErrorRecovery {
             totalDurationMs: Date.now() - sessionStartTime,
             totalTokensUsed: context.metadata?.tokensUsed ?? 0,
             strategiesUsed: context.strategiesUsed ?? [],
-            insights
-          }
+            insights,
+          },
         };
 
         if (abandonReason) {
@@ -205,14 +205,14 @@ export class EnhancedErrorRecovery {
         originalRequest,
         lastError,
         context,
-        executor
+        executor,
       );
 
       await attempts.push({
         strategy: attemptResult.strategy?.name ?? 'unknown',
         success: attemptResult.success,
         durationMs: attemptResult.metadata.attemptDurationMs,
-        confidence: attemptResult.metadata.confidence
+        confidence: attemptResult.metadata.confidence,
       });
 
       // If successful, return result
@@ -221,9 +221,9 @@ export class EnhancedErrorRecovery {
           {
             strategy: attemptResult.strategy?.name,
             attempt: context.attempt,
-            totalDurationMs: Date.now() - sessionStartTime
+            totalDurationMs: Date.now() - sessionStartTime,
           },
-          'Recovery successful'
+          'Recovery successful',
         );
 
         return {
@@ -235,8 +235,8 @@ export class EnhancedErrorRecovery {
             totalDurationMs: Date.now() - sessionStartTime,
             totalTokensUsed: attemptResult.context.metadata?.tokensUsed ?? 0,
             strategiesUsed: attemptResult.context.strategiesUsed ?? [],
-            insights
-          }
+            insights,
+          },
         };
       }
 
@@ -247,7 +247,7 @@ export class EnhancedErrorRecovery {
       if (attemptResult.strategy?.analyzeFailure && attemptResult.error) {
         const strategyInsights = attemptResult.strategy.analyzeFailure(
           attemptResult.error,
-          context
+          context,
         );
         await insights.push(...strategyInsights);
       }
@@ -260,9 +260,9 @@ export class EnhancedErrorRecovery {
             attempt: context.attempt,
             strategy: attemptResult.strategy?.name,
             error: attemptResult.error?.message,
-            confidence: attemptResult.metadata.confidence
+            confidence: attemptResult.metadata.confidence,
           },
-          'Recovery attempt failed'
+          'Recovery attempt failed',
         );
       }
     }
@@ -272,9 +272,9 @@ export class EnhancedErrorRecovery {
       {
         attempts: context.attempt,
         strategies: context.strategiesUsed,
-        totalDurationMs: Date.now() - sessionStartTime
+        totalDurationMs: Date.now() - sessionStartTime,
       },
-      'All recovery attempts exhausted'
+      'All recovery attempts exhausted',
     );
 
     return {
@@ -287,8 +287,8 @@ export class EnhancedErrorRecovery {
         totalTokensUsed: context.metadata?.tokensUsed ?? 0,
         strategiesUsed: context.strategiesUsed ?? [],
         insights,
-        abandonReason: 'Max attempts reached'
-      }
+        abandonReason: 'Max attempts reached',
+      },
     };
   }
 
@@ -299,7 +299,7 @@ export class EnhancedErrorRecovery {
     originalRequest: AIRequest,
     error: Error,
     context: ErrorContext,
-    executor: (request: AIRequest) => Promise<T>
+    executor: (request: AIRequest) => Promise<T>,
   ): Promise<RecoveryAttemptResult<T>> {
     const attemptStart = Date.now();
 
@@ -313,13 +313,13 @@ export class EnhancedErrorRecovery {
         context: ErrorContextFactory.updateForFailure(
           context,
           new Error('No recovery strategy available'),
-          'none'
+          'none',
         ),
         metadata: {
           attemptDurationMs: Date.now() - attemptStart,
           confidence: 0,
-          wasFinalAttempt: true
-        }
+          wasFinalAttempt: true,
+        },
       };
     }
 
@@ -350,8 +350,8 @@ export class EnhancedErrorRecovery {
         metadata: {
           attemptDurationMs: Date.now() - attemptStart,
           confidence: recoveryResult.metadata.confidence,
-          wasFinalAttempt: recoveryResult.metadata.isFinalAttempt ?? false
-        }
+          wasFinalAttempt: recoveryResult.metadata.isFinalAttempt ?? false,
+        },
       };
     } catch (attemptError) {
       // Recovery attempt failed
@@ -360,7 +360,7 @@ export class EnhancedErrorRecovery {
       const updatedContext = ErrorContextFactory.updateForFailure(
         context,
         newError,
-        recoveryResult.strategy.name
+        recoveryResult.strategy.name,
       );
 
       return {
@@ -371,8 +371,8 @@ export class EnhancedErrorRecovery {
         metadata: {
           attemptDurationMs: Date.now() - attemptStart,
           confidence: recoveryResult.metadata.confidence,
-          wasFinalAttempt: recoveryResult.metadata.isFinalAttempt ?? false
-        }
+          wasFinalAttempt: recoveryResult.metadata.isFinalAttempt ?? false,
+        },
       };
     }
   }
@@ -443,10 +443,10 @@ export class EnhancedErrorRecovery {
         maxAttempts: this.options.maxAttempts,
         strategies: this.coordinator.getAvailableStrategies(
           new Error(ErrorContextUtils.getLastError(context)),
-          context
-        )
+          context,
+        ),
       },
-      'Starting error recovery session'
+      'Starting error recovery session',
     );
   }
 
@@ -478,7 +478,7 @@ export class EnhancedErrorRecovery {
         sessionResult.attempts.reduce((sum, a) => sum + a.confidence, 0) /
         sessionResult.attempts.length,
       insightCount: sessionResult.metadata.insights.length,
-      abandonReason: sessionResult.metadata.abandonReason ?? null
+      abandonReason: sessionResult.metadata.abandonReason ?? null,
     };
   }
 }
@@ -488,7 +488,7 @@ export class EnhancedErrorRecovery {
  */
 export function createEnhancedErrorRecovery(
   logger: Logger,
-  options?: EnhancedRecoveryOptions
+  options?: EnhancedRecoveryOptions,
 ): EnhancedErrorRecovery {
   return new EnhancedErrorRecovery(logger, options);
 }
@@ -502,7 +502,7 @@ export async function executeWithEnhancedRecovery<T>(
   variables: Record<string, any>,
   executor: (request: AIRequest) => Promise<T>,
   logger: Logger,
-  options?: EnhancedRecoveryOptions
+  options?: EnhancedRecoveryOptions,
 ): Promise<T> {
   try {
     // Try original request first
@@ -515,7 +515,7 @@ export async function executeWithEnhancedRecovery<T>(
       initialError as Error,
       templateId,
       variables,
-      executor
+      executor,
     );
 
     if (result.success && result.data !== undefined) {

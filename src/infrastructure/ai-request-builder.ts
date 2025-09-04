@@ -46,7 +46,7 @@ Requirements: {{optimization}} optimization{{#if multistage}}, multi-stage{{/if}
 {{#if baseImage}}Base: {{baseImage}}{{/if}}{{#if customInstructions}}
 Custom: {{customInstructions}}{{/if}}
 
-Output: Production Dockerfile only`
+Output: Production Dockerfile only`,
   },
 
   'repository-analysis': {
@@ -58,7 +58,7 @@ Files: {{fileList}}
 Config: {{configFiles}}
 Tree: {{directoryTree}}
 
-Output: JSON format: {"language":"<lang>","framework":"<fw>","buildSystem":{"type":"<type>","buildFile":"<file>"},"dependencies":["<deps>"],"ports":[<nums>],"entryPoint":"<file>"}`
+Output: JSON format: {"language":"<lang>","framework":"<fw>","buildSystem":{"type":"<type>","buildFile":"<file>"},"dependencies":["<deps>"],"ports":[<nums>],"entryPoint":"<file>"}`,
   },
 
   'dockerfile-fix': {
@@ -70,7 +70,7 @@ Current: {{dockerfile}}
 Error: {{error_message}}
 
 Requirements: Fix error, maintain security, keep functionality
-Output: Corrected Dockerfile only`
+Output: Corrected Dockerfile only`,
   },
 
   'optimization-suggestion': {
@@ -81,7 +81,7 @@ Output: Corrected Dockerfile only`
 {{dockerfile}}
 
 Focus: Size, security, performance, caching
-Output: JSON array of suggestions with impact/effort ratings`
+Output: JSON array of suggestions with impact/effort ratings`,
   },
 
   'k8s-generation': {
@@ -95,7 +95,7 @@ Service Type: {{serviceType}}, Replicas: {{replicas}}
 {{#if ingressEnabled}}Ingress: {{ingressHost}}{{/if}}
 {{#if autoscaling}}Autoscaling: {{minReplicas}}-{{maxReplicas}} @ {{targetCPU}}%{{/if}}
 
-Output: Complete K8s YAML manifests (Deployment, Service, Ingress, ConfigMap, HPA as needed)`
+Output: Complete K8s YAML manifests (Deployment, Service, Ingress, ConfigMap, HPA as needed)`,
   },
 
   'error-analysis': {
@@ -107,7 +107,7 @@ Command: {{command}}
 Error: {{error_output}}
 Context: {{build_context}}
 
-Output: JSON with root cause, fix steps, prevention tips`
+Output: JSON with root cause, fix steps, prevention tips`,
   },
 
   'json-repair': {
@@ -119,8 +119,8 @@ Output: JSON with root cause, fix steps, prevention tips`
 
 Error: {{error_message}}
 
-Output: Valid JSON only`
-  }
+Output: Valid JSON only`,
+  },
 };
 
 type TemplateId = keyof typeof PROMPT_TEMPLATES;
@@ -179,7 +179,7 @@ export class AIRequestBuilder {
       buildSystem: context.buildSystem ?? 'unknown',
       buildSystemType: context.buildSystem ?? 'unknown', // Alias for template compatibility
       port: context.port ?? 8080,
-      entryPoint: context.entryPoint ?? 'index'
+      entryPoint: context.entryPoint ?? 'index',
     });
   }
 
@@ -191,7 +191,7 @@ export class AIRequestBuilder {
   withSession(sessionId: string, additionalVars: Record<string, any> = {}): this {
     return this.withVariables({
       sessionId,
-      ...additionalVars
+      ...additionalVars,
     });
   }
 
@@ -230,7 +230,7 @@ export class AIRequestBuilder {
       isRetry: true,
       attemptNumber,
       errorCount: previousErrors.length,
-      previousErrors
+      previousErrors,
     };
     return this;
   }
@@ -242,7 +242,7 @@ export class AIRequestBuilder {
   withComplexity(complexity: 'low' | 'medium' | 'high'): this {
     this.samplingContext = {
       ...this.samplingContext,
-      complexity
+      complexity,
     };
     return this;
   }
@@ -254,7 +254,7 @@ export class AIRequestBuilder {
   withTimeConstraint(constraint: 'fast' | 'normal' | 'thorough'): this {
     this.samplingContext = {
       ...this.samplingContext,
-      timeConstraint: constraint
+      timeConstraint: constraint,
     };
     return this;
   }
@@ -284,7 +284,7 @@ export class AIRequestBuilder {
       optimization: dockerContext.optimization ?? 'balanced',
       multistage: dockerContext.multistage !== false, // Default to true
       securityHardening: dockerContext.securityHardening !== false, // Default to true
-      includeHealthcheck: dockerContext.includeHealthcheck !== false // Default to true
+      includeHealthcheck: dockerContext.includeHealthcheck !== false, // Default to true
     });
   }
 
@@ -308,7 +308,7 @@ export class AIRequestBuilder {
       secrets: k8sContext.secrets ?? [],
       minReplicas: k8sContext.minReplicas ?? 2,
       maxReplicas: k8sContext.maxReplicas ?? 10,
-      targetCPU: k8sContext.targetCPU ?? 70
+      targetCPU: k8sContext.targetCPU ?? 70,
     });
   }
 
@@ -328,7 +328,7 @@ export class AIRequestBuilder {
       dockerfile: errorContext.malformedContent ?? '', // Alias for dockerfile fix
       attempt: errorContext.attempt ?? 1,
       previous_attempts: errorContext.previousAttempts?.join('; ') || '',
-      repair_instruction: 'Fix the content and return only valid output'
+      repair_instruction: 'Fix the content and return only valid output',
     });
   }
 
@@ -339,7 +339,7 @@ export class AIRequestBuilder {
   withFormat(format: string): this {
     return this.withVariables({
       output_format: format,
-      format_specification: format
+      format_specification: format,
     });
   }
 
@@ -364,8 +364,8 @@ export class AIRequestBuilder {
       maxTokens: this.maxTokens ?? samplingParams.maxTokens,
       context: {
         ...this.variables,
-        ...(this.samplingContext && { _samplingContext: this.samplingContext }) // Include context for debugging
-      }
+        ...(this.samplingContext && { _samplingContext: this.samplingContext }), // Include context for debugging
+      },
     };
 
     if (this.model) {
@@ -388,7 +388,7 @@ export class AIRequestBuilder {
     const result: AIRequestContext = {
       language: analysis.language,
       dependencies,
-      devDependencies
+      devDependencies,
     };
 
     if (analysis.language_version) {
@@ -433,7 +433,7 @@ export class AIRequestBuilder {
       (_match, varName, content) => {
         const value = variables[varName];
         return value ? content : '';
-      }
+      },
     );
 
     // Then handle simple {{variable}} patterns

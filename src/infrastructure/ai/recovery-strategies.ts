@@ -40,14 +40,14 @@ export class JSONRepairStrategy extends BaseRecoveryStrategy {
       'bracket',
       'brace',
       'comma',
-      'quote'
+      'quote',
     ]);
   }
 
   protected override async createRecoveryRequest(
     originalRequest: AIRequest,
     error: Error,
-    context: ErrorContext
+    context: ErrorContext,
   ): Promise<AIRequest> {
     // Extract malformed content from partial result or error message
     const malformedContent = this.extractMalformedContent(context);
@@ -61,7 +61,7 @@ export class JSONRepairStrategy extends BaseRecoveryStrategy {
       malformedContent,
       error.message,
       syntaxIssues,
-      context.attempt
+      context.attempt,
     );
 
     return {
@@ -73,8 +73,8 @@ export class JSONRepairStrategy extends BaseRecoveryStrategy {
         ...originalRequest.context,
         _repairMode: true,
         _malformedContent: malformedContent,
-        _syntaxIssues: syntaxIssues
-      }
+        _syntaxIssues: syntaxIssues,
+      },
     };
   }
 
@@ -140,7 +140,7 @@ export class JSONRepairStrategy extends BaseRecoveryStrategy {
     malformedContent: string,
     errorMessage: string,
     syntaxIssues: string[],
-    attempt: number
+    attempt: number,
   ): string {
     const urgency = attempt > 1 ? 'CRITICAL: ' : '';
 
@@ -241,7 +241,7 @@ export class SimplificationStrategy extends BaseRecoveryStrategy {
   protected override async createRecoveryRequest(
     originalRequest: AIRequest,
     _error: Error,
-    context: ErrorContext
+    context: ErrorContext,
   ): Promise<AIRequest> {
     // Simplify the prompt
     const simplifiedPrompt = this.simplifyPrompt(originalRequest.prompt, context);
@@ -259,8 +259,8 @@ export class SimplificationStrategy extends BaseRecoveryStrategy {
         ...originalRequest.context,
         ...simplifiedVariables,
         _simplified: true,
-        _simplificationLevel: context.attempt
-      }
+        _simplificationLevel: context.attempt,
+      },
     };
   }
 
@@ -273,7 +273,7 @@ export class SimplificationStrategy extends BaseRecoveryStrategy {
     // Remove optional sections (common patterns)
     simplified = simplified.replace(
       /\n\n(Additional|Optional|Notes?|Examples?)[\s\S]*?(?=\n\n|\n$|$)/gi,
-      ''
+      '',
     );
 
     // Simplify conditional sections
@@ -348,7 +348,7 @@ export class AlternativeTemplateStrategy extends BaseRecoveryStrategy {
     'repository-analysis': ['analysis-simple', 'analysis-basic'],
     'k8s-generation': ['k8s-simple', 'k8s-basic'],
     'error-analysis': ['error-simple'],
-    'optimization-suggestion': ['optimization-basic']
+    'optimization-suggestion': ['optimization-basic'],
   };
 
   protected override canHandleSpecific(error: Error, context: ErrorContext): boolean {
@@ -372,7 +372,7 @@ export class AlternativeTemplateStrategy extends BaseRecoveryStrategy {
   protected override async createRecoveryRequest(
     originalRequest: AIRequest,
     _error: Error,
-    context: ErrorContext
+    context: ErrorContext,
   ): Promise<AIRequest> {
     // Try to find an alternative template
     const alternativeTemplate = this.selectAlternativeTemplate(context);
@@ -409,7 +409,7 @@ export class AlternativeTemplateStrategy extends BaseRecoveryStrategy {
   private createAlternativeTemplateRequest(
     originalRequest: AIRequest,
     context: ErrorContext,
-    templateId: string
+    templateId: string,
   ): AIRequest {
     // Simplified prompts for alternative templates
     const alternativePrompts: Record<string, string> = {
@@ -419,7 +419,7 @@ export class AlternativeTemplateStrategy extends BaseRecoveryStrategy {
         'Analyze project. Language: {{language}}, Framework: {{framework}}, Build: {{buildSystem}}',
       'k8s-simple': 'Generate Kubernetes deployment for {{language}} app on port {{port}}',
       'error-simple': 'Fix this error: {{error_message}}',
-      'optimization-basic': 'List 3 improvements for: {{dockerfile}}'
+      'optimization-basic': 'List 3 improvements for: {{dockerfile}}',
     };
 
     const prompt = alternativePrompts[templateId] || this.createGenericPrompt(context);
@@ -432,8 +432,8 @@ export class AlternativeTemplateStrategy extends BaseRecoveryStrategy {
       context: {
         ...originalRequest.context,
         _alternativeTemplate: templateId,
-        _originalTemplate: context.templateId
-      }
+        _originalTemplate: context.templateId,
+      },
     };
   }
 
@@ -449,7 +449,7 @@ export class AlternativeTemplateStrategy extends BaseRecoveryStrategy {
       analysis: 'Analyze the project structure and provide basic information',
       k8s: 'Generate basic Kubernetes deployment configuration',
       optimization: 'Suggest basic improvements',
-      general: 'Provide a helpful response based on the context'
+      general: 'Provide a helpful response based on the context',
     };
 
     // Match template type or use general fallback
@@ -467,7 +467,7 @@ export class AlternativeTemplateStrategy extends BaseRecoveryStrategy {
    */
   private createGenericAlternativeRequest(
     originalRequest: AIRequest,
-    context: ErrorContext
+    context: ErrorContext,
   ): AIRequest {
     // Extract core intent from original prompt
     const coreIntent = this.extractCoreIntent(originalRequest.prompt);
@@ -485,8 +485,8 @@ No explanations, just the requested content.`;
       maxTokens: 600,
       context: {
         ...originalRequest.context,
-        _genericAlternative: true
-      }
+        _genericAlternative: true,
+      },
     };
   }
 
@@ -526,7 +526,7 @@ No explanations, just the requested content.`;
       /\{\{#if\s+(\w+)\}\}(.*?)\{\{\/if\}\}/gs,
       (_match, varName, content) => {
         return variables[varName] ? content : '';
-      }
+      },
     );
 
     // Handle {{var}}
@@ -556,7 +556,7 @@ export class FallbackDefaultStrategy extends BaseRecoveryStrategy {
   protected override async createRecoveryRequest(
     originalRequest: AIRequest,
     _error: Error,
-    context: ErrorContext
+    context: ErrorContext,
   ): Promise<AIRequest> {
     // Ultra-simple fallback based on template type
     const fallbackPrompt = this.createFallbackPrompt(context);
@@ -568,8 +568,8 @@ export class FallbackDefaultStrategy extends BaseRecoveryStrategy {
       context: {
         _fallbackMode: true,
         _originalTemplate: context.templateId,
-        language: context.originalVariables.language ?? 'unknown'
-      }
+        language: context.originalVariables.language ?? 'unknown',
+      },
     };
 
     if (originalRequest.model) {
@@ -592,7 +592,7 @@ export class FallbackDefaultStrategy extends BaseRecoveryStrategy {
       analysis: `{"language": "${language}", "framework": "unknown", "buildSystem": {"type": "npm"}, "ports": [${port}]}`,
       k8s: `apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: app\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: app\n  template:\n    spec:\n      containers:\n      - name: app\n        image: app:latest\n        ports:\n        - containerPort: ${port}`,
       error: 'Check syntax and fix formatting issues.',
-      optimization: '["Use multi-stage build", "Minimize image size", "Add health checks"]'
+      optimization: '["Use multi-stage build", "Minimize image size", "Add health checks"]',
     };
 
     // Determine fallback type
@@ -622,5 +622,5 @@ export const DEFAULT_RECOVERY_STRATEGIES: RecoveryStrategy[] = [
   new JSONRepairStrategy(),
   new SimplificationStrategy(),
   new AlternativeTemplateStrategy(),
-  new FallbackDefaultStrategy()
+  new FallbackDefaultStrategy(),
 ];

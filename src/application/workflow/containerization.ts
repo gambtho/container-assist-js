@@ -12,7 +12,7 @@ import type {
   DeploymentParams,
   DeploymentResult,
   SecurityScanParams,
-  SecurityScanResult
+  SecurityScanResult,
 } from './types';
 
 /**
@@ -21,7 +21,7 @@ import type {
 export async function runContainerizationWorkflow(
   params: ContainerizationParams,
   logger: Logger,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
 ): Promise<ContainerizationResult> {
   const tracker = new SimpleProgressTracker(logger);
 
@@ -35,7 +35,7 @@ export async function runContainerizationWorkflow(
   await stepReporter.complete('Repository analysis completed', {
     repositoryPath: params.repositoryPath,
     fileCount: 25,
-    detectedLanguages: ['typescript', 'javascript']
+    detectedLanguages: ['typescript', 'javascript'],
   });
 
   // Step 2: Generate Dockerfile
@@ -49,7 +49,7 @@ export async function runContainerizationWorkflow(
 
   await dockerfileReporter.complete('Dockerfile generated', {
     dockerfilePath,
-    baseImage: params.baseImage ?? 'node:18-alpine'
+    baseImage: params.baseImage ?? 'node:18-alpine',
   });
 
   // Step 3: Build image (if requested)
@@ -65,7 +65,7 @@ export async function runContainerizationWorkflow(
 
     await buildReporter.complete('Docker image built successfully', {
       imageId,
-      size: '125MB'
+      size: '125MB',
     });
   }
 
@@ -80,18 +80,18 @@ export async function runContainerizationWorkflow(
 
     securityScanResults = {
       vulnerabilities: [],
-      summary: { total: 0, high: 0, medium: 0, low: 0 }
+      summary: { total: 0, high: 0, medium: 0, low: 0 },
     };
 
     await scanReporter.complete('Security scan completed', {
-      vulnerabilitiesFound: 0
+      vulnerabilitiesFound: 0,
     });
   }
 
   const result: ContainerizationResult = {
     dockerfilePath,
     securityScanResults,
-    manifestPaths: []
+    manifestPaths: [],
   };
 
   if (imageId) {
@@ -108,7 +108,7 @@ export async function runContainerizationWorkflow(
 export async function runDeploymentWorkflow(
   params: DeploymentParams,
   logger: Logger,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
 ): Promise<DeploymentResult> {
   const tracker = new SimpleProgressTracker(logger);
 
@@ -122,7 +122,7 @@ export async function runDeploymentWorkflow(
 
   await manifestReporter.complete('Kubernetes manifests generated', {
     manifestCount: manifestPaths.length,
-    environment: params.environment
+    environment: params.environment,
   });
 
   // Step 2: Deploy to cluster
@@ -136,7 +136,7 @@ export async function runDeploymentWorkflow(
   await deployReporter.complete('Deployment completed', {
     deploymentName,
     namespace: params.namespace ?? 'default',
-    replicas: params.replicas ?? 1
+    replicas: params.replicas ?? 1,
   });
 
   return {
@@ -144,7 +144,7 @@ export async function runDeploymentWorkflow(
     deploymentName,
     serviceName: `${deploymentName}-service`,
     ingressName: `${deploymentName}-ingress`,
-    status: 'deployed'
+    status: 'deployed',
   };
 }
 
@@ -154,7 +154,7 @@ export async function runDeploymentWorkflow(
 export async function runSecurityScanWorkflow(
   params: SecurityScanParams,
   logger: Logger,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
 ): Promise<SecurityScanResult> {
   const tracker = new SimpleProgressTracker(logger);
 
@@ -171,24 +171,24 @@ export async function runSecurityScanWorkflow(
       severity: 'MEDIUM',
       title: 'Sample vulnerability',
       description: 'This is a sample vulnerability for testing',
-      fixedVersion: '1.2.3'
-    }
+      fixedVersion: '1.2.3',
+    },
   ];
 
   const summary = {
     total: vulnerabilities.length,
     high: 0,
     medium: 1,
-    low: 0
+    low: 0,
   };
 
   await scanReporter.complete('Security scan completed', {
     vulnerabilitiesFound: vulnerabilities.length,
-    highSeverity: summary.high
+    highSeverity: summary.high,
   });
 
   return {
     vulnerabilities,
-    summary
+    summary,
   };
 }

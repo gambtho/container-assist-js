@@ -55,7 +55,7 @@ export class AIClient {
   constructor(
     private config: AIClientConfig = {},
     sampler: MCPSampler | undefined,
-    logger: Logger
+    logger: Logger,
   ) {
     this.logger = logger.child({ component: 'AIClient' });
     this.sampler = sampler;
@@ -75,7 +75,7 @@ export class AIClient {
         'AI_SAMPLER_UNAVAILABLE',
         undefined,
         undefined,
-        { operation: 'generateText' }
+        { operation: 'generateText' },
       );
     }
 
@@ -83,7 +83,7 @@ export class AIClient {
       const result = await this.sampler.sample({
         prompt: options.prompt,
         maxTokens: options.maxTokens ?? (this.config.maxTokens || 2000),
-        temperature: options.temperature ?? (this.config.temperature || 0.7)
+        temperature: options.temperature ?? (this.config.temperature || 0.7),
       });
 
       if ('error' in result) {
@@ -92,13 +92,13 @@ export class AIClient {
           'AI_GENERATION_FAILED',
           undefined,
           undefined,
-          { prompt: `${options.prompt.substring(0, 100)}...` }
+          { prompt: `${options.prompt.substring(0, 100)}...` },
         );
       }
 
       const response: AIGenerationResult = {
         text: result.text,
-        tokenCount: result.text.length // Rough estimate
+        tokenCount: result.text.length, // Rough estimate
       };
 
       if (options.model) {
@@ -116,7 +116,7 @@ export class AIClient {
         'AI_TEXT_GENERATION_FAILED',
         undefined,
         error instanceof Error ? error : undefined,
-        { operation: 'generateText' }
+        { operation: 'generateText' },
       );
     }
   }
@@ -127,7 +127,7 @@ export class AIClient {
       prompt,
       maxTokens: 2000,
       temperature: 0.7,
-      model: this.getModelPreference('dockerfile')
+      model: this.getModelPreference('dockerfile'),
     });
 
     return result.text;
@@ -138,7 +138,7 @@ export class AIClient {
     const result = await this.generateText({
       prompt,
       maxTokens: 1500,
-      temperature: 0.5
+      temperature: 0.5,
     });
 
     // Try to parse as JSON, fallback to raw text
@@ -153,7 +153,7 @@ export class AIClient {
         hasTests: false,
         hasDatabase: false,
         recommendations: [],
-        rawAnalysis: result.text
+        rawAnalysis: result.text,
       };
     }
   }
@@ -163,7 +163,7 @@ export class AIClient {
     const result = await this.generateText({
       prompt,
       maxTokens: 1000,
-      temperature: 0.6
+      temperature: 0.6,
     });
 
     // Parse suggestions from response
@@ -179,7 +179,7 @@ export class AIClient {
     const result = await this.generateText({
       prompt,
       maxTokens: 2000,
-      temperature: 0.5
+      temperature: 0.5,
     });
 
     return result.text;

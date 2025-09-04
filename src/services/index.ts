@@ -33,7 +33,7 @@ export interface Services {
 export async function initializeServices(
   config: ServicesConfig,
   logger: Logger,
-  sampler?: MCPSampler
+  sampler?: MCPSampler,
 ): Promise<Services> {
   logger.info('Initializing services...');
 
@@ -44,7 +44,7 @@ export async function initializeServices(
   const [docker, kubernetes, session] = await Promise.all([
     createDockerService(config.docker ?? {}, logger),
     createKubernetesService(config.kubernetes ?? {}, logger),
-    createSessionService(config.session ?? {}, logger)
+    createSessionService(config.session ?? {}, logger),
   ]);
 
   // Create AI service
@@ -55,9 +55,9 @@ export async function initializeServices(
       docker: true,
       kubernetes: true,
       ai: ai.isAvailable(),
-      session: true
+      session: true,
     },
-    'Services initialized'
+    'Services initialized',
   );
 
   return {
@@ -65,7 +65,7 @@ export async function initializeServices(
     kubernetes,
     ai,
     session,
-    events
+    events,
   };
 }
 
@@ -79,7 +79,7 @@ export async function cleanupServices(services: Services, logger: Logger): Promi
     await Promise.all([
       services.docker.close(),
       services.kubernetes.close(),
-      services.session.close()
+      services.session.close(),
     ]);
 
     // Clean up event emitters

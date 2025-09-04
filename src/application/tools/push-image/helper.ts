@@ -10,7 +10,7 @@ import type { ToolContext } from '../tool-types.js';
 export async function authenticateRegistry(
   registry: string,
   credentials: { username?: string; password?: string; authToken?: string },
-  context: ToolContext
+  context: ToolContext,
 ): Promise<boolean> {
   const { logger } = context;
 
@@ -19,7 +19,7 @@ export async function authenticateRegistry(
     const envAuth = {
       username: process.env.DOCKER_USERNAME,
       password: process.env.DOCKER_PASSWORD,
-      authToken: process.env.DOCKER_AUTH_TOKEN
+      authToken: process.env.DOCKER_AUTH_TOKEN,
     };
 
     if (envAuth.username ?? envAuth.authToken) {
@@ -45,7 +45,7 @@ export async function pushImage(
   tag: string,
   registry: string,
   auth: { username?: string; password?: string },
-  context: ToolContext
+  context: ToolContext,
 ): Promise<{ digest: string; size?: number; pushTime?: number }> {
   const { dockerService, logger } = context;
   const startTime = Date.now();
@@ -54,13 +54,13 @@ export async function pushImage(
     const result = await (dockerService as unknown as any).push({
       image: tag,
       registry,
-      auth: auth.username && auth.password ? auth : undefined
+      auth: auth.username && auth.password ? auth : undefined,
     });
 
     if (result.success && result.data) {
       const pushResult: { digest: string; size?: number; pushTime?: number } = {
         digest: result.data.digest,
-        pushTime: Date.now() - startTime
+        pushTime: Date.now() - startTime,
       };
 
       // Only add size if it's defined
@@ -79,7 +79,7 @@ export async function pushImage(
   return {
     digest: `sha256:${Math.random().toString(36).substring(7)}`,
     size: 100 * 1024 * 1024,
-    pushTime: Date.now() - startTime
+    pushTime: Date.now() - startTime,
   };
 }
 
@@ -91,7 +91,7 @@ export async function pushWithRetry(
   registry: string,
   auth: { username?: string; password?: string },
   context: ToolContext,
-  maxRetries: number = 3
+  maxRetries: number = 3,
 ): Promise<{ digest: string; size?: number; pushTime?: number }> {
   const { logger } = context;
   let lastError: Error | undefined;
@@ -121,7 +121,7 @@ export async function pushWithRetry(
 export async function getImagesToPush(
   tags: string[],
   sessionId: string | undefined,
-  sessionService: any
+  sessionService: any,
 ): Promise<string[]> {
   let imagesToPush = tags;
 
@@ -153,7 +153,7 @@ export async function pushImagesParallel(
   targetRegistry: string,
   auth: { username?: string; password?: string },
   retryOnFailure: boolean,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<{
   pushed: Array<{ tag: string; digest: string; size?: number; pushTime?: number }>;
   failed: Array<{ tag: string; error?: string }>;
@@ -190,7 +190,7 @@ export async function pushImagesSequential(
   auth: { username?: string; password?: string },
   retryOnFailure: boolean,
   context: ToolContext,
-  progressCallback?: (index: number, tag: string) => Promise<void>
+  progressCallback?: (index: number, tag: string) => Promise<void>,
 ): Promise<{
   pushed: Array<{ tag: string; digest: string; size?: number; pushTime?: number }>;
   failed: Array<{ tag: string; error?: string }>;
@@ -233,7 +233,7 @@ export async function pushImagesSequential(
  * Calculate push totals
  */
 export function calculatePushTotals(
-  pushed: Array<{ tag: string; digest: string; size?: number; pushTime?: number }>
+  pushed: Array<{ tag: string; digest: string; size?: number; pushTime?: number }>,
 ): { totalSize: number; totalPushTime: number } {
   const totalSize = pushed.reduce((sum, p) => sum + (p.size ?? 0), 0);
   const totalPushTime = pushed.reduce((sum, p) => sum + (p.pushTime ?? 0), 0);

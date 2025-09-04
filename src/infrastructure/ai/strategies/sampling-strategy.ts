@@ -30,8 +30,8 @@ export class SamplingStrategy {
         temperature: 0.3,
         top_p: 0.95,
         frequency_penalty: 0.1,
-        presence_penalty: 0.0
-      }
+        presence_penalty: 0.0,
+      },
     ],
     [
       TaskType.ANALYSIS,
@@ -39,8 +39,8 @@ export class SamplingStrategy {
         temperature: 0.5,
         top_p: 0.9,
         frequency_penalty: 0.0,
-        presence_penalty: 0.0
-      }
+        presence_penalty: 0.0,
+      },
     ],
     [
       TaskType.DOCUMENTATION,
@@ -48,8 +48,8 @@ export class SamplingStrategy {
         temperature: 0.7,
         top_p: 0.85,
         frequency_penalty: 0.2,
-        presence_penalty: 0.1
-      }
+        presence_penalty: 0.1,
+      },
     ],
     [
       TaskType.ERROR_DIAGNOSIS,
@@ -57,8 +57,8 @@ export class SamplingStrategy {
         temperature: 0.2,
         top_p: 0.95,
         frequency_penalty: 0.0,
-        presence_penalty: 0.0
-      }
+        presence_penalty: 0.0,
+      },
     ],
     [
       TaskType.OPTIMIZATION,
@@ -66,8 +66,8 @@ export class SamplingStrategy {
         temperature: 0.4,
         top_p: 0.9,
         frequency_penalty: 0.1,
-        presence_penalty: 0.1
-      }
+        presence_penalty: 0.1,
+      },
     ],
     [
       TaskType.CONFIGURATION,
@@ -75,9 +75,9 @@ export class SamplingStrategy {
         temperature: 0.3,
         top_p: 0.9,
         frequency_penalty: 0.05,
-        presence_penalty: 0.0
-      }
-    ]
+        presence_penalty: 0.0,
+      },
+    ],
   ]);
 
   getParams(taskType: TaskType, context?: SamplingContext): SamplingParams {
@@ -124,7 +124,7 @@ export class SamplingStrategy {
       temperature: 0.5,
       top_p: 0.9,
       frequency_penalty: 0.0,
-      presence_penalty: 0.0
+      presence_penalty: 0.0,
     };
   }
 
@@ -136,7 +136,7 @@ export class SamplingStrategy {
     return {
       ...params,
       temperature: params.temperature + tempIncrease,
-      top_p: Math.min(1.0, params.top_p + topPIncrease)
+      top_p: Math.min(1.0, params.top_p + topPIncrease),
     };
   }
 
@@ -146,14 +146,14 @@ export class SamplingStrategy {
         return {
           ...params,
           temperature: Math.max(0.1, params.temperature - 0.1),
-          top_p: Math.max(0.8, params.top_p - 0.05)
+          top_p: Math.max(0.8, params.top_p - 0.05),
         };
       case 'high':
         return {
           ...params,
           temperature: Math.min(0.8, params.temperature + 0.1),
           top_p: Math.min(0.95, params.top_p + 0.05),
-          presence_penalty: Math.min(0.5, params.presence_penalty + 0.1)
+          presence_penalty: Math.min(0.5, params.presence_penalty + 0.1),
         };
       default:
         return params;
@@ -166,7 +166,7 @@ export class SamplingStrategy {
       return {
         ...params,
         temperature: Math.max(0.1, params.temperature - 0.1),
-        frequency_penalty: Math.min(1.0, params.frequency_penalty + 0.1)
+        frequency_penalty: Math.min(1.0, params.frequency_penalty + 0.1),
       };
     }
 
@@ -174,7 +174,7 @@ export class SamplingStrategy {
     if (contentLength < 1000) {
       return {
         ...params,
-        temperature: Math.min(0.8, params.temperature + 0.1)
+        temperature: Math.min(0.8, params.temperature + 0.1),
       };
     }
 
@@ -188,7 +188,7 @@ export class SamplingStrategy {
         return {
           ...params,
           temperature: Math.max(0.1, params.temperature - 0.2),
-          top_p: Math.max(0.7, params.top_p - 0.1)
+          top_p: Math.max(0.7, params.top_p - 0.1),
         };
       case 'thorough':
         // Higher creativity for more thorough exploration
@@ -196,7 +196,7 @@ export class SamplingStrategy {
           ...params,
           temperature: Math.min(0.7, params.temperature + 0.1),
           top_p: Math.min(0.95, params.top_p + 0.05),
-          presence_penalty: Math.min(0.3, params.presence_penalty + 0.1)
+          presence_penalty: Math.min(0.3, params.presence_penalty + 0.1),
         };
       default:
         return params;
@@ -212,7 +212,7 @@ export class SamplingStrategy {
         ...params,
         temperature: Math.max(0.1, params.temperature - 0.15),
         top_p: Math.max(0.8, params.top_p - 0.1),
-        frequency_penalty: Math.min(1.0, params.frequency_penalty + 0.1)
+        frequency_penalty: Math.min(1.0, params.frequency_penalty + 0.1),
       };
     }
 
@@ -224,7 +224,7 @@ export class SamplingStrategy {
       temperature: Math.max(0.0, Math.min(1.0, params.temperature)),
       top_p: Math.max(0.1, Math.min(1.0, params.top_p)),
       frequency_penalty: Math.max(-2.0, Math.min(2.0, params.frequency_penalty)),
-      presence_penalty: Math.max(-2.0, Math.min(2.0, params.presence_penalty))
+      presence_penalty: Math.max(-2.0, Math.min(2.0, params.presence_penalty)),
     };
   }
 
@@ -235,7 +235,7 @@ export class SamplingStrategy {
       complexity: 'medium',
       timeConstraint: 'standard',
       previousErrors: [],
-      ...options
+      ...options,
     };
   }
 
@@ -257,7 +257,7 @@ export class SamplingStrategy {
   // Analyze the effectiveness of current parameters (for optimization)
   analyzeEffectiveness(
     _taskType: TaskType,
-    results: Array<{ params: SamplingParams; success: boolean; quality: number }>
+    results: Array<{ params: SamplingParams; success: boolean; quality: number }>,
   ): AnalysisResult {
     const successful = results.filter((r) => r.success);
 
@@ -294,7 +294,7 @@ export class SamplingStrategy {
       confidence,
       successRate,
       avgQuality,
-      sampleSize: results.length
+      sampleSize: results.length,
     };
   }
 }

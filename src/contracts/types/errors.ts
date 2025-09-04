@@ -92,20 +92,20 @@ export class DomainError extends Error {
       message: string;
       stack?: string;
     };
-  } {
+    } {
     return {
       name: this.name,
       code: this.code,
       message: this.message,
-      metadata: this.metadata,
-      stack: this.stack,
-      cause: this.cause
-        ? {
-            name: this.cause.name,
-            message: this.cause.message,
-            stack: this.cause.stack
-          }
-        : undefined
+      ...(this.metadata !== undefined && { metadata: this.metadata }),
+      ...(this.stack !== undefined && { stack: this.stack }),
+      ...(this.cause !== undefined && { 
+        cause: {
+          name: this.cause.name,
+          message: this.cause.message,
+          ...(this.cause.stack !== undefined && { stack: this.cause.stack }),
+        }
+      }),
     };
   }
 }
@@ -145,20 +145,20 @@ export class InfrastructureError extends Error {
       message: string;
       stack?: string;
     };
-  } {
+    } {
     return {
       name: this.name,
       code: this.code,
       message: this.message,
-      metadata: this.metadata,
-      stack: this.stack,
-      cause: this.cause
-        ? {
-            name: this.cause.name,
-            message: this.cause.message,
-            stack: this.cause.stack
-          }
-        : undefined
+      ...(this.metadata !== undefined && { metadata: this.metadata }),
+      ...(this.stack !== undefined && { stack: this.stack }),
+      ...(this.cause !== undefined && { 
+        cause: {
+          name: this.cause.name,
+          message: this.cause.message,
+          ...(this.cause.stack !== undefined && { stack: this.cause.stack }),
+        }
+      }),
     };
   }
 }
@@ -198,20 +198,20 @@ export class ServiceError extends Error {
       message: string;
       stack?: string;
     };
-  } {
+    } {
     return {
       name: this.name,
       code: this.code,
       message: this.message,
-      metadata: this.metadata,
-      stack: this.stack,
-      cause: this.cause
-        ? {
-            name: this.cause.name,
-            message: this.cause.message,
-            stack: this.cause.stack
-          }
-        : undefined
+      ...(this.metadata !== undefined && { metadata: this.metadata }),
+      ...(this.stack !== undefined && { stack: this.stack }),
+      ...(this.cause !== undefined && { 
+        cause: {
+          name: this.cause.name,
+          message: this.cause.message,
+          ...(this.cause.stack !== undefined && { stack: this.cause.stack }),
+        }
+      }),
     };
   }
 }
@@ -223,7 +223,7 @@ export class ValidationError extends DomainError {
   constructor(
     message: string,
     public readonly fields?: Record<string, string[]>,
-    cause?: Error
+    cause?: Error,
   ) {
     super(ErrorCode.ValidationFailed, message, cause, { fields });
     this.name = 'ValidationError';
@@ -239,7 +239,7 @@ export class ToolError extends ServiceError {
     message: string,
     code: ErrorCode = ErrorCode.ToolExecutionFailed,
     cause?: Error,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ) {
     super(code, message, cause, { ...metadata, toolName });
     this.name = 'ToolError';
@@ -255,7 +255,7 @@ export class WorkflowError extends DomainError {
     public readonly step: string,
     message: string,
     cause?: Error,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ) {
     super(ErrorCode.WorkflowStepFailed, message, cause, { ...metadata, workflowId, step });
     this.name = 'WorkflowError';
@@ -271,7 +271,7 @@ export function isRetryable(error: Error): boolean {
       ErrorCode.DockerError,
       ErrorCode.KubernetesError,
       ErrorCode.ServiceUnavailable,
-      ErrorCode.ResourceExhausted
+      ErrorCode.ResourceExhausted,
     ].includes(error.code);
   }
 
@@ -373,6 +373,6 @@ export function normalizeError(error: unknown): DomainError | InfrastructureErro
 
   // Handle non-Error objects
   return new ServiceError(ErrorCode.UnknownError, String(error), undefined, {
-    originalError: error
+    originalError: error,
   });
 }

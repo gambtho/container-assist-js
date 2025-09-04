@@ -22,7 +22,7 @@ export interface AIConfig {
 export function createAIService(
   config: AIConfig,
   sampler: MCPSampler | undefined,
-  logger: Logger
+  logger: Logger,
 ): AIService {
   return new AIService(config, sampler, logger);
 }
@@ -53,7 +53,7 @@ export class AIService {
 
   async analyzeRepository(
     repoPath: string,
-    files?: string[]
+    files?: string[],
   ): Promise<{
     language: string;
     buildSystem: string;
@@ -90,7 +90,7 @@ let _aiService: AIService | undefined;
 export function getAIService(
   config: AIConfig,
   sampler: MCPSampler | undefined,
-  logger: Logger
+  logger: Logger,
 ): AIService {
   if (!_aiService) {
     _aiService = createAIService(config, sampler, logger);

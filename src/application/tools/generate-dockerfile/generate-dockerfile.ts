@@ -8,7 +8,7 @@ import { promises as fs } from 'node:fs';
 import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
 import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
 import type { ToolDescriptor, ToolContext } from '../tool-types.js';
-import type { AnalysisResult } from '../../../contracts/types/session.js';
+import type { AnalysisResult, Session } from '../../../contracts/types/session.js';
 
 interface DockerfileStage {
   name: string;
@@ -44,7 +44,7 @@ const GenerateDockerfileInput = z
     custom_instructions: z.string().optional(),
     customInstructions: z.string().optional(),
     force_regenerate: z.boolean().default(false),
-    forceRegenerate: z.boolean().optional()
+    forceRegenerate: z.boolean().optional(),
   })
   .transform((data) => ({
     sessionId: data.session_id ?? (data.sessionId || ''),
@@ -58,7 +58,7 @@ const GenerateDockerfileInput = z
     includeSecurityScanning: data.include_security_scanning ?? data.includeSecurityScanning ?? true,
     customCommands: data.custom_commands ?? (data.customCommands || []),
     customInstructions: data.custom_instructions ?? data.customInstructions ?? undefined,
-    forceRegenerate: data.force_regenerate ?? data.forceRegenerate ?? false
+    forceRegenerate: data.force_regenerate ?? data.forceRegenerate ?? false,
   }));
 
 // Output schema
@@ -71,8 +71,8 @@ const GenerateDockerfileOutput = z.object({
     z.object({
       name: z.string(),
       baseImage: z.string(),
-      purpose: z.string()
-    })
+      purpose: z.string(),
+    }),
   ),
   optimizations: z.array(z.string()),
   warnings: z.array(z.string()).optional(),
@@ -82,9 +82,9 @@ const GenerateDockerfileOutput = z.object({
       layers: z.number().optional(),
       securityFeatures: z.array(z.string()).optional(),
       buildTime: z.string().optional(),
-      generated: z.string()
+      generated: z.string(),
     })
-    .optional()
+    .optional(),
 });
 
 // Type aliases
@@ -181,7 +181,7 @@ COPY --from=builder --chown=app:app /app/main .
 USER app
 EXPOSE 8080
 CMD ["./main"]
-`
+`,
 };
 
 /**
@@ -190,7 +190,7 @@ CMD ["./main"]
 async function generateDockerfileContent(
   analysis: AnalysisResult,
   options: DockerfileInput,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<DockerfileGenerationResult> {
   const { logger, aiService } = context;
 
@@ -212,14 +212,14 @@ async function generateDockerfileContent(
           optimization: options.optimization,
           multistage: options.multistage,
           securityHardening: options.securityHardening,
-          includeHealthcheck: options.includeHealthcheck
+          includeHealthcheck: options.includeHealthcheck,
         })
         .withVariables({
           customInstructions: options.customInstructions ?? '',
-          customCommands: options.customCommands?.join('\n') || ''
+          customCommands: options.customCommands?.join('\n') || '',
         });
 
-      const result = await aiService.generate<string>(requestBuilder);
+      const result = await (aiService as any).generate(requestBuilder);
 
       if (result.data) {
         baseTemplate = result.data;
@@ -230,9 +230,9 @@ async function generateDockerfileContent(
             model: result.metadata.model,
             tokensUsed: result.metadata.tokensUsed,
             fromCache: result.metadata.fromCache,
-            durationMs: result.metadata.durationMs
+            durationMs: result.metadata.durationMs,
           },
-          'AI-generated Dockerfile successfully'
+          'AI-generated Dockerfile successfully',
         );
       }
     } else {
@@ -306,7 +306,7 @@ ${options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}`;
       stages.push({
         name: match[1],
         baseImage,
-        purpose: match[1] === 'builder' ? 'Build dependencies and compile' : 'Runtime environment'
+        purpose: match[1] === 'builder' ? 'Build dependencies and compile' : 'Runtime environment',
       });
     }
   }
@@ -318,7 +318,7 @@ ${options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}`;
       stages.push({
         name: 'runtime',
         baseImage: finalFrom[1],
-        purpose: 'Single-stage runtime'
+        purpose: 'Single-stage runtime',
       });
     }
   }
@@ -483,7 +483,7 @@ function getRecommendedBaseImage(language: string): string {
     go: 'golang:1.21-alpine',
     rust: 'rust:1.75-slim',
     ruby: 'ruby:3.2-slim',
-    php: 'php:8.2-fpm-alpine'
+    php: 'php:8.2-fpm-alpine',
   };
 
   return imageMap[language] || 'alpine:latest';
@@ -539,7 +539,7 @@ function estimateImageSize(language: string, dependencies: string[], multistage:
     'python:3.11-slim': 120,
     'openjdk:17-jdk-slim': 420,
     'golang:1.21-alpine': 350,
-    'alpine:latest': 5
+    'alpine:latest': 5,
   };
 
   let estimatedSize = baseSizes[language] || 100;
@@ -577,9 +577,9 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
       {
         sessionId,
         optimization: input.optimization,
-        multistage: input.multistage
+        multistage: input.multistage,
       },
-      'Starting Dockerfile generation'
+      'Starting Dockerfile generation',
     );
 
     try {
@@ -597,7 +597,7 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
       if (!analysis) {
         throw new DomainError(
           ErrorCode.VALIDATION_ERROR,
-          'No analysis result found. Run analyze_repository first'
+          'No analysis result found. Run analyze_repository first',
         );
       }
 
@@ -620,8 +620,8 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
             optimizations: ['Using existing Dockerfile'],
             warnings: analyzeDockerfileSecurity(existingContent),
             metadata: {
-              generated: new Date().toISOString()
-            }
+              generated: new Date().toISOString(),
+            },
           };
         } catch {
           // File doesn't exist, continue with generation
@@ -635,7 +635,7 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
           step: 'generate_dockerfile',
           status: 'in_progress',
           message: 'Generating optimized Dockerfile',
-          progress: 0.3
+          progress: 0.3,
         });
       }
 
@@ -643,7 +643,7 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
       const { content, stages, optimizations } = await generateDockerfileContent(
         analysis,
         input,
-        context
+        context,
       );
 
       // Analyze for security issues
@@ -656,7 +656,7 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
           step: 'generate_dockerfile',
           status: 'in_progress',
           message: 'Writing Dockerfile',
-          progress: 0.8
+          progress: 0.8,
         });
       }
 
@@ -671,8 +671,8 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
       // Estimate size
       const estimatedSize = estimateImageSize(
         analysis.language,
-        (analysis.dependencies ?? []).map((dep) => dep.name),
-        input.multistage
+        (analysis.dependencies ?? []).map((dep: { name: string; version?: string; type?: string }) => dep.name),
+        input.multistage,
       );
 
       // Build metadata
@@ -682,14 +682,14 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
         securityFeatures: [
           input.securityHardening ? 'Non-root user' : '',
           input.includeHealthcheck ? 'Health check' : '',
-          input.multistage ? 'Multi-stage build' : ''
+          input.multistage ? 'Multi-stage build' : '',
         ].filter(Boolean),
         buildTime: analysis.build_system?.build_command,
-        generated: new Date().toISOString()
+        generated: new Date().toISOString(),
       };
 
       // Update session with Dockerfile info
-      await sessionService.updateAtomic(sessionId, (session) => ({
+      await sessionService.updateAtomic(sessionId, (session: Session) => ({
         ...session,
         workflow_state: {
           ...session.workflow_state,
@@ -699,9 +699,9 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
             base_image: baseImage,
             stages: [],
             optimizations,
-            multistage: input.multistage ?? false
-          }
-        }
+            multistage: input.multistage ?? false,
+          },
+        },
       }));
 
       // Emit completion
@@ -711,7 +711,7 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
           step: 'generate_dockerfile',
           status: 'completed',
           message: 'Dockerfile generated successfully',
-          progress: 1.0
+          progress: 1.0,
         });
       }
 
@@ -719,9 +719,9 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
         {
           path: dockerfilePath,
           stages: stages ? stages.length : 0,
-          warnings: warnings.length
+          warnings: warnings.length,
         },
-        'Dockerfile generated successfully'
+        'Dockerfile generated successfully',
       );
 
       const result: any = {
@@ -729,7 +729,7 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
         dockerfile: content,
         path: dockerfilePath,
         baseImage,
-        metadata
+        metadata,
       };
 
       if (stages && stages.length > 0) {
@@ -753,7 +753,7 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
           sessionId,
           step: 'generate_dockerfile',
           status: 'failed',
-          message: 'Dockerfile generation failed'
+          message: 'Dockerfile generation failed',
         });
       }
 
@@ -767,9 +767,9 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
     paramMapper: (output) => ({
       session_id: output.path.includes('/') ? undefined : output.path,
       dockerfile_path: output.path,
-      tags: [`app:${Date.now()}`]
-    })
-  }
+      tags: [`app:${Date.now()}`],
+    }),
+  },
 };
 
 // Default export for registry

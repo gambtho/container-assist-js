@@ -40,7 +40,7 @@ export function validateConfig(config: ApplicationConfig): ValidationResult {
   if (config.session.maxSessions > 1000) {
     warnings.push({
       path: 'session.maxSessions',
-      message: 'Large number of sessions may impact performance'
+      message: 'Large number of sessions may impact performance',
     });
   }
 
@@ -59,7 +59,7 @@ export function validateConfig(config: ApplicationConfig): ValidationResult {
   if (config.features.aiEnabled && !config.aiServices.ai.apiKey && !config.features.mockMode) {
     warnings.push({
       path: 'aiServices.ai.apiKey',
-      message: 'AI enabled but no API key provided - consider enabling mock mode'
+      message: 'AI enabled but no API key provided - consider enabling mock mode',
     });
   }
 
@@ -81,19 +81,19 @@ export function validateConfig(config: ApplicationConfig): ValidationResult {
 
   if (
     !['low', 'medium', 'high', 'critical'].includes(
-      config.infrastructure.scanning.severityThreshold
+      config.infrastructure.scanning.severityThreshold,
     )
   ) {
     errors.push({
       path: 'infrastructure.scanning.severityThreshold',
-      message: 'Must be low, medium, high, or critical'
+      message: 'Must be low, medium, high, or critical',
     });
   }
 
   return {
     isValid: errors.length === 0,
     errors,
-    warnings
+    warnings,
   };
 }
 
@@ -109,7 +109,7 @@ export function validatePartialConfig(config: Partial<ApplicationConfig>): Valid
       sessionTTL: '24h',
       maxSessions: 100,
       enableMetrics: false,
-      enableEvents: true
+      enableEvents: true,
     },
     session: {
       store: 'memory',
@@ -117,7 +117,7 @@ export function validatePartialConfig(config: Partial<ApplicationConfig>): Valid
       maxSessions: 100,
       persistencePath: './data/sessions.db',
       persistenceInterval: 3600,
-      cleanupInterval: 3600
+      cleanupInterval: 3600,
     },
     workspace: { workspaceDir: process.cwd(), tempDir: './tmp', cleanupOnExit: true },
     infrastructure: {
@@ -127,14 +127,14 @@ export function validatePartialConfig(config: Partial<ApplicationConfig>): Valid
         host: 'localhost',
         port: 2376,
         timeout: 300000,
-        apiVersion: '1.41'
+        apiVersion: '1.41',
       },
       kubernetes: {
         kubeconfig: '',
         namespace: 'default',
         context: '',
         timeout: 300000,
-        dryRun: false
+        dryRun: false,
       },
       scanning: {
         enabled: true,
@@ -142,7 +142,7 @@ export function validatePartialConfig(config: Partial<ApplicationConfig>): Valid
         severityThreshold: 'high',
         failOnVulnerabilities: false,
         skipUpdate: false,
-        timeout: 300000
+        timeout: 300000,
       },
       build: {
         enableCache: true,
@@ -151,15 +151,15 @@ export function validatePartialConfig(config: Partial<ApplicationConfig>): Valid
         buildArgs: {},
         labels: {},
         target: '',
-        squash: false
+        squash: false,
       },
       java: {
         defaultVersion: '17',
         defaultJvmHeapPercentage: 75,
         enableNativeImage: false,
         enableJmx: false,
-        enableProfiling: false
-      }
+        enableProfiling: false,
+      },
     },
     aiServices: {
       ai: {
@@ -170,14 +170,14 @@ export function validatePartialConfig(config: Partial<ApplicationConfig>): Valid
         retryAttempts: 3,
         retryDelayMs: 1000,
         temperature: 0.1,
-        maxTokens: 4096
+        maxTokens: 4096,
       },
       sampler: {
         mode: 'auto',
         templateDir: './templates',
         cacheEnabled: true,
         retryAttempts: 3,
-        retryDelayMs: 1000
+        retryDelayMs: 1000,
       },
       mock: {
         enabled: false,
@@ -185,8 +185,8 @@ export function validatePartialConfig(config: Partial<ApplicationConfig>): Valid
         deterministicMode: false,
         simulateLatency: false,
         errorRate: 0,
-        latencyRange: { min: 100, max: 500 }
-      }
+        latencyRange: { min: 100, max: 500 },
+      },
     },
     logging: {
       level: 'info',
@@ -195,7 +195,7 @@ export function validatePartialConfig(config: Partial<ApplicationConfig>): Valid
       filePath: './logs/app.log',
       maxFileSize: '10MB',
       maxFiles: 5,
-      enableColors: true
+      enableColors: true,
     },
     workflow: {
       mode: 'interactive',
@@ -203,7 +203,7 @@ export function validatePartialConfig(config: Partial<ApplicationConfig>): Valid
       maxRetries: 3,
       retryDelayMs: 5000,
       parallelSteps: false,
-      skipOptionalSteps: false
+      skipOptionalSteps: false,
     },
     features: {
       aiEnabled: true,
@@ -213,8 +213,8 @@ export function validatePartialConfig(config: Partial<ApplicationConfig>): Valid
       enablePerformanceMonitoring: false,
       enableDebugLogs: false,
       enableTracing: false,
-      nonInteractive: false
-    }
+      nonInteractive: false,
+    },
   };
 
   // Deep merge the partial config

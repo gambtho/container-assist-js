@@ -7,7 +7,7 @@ import {
   WorkflowState,
   SessionSchema,
   WorkflowStep,
-  getWorkflowSteps
+  getWorkflowSteps,
 } from '../../contracts/types/session.js';
 import { randomBytes } from 'crypto';
 
@@ -41,9 +41,9 @@ export class SessionUtils {
         completed_steps: [],
         errors: {},
         metadata: {},
-        dockerfile_fix_history: []
+        dockerfile_fix_history: [],
       },
-      ...partial
+      ...partial,
     };
 
     // Validate the session
@@ -72,7 +72,7 @@ export class SessionUtils {
     return {
       current: completed,
       total: allSteps.length,
-      percentage: Math.round((completed / allSteps.length) * 100)
+      percentage: Math.round((completed / allSteps.length) * 100),
     };
   }
 
@@ -90,7 +90,7 @@ export class SessionUtils {
       k8s_result: 'k8s_generation',
       cluster_result: 'cluster_preparation',
       deployment_result: 'deployment',
-      verification_result: 'verification'
+      verification_result: 'verification',
     };
 
     // Find the last completed stage
@@ -111,7 +111,7 @@ export class SessionUtils {
         [WorkflowStep.GENERATE_K8S]: 'k8s_generation',
         [WorkflowStep.PREPARE_CLUSTER]: 'cluster_preparation',
         [WorkflowStep.DEPLOY]: 'deployment',
-        [WorkflowStep.VERIFY]: 'verification'
+        [WorkflowStep.VERIFY]: 'verification',
       };
       return stepToStage[state.current_step] || 'initialized';
     }
@@ -126,7 +126,7 @@ export class SessionUtils {
     // Deep merge, preserving arrays
     const merged = {
       ...current,
-      ...update
+      ...update,
     };
 
     // Special handling for arrays to avoid overwriting
@@ -140,7 +140,7 @@ export class SessionUtils {
     if (update.errors && current.errors) {
       merged.errors = {
         ...current.errors,
-        ...update.errors
+        ...update.errors,
       };
     }
 
@@ -148,7 +148,7 @@ export class SessionUtils {
     if (update.metadata && current.metadata) {
       merged.metadata = {
         ...current.metadata,
-        ...update.metadata
+        ...update.metadata,
       };
     }
 
@@ -170,9 +170,9 @@ export class SessionUtils {
       workflow_state: {
         ...session.workflow_state,
         completed_steps: completedSteps,
-        current_step: null
+        current_step: null,
       },
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
   }
 
@@ -184,9 +184,9 @@ export class SessionUtils {
       ...session,
       workflow_state: {
         ...session.workflow_state,
-        current_step: step
+        current_step: step,
       },
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
   }
 
@@ -202,11 +202,11 @@ export class SessionUtils {
         ...session.workflow_state,
         errors: {
           ...session.workflow_state.errors,
-          [step]: errorMessage
-        }
+          [step]: errorMessage,
+        },
       },
       status: 'failed',
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
   }
 

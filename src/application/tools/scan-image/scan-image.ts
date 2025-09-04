@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { DockerScanResult } from '../../../contracts/types/index.js';
 import { DomainError, ErrorCode } from '../../../contracts/types/errors.js';
 import type { ToolDescriptor, ToolContext } from '../tool-types.js';
+import type { Session } from '../../../contracts/types/session.js';
 
 // Input schema with support for both snake_case and camelCase
 const ScanImageInput = z
@@ -23,7 +24,7 @@ const ScanImageInput = z
     ignore_unfixed: z.boolean().default(false),
     ignoreUnfixed: z.boolean().optional(),
     scan_layers: z.boolean().default(true),
-    scanLayers: z.boolean().optional()
+    scanLayers: z.boolean().optional(),
   })
   .transform((data) => ({
     sessionId: data.session_id ?? data.sessionId,
@@ -33,7 +34,7 @@ const ScanImageInput = z
     severityThreshold: data.severity_threshold ?? (data.severityThreshold || 'high'),
     format: data.format,
     ignoreUnfixed: data.ignore_unfixed ?? data.ignoreUnfixed ?? false,
-    scanLayers: data.scan_layers ?? data.scanLayers ?? true
+    scanLayers: data.scan_layers ?? data.scanLayers ?? true,
   }));
 
 // Output schema
@@ -48,8 +49,8 @@ const ScanImageOutput = z.object({
       fixedVersion: z.string().optional(),
       description: z.string().optional(),
       publishedDate: z.string().optional(),
-      score: z.number().optional()
-    })
+      score: z.number().optional(),
+    }),
   ),
   summary: z.object({
     critical: z.number(),
@@ -57,12 +58,12 @@ const ScanImageOutput = z.object({
     medium: z.number(),
     low: z.number(),
     total: z.number(),
-    fixable: z.number()
+    fixable: z.number(),
   }),
   sbom: z
     .object({
       packages: z.number(),
-      licenses: z.array(z.string()).optional()
+      licenses: z.array(z.string()).optional(),
     })
     .optional(),
   scanTime: z.string(),
@@ -72,10 +73,10 @@ const ScanImageOutput = z.object({
       size: z.number().optional(),
       layers: z.number().optional(),
       os: z.string().optional(),
-      architecture: z.string().optional()
+      architecture: z.string().optional(),
     })
     .optional(),
-  recommendations: z.array(z.string()).optional()
+  recommendations: z.array(z.string()).optional(),
 });
 
 // Type aliases
@@ -89,7 +90,7 @@ const SEVERITY_PRIORITY: Record<string, number> = {
   critical: 4,
   high: 3,
   medium: 2,
-  low: 1
+  low: 1,
 };
 
 /**
@@ -97,11 +98,11 @@ const SEVERITY_PRIORITY: Record<string, number> = {
  */
 function filterBySeverity(
   vulnerabilities: DockerScanResult['vulnerabilities'],
-  threshold: string
+  threshold: string,
 ): DockerScanResult['vulnerabilities'] {
   const thresholdPriority = SEVERITY_PRIORITY[threshold] || 0;
   return vulnerabilities.filter(
-    (vuln) => (SEVERITY_PRIORITY[vuln.severity] || 0) >= thresholdPriority
+    (vuln) => (SEVERITY_PRIORITY[vuln.severity] || 0) >= thresholdPriority,
   );
 }
 
@@ -110,7 +111,7 @@ function filterBySeverity(
  */
 function generateRecommendations(
   vulnerabilities: DockerScanResult['vulnerabilities'],
-  summary: DockerScanResult['summary']
+  summary: DockerScanResult['summary'],
 ): string[] {
   const recommendations: string[] = [];
 
@@ -143,7 +144,7 @@ function generateRecommendations(
   const fixableVulns = vulnerabilities.filter((v) => v.fixedVersion);
   if (fixableVulns.length > 0) {
     recommendations.push(
-      `${fixableVulns.length} vulnerabilities have fixes available - run updates`
+      `${fixableVulns.length} vulnerabilities have fixes available - run updates`,
     );
   }
 
@@ -168,17 +169,17 @@ async function mockScan(_imageId: string): Promise<DockerScanResult> {
         package: 'example-package',
         version: '1.0.0',
         fixedVersion: '1.0.1',
-        description: 'Mock vulnerability for testing'
-      }
+        description: 'Mock vulnerability for testing',
+      },
     ],
     summary: {
       critical: 0,
       high: 1,
       medium: 2,
       low: 3,
-      total: 6
+      total: 6,
     },
-    scanTime: new Date().toISOString()
+    scanTime: new Date().toISOString(),
   };
 }
 
@@ -201,7 +202,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
       scanner,
       severityThreshold,
       ignoreUnfixed,
-      scanLayers: _scanLayers
+      scanLayers: _scanLayers,
     } = input;
 
     logger.info(
@@ -210,9 +211,9 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
         imageId,
         imageTag,
         scanner,
-        severityThreshold
+        severityThreshold,
       },
-      'Starting image security scan'
+      'Starting image security scan',
     );
 
     try {
@@ -239,7 +240,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
           step: 'scan_image',
           status: 'in_progress',
           message: `Scanning image ${scanTarget}`,
-          progress: 0.2
+          progress: 0.2,
         });
       }
 
@@ -250,7 +251,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
         // Use Docker service for scanning
         logger.info('Using Docker service for vulnerability scan');
         if ('scan' in dockerService) {
-          const result = await (dockerService as any).scan(scanTarget);
+          const result = await (dockerService).scan(scanTarget);
 
           if (!result.success ?? !result.data) {
             throw new Error(result.error?.message ?? 'Scan failed');
@@ -272,14 +273,14 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
           step: 'scan_image',
           status: 'in_progress',
           message: 'Analyzing vulnerabilities',
-          progress: 0.7
+          progress: 0.7,
         });
       }
 
       // Filter vulnerabilities based on threshold
       const filteredVulnerabilities = filterBySeverity(
         scanResult.vulnerabilities,
-        severityThreshold
+        severityThreshold,
       );
 
       // Filter unfixed if requested
@@ -289,7 +290,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
 
       // Sort by severity
       finalVulnerabilities.sort(
-        (a, b) => (SEVERITY_PRIORITY[b.severity] || 0) - (SEVERITY_PRIORITY[a.severity] || 0)
+        (a, b) => (SEVERITY_PRIORITY[b.severity] || 0) - (SEVERITY_PRIORITY[a.severity] || 0),
       );
 
       // Calculate fixable count
@@ -307,43 +308,43 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
           package: v.package,
           version: v.version,
           fixedVersion: v.fixedVersion,
-          description: v.description
+          description: v.description,
         })),
         summary: {
           ...scanResult.summary,
-          fixable: fixableCount
+          fixable: fixableCount,
         },
         sbom: {
           packages: 0, // Would be populated by actual scanner
-          licenses: []
+          licenses: [],
         },
         scanTime: String(
           (typeof scanResult.scanTime === 'number'
             ? scanResult.scanTime
-            : parseInt(String(scanResult.scanTime), 10)) || 0
+            : parseInt(String(scanResult.scanTime), 10)) || 0,
         ),
         scanner: scanner === 'auto' ? 'trivy' : (scanner ?? 'trivy'),
         imageDetails:
           sessionId && sessionService
             ? await (async () => {
-                const session = await sessionService.get(sessionId);
-                const buildResult = session?.workflow_state?.build_result;
-                return buildResult
-                  ? {
-                      size: buildResult.size ?? 0,
-                      layers: Array.isArray(buildResult.layers) ? buildResult.layers.length : 0,
-                      os: 'linux',
-                      architecture: 'amd64'
-                    }
-                  : undefined;
-              })()
+              const session = await sessionService.get(sessionId);
+              const buildResult = session?.workflow_state?.build_result;
+              return buildResult
+                ? {
+                  size: buildResult.size ?? 0,
+                  layers: Array.isArray(buildResult.layers) ? buildResult.layers.length : 0,
+                  os: 'linux',
+                  architecture: 'amd64',
+                }
+                : undefined;
+            })()
             : undefined,
-        recommendations
+        recommendations,
       };
 
       // Update session with scan results
       if (sessionId && sessionService) {
-        await sessionService.updateAtomic(sessionId, (session) => ({
+        await sessionService.updateAtomic(sessionId, (session: Session) => ({
           ...session,
           workflow_state: {
             ...session.workflow_state,
@@ -355,13 +356,13 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
                 package: vuln.package,
                 version: vuln.version,
                 fixed_version: vuln.fixedVersion,
-                description: vuln.description
+                description: vuln.description,
               })),
               summary: output.summary,
               scan_duration_ms:
-                typeof output.scanTime === 'string' ? parseInt(output.scanTime) : output.scanTime
-            }
-          }
+                typeof output.scanTime === 'string' ? parseInt(output.scanTime) : output.scanTime,
+            },
+          },
         }));
       }
 
@@ -372,7 +373,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
           step: 'scan_image',
           status: 'completed',
           message: `Scan complete: ${output.summary.total} vulnerabilities found`,
-          progress: 1.0
+          progress: 1.0,
         });
       }
 
@@ -382,9 +383,9 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
           total: output.summary.total,
           critical: output.summary.critical,
           high: output.summary.high,
-          fixable: output.summary.fixable
+          fixable: output.summary.fixable,
         },
-        'Security scan completed'
+        'Security scan completed',
       );
 
       // Fail if critical vulnerabilities found and threshold is strict
@@ -392,7 +393,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
         logger.error('Critical vulnerabilities found, failing scan');
         throw new DomainError(
           ErrorCode.VALIDATION_ERROR,
-          `Found ${output.summary.critical} critical vulnerabilities`
+          `Found ${output.summary.critical} critical vulnerabilities`,
         );
       }
 
@@ -406,7 +407,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
           step: 'scan_image',
           status: 'failed',
           message: 'Security scan failed',
-          progress: 0
+          progress: 0,
         });
       }
 
@@ -419,9 +420,9 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
     reason: 'Tag the scanned image for registry push',
     paramMapper: (output) => ({
       scan_passed: output.summary.critical === 0,
-      vulnerabilities: output.summary.total
-    })
-  }
+      vulnerabilities: output.summary.total,
+    }),
+  },
 };
 
 // Default export for registry

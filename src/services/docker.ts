@@ -9,7 +9,7 @@ import {
   DockerBuildOptions,
   DockerBuildResult,
   DockerScanResult,
-  ScanOptions
+  ScanOptions,
 } from '../contracts/types/index.js';
 
 export interface DockerServiceConfig {
@@ -63,7 +63,7 @@ export class DockerService {
       Size?: number;
       Created?: number;
     }>
-  > {
+    > {
     return this.client.listImages() as Promise<
       Array<{
         Id: string;
@@ -106,7 +106,7 @@ export class DockerService {
       client?: DockerClient;
     } = {
       available: healthStatus.available,
-      status: 'healthy'
+      status: 'healthy',
     };
 
     if (healthStatus.version !== undefined) {
@@ -179,7 +179,7 @@ export class DockerService {
  */
 export async function createDockerService(
   config: DockerServiceConfig,
-  logger: Logger
+  logger: Logger,
 ): Promise<DockerService> {
   const service = new DockerService(config, logger);
   await service.initialize();

@@ -32,7 +32,7 @@ export class MockSampler implements MCPSampler {
     this.defaultResponse = {
       text: 'This is a mock AI response.',
       tokenCount: 10,
-      model: 'mock-model'
+      model: 'mock-model',
     };
 
     // Initialize with common templates
@@ -47,9 +47,9 @@ export class MockSampler implements MCPSampler {
     this.logger.debug(
       {
         pattern: template.pattern.toString(),
-        hasDelay: !!template.delay
+        hasDelay: !!template.delay,
       },
-      'Added mock template'
+      'Added mock template',
     );
   }
 
@@ -87,15 +87,15 @@ export class MockSampler implements MCPSampler {
         callCount: this.callCount,
         promptLength: request.prompt.length,
         temperature: request.temperature,
-        available: this.available
+        available: this.available,
       },
-      'Mock sampling'
+      'Mock sampling',
     );
 
     if (!this.available) {
       return {
         error: 'Mock sampler is not available',
-        code: 'SAMPLER_UNAVAILABLE'
+        code: 'SAMPLER_UNAVAILABLE',
       };
     }
 
@@ -111,7 +111,7 @@ export class MockSampler implements MCPSampler {
         if (template.failureRate && Math.random() < template.failureRate) {
           return {
             error: 'Mock failure triggered',
-            code: 'MOCK_FAILURE'
+            code: 'MOCK_FAILURE',
           };
         }
 
@@ -122,7 +122,7 @@ export class MockSampler implements MCPSampler {
 
         return {
           ...template.response,
-          model: request.model ?? template.response.model
+          model: request.model ?? template.response.model,
         };
       }
     }
@@ -130,7 +130,7 @@ export class MockSampler implements MCPSampler {
     // Return default response
     return {
       ...this.defaultResponse,
-      model: request.model ?? this.defaultResponse.model
+      model: request.model ?? this.defaultResponse.model,
     };
   }
 
@@ -161,7 +161,7 @@ export class MockSampler implements MCPSampler {
   getStats(): { callCount: number; templatesCount: number } {
     return {
       callCount: this.callCount,
-      templatesCount: this.templates.length
+      templatesCount: this.templates.length,
     };
   }
 
@@ -202,8 +202,8 @@ EXPOSE 3000
 
 CMD ["npm", "start"]`,
         tokenCount: 150,
-        model: 'mock-model'
-      }
+        model: 'mock-model',
+      },
     });
 
     // Kubernetes manifests
@@ -241,8 +241,8 @@ spec:
   - port: 80
     targetPort: 3000`,
         tokenCount: 200,
-        model: 'mock-model'
-      }
+        model: 'mock-model',
+      },
     });
 
     // Repository analysis
@@ -260,15 +260,15 @@ spec:
             recommendations: [
               'Add Dockerfile for containerization',
               'Consider using multi-stage builds',
-              'Add health check endpoint'
-            ]
+              'Add health check endpoint',
+            ],
           },
           null,
-          2
+          2,
         ),
         tokenCount: 120,
-        model: 'mock-model'
-      }
+        model: 'mock-model',
+      },
     });
 
     // Configuration generation
@@ -283,17 +283,17 @@ spec:
                 build: '.',
                 ports: ['3000:3000'],
                 environment: {
-                  NODE_ENV: 'production'
-                }
-              }
-            }
+                  NODE_ENV: 'production',
+                },
+              },
+            },
           },
           null,
-          2
+          2,
         ),
         tokenCount: 80,
-        model: 'mock-model'
-      }
+        model: 'mock-model',
+      },
     });
 
     // Error responses
@@ -302,16 +302,16 @@ spec:
       response: {
         text: 'I apologize, but I encountered an error processing your request. Please try again with more specific instructions.',
         tokenCount: 25,
-        model: 'mock-model'
+        model: 'mock-model',
       },
-      failureRate: 0.1 // 10% chance of failure
+      failureRate: 0.1, // 10% chance of failure
     });
 
     this.logger.debug(
       {
-        count: this.templates.length
+        count: this.templates.length,
       },
-      'Initialized default templates'
+      'Initialized default templates',
     );
   }
 

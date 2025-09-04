@@ -107,7 +107,7 @@ export class AIRequestBuilder {
       temperature: this.temperature,
       top_p: this.topP,
       frequency_penalty: this.frequencyPenalty,
-      presence_penalty: this.presencePenalty
+      presence_penalty: this.presencePenalty,
     };
 
     // Add any additional sampling parameters
@@ -154,7 +154,7 @@ export class AIRequestBuilder {
     const estimatedTokens = this.estimateTokens();
     if (estimatedTokens > this.maxTokens * 0.8) {
       warnings.push(
-        `Estimated input tokens (${estimatedTokens}) are close to max_tokens (${this.maxTokens})`
+        `Estimated input tokens (${estimatedTokens}) are close to max_tokens (${this.maxTokens})`,
       );
     }
 
@@ -166,7 +166,7 @@ export class AIRequestBuilder {
       valid: errors.length === 0,
       errors,
       warnings,
-      estimatedInputTokens: estimatedTokens
+      estimatedInputTokens: estimatedTokens,
     };
   }
 

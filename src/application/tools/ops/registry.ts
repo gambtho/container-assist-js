@@ -1,4 +1,3 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
@@ -15,11 +14,11 @@ import { getImplementedTools, isToolImplemented, getToolInfo } from '../tool-man
 export type { ToolDescriptor, ToolContext } from '../tool-types.js';
 
 // Helper function to convert Zod schema to JSON Schema (simplified)
-function zodToJsonSchema(schema: any): any {
+function zodToJsonSchema(_schema: any): any {
   return {
     type: 'object',
     properties: {},
-    additionalProperties: true
+    additionalProperties: true,
   };
 }
 
@@ -30,7 +29,7 @@ export class ToolRegistry {
 
   constructor(
     private readonly services: Services,
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {
     this.logger = logger.child({ component: 'ToolRegistry' });
   }
@@ -45,7 +44,7 @@ export class ToolRegistry {
       this.server.log('info', 'Tool execution started', {
         tool: toolName,
         params: this.sanitizeParams(params) as any,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -71,7 +70,7 @@ export class ToolRegistry {
     if (this.server == null) {
       throw new ServiceError(
         ErrorCode.DependencyNotInitialized,
-        'MCP server not attached to registry. Call setServer() first.'
+        'MCP server not attached to registry. Call setServer() first.',
       );
     }
 
@@ -84,7 +83,7 @@ export class ToolRegistry {
         inputSchema: zodToJsonSchema(descriptor.inputSchema) as {
           type: 'object';
           properties?: any;
-        } & { [k: string]: unknown }
+        } & { [k: string]: unknown },
       };
 
       this.server.addTool(tool, async (params: unknown, context: unknown) => {
@@ -102,7 +101,7 @@ export class ToolRegistry {
               return await descriptor.handler(validatedInput, toolContext);
             },
             toolLogger,
-            descriptor.name
+            descriptor.name,
           );
 
           const result = await validatedHandler(params as TInput);
@@ -113,9 +112,9 @@ export class ToolRegistry {
             content: [
               {
                 type: 'text' as const,
-                text: responseText
-              }
-            ]
+                text: responseText,
+              },
+            ],
           };
         } catch (error) {
           toolLogger.error({ error }, 'Tool execution failed');
@@ -125,9 +124,9 @@ export class ToolRegistry {
             content: [
               {
                 type: 'text' as const,
-                text: `❌ **${descriptor.name} failed**: ${errorMessage}`
-              }
-            ]
+                text: `❌ **${descriptor.name} failed**: ${errorMessage}`,
+              },
+            ],
           };
         }
       });
@@ -135,7 +134,7 @@ export class ToolRegistry {
       this.toolList.push({
         name: descriptor.name,
         description: descriptor.description,
-        inputSchema: zodToJsonSchema(descriptor.inputSchema)
+        inputSchema: zodToJsonSchema(descriptor.inputSchema),
       });
 
       this.logger.info(
@@ -143,9 +142,9 @@ export class ToolRegistry {
           tool: descriptor.name,
           category: descriptor.category,
           hasChainHint: !!descriptor.chainHint,
-          registrationMethod: 'mcp-sdk'
+          registrationMethod: 'mcp-sdk',
         },
-        'MCP tool registered'
+        'MCP tool registered',
       );
     } catch (error) {
       this.logger.error({ error, tool: descriptor.name }, 'Failed to register MCP tool');
@@ -158,14 +157,14 @@ export class ToolRegistry {
     if (desc?.name == null || desc?.inputSchema == null || desc?.outputSchema == null) {
       throw new ServiceError(
         ErrorCode.VALIDATION_ERROR,
-        'Tool must have name, inputSchema, and outputSchema'
+        'Tool must have name, inputSchema, and outputSchema',
       );
     }
 
     if (desc.inputSchema?.parse == null || desc.outputSchema?.parse == null) {
       throw new ServiceError(
         ErrorCode.VALIDATION_ERROR,
-        'Input and output schemas must be valid Zod schemas'
+        'Input and output schemas must be valid Zod schemas',
       );
     }
 
@@ -179,9 +178,9 @@ export class ToolRegistry {
       {
         tool: desc.name,
         category: desc.category,
-        hasChainHint: Boolean(desc.chainHint)
+        hasChainHint: Boolean(desc.chainHint),
       },
-      'Tool registered'
+      'Tool registered',
     );
   }
 
@@ -206,14 +205,14 @@ export class ToolRegistry {
         {
           tool: name,
           availableTools: availableTools.length,
-          suggestions
+          suggestions,
         },
-        'Unimplemented tool requested'
+        'Unimplemented tool requested',
       );
 
       throw new ToolNotImplementedError(errorMessage, name, {
         availableTools,
-        suggestedAlternatives: suggestions
+        suggestedAlternatives: suggestions,
       });
     }
 
@@ -224,7 +223,7 @@ export class ToolRegistry {
       this.logger.warn({ tool: name }, 'Tool not found in registry');
       throw new McpError(MCPErrorCode.MethodNotFound, `Tool ${name} not registered`, {
         requestedTool: name,
-        hint: 'Tool is implemented but not registered. This is a server configuration issue.'
+        hint: 'Tool is implemented but not registered. This is a server configuration issue.',
       });
     }
 
@@ -241,7 +240,7 @@ export class ToolRegistry {
         const executeFn = (tool as any).execute ?? tool.handler;
         const result = await executeFn(validated, {
           ...baseContext,
-          signal: controller.signal
+          signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
@@ -253,9 +252,9 @@ export class ToolRegistry {
             content: [
               {
                 type: 'text',
-                text: JSON.stringify(validatedOutput, null, 2)
-              }
-            ]
+                text: JSON.stringify(validatedOutput, null, 2),
+              },
+            ],
           };
         } else {
           throw convertToMcpError(result?.error ?? new Error('Unknown error'));
@@ -271,8 +270,8 @@ export class ToolRegistry {
           issues: error.issues.map((e) => ({
             path: e.path.join('.'),
             message: e.message,
-            code: e.code
-          }))
+            code: e.code,
+          })),
         });
       }
 
@@ -300,9 +299,9 @@ export class ToolRegistry {
                 text:
                   typeof result?.content === 'string'
                     ? result.content
-                    : JSON.stringify(result?.content)
-              }
-            ]
+                    : JSON.stringify(result?.content),
+              },
+            ],
           };
         } else {
           return {
@@ -310,9 +309,9 @@ export class ToolRegistry {
             content: [
               {
                 type: 'text',
-                text: `Sampling error: ${result?.error ?? 'Unknown error'}`
-              }
-            ]
+                text: `Sampling error: ${result?.error ?? 'Unknown error'}`,
+              },
+            ],
           };
         }
       } catch (error) {
@@ -321,9 +320,9 @@ export class ToolRegistry {
           content: [
             {
               type: 'text',
-              text: `Sampling error: ${error instanceof Error ? error.message : String(error)}`
-            }
-          ]
+              text: `Sampling error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
         };
       }
     }
@@ -340,9 +339,9 @@ export class ToolRegistry {
         content: [
           {
             type: 'text',
-            text: 'AI sampling not available'
-          }
-        ]
+            text: 'AI sampling not available',
+          },
+        ],
       };
     }
 
@@ -362,9 +361,9 @@ export class ToolRegistry {
         content: [
           {
             type: 'text',
-            text: resultText
-          }
-        ]
+            text: resultText,
+          },
+        ],
       };
     } catch (error) {
       this.logger.error({ error }, 'Sampling error');
@@ -373,9 +372,9 @@ export class ToolRegistry {
         content: [
           {
             type: 'text',
-            text: `Sampling error: ${error instanceof Error ? error.message : String(error)}`
-          }
-        ]
+            text: `Sampling error: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
       };
     }
   }
@@ -396,7 +395,7 @@ export class ToolRegistry {
         '../generate-k8s-manifests/generate-k8s-manifests',
         '../prepare-cluster/prepare-cluster',
         '../deploy-application/deploy-application',
-        '../verify-deployment/verify-deployment'
+        '../verify-deployment/verify-deployment',
       ];
 
       for (const moduleName of allModules) {
@@ -416,25 +415,25 @@ export class ToolRegistry {
           this.logger.error(
             {
               module: moduleName,
-              error: error instanceof Error ? error.message : String(error)
+              error: error instanceof Error ? error.message : String(error),
             },
-            'Failed to load tool handler'
+            'Failed to load tool handler',
           );
         }
       }
 
       this.logger.info(
         {
-          toolCount: this.tools.size
+          toolCount: this.tools.size,
         },
-        'All tools registered'
+        'All tools registered',
       );
     } catch (error) {
       this.logger.error({ error }, 'Failed to register tools');
       throw new ServiceError(
         ErrorCode.ServiceUnavailable,
         'Failed to register tool handlers',
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
     }
   }
@@ -453,7 +452,7 @@ export class ToolRegistry {
 
   private async createToolContext(
     contextOrSignal?: unknown,
-    logger?: Logger
+    logger?: Logger,
   ): Promise<ToolContext> {
     const signal = logger ? (contextOrSignal as AbortSignal) : (contextOrSignal as AbortSignal);
     const contextLogger = logger ?? this.logger;
@@ -464,7 +463,7 @@ export class ToolRegistry {
     const workflowManager = new WorkflowManager(this.logger);
     const workflowOrchestrator = new WorkflowOrchestrator(
       this.services.session as any,
-      this.logger
+      this.logger,
     );
 
     const context: ToolContext = {
@@ -474,7 +473,8 @@ export class ToolRegistry {
       logger: contextLogger,
       sessionService: this.services.session as any,
       progressEmitter: this.services.events as any,
-      kubernetesService: this.services.kubernetes,
+      dockerService: this.services.docker as any,
+      kubernetesService: this.services.kubernetes as any,
       aiService: this.services.ai as any,
       eventPublisher: this.services.events as any,
       workflowManager,
@@ -487,7 +487,7 @@ export class ToolRegistry {
           sessionTTL: '24h',
           maxSessions: 100,
           enableMetrics: false,
-          enableEvents: true
+          enableEvents: true,
         },
         workspace: { workspaceDir: process.cwd(), tempDir: './tmp', cleanupOnExit: true },
         infrastructure: {
@@ -497,14 +497,14 @@ export class ToolRegistry {
             host: 'localhost',
             port: 2376,
             timeout: 300000,
-            apiVersion: '1.41'
+            apiVersion: '1.41',
           },
           kubernetes: {
             kubeconfig: '',
             namespace: 'default',
             context: '',
             timeout: 300000,
-            dryRun: false
+            dryRun: false,
           },
           scanning: {
             enabled: true,
@@ -512,7 +512,7 @@ export class ToolRegistry {
             severityThreshold: 'high' as const,
             failOnVulnerabilities: false,
             skipUpdate: false,
-            timeout: 300000
+            timeout: 300000,
           },
           build: {
             enableCache: true,
@@ -521,15 +521,15 @@ export class ToolRegistry {
             buildArgs: {},
             labels: {},
             target: '',
-            squash: false
+            squash: false,
           },
           java: {
             defaultVersion: '17',
             defaultJvmHeapPercentage: 75,
             enableNativeImage: false,
             enableJmx: false,
-            enableProfiling: false
-          }
+            enableProfiling: false,
+          },
         },
         aiServices: {
           ai: {
@@ -540,14 +540,14 @@ export class ToolRegistry {
             retryAttempts: 3,
             retryDelayMs: 1000,
             temperature: 0.1,
-            maxTokens: 4096
+            maxTokens: 4096,
           },
           sampler: {
             mode: 'auto' as const,
             templateDir: './templates',
             cacheEnabled: true,
             retryAttempts: 3,
-            retryDelayMs: 1000
+            retryDelayMs: 1000,
           },
           mock: {
             enabled: false,
@@ -555,8 +555,8 @@ export class ToolRegistry {
             deterministicMode: false,
             simulateLatency: false,
             errorRate: 0,
-            latencyRange: { min: 100, max: 500 }
-          }
+            latencyRange: { min: 100, max: 500 },
+          },
         },
         logging: {
           level: 'info' as const,
@@ -565,7 +565,7 @@ export class ToolRegistry {
           filePath: './logs/app.log',
           maxFileSize: '10MB',
           maxFiles: 5,
-          enableColors: true
+          enableColors: true,
         },
         workflow: {
           mode: 'interactive' as const,
@@ -573,7 +573,7 @@ export class ToolRegistry {
           maxRetries: 3,
           retryDelayMs: 5000,
           parallelSteps: false,
-          skipOptionalSteps: false
+          skipOptionalSteps: false,
         },
         features: {
           aiEnabled: true,
@@ -583,8 +583,8 @@ export class ToolRegistry {
           enablePerformanceMonitoring: false,
           enableDebugLogs: false,
           enableTracing: false,
-          nonInteractive: false
-        }
+          nonInteractive: false,
+        },
       } as any,
       logPerformanceMetrics: (operation: string, duration: number, metadata?: unknown) => {
         try {
@@ -597,21 +597,21 @@ export class ToolRegistry {
                 operation,
                 duration,
                 metadata: metadata ?? {},
-                timestamp: new Date().toISOString()
-              }
-            }
+                timestamp: new Date().toISOString(),
+              },
+            },
           });
         } catch (error) {
           contextLogger.info(
             {
               operation,
               duration,
-              metadata: metadata ?? {}
+              metadata: metadata ?? {},
             },
-            'Performance metrics'
+            'Performance metrics',
           );
         }
-      }
+      },
     };
 
     if (this.services.ai && 'isAvailable' in this.services.ai && (this.services.ai as any).isAvailable?.() === true) {

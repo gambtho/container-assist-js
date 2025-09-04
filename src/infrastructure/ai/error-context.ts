@@ -89,7 +89,7 @@ export class ErrorContextFactory {
     templateId: string,
     originalVariables: Record<string, any>,
     originalRequest: Partial<AIRequest>,
-    error: Error
+    error: Error,
   ): ErrorContext {
     const errorType = this.classifyError(error);
     const patterns = this.detectPatterns(error.message);
@@ -107,8 +107,8 @@ export class ErrorContextFactory {
         firstErrorTimestamp: Date.now(),
         lastErrorTimestamp: Date.now(),
         totalElapsedMs: 0,
-        modelsAttempted: originalRequest.model ? [originalRequest.model] : []
-      }
+        modelsAttempted: originalRequest.model ? [originalRequest.model] : [],
+      },
     };
   }
 
@@ -123,7 +123,7 @@ export class ErrorContextFactory {
     context: ErrorContext,
     error: Error,
     strategyUsed: string,
-    partialResult?: unknown
+    partialResult?: unknown,
   ): ErrorContext {
     const newErrorType = this.classifyError(error);
     const newPatterns = this.detectPatterns(error.message);
@@ -139,8 +139,8 @@ export class ErrorContextFactory {
         lastErrorTimestamp: now,
         totalElapsedMs: context.metadata?.firstErrorTimestamp
           ? now - context.metadata.firstErrorTimestamp
-          : 0
-      }
+          : 0,
+      },
     };
 
     // Add partialResult if provided or exists
@@ -172,12 +172,12 @@ export class ErrorContextFactory {
     const existingSuggestions = context.suggestions ?? [];
     const uniqueSuggestions = [
       ...existingSuggestions,
-      ...suggestions.filter((s) => !existingSuggestions.includes(s))
+      ...suggestions.filter((s) => !existingSuggestions.includes(s)),
     ];
 
     return {
       ...context,
-      suggestions: uniqueSuggestions
+      suggestions: uniqueSuggestions,
     };
   }
 
@@ -197,8 +197,8 @@ export class ErrorContextFactory {
         ...context.metadata,
         tokensUsed: currentTokens + tokensUsed,
         modelsAttempted:
-          model && !modelsAttempted.includes(model) ? [...modelsAttempted, model] : modelsAttempted
-      }
+          model && !modelsAttempted.includes(model) ? [...modelsAttempted, model] : modelsAttempted,
+      },
     };
   }
 
@@ -333,7 +333,7 @@ export class ErrorContextFactory {
         type: 'json_syntax',
         confidence: 0.9,
         description: 'Invalid JSON syntax detected',
-        suggestedFix: 'Use json_repair strategy to fix syntax issues'
+        suggestedFix: 'Use json_repair strategy to fix syntax issues',
       });
     }
 
@@ -347,7 +347,7 @@ export class ErrorContextFactory {
         type: 'incomplete_response',
         confidence: 0.8,
         description: 'Response appears to be incomplete',
-        suggestedFix: 'Increase max tokens or use continuation strategy'
+        suggestedFix: 'Increase max tokens or use continuation strategy',
       });
     }
 
@@ -360,7 +360,7 @@ export class ErrorContextFactory {
         type: 'wrong_format',
         confidence: 0.7,
         description: 'Response format does not match expectations',
-        suggestedFix: 'Add explicit format instructions to prompt'
+        suggestedFix: 'Add explicit format instructions to prompt',
       });
     }
 
@@ -370,7 +370,7 @@ export class ErrorContextFactory {
         type: 'missing_field',
         confidence: 0.8,
         description: 'Required fields missing from response',
-        suggestedFix: 'Add schema validation guidance to prompt'
+        suggestedFix: 'Add schema validation guidance to prompt',
       });
     }
 
@@ -380,7 +380,7 @@ export class ErrorContextFactory {
         type: 'invalid_value',
         confidence: 0.7,
         description: 'Invalid values in response fields',
-        suggestedFix: 'Add value validation examples to prompt'
+        suggestedFix: 'Add value validation examples to prompt',
       });
     }
 
@@ -394,7 +394,7 @@ export class ErrorContextFactory {
    */
   private static mergePatterns(
     existing: FailurePattern[],
-    newPatterns: FailurePattern[]
+    newPatterns: FailurePattern[],
   ): FailurePattern[] {
     const merged = [...existing];
 
@@ -491,7 +491,7 @@ export class ErrorContextUtils {
       elapsedMs: context.metadata?.totalElapsedMs,
       modelsAttempted: context.metadata?.modelsAttempted,
       errorCount: context.previousErrors.length,
-      hasPartialResult: !!context.partialResult
+      hasPartialResult: !!context.partialResult,
     };
   }
 }

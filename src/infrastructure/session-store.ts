@@ -76,10 +76,10 @@ export class SessionStore {
         completed_steps: [],
         errors: {},
         metadata: {},
-        dockerfile_fix_history: []
+        dockerfile_fix_history: [],
       },
       version: (session.version ?? 0) + 1,
-      ...session
+      ...session,
     };
 
     // Validate schema
@@ -99,7 +99,7 @@ export class SessionStore {
    */
   async update(
     id: string,
-    updater: (session: Session) => Partial<Session>
+    updater: (session: Session) => Partial<Session>,
   ): Promise<Session | null> {
     const existing = await this.get(id);
     if (!existing) {
@@ -226,12 +226,12 @@ export class SessionStore {
     totalSessions: number;
     activeSessions: number;
     maxSessions: number;
-  } {
+    } {
     return {
       totalSessions: this.sessions.size,
       activeSessions: Array.from(this.sessions.values()).filter((s) => s.status === 'active')
         .length,
-      maxSessions: this.maxSessions
+      maxSessions: this.maxSessions,
     };
   }
 

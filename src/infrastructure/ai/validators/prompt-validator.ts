@@ -42,30 +42,30 @@ export class PromptValidator {
       'verbose_phrases',
       {
         pattern: /(in order to|due to the fact that|at this point in time|in the event that)/gi,
-        severity: 'medium'
-      }
+        severity: 'medium',
+      },
     ],
     [
       'repetitive_instructions',
       {
         pattern: /(make sure|ensure that|be sure to).*\1/gi,
-        severity: 'medium'
-      }
+        severity: 'medium',
+      },
     ],
     [
       'excessive_examples',
       {
         pattern: /(for example|such as|like)[\s\S]{200,}/gi,
-        severity: 'medium'
-      }
+        severity: 'medium',
+      },
     ],
     [
       'filler_words',
       {
         pattern: /\b(basically|essentially|actually|simply|just|really|very)\b/gi,
-        severity: 'low'
-      }
-    ]
+        severity: 'low',
+      },
+    ],
   ]);
 
   // Clarity anti-patterns
@@ -73,7 +73,7 @@ export class PromptValidator {
     ['vague_instructions', { pattern: /\b(somehow|something|anything|various|multiple)\b/gi }],
     ['double_negatives', { pattern: /\b(not\s+(?:un|in|non|dis)\w+|don't\s+(?:not|avoid))/gi }],
     ['passive_voice', { pattern: /\b(is\s+\w+ed|are\s+\w+ed|was\s+\w+ed|were\s+\w+ed)\b/gi }],
-    ['complex_sentences', { pattern: /[.!?][^.!?]{200,}[.!?]/g }]
+    ['complex_sentences', { pattern: /[.!?][^.!?]{200,}[.!?]/g }],
   ]);
 
   constructor() {
@@ -101,7 +101,7 @@ export class PromptValidator {
         warnings,
         metrics: { systemTokens: 0, userTokens: 0, totalTokens: 0 },
         optimizationSuggestions: [],
-        efficiency: { score: 0, issues: ['Missing required prompts'] }
+        efficiency: { score: 0, issues: ['Missing required prompts'] },
       };
     }
 
@@ -113,13 +113,13 @@ export class PromptValidator {
     // Token limit validation
     if (systemTokens > this.maxSystemPromptTokens) {
       errors.push(
-        `System prompt too long: ${systemTokens} tokens (max: ${this.maxSystemPromptTokens})`
+        `System prompt too long: ${systemTokens} tokens (max: ${this.maxSystemPromptTokens})`,
       );
       suggestions.push({
         type: 'token_reduction',
         description: 'System prompt exceeds recommended length',
         impact: 'high',
-        example: 'Consider moving detailed instructions to user prompt'
+        example: 'Consider moving detailed instructions to user prompt',
       });
     }
 
@@ -129,13 +129,13 @@ export class PromptValidator {
         type: 'token_reduction',
         description: 'User prompt exceeds recommended length',
         impact: 'high',
-        example: 'Split into multiple requests or use context optimization'
+        example: 'Split into multiple requests or use context optimization',
       });
     }
 
     if (totalTokens > this.maxTotalTokens) {
       warnings.push(
-        `Total prompt tokens (${totalTokens}) exceed recommended limit (${this.maxTotalTokens})`
+        `Total prompt tokens (${totalTokens}) exceed recommended limit (${this.maxTotalTokens})`,
       );
     }
 
@@ -168,7 +168,7 @@ export class PromptValidator {
       warnings,
       metrics: { systemTokens, userTokens, totalTokens },
       optimizationSuggestions: suggestions,
-      efficiency
+      efficiency,
     };
   }
 
@@ -196,7 +196,7 @@ export class PromptValidator {
           type: 'token_reduction',
           description: this.getOptimizationMessage(name),
           impact: severity,
-          example: this.getOptimizationExample(name)
+          example: this.getOptimizationExample(name),
         });
       }
     }
@@ -205,13 +205,13 @@ export class PromptValidator {
     const repetitionAnalysis = this.analyzeWordRepetition(combined);
     if (repetitionAnalysis.score < 0.7) {
       warnings.push(
-        `High word repetition detected (score: ${Math.round(repetitionAnalysis.score * 100)}%)`
+        `High word repetition detected (score: ${Math.round(repetitionAnalysis.score * 100)}%)`,
       );
       suggestions.push({
         type: 'redundancy',
         description: 'Reduce repeated words and phrases',
         impact: 'medium',
-        example: `Most repeated: ${repetitionAnalysis.topRepeated.slice(0, 3).join(', ')}`
+        example: `Most repeated: ${repetitionAnalysis.topRepeated.slice(0, 3).join(', ')}`,
       });
     }
 
@@ -234,7 +234,7 @@ export class PromptValidator {
           type: 'clarity',
           description: this.getClarityMessage(issue),
           impact: 'medium',
-          example: this.getClarityExample(issue)
+          example: this.getClarityExample(issue),
         });
       }
     }
@@ -247,7 +247,7 @@ export class PromptValidator {
         type: 'clarity',
         description: 'Break down long sentences for better clarity',
         impact: 'medium',
-        example: 'Use shorter, more direct sentences'
+        example: 'Use shorter, more direct sentences',
       });
     }
 
@@ -296,21 +296,21 @@ export class PromptValidator {
       'will',
       'would',
       'could',
-      'should'
+      'should',
     ]);
     const significantOverlap = new Set(
-      [...intersection].filter((word) => !commonWords.has(word) && word.length > 3)
+      [...intersection].filter((word) => !commonWords.has(word) && word.length > 3),
     );
 
     if (significantOverlap.size > 5) {
       warnings.push(
-        `High overlap between system and user prompts: ${significantOverlap.size} significant words`
+        `High overlap between system and user prompts: ${significantOverlap.size} significant words`,
       );
       suggestions.push({
         type: 'redundancy',
         description: 'Consolidate overlapping instructions',
         impact: 'medium',
-        example: 'Move repeated instructions to system prompt only'
+        example: 'Move repeated instructions to system prompt only',
       });
     }
 
@@ -322,7 +322,7 @@ export class PromptValidator {
         type: 'redundancy',
         description: 'Remove or consolidate repeated phrases',
         impact: 'low',
-        example: `E.g., "${phraseRepetition[0]}" appears multiple times`
+        example: `E.g., "${phraseRepetition[0]}" appears multiple times`,
       });
     }
 
@@ -342,7 +342,7 @@ export class PromptValidator {
         type: 'structure',
         description: 'Improve system prompt structure',
         impact: 'medium',
-        example: 'Start with role/context, then specific instructions'
+        example: 'Start with role/context, then specific instructions',
       });
     }
 
@@ -352,7 +352,7 @@ export class PromptValidator {
         type: 'structure',
         description: 'Improve instruction formatting',
         impact: 'low',
-        example: 'Use clear sections or bullet points for complex instructions'
+        example: 'Use clear sections or bullet points for complex instructions',
       });
     }
 
@@ -363,7 +363,7 @@ export class PromptValidator {
         type: 'structure',
         description: 'Optimize context placement',
         impact: 'medium',
-        example: 'Place background context early, specific tasks at the end'
+        example: 'Place background context early, specific tasks at the end',
       });
     }
 
@@ -372,7 +372,7 @@ export class PromptValidator {
 
   private calculateEfficiencyScore(
     prompt: PromptPair,
-    suggestions: OptimizationSuggestion[]
+    suggestions: OptimizationSuggestion[],
   ): { score: number; issues: string[] } {
     let score = 100;
     const issues: string[] = [];
@@ -383,7 +383,7 @@ export class PromptValidator {
     if (totalTokens > this.maxTotalTokens) {
       const penalty = Math.min(
         30,
-        ((totalTokens - this.maxTotalTokens) / this.maxTotalTokens) * 30
+        ((totalTokens - this.maxTotalTokens) / this.maxTotalTokens) * 30,
       );
       score -= penalty;
       issues.push(`Token count exceeds recommendations (${totalTokens} tokens)`);
@@ -415,7 +415,7 @@ export class PromptValidator {
 
     return {
       score: Math.max(0, Math.round(score)),
-      issues
+      issues,
     };
   }
 
@@ -497,7 +497,7 @@ export class PromptValidator {
   private hasContextMisplacement(prompt: PromptPair): boolean {
     // Very simple heuristic: if user prompt starts with context but system is short
     const userStartsWithContext = /^(Context:|Background:|Given:|Current:)/i.test(
-      prompt.user.trim()
+      prompt.user.trim(),
     );
     const systemIsShort = prompt.system.length < 100;
     return userStartsWithContext && systemIsShort;
@@ -510,7 +510,7 @@ export class PromptValidator {
       verbose_phrases: 'Replace verbose phrases with concise alternatives',
       repetitive_instructions: 'Consolidate repetitive instruction patterns',
       excessive_examples: 'Limit examples or move them to context',
-      filler_words: 'Remove filler words that add no value'
+      filler_words: 'Remove filler words that add no value',
     };
     return messages[patternName] || 'Optimize this pattern';
   }
@@ -522,7 +522,7 @@ export class PromptValidator {
       verbose_phrases: '"in order to" → "to", "due to the fact that" → "because"',
       repetitive_instructions: 'Combine similar instructions into one clear statement',
       excessive_examples: 'Limit to 1-2 concise examples',
-      filler_words: '"basically just generate" → "generate"'
+      filler_words: '"basically just generate" → "generate"',
     };
     return examples[patternName] || ';';
   }
@@ -532,7 +532,7 @@ export class PromptValidator {
       vague_instructions: 'Replace vague terms with specific instructions',
       double_negatives: 'Use positive phrasing instead of double negatives',
       passive_voice: 'Use active voice for clearer instructions',
-      complex_sentences: 'Break complex sentences into simpler ones'
+      complex_sentences: 'Break complex sentences into simpler ones',
     };
     return messages[issue] || 'Improve clarity';
   }
@@ -542,7 +542,7 @@ export class PromptValidator {
       vague_instructions: '"something like" → "specifically", "various ways" → "using X, Y, Z"',
       double_negatives: '"don\'t not include" → "include"',
       passive_voice: '"should be generated" → "generate"',
-      complex_sentences: 'Split sentences at conjunctions'
+      complex_sentences: 'Split sentences at conjunctions',
     };
     return examples[issue] || ';';
   }
@@ -561,11 +561,11 @@ export class PromptValidator {
     maxSystemPromptTokens: number;
     maxUserPromptTokens: number;
     maxTotalTokens: number;
-  } {
+    } {
     return {
       maxSystemPromptTokens: this.maxSystemPromptTokens,
       maxUserPromptTokens: this.maxUserPromptTokens,
-      maxTotalTokens: this.maxTotalTokens
+      maxTotalTokens: this.maxTotalTokens,
     };
   }
 
@@ -575,7 +575,7 @@ export class PromptValidator {
       maxSystemPromptTokens: number;
       maxUserPromptTokens: number;
       maxTotalTokens: number;
-    }>
+    }>,
   ): void {
     if (config.maxSystemPromptTokens != null)
       this.maxSystemPromptTokens = config.maxSystemPromptTokens;

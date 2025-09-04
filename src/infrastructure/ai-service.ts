@@ -171,17 +171,17 @@ export class EnhancedAIService {
     totalRequests: 0,
     successfulRequests: 0,
     failedRequests: 0,
-    avgResponseTimeMs: 0
+    avgResponseTimeMs: 0,
   };
   private recoveryMetrics = {
     sessionsInitiated: 0,
     successfulRecoveries: 0,
     totalRecoveryAttempts: 0,
-    failureReasons: new Map<string, number>()
+    failureReasons: new Map<string, number>(),
   };
   private tokenMetrics = {
     totalTokens: 0,
-    tokensSavedByCache: 0
+    tokensSavedByCache: 0,
   };
 
   private logger: Logger;
@@ -200,27 +200,27 @@ export class EnhancedAIService {
         kubernetes: 'claude-3-opus',
         analysis: 'claude-3-opus',
         optimization: 'claude-3-opus',
-        ...config.modelPreferences
+        ...config.modelPreferences,
       },
       defaultSampling: {
         temperature: 0.2,
         maxTokens: 1500,
-        ...config.defaultSampling
+        ...config.defaultSampling,
       },
       cache: {
         enabled: true,
         defaultTtlMs: 15 * 60 * 1000, // 15 minutes
         maxSize: 100,
         enableDetailedLogging: config.enableDetailedLogging ?? false,
-        ...config.cache
+        ...config.cache,
       },
       errorRecovery: {
         maxAttempts: 5,
         enableDetailedLogging: config.enableDetailedLogging ?? false,
-        ...config.errorRecovery
+        ...config.errorRecovery,
       },
       enableMetrics: config.enableMetrics !== false,
-      enableDetailedLogging: config.enableDetailedLogging ?? false
+      enableDetailedLogging: config.enableDetailedLogging ?? false,
     };
 
     // Initialize subsystems
@@ -230,9 +230,9 @@ export class EnhancedAIService {
       {
         cacheEnabled: this.config.cache.enabled,
         errorRecoveryEnabled: true,
-        metricsEnabled: this.config.enableMetrics
+        metricsEnabled: this.config.enableMetrics,
       },
-      'Enhanced AI Service initialized'
+      'Enhanced AI Service initialized',
     );
   }
 
@@ -243,7 +243,7 @@ export class EnhancedAIService {
    */
   async generate<T = string>(
     builder: AIRequestBuilder | AIRequest,
-    options: GenerationOptions = {}
+    options: GenerationOptions = {},
   ): Promise<GenerationResult<T>> {
     const startTime = Date.now();
     this.metrics.totalRequests++;
@@ -261,7 +261,7 @@ export class EnhancedAIService {
             durationMs: Date.now() - startTime,
             fromCache: true,
             usedRecovery: false,
-            confidence: 1.0
+            confidence: 1.0,
           });
         }
       }
@@ -287,7 +287,7 @@ export class EnhancedAIService {
         'ENHANCED_AI_GENERATION_FAILED',
         undefined,
         error instanceof Error ? error : undefined,
-        { options }
+        { options },
       );
     }
   }
@@ -301,7 +301,7 @@ export class EnhancedAIService {
   async generateStructured<T>(
     builder: AIRequestBuilder,
     schema: z.ZodSchema<T>,
-    options: StructuredOptions = {}
+    options: StructuredOptions = {},
   ): Promise<GenerationResult<T>> {
     const request = this.buildFinalRequest(builder, options);
     const templateId = this.extractTemplateId(request);
@@ -313,8 +313,8 @@ export class EnhancedAIService {
         ...request.context,
         _schemaHint: this.generateSchemaHint(schema),
         _structuredMode: true,
-        _maxRepairAttempts: options.maxRepairAttempts ?? 3
-      }
+        _maxRepairAttempts: options.maxRepairAttempts ?? 3,
+      },
     };
 
     const startTime = Date.now();
@@ -332,7 +332,7 @@ export class EnhancedAIService {
               durationMs: Date.now() - startTime,
               fromCache: true,
               usedRecovery: false,
-              confidence: 1.0
+              confidence: 1.0,
             });
           }
           // Invalid cached result - remove from cache
@@ -342,7 +342,7 @@ export class EnhancedAIService {
 
       // Execute structured generation with enhanced error recovery
       const executor = async (
-        req: AIRequest
+        req: AIRequest,
       ): Promise<{ data: T; tokensUsed?: number; model?: string }> => {
         if (!this.sampler) {
           throw new AIServiceError(
@@ -350,7 +350,7 @@ export class EnhancedAIService {
             'AI_SAMPLER_UNAVAILABLE',
             undefined,
             undefined,
-            { operation: 'generateStructured' }
+            { operation: 'generateStructured' },
           );
         }
 
@@ -366,7 +366,7 @@ export class EnhancedAIService {
           parsed = typeof result.text === 'string' ? JSON.parse(result.text) : result.text;
         } catch (parseError) {
           throw new Error(
-            `JSON parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`
+            `JSON parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`,
           );
         }
 
@@ -378,7 +378,7 @@ export class EnhancedAIService {
         return {
           data: validation.data,
           ...(result.tokenCount !== undefined && { tokensUsed: result.tokenCount }),
-          ...(req.model !== undefined && { model: req.model })
+          ...(req.model !== undefined && { model: req.model }),
         };
       };
 
@@ -388,7 +388,7 @@ export class EnhancedAIService {
           durationMs: Date.now() - startTime,
           fromCache: false,
           usedRecovery: false,
-          confidence: 0.9
+          confidence: 0.9,
         };
 
         if (result.model) {
@@ -406,14 +406,14 @@ export class EnhancedAIService {
           enhancedRequest.context ?? {},
           executor,
           this.logger,
-          this.config.errorRecovery
+          this.config.errorRecovery,
         );
 
         const metadata: Partial<GenerationResult<typeof result.data>['metadata']> = {
           durationMs: Date.now() - startTime,
           fromCache: false,
           usedRecovery: false,
-          confidence: 0.8
+          confidence: 0.8,
         };
 
         if (result.model) {
@@ -433,7 +433,7 @@ export class EnhancedAIService {
         'ENHANCED_AI_STRUCTURED_GENERATION_FAILED',
         undefined,
         error instanceof Error ? error : undefined,
-        { templateId, options }
+        { templateId, options },
       );
     }
   }
@@ -447,24 +447,24 @@ export class EnhancedAIService {
   async generateWithFallback<T>(
     primaryBuilder: AIRequestBuilder,
     fallbackBuilder: AIRequestBuilder,
-    options: GenerationOptions = {}
+    options: GenerationOptions = {},
   ): Promise<GenerationResult<T>> {
     try {
       return await this.generate<T>(primaryBuilder, options);
     } catch (primaryError) {
       this.logger.warn(
         {
-          error: primaryError instanceof Error ? primaryError.message : 'Unknown error'
+          error: primaryError instanceof Error ? primaryError.message : 'Unknown error',
         },
-        'Primary generation failed, trying fallback'
+        'Primary generation failed, trying fallback',
       );
 
       return await this.generate<T>(fallbackBuilder, {
         ...options,
         additionalContext: {
           _fallbackMode: true,
-          _primaryFailure: primaryError instanceof Error ? primaryError.message : 'Unknown error'
-        }
+          _primaryFailure: primaryError instanceof Error ? primaryError.message : 'Unknown error',
+        },
       });
     }
   }
@@ -503,7 +503,7 @@ export class EnhancedAIService {
         topFailureReasons: Array.from(this.recoveryMetrics.failureReasons.entries())
           .sort(([, a], [, b]) => b - a)
           .slice(0, 5)
-          .map(([reason]) => reason)
+          .map(([reason]) => reason),
       },
       tokenUsage: {
         totalTokens: this.tokenMetrics.totalTokens,
@@ -511,8 +511,8 @@ export class EnhancedAIService {
           this.metrics.totalRequests > 0
             ? this.tokenMetrics.totalTokens / this.metrics.totalRequests
             : 0,
-        tokensSavedByCache: this.tokenMetrics.tokensSavedByCache
-      }
+        tokensSavedByCache: this.tokenMetrics.tokensSavedByCache,
+      },
     };
   }
 
@@ -524,17 +524,17 @@ export class EnhancedAIService {
       totalRequests: 0,
       successfulRequests: 0,
       failedRequests: 0,
-      avgResponseTimeMs: 0
+      avgResponseTimeMs: 0,
     };
     this.recoveryMetrics = {
       sessionsInitiated: 0,
       successfulRecoveries: 0,
       totalRecoveryAttempts: 0,
-      failureReasons: new Map()
+      failureReasons: new Map(),
     };
     this.tokenMetrics = {
       totalTokens: 0,
-      tokensSavedByCache: 0
+      tokensSavedByCache: 0,
     };
     this.cache.resetStats();
   }
@@ -558,7 +558,7 @@ export class EnhancedAIService {
    */
   private buildFinalRequest(
     builder: AIRequestBuilder | AIRequest,
-    options: GenerationOptions
+    options: GenerationOptions,
   ): AIRequest {
     let request: AIRequest;
 
@@ -611,12 +611,12 @@ export class EnhancedAIService {
   private async executeGeneration<T>(
     request: AIRequest,
     templateId: string,
-    options: GenerationOptions
+    options: GenerationOptions,
   ): Promise<GenerationResult<T>> {
     const startTime = Date.now();
 
     const executor = async (
-      req: AIRequest
+      req: AIRequest,
     ): Promise<{ data: T; tokensUsed?: number; model?: string }> => {
       if (!this.sampler) {
         throw new AIServiceError(
@@ -624,7 +624,7 @@ export class EnhancedAIService {
           'AI_SAMPLER_UNAVAILABLE',
           undefined,
           undefined,
-          { operation: 'generate' }
+          { operation: 'generate' },
         );
       }
 
@@ -637,7 +637,7 @@ export class EnhancedAIService {
       return {
         data: result.text as T,
         ...(result.tokenCount !== undefined && { tokensUsed: result.tokenCount }),
-        ...(req.model !== undefined && { model: req.model })
+        ...(req.model !== undefined && { model: req.model }),
       };
     };
 
@@ -647,7 +647,7 @@ export class EnhancedAIService {
         durationMs: Date.now() - startTime,
         fromCache: false,
         usedRecovery: false,
-        confidence: 0.9
+        confidence: 0.9,
       };
 
       if (result.model) {
@@ -665,14 +665,14 @@ export class EnhancedAIService {
         request.context ?? {},
         executor,
         this.logger,
-        this.config.errorRecovery
+        this.config.errorRecovery,
       );
 
       const metadata: Partial<GenerationResult<typeof result.data>['metadata']> = {
         durationMs: Date.now() - startTime,
         fromCache: false,
         usedRecovery: false,
-        confidence: 0.8
+        confidence: 0.8,
       };
 
       if (result.model) {
@@ -691,7 +691,7 @@ export class EnhancedAIService {
    */
   private createSuccessResult<T>(
     data: T,
-    metadata: Partial<GenerationResult<T>['metadata']>
+    metadata: Partial<GenerationResult<T>['metadata']>,
   ): GenerationResult<T> {
     this.metrics.successfulRequests++;
 
@@ -713,8 +713,8 @@ export class EnhancedAIService {
         fromCache: false,
         usedRecovery: false,
         confidence: 0.8,
-        ...metadata
-      }
+        ...metadata,
+      },
     };
   }
 
@@ -777,7 +777,7 @@ export class EnhancedAIService {
 export function createEnhancedAIService(
   config: EnhancedAIConfig,
   sampler: MCPSampler | undefined,
-  logger: Logger
+  logger: Logger,
 ): EnhancedAIService {
   return new EnhancedAIService(config, sampler, logger);
 }
@@ -788,7 +788,7 @@ export function createEnhancedAIService(
 export function migrateToEnhancedAIService(
   legacyConfig: unknown,
   sampler: MCPSampler | undefined,
-  logger: Logger
+  logger: Logger,
 ): EnhancedAIService {
   // Type the legacy config properly
   interface LegacyConfig {
@@ -803,10 +803,10 @@ export function migrateToEnhancedAIService(
   const enhancedConfig: EnhancedAIConfig = {
     defaultSampling: {},
     cache: {
-      enabled: typedConfig.cacheEnabled !== false
+      enabled: typedConfig.cacheEnabled !== false,
     },
     enableMetrics: true,
-    enableDetailedLogging: false
+    enableDetailedLogging: false,
   };
 
   // Only add optional properties if they have defined values

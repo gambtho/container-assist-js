@@ -60,7 +60,7 @@ export class MockMCPSampler implements MCPSampler {
   private defaultResponse: MCPSampleResponse = {
     text: 'Mock response',
     tokenCount: 10,
-    model: 'mock-model'
+    model: 'mock-model',
   };
   private available: boolean = true;
   private logger: Logger;
@@ -87,7 +87,7 @@ export class MockMCPSampler implements MCPSampler {
     if (!this.available) {
       return {
         error: 'Mock sampler is not available',
-        code: 'SAMPLER_UNAVAILABLE'
+        code: 'SAMPLER_UNAVAILABLE',
       };
     }
 
@@ -95,9 +95,9 @@ export class MockMCPSampler implements MCPSampler {
       {
         promptLength: request.prompt.length,
         temperature: request.temperature,
-        maxTokens: request.maxTokens
+        maxTokens: request.maxTokens,
       },
-      'Mock sampling'
+      'Mock sampling',
     );
 
     // Check for matching mock response
@@ -105,7 +105,7 @@ export class MockMCPSampler implements MCPSampler {
       if (request.prompt.includes(pattern)) {
         return {
           ...response,
-          model: request.model ?? response.model
+          model: request.model ?? response.model,
         };
       }
     }
@@ -113,7 +113,7 @@ export class MockMCPSampler implements MCPSampler {
     // Return default response
     return {
       ...this.defaultResponse,
-      model: request.model ?? this.defaultResponse.model
+      model: request.model ?? this.defaultResponse.model,
     };
   }
 
@@ -166,12 +166,12 @@ export class LegacyMCPSamplerAdapter implements MCPSampler {
         templateId: request.context?._templateId ?? 'unknown',
         variables: {
           ...request.context,
-          _prompt: request.prompt
+          _prompt: request.prompt,
         },
         format: 'text' as const,
         temperature: request.temperature,
         maxTokens: request.maxTokens,
-        model: request.model
+        model: request.model,
       };
 
       // Call legacy sampler
@@ -183,17 +183,17 @@ export class LegacyMCPSamplerAdapter implements MCPSampler {
           text:
             typeof result.content === 'string' ? result.content : JSON.stringify(result.content),
           tokenCount: result.tokenCount,
-          model: result.model ?? request.model
+          model: result.model ?? request.model,
         };
       } else if (result.error) {
         return {
           error: result.error.message ?? 'Unknown error',
           code: result.error.code,
-          details: result.error
+          details: result.error,
         };
       } else {
         return {
-          error: 'Invalid response from legacy sampler'
+          error: 'Invalid response from legacy sampler',
         };
       }
     } catch (error) {
@@ -201,7 +201,7 @@ export class LegacyMCPSamplerAdapter implements MCPSampler {
       return {
         error: error instanceof Error ? error.message : 'Unknown error',
         code: 'LEGACY_SAMPLER_ERROR',
-        details: { originalError: error }
+        details: { originalError: error },
       };
     }
   }
@@ -234,7 +234,7 @@ export class MCPSamplerFactory {
    */
   static create(
     config: { legacySampler?: LegacySampler; useMock?: boolean },
-    logger: Logger
+    logger: Logger,
   ): MCPSampler {
     // If a legacy sampler is provided, wrap it
     if (config.legacySampler != null) {

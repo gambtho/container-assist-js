@@ -29,13 +29,13 @@ export class CommandExecutor {
   async execute(
     command: string,
     args: string[] = [],
-    options: CommandOptions = {}
+    options: CommandOptions = {},
   ): Promise<CommandResult> {
     const {
       cwd = process.cwd(),
       env = process.env,
       timeout = 30000,
-      maxBuffer = 10 * 1024 * 1024 // 10MB
+      maxBuffer = 10 * 1024 * 1024, // 10MB
     } = options;
 
     this.logger.debug({ command, args, cwd }, 'Executing command');
@@ -49,7 +49,7 @@ export class CommandExecutor {
       const spawnOptions: SpawnOptions = {
         cwd,
         env,
-        shell: false
+        shell: false,
       };
 
       const child = spawn(command, args, spawnOptions);
@@ -100,7 +100,7 @@ export class CommandExecutor {
           stdout: stdout.trim(),
           stderr: stderr.trim(),
           exitCode,
-          timedOut
+          timedOut,
         });
       });
 

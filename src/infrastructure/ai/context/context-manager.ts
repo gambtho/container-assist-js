@@ -12,7 +12,7 @@ export class AIContextManager {
   private maxContextTokens: Map<ContextPriority, number> = new Map([
     ['high', 3500],
     ['medium', 2500],
-    ['low', 1500]
+    ['low', 1500],
   ]);
 
   private tokenEstimator: TokenEstimator;
@@ -23,7 +23,7 @@ export class AIContextManager {
 
   optimizeContext(
     context: string,
-    priority: ContextPriority = 'medium'
+    priority: ContextPriority = 'medium',
   ): ContextOptimizationResult {
     const originalTokens = this.tokenEstimator.estimate(context);
     const maxTokens = this.maxContextTokens.get(priority) || 2500;
@@ -35,7 +35,7 @@ export class AIContextManager {
         originalTokens,
         optimizedTokens: originalTokens,
         reductionPercentage: 0,
-        applicationsApplied
+        applicationsApplied,
       };
     }
 
@@ -73,7 +73,7 @@ export class AIContextManager {
       originalTokens,
       optimizedTokens: finalTokens,
       reductionPercentage,
-      applicationsApplied
+      applicationsApplied,
     };
   }
 
@@ -118,7 +118,7 @@ export class AIContextManager {
       /module\.exports = \w+;?$/gm,
       /\/\*\*[\s\S]*?\*\//g, // JSDoc comments
       /^\s*console\.log\(.*\);?$/gm, // Console logs
-      /^\s*\/\/.*$/gm // Single-line comments (again for safety)
+      /^\s*\/\/.*$/gm, // Single-line comments (again for safety)
     ];
 
     boilerplatePatterns.forEach((pattern) => {
@@ -170,7 +170,7 @@ export class AIContextManager {
     // Replace function bodies with ... for context awareness
     return content.replace(
       /((?:function|async function|\w+\s*:\s*function|\w+\s*=\s*(?:async\s+)?\([^)]*\)\s*=>)\s*\{)[^}]*(\})/g,
-      '$1 /* ... */ $2'
+      '$1 /* ... */ $2',
     );
   }
 
@@ -196,7 +196,7 @@ export class AIContextManager {
       'case',
       'try',
       'catch',
-      'finally'
+      'finally',
     ];
     return controlKeywords.some((keyword) => line.includes(keyword));
   }
@@ -228,7 +228,7 @@ export class AIContextManager {
         }
       } else if (trimmed.includes('function ') && !trimmed.includes('{')) {
         const match = trimmed.match(
-          /((?:export\s+)?(?:async\s+)?function\s+\w+\([^)]*\)(?:\s*:\s*[^{]+)?)/
+          /((?:export\s+)?(?:async\s+)?function\s+\w+\([^)]*\)(?:\s*:\s*[^{]+)?)/,
         );
         if (match) {
           summary.push(`${match[1]} { /* ... */ }`);
@@ -273,7 +273,7 @@ export class AIContextManager {
       '\n', // Single newline
       ';', // End of statement
       ',', // Comma
-      ' ' // Space
+      ' ', // Space
     ];
 
     for (const boundary of boundaries) {
@@ -390,7 +390,7 @@ export class TokenEstimator {
       /while\s*\([^)]+\)/,
       /\w+\s*:\s*\w+/,
       /=>/,
-      /\{[\s\S]*\}/
+      /\{[\s\S]*\}/,
     ];
 
     const matches = codeIndicators.reduce((count, pattern) => {
@@ -406,7 +406,7 @@ export class TokenEstimator {
       code: 3.5,
       documentation: 4.5,
       data: 3.8,
-      mixed: 4.0
+      mixed: 4.0,
     };
 
     return Math.ceil(text.length / ratios[contentType]);

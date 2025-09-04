@@ -11,7 +11,7 @@ import type { Session } from '../../contracts/types/session.js';
 export class SessionResourceProvider {
   constructor(
     private sessionService: SessionService,
-    private logger: Logger
+    private logger: Logger,
   ) {
     this.logger = logger.child({ component: 'SessionResourceProvider' });
   }
@@ -31,7 +31,7 @@ export class SessionResourceProvider {
           try {
             const activeSessions = await this.sessionService.query({
               status: 'active',
-              limit: 50
+              limit: 50,
             });
 
             if (activeSessions == null) {
@@ -47,12 +47,12 @@ export class SessionResourceProvider {
                 progress: {
                   percentage: sessionData.progress?.percentage ?? 0,
                   message: '', // Not available in schema, set default
-                  step: sessionData.progress?.current_step?.toString() ?? ''
+                  step: sessionData.progress?.current_step?.toString() ?? '',
                 },
                 repoPath: sessionData.repo_path,
                 created: sessionData.created_at,
                 updated: sessionData.updated_at,
-                timeActive: new Date().getTime() - new Date(sessionData.created_at).getTime()
+                timeActive: new Date().getTime() - new Date(sessionData.created_at).getTime(),
               };
             });
 
@@ -64,13 +64,13 @@ export class SessionResourceProvider {
                     {
                       count: sessions.length,
                       sessions,
-                      timestamp: new Date().toISOString()
+                      timestamp: new Date().toISOString(),
                     },
                     null,
-                    2
-                  )
-                }
-              ]
+                    2,
+                  ),
+                },
+              ],
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to get active sessions');
@@ -82,16 +82,16 @@ export class SessionResourceProvider {
                     {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString()
+                      timestamp: new Date().toISOString(),
                     },
                     null,
-                    2
-                  )
-                }
-              ]
+                    2,
+                  ),
+                },
+              ],
             };
           }
-        }
+        },
       },
       // Session details resource (parameterized)
       {
@@ -112,13 +112,13 @@ export class SessionResourceProvider {
                       {
                         status: 'not_found',
                         message: `Session ${params.sessionId} not found`,
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
                       },
                       null,
-                      2
-                    )
-                  }
-                ]
+                      2,
+                    ),
+                  },
+                ],
               };
             }
 
@@ -139,21 +139,21 @@ export class SessionResourceProvider {
                 ? new Date(sessionData.updated_at).getTime() -
                   new Date(sessionData.created_at).getTime()
                 : 0,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
             };
 
             return {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(details, null, 2)
-                }
-              ]
+                  text: JSON.stringify(details, null, 2),
+                },
+              ],
             };
           } catch (error) {
             this.logger.error(
               { error, sessionId: params.sessionId },
-              'Failed to get session details'
+              'Failed to get session details',
             );
             return {
               content: [
@@ -164,16 +164,16 @@ export class SessionResourceProvider {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
                       sessionId: params.sessionId,
-                      timestamp: new Date().toISOString()
+                      timestamp: new Date().toISOString(),
                     },
                     null,
-                    2
-                  )
-                }
-              ]
+                    2,
+                  ),
+                },
+              ],
             };
           }
-        }
+        },
       },
       // Session management resource
       {
@@ -203,7 +203,7 @@ export class SessionResourceProvider {
               failed: 0,
               cleanupCandidates: [] as string[],
               recommendations: [] as string[],
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
             };
 
             for (const session of allSessions) {
@@ -242,17 +242,17 @@ export class SessionResourceProvider {
             // Generate recommendations
             if (management.stale > 0) {
               management.recommendations.push(
-                `${management.stale} stale sessions should be cleaned up`
+                `${management.stale} stale sessions should be cleaned up`,
               );
             }
             if (management.expired > 0) {
               management.recommendations.push(
-                `${management.expired} expired sessions can be archived`
+                `${management.expired} expired sessions can be archived`,
               );
             }
             if (management.active > 10) {
               management.recommendations.push(
-                'High number of active sessions - consider reviewing resource usage'
+                'High number of active sessions - consider reviewing resource usage',
               );
             }
 
@@ -260,9 +260,9 @@ export class SessionResourceProvider {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(management, null, 2)
-                }
-              ]
+                  text: JSON.stringify(management, null, 2),
+                },
+              ],
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to get session management data');
@@ -274,17 +274,17 @@ export class SessionResourceProvider {
                     {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString()
+                      timestamp: new Date().toISOString(),
                     },
                     null,
-                    2
-                  )
-                }
-              ]
+                    2,
+                  ),
+                },
+              ],
             };
           }
-        }
-      }
+        },
+      },
     ];
   }
 }

@@ -25,7 +25,7 @@ export class ProgressReporter {
 
   constructor(
     _server: Server, // Intentionally unused parameter
-    logger: Logger
+    logger: Logger,
   ) {
     this.logger = logger.child({ component: 'ProgressReporter' });
   }
@@ -40,9 +40,9 @@ export class ProgressReporter {
           current: update.current,
           total: update.total,
           percentage: Math.round((update.current / update.total) * 100),
-          message: update.message
+          message: update.message,
         },
-        'Progress update (no token)'
+        'Progress update (no token)',
       );
       return;
     }
@@ -57,18 +57,18 @@ export class ProgressReporter {
           current: update.current,
           total: update.total,
           percentage: Math.round((update.current / update.total) * 100),
-          message: update.message
+          message: update.message,
         },
-        'Progress update (MCP notifications not yet implemented)'
+        'Progress update (MCP notifications not yet implemented)',
       );
     } catch (error) {
       this.logger.warn(
         {
           error: error instanceof Error ? error.message : String(error),
           progressToken,
-          update
+          update,
         },
-        'Failed to send progress notification'
+        'Failed to send progress notification',
       );
     }
   }
@@ -86,13 +86,13 @@ export class ProgressReporter {
   async reportPercentage(
     progressToken: string | undefined,
     percentage: number,
-    message?: string
+    message?: string,
   ): Promise<void> {
     const clampedPercentage = Math.max(0, Math.min(100, percentage));
 
     const update: ProgressUpdate = {
       current: clampedPercentage,
-      total: 100
+      total: 100,
     };
 
     if (message !== undefined) {
@@ -109,7 +109,7 @@ export class ProgressReporter {
     await this.reportProgress(progressToken, {
       current: 100,
       total: 100,
-      message: message ?? 'Operation completed'
+      message: message ?? 'Operation completed',
     });
   }
 }
@@ -125,7 +125,7 @@ export class StepProgressTracker {
   constructor(
     private reporter: ProgressReporter,
     private progressToken: string | undefined,
-    private steps: ProgressStep[]
+    private steps: ProgressStep[],
   ) {
     this.totalWeight = steps.reduce((sum, step) => sum + (step.weight ?? 1), 0);
   }
@@ -152,8 +152,8 @@ export class StepProgressTracker {
       metadata: {
         step: step.name,
         stepNumber: this.currentStep + 1,
-        totalSteps: this.steps.length
-      }
+        totalSteps: this.steps.length,
+      },
     });
   }
 
@@ -182,8 +182,8 @@ export class StepProgressTracker {
       metadata: {
         completedStep: step.name,
         stepNumber: this.currentStep,
-        totalSteps: this.steps.length
-      }
+        totalSteps: this.steps.length,
+      },
     });
   }
 
@@ -211,8 +211,8 @@ export class StepProgressTracker {
         step: step.name,
         stepNumber: this.currentStep + 1,
         totalSteps: this.steps.length,
-        stepProgress: Math.round(currentStepProgress * 100)
-      }
+        stepProgress: Math.round(currentStepProgress * 100),
+      },
     });
   }
 
@@ -224,7 +224,7 @@ export class StepProgressTracker {
     totalSteps: number;
     currentStepName?: string | undefined;
     overallProgress: number;
-  } {
+    } {
     const currentStepName =
       this.currentStep < this.steps.length ? this.steps[this.currentStep]?.name : undefined;
 
@@ -232,7 +232,7 @@ export class StepProgressTracker {
       currentStep: this.currentStep,
       totalSteps: this.steps.length,
       ...(currentStepName !== undefined && { currentStepName }),
-      overallProgress: Math.round((this.completedWeight / this.totalWeight) * 100)
+      overallProgress: Math.round((this.completedWeight / this.totalWeight) * 100),
     };
   }
 

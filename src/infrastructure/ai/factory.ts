@@ -54,7 +54,7 @@ export class AIServiceFactory {
     return {
       sampler,
       structuredSampler,
-      contentValidator
+      contentValidator,
     };
   }
 
@@ -71,9 +71,9 @@ export class AIServiceFactory {
     // Use the existing factory
     return MCPSamplerFactory.create(
       {
-        ...(samplerConfig.config as Record<string, unknown>)
+        ...(samplerConfig.config as Record<string, unknown>),
       },
-      logger
+      logger,
     );
   }
 
@@ -96,7 +96,7 @@ export class AIServiceFactory {
    */
   static createFromLegacyConfig(
     legacyConfig: Record<string, unknown>,
-    logger: Logger
+    logger: Logger,
   ): AIServiceBundle {
     const config: AIFactoryConfig = {
       sampler: {
@@ -105,13 +105,13 @@ export class AIServiceFactory {
           | 'mock'
           | 'anthropic'
           | 'openai',
-        config: legacyConfig
+        config: legacyConfig,
       },
       validation: {
         enabled: legacyConfig.enableValidation !== false,
-        strict: legacyConfig.strictValidation === true
+        strict: legacyConfig.strictValidation === true,
       },
-      logger
+      logger,
     };
 
     return this.createBundle(config);
@@ -128,7 +128,7 @@ export class AIServiceFactory {
     return {
       sampler: mockSampler,
       structuredSampler,
-      contentValidator
+      contentValidator,
     };
   }
 }

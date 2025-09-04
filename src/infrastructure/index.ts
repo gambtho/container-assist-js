@@ -15,11 +15,11 @@ export * from './ai/mock-sampler';
 // Explicit exports to resolve naming conflicts
 export type {
   SecurityIssue as StructuredSamplerSecurityIssue,
-  ValidationResult as StructuredSamplerValidationResult
+  ValidationResult as StructuredSamplerValidationResult,
 } from './ai/structured-sampler';
 export type {
   SecurityIssue as ContentValidatorSecurityIssue,
-  ValidationResult as ContentValidatorValidationResult
+  ValidationResult as ContentValidatorValidationResult,
 } from './ai/content-validator';
 
 // Export the main classes from these modules

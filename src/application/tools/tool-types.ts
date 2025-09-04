@@ -1,14 +1,9 @@
-import { z , type ZodRawShape} from 'zod';
+import { z } from 'zod';
 import type { Logger } from 'pino';
 // import type { Server, Tool } from '@modelcontextprotocol/sdk/types';
 // Server not exported from SDK, Tool unused
-import type { AnalysisResult, WorkflowState } from '../../contracts/types/index.js';
-import type { SessionService } from '../session/manager.js';
 import type { WorkflowOrchestrator } from '../workflow/orchestrator.js';
 import type { WorkflowManager } from '../workflow/manager.js';
-import type { DockerService } from '../../services/docker.js';
-import type { KubernetesService } from '../../services/kubernetes.js';
-import type { EnhancedAIService } from '../../infrastructure/ai-service.js';
 import type { ProgressEmitter, EventPublisher, DependenciesConfig } from '../interfaces.js';
 import type { ProgressCallback } from '../workflow/types.js';
 import type { MCPSampler } from '../../infrastructure/ai/ai-types.js';
@@ -51,6 +46,8 @@ export interface ToolContext {
   // Services - for backwards compatibility
   sessionService?: any;
   aiService?: any;
+  dockerService?: any;
+  kubernetesService?: any;
 }
 
 /**

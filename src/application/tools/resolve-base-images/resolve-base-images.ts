@@ -6,14 +6,14 @@ import {
   BaseImageRecommendation,
   BaseImageRecommendationSchema,
   BaseImageResolutionInput,
-  BaseImageResolutionInputSchema
+  BaseImageResolutionInputSchema,
 } from '../../../contracts/types/index.js';
 import { executeWithRetry } from '../error-recovery.js';
 import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 import {
   getSuggestedImagesForReference,
   validateBaseImageRecommendation,
-  buildBaseImageAIRequest
+  buildBaseImageAIRequest,
 } from './helper';
 
 /**
@@ -28,7 +28,7 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
 
   handler: async (
     input: BaseImageResolutionInput,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<BaseImageRecommendation> => {
     return executeWithRetry(
       async () => {
@@ -51,7 +51,7 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
         // Prepare suggested images as reference (not hardcoded decision)
         const suggestedImages = getSuggestedImagesForReference(
           analysis.language,
-          analysis.framework
+          analysis.framework,
         );
 
         // Use AI for intelligent decision making
@@ -64,7 +64,7 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
 
         const recommendation = await context.structuredSampler.sampleJSON(
           JSON.stringify(aiRequest),
-          { schema: BaseImageRecommendationSchema }
+          { schema: BaseImageRecommendationSchema },
         );
 
         if (!recommendation.success) {
@@ -75,7 +75,7 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
         const validationResult = await validateBaseImageRecommendation(recommendation.data);
         if (!validationResult.isValid) {
           throw new Error(
-            `AI recommendation validation failed: ${validationResult.issues.join(', ')}`
+            `AI recommendation validation failed: ${validationResult.issues.join(', ')}`,
           );
         }
 
@@ -85,24 +85,24 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
             ...session,
             workflow_state: {
               ...session.workflow_state,
-              base_image_recommendation: recommendation.data
-            }
+              base_image_recommendation: recommendation.data,
+            },
           }));
         } catch (error) {
           context.logger.warn(
             {
               sessionId: input.session_id,
-              error
+              error,
             },
-            'Failed to store base image recommendation in session'
+            'Failed to store base image recommendation in session',
           );
         }
 
         return recommendation.data;
       },
-      { maxAttempts: 2 }
+      { maxAttempts: 2 },
     );
-  }
+  },
 };
 
 export default resolveBaseImagesHandler;

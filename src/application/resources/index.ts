@@ -29,7 +29,7 @@ export class ResourceManager {
     private sessionService: SessionService,
     private dockerService: DockerService,
     private toolRegistryOrFactory: ToolRegistry | ToolFactory,
-    private logger: Logger
+    private logger: Logger,
   ) {
     this.logger = logger.child({ component: 'ResourceManager' });
     this.initializeProviders();
@@ -55,9 +55,9 @@ export class ResourceManager {
             description: (tool as Record<string, unknown>).description ?? '',
             inputSchema: (tool as Record<string, unknown>).inputSchema ?? {
               type: 'object',
-              properties: {}
-            }
-          }))
+              properties: {},
+            },
+          })),
         };
       },
       getToolCount: () => {
@@ -76,14 +76,14 @@ export class ResourceManager {
         // Delegate to factory if it has a handler
         return Promise.resolve({
           content: [{ type: 'text', text: 'Not implemented' }],
-          success: false
+          success: false,
         });
       },
       handleSamplingRequest: async (_request: unknown) => {
         // Delegate to factory if it has a handler
         return Promise.resolve({
           content: [{ type: 'text', text: 'Not implemented' }],
-          success: false
+          success: false,
         });
       },
       register: () => {
@@ -95,7 +95,7 @@ export class ResourceManager {
       },
       setServer: () => {
         // No-op for factory adapter
-      }
+      },
     };
 
     return adapter as unknown as ToolRegistry;
@@ -130,9 +130,9 @@ export class ResourceManager {
 
     this.logger.info(
       {
-        providers: Array.from(this.providers.keys())
+        providers: Array.from(this.providers.keys()),
       },
-      'Resource providers initialized'
+      'Resource providers initialized',
     );
   }
 
@@ -168,7 +168,7 @@ export class ResourceManager {
             uri: resource.uri,
             name: resource.name,
             description: resource.description,
-            mimeType: resource.mimeType ?? 'application/json'
+            mimeType: resource.mimeType ?? 'application/json',
           };
         });
 
@@ -197,23 +197,23 @@ export class ResourceManager {
                 {
                   uri,
                   mimeType: resourceObj.mimeType ?? 'application/json',
-                  text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
-                }
-              ]
+                  text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
+                },
+              ],
             };
           } catch (error) {
             this.logger.error({ error, uri }, 'Failed to read resource');
             throw error;
           }
-        }
+        },
       );
 
       this.isRegistered = true;
       this.logger.info(
         {
-          resourceCount: this.resources.size
+          resourceCount: this.resources.size,
         },
-        'All resources registered with MCP server'
+        'All resources registered with MCP server',
       );
     } catch (error) {
       this.logger.error({ error }, 'Failed to register resource providers');
@@ -240,16 +240,16 @@ export class ResourceManager {
                 resources: [
                   { uri: 'workflow://current', name: 'Current Workflow State' },
                   { uri: 'workflow://history', name: 'Workflow History' },
-                  { uri: 'workflow://stats', name: 'Workflow Statistics' }
-                ]
+                  { uri: 'workflow://stats', name: 'Workflow Statistics' },
+                ],
               },
               session: {
                 description: 'Session management and tracking',
                 resources: [
                   { uri: 'session://active', name: 'Active Sessions' },
                   { uri: 'session://details/{sessionId}', name: 'Session Details' },
-                  { uri: 'session://management', name: 'Session Management' }
-                ]
+                  { uri: 'session://management', name: 'Session Management' },
+                ],
               },
               docker: {
                 description: 'Docker system and container information',
@@ -257,8 +257,8 @@ export class ResourceManager {
                   { uri: 'docker://system', name: 'Docker System Information' },
                   { uri: 'docker://images', name: 'Docker Images' },
                   { uri: 'docker://containers', name: 'Docker Containers' },
-                  { uri: 'docker://build-context', name: 'Docker Build Context' }
-                ]
+                  { uri: 'docker://build-context', name: 'Docker Build Context' },
+                ],
               },
               config: {
                 description: 'Server configuration and capabilities',
@@ -266,8 +266,8 @@ export class ResourceManager {
                   { uri: 'config://current', name: 'Current Server Configuration' },
                   { uri: 'config://capabilities', name: 'Server Capabilities' },
                   { uri: 'config://environment', name: 'Server Environment' },
-                  { uri: 'config://validation', name: 'Configuration Validation' }
-                ]
+                  { uri: 'config://validation', name: 'Configuration Validation' },
+                ],
               },
               tools: {
                 description: 'Tool registry and analytics',
@@ -275,12 +275,12 @@ export class ResourceManager {
                   { uri: 'tools://registry', name: 'Tool Registry' },
                   { uri: 'tools://analytics', name: 'Tool Usage Analytics' },
                   { uri: 'tools://dependencies', name: 'Tool Dependencies' },
-                  { uri: 'tools://documentation', name: 'Tool Documentation' }
-                ]
-              }
+                  { uri: 'tools://documentation', name: 'Tool Documentation' },
+                ],
+              },
             },
             totalResources: this.resources.size,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
 
           return catalog;
@@ -289,10 +289,10 @@ export class ResourceManager {
           return {
             status: 'error',
             message: error instanceof Error ? error.message : 'Unknown error',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         }
-      }
+      },
     });
 
     // Resource health check
@@ -307,7 +307,7 @@ export class ResourceManager {
             overall: 'healthy',
             providers: {} as Record<string, any>,
             issues: [] as string[],
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
 
           // Check each provider
@@ -316,12 +316,12 @@ export class ResourceManager {
               // Basic health check - providers are healthy if they exist
               health.providers[name] = {
                 status: 'healthy',
-                message: 'Provider operational'
+                message: 'Provider operational',
               };
             } catch (error) {
               health.providers[name] = {
                 status: 'unhealthy',
-                message: error instanceof Error ? error.message : 'Unknown error'
+                message: error instanceof Error ? error.message : 'Unknown error',
               };
               health.issues.push(`${name} provider is unhealthy`);
             }
@@ -329,7 +329,7 @@ export class ResourceManager {
 
           // Set overall status
           const unhealthyProviders = Object.values(health.providers).filter(
-            (p: { status: string }) => p.status === 'unhealthy'
+            (p: { status: string }) => p.status === 'unhealthy',
           );
 
           if (unhealthyProviders.length > 0) {
@@ -342,10 +342,10 @@ export class ResourceManager {
           return {
             overall: 'error',
             message: error instanceof Error ? error.message : 'Unknown error',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         }
-      }
+      },
     });
   }
 

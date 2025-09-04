@@ -68,7 +68,7 @@ export abstract class BaseRecoveryStrategy implements RecoveryStrategy {
   canHandle(error: Error, context: ErrorContext): boolean {
     // Check if this strategy has been used too many times
     const usageCount = (context.strategiesUsed ?? []).filter(
-      (strategy) => strategy === this.name
+      (strategy) => strategy === this.name,
     ).length;
 
     if (usageCount >= this.maxAttempts) {
@@ -90,7 +90,7 @@ export abstract class BaseRecoveryStrategy implements RecoveryStrategy {
   async recover(
     originalRequest: AIRequest,
     error: Error,
-    context: ErrorContext
+    context: ErrorContext,
   ): Promise<AIRequest> {
     // Create base recovery request
     const recoveryRequest = await this.createRecoveryRequest(originalRequest, error, context);
@@ -122,7 +122,7 @@ export abstract class BaseRecoveryStrategy implements RecoveryStrategy {
       // Increase max tokens slightly for more complete responses
       modifications.maxTokens = Math.min(
         (request.maxTokens ?? 1000) * 1.2,
-        (request.maxTokens ?? 1000) + 500
+        (request.maxTokens ?? 1000) + 500,
       );
     }
 
@@ -132,8 +132,8 @@ export abstract class BaseRecoveryStrategy implements RecoveryStrategy {
         attempt: context.attempt,
         strategy: this.name,
         previousError: context.previousErrors[context.previousErrors.length - 1],
-        patterns: context.patterns?.map((p) => p.type) || []
-      }
+        patterns: context.patterns?.map((p) => p.type) || [],
+      },
     };
 
     return {
@@ -141,8 +141,8 @@ export abstract class BaseRecoveryStrategy implements RecoveryStrategy {
       ...modifications,
       context: {
         ...request.context,
-        ...contextAdditions
-      }
+        ...contextAdditions,
+      },
     };
   }
 
@@ -306,7 +306,7 @@ export class RecoveryCoordinator {
   async executeRecovery(
     originalRequest: AIRequest,
     error: Error,
-    context: ErrorContext
+    context: ErrorContext,
   ): Promise<RecoveryResult | null> {
     const strategy = this.selector.selectStrategy(error, context);
 
@@ -324,8 +324,8 @@ export class RecoveryCoordinator {
         expectedImprovement: this.getExpectedImprovement(strategy, error, context),
         instructions: this.getRecoveryInstructions(strategy, context),
         isFinalAttempt:
-          context.attempt >= 4 ?? this.selector.getAvailableStrategies(error, context).length <= 1
-      }
+          context.attempt >= 4 ?? this.selector.getAvailableStrategies(error, context).length <= 1,
+      },
     };
   }
 
@@ -357,7 +357,7 @@ export class RecoveryCoordinator {
   private getExpectedImprovement(
     strategy: RecoveryStrategy,
     _error: Error,
-    context: ErrorContext
+    context: ErrorContext,
   ): string {
     // This would be strategy-specific, but provide a generic fallback
     return (

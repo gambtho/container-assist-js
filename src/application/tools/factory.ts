@@ -24,7 +24,7 @@ export class ToolFactory {
 
   async getAllTools(): Promise<
     Array<{ name: string; description?: string; inputSchema?: unknown }>
-  > {
+    > {
     const result = await this.registry.listTools();
     return result.tools;
   }
@@ -67,5 +67,5 @@ export const AVAILABLE_TOOLS = [
   'workflow-status',
   'ping',
   'list-tools',
-  'server-status'
+  'server-status',
 ];

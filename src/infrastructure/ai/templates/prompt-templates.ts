@@ -27,7 +27,7 @@ export class PromptTemplates {
       maxTokens: 2000,
       taskType: TaskType.CODE_GENERATION,
       description: 'Generates secure, optimized Dockerfiles',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('dockerfile_optimization', {
@@ -37,7 +37,7 @@ export class PromptTemplates {
       maxTokens: 1800,
       taskType: TaskType.OPTIMIZATION,
       description: 'Optimizes existing Dockerfiles',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('error_analysis', {
@@ -46,7 +46,7 @@ export class PromptTemplates {
       maxTokens: 1500,
       taskType: TaskType.ERROR_DIAGNOSIS,
       description: 'Diagnoses and provides solutions for errors',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('repository_analysis', {
@@ -56,7 +56,7 @@ export class PromptTemplates {
       maxTokens: 2500,
       taskType: TaskType.ANALYSIS,
       description: 'Analyzes repository for containerization',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('kubernetes_manifest', {
@@ -66,7 +66,7 @@ export class PromptTemplates {
       maxTokens: 3000,
       taskType: TaskType.CODE_GENERATION,
       description: 'Generates Kubernetes deployment manifests',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('security_analysis', {
@@ -76,7 +76,7 @@ export class PromptTemplates {
       maxTokens: 2000,
       taskType: TaskType.ANALYSIS,
       description: 'Analyzes container security',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('dependency_analysis', {
@@ -86,7 +86,7 @@ export class PromptTemplates {
       maxTokens: 1800,
       taskType: TaskType.ANALYSIS,
       description: 'Analyzes project dependencies',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('base_image_recommendation', {
@@ -95,7 +95,7 @@ export class PromptTemplates {
       maxTokens: 1200,
       taskType: TaskType.OPTIMIZATION,
       description: 'Recommends optimal base images',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('docker_compose_generation', {
@@ -105,7 +105,7 @@ export class PromptTemplates {
       maxTokens: 2500,
       taskType: TaskType.CODE_GENERATION,
       description: 'Generates Docker Compose configurations',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('performance_optimization', {
@@ -115,7 +115,7 @@ export class PromptTemplates {
       maxTokens: 2000,
       taskType: TaskType.OPTIMIZATION,
       description: 'Optimizes container performance',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('ci_cd_integration', {
@@ -125,7 +125,7 @@ export class PromptTemplates {
       maxTokens: 2800,
       taskType: TaskType.CODE_GENERATION,
       description: 'Generates CI/CD pipeline configurations',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('troubleshooting', {
@@ -135,7 +135,7 @@ export class PromptTemplates {
       maxTokens: 1800,
       taskType: TaskType.ERROR_DIAGNOSIS,
       description: 'Troubleshoots container issues',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('migration_plan', {
@@ -145,7 +145,7 @@ export class PromptTemplates {
       maxTokens: 3000,
       taskType: TaskType.ANALYSIS,
       description: 'Creates migration plans to containers',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('health_check_generation', {
@@ -155,7 +155,7 @@ export class PromptTemplates {
       maxTokens: 1500,
       taskType: TaskType.CODE_GENERATION,
       description: 'Generates container health checks',
-      version: '1.0'
+      version: '1.0',
     });
 
     this.registerTemplate('resource_optimization', {
@@ -164,7 +164,7 @@ export class PromptTemplates {
       maxTokens: 1600,
       taskType: TaskType.OPTIMIZATION,
       description: 'Optimizes container resource allocation',
-      version: '1.0'
+      version: '1.0',
     });
   }
 
@@ -190,14 +190,14 @@ export class PromptTemplates {
     const template = this.templates.get(templateName);
     if (!template) {
       throw new Error(
-        `Template '${templateName}' not found. Available: ${Array.from(this.templates.keys()).join(', ')}`
+        `Template '${templateName}' not found. Available: ${Array.from(this.templates.keys()).join(', ')}`,
       );
     }
 
     return {
       ...template,
       system: this.replaceVariables(template.system, variables),
-      user: this.replaceVariables(template.user, variables)
+      user: this.replaceVariables(template.user, variables),
     };
   }
 
@@ -293,7 +293,7 @@ export class PromptTemplates {
       maxTokens: template.maxTokens,
       version: this.templateVersions.get(name) || '1.0',
       variables: this.extractVariables(template),
-      estimatedInputTokens: this.estimateTemplateTokens(template)
+      estimatedInputTokens: this.estimateTemplateTokens(template),
     };
   }
 
@@ -329,7 +329,7 @@ export class PromptTemplates {
       return {
         valid: false,
         errors: [`Template '${templateName}' not found`],
-        warnings: []
+        warnings: [],
       };
     }
 
@@ -342,7 +342,7 @@ export class PromptTemplates {
     const missingVars = requiredVars.filter((v) => !(v in variables));
     if (missingVars.length > 0) {
       warnings.push(
-        `Missing variables will be filled with '[not provided]': ${missingVars.join(', ')}`
+        `Missing variables will be filled with '[not provided]': ${missingVars.join(', ')}`,
       );
     }
 
@@ -356,7 +356,7 @@ export class PromptTemplates {
     for (const [key, value] of Object.entries(variables)) {
       if (typeof value === 'string' && value.length > 5000) {
         warnings.push(
-          `Variable '${key}' is very large (${value.length} chars), consider truncating`
+          `Variable '${key}' is very large (${value.length} chars), consider truncating`,
         );
       }
     }
@@ -364,7 +364,7 @@ export class PromptTemplates {
     return {
       valid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 

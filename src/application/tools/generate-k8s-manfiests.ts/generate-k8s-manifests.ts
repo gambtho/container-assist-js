@@ -10,8 +10,9 @@ import {
   ErrorCode,
   DomainError,
   KubernetesManifest,
-  AnalysisResult
+  AnalysisResult,
 } from '../../../contracts/types/index.js';
+import type { Session } from '../../../contracts/types/session.js';
 import { executeWithRecovery } from '../error-recovery.js';
 import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
 import type { ToolDescriptor, ToolContext } from '../tool-types.js';
@@ -38,15 +39,15 @@ const GenerateKubernetesManifestsInput = z
         requests: z
           .object({
             memory: z.string().default('128Mi'),
-            cpu: z.string().default('100m')
+            cpu: z.string().default('100m'),
           })
           .optional(),
         limits: z
           .object({
             memory: z.string().default('512Mi'),
-            cpu: z.string().default('500m')
+            cpu: z.string().default('500m'),
           })
-          .optional()
+          .optional(),
       })
       .optional(),
     environment: z.enum(['dev', 'staging', 'production']).default('dev'),
@@ -63,7 +64,7 @@ const GenerateKubernetesManifestsInput = z
     target_cpu: z.number().default(70),
     targetCPU: z.number().optional(),
     output_path: z.string().optional(),
-    outputPath: z.string().optional()
+    outputPath: z.string().optional(),
   })
   .transform((data) => ({
     sessionId: data.session_id ?? data.sessionId ?? undefined,
@@ -77,7 +78,7 @@ const GenerateKubernetesManifestsInput = z
     ingressHost: data.ingress_host ?? data.ingressHost ?? undefined,
     resources: data.resources ?? {
       requests: { memory: '128Mi', cpu: '100m' },
-      limits: { memory: '512Mi', cpu: '500m' }
+      limits: { memory: '512Mi', cpu: '500m' },
     },
     environment: data.environment,
     configMap: data.config_map ?? data.configMap ?? {},
@@ -87,7 +88,7 @@ const GenerateKubernetesManifestsInput = z
     minReplicas: data.min_replicas ?? data.minReplicas ?? 2,
     maxReplicas: data.max_replicas ?? data.maxReplicas ?? 10,
     targetCPU: data.target_cpu ?? data.targetCPU ?? 70,
-    outputPath: data.output_path ?? data.outputPath ?? './k8s'
+    outputPath: data.output_path ?? data.outputPath ?? './k8s',
   }));
 
 // Output schema
@@ -98,8 +99,8 @@ const GenerateKubernetesManifestsOutput = z.object({
       kind: z.string(),
       name: z.string(),
       path: z.string(),
-      content: z.string()
-    })
+      content: z.string(),
+    }),
   ),
   outputPath: z.string(),
   metadata: z.object({
@@ -107,8 +108,8 @@ const GenerateKubernetesManifestsOutput = z.object({
     namespace: z.string(),
     image: z.string(),
     estimatedCost: z.string().optional(),
-    warnings: z.array(z.string()).optional()
-  })
+    warnings: z.array(z.string()).optional(),
+  }),
 });
 
 // Type aliases
@@ -131,23 +132,23 @@ function generateDeployment(input: KubernetesManifestsInput): KubernetesManifest
       labels: {
         app: appName,
         environment,
-        'managed-by': 'container-kit-mcp'
-      }
+        'managed-by': 'container-kit-mcp',
+      },
     },
     spec: {
       replicas,
       selector: {
         matchLabels: {
-          app: appName
-        }
+          app: appName,
+        },
       },
       template: {
         metadata: {
           labels: {
             app: appName,
             environment,
-            version: 'v1'
-          }
+            version: 'v1',
+          },
         },
         spec: {
           containers: [
@@ -157,37 +158,37 @@ function generateDeployment(input: KubernetesManifestsInput): KubernetesManifest
               ports:
                 port != null
                   ? [
-                      {
-                        containerPort: port,
-                        name: 'http',
-                        protocol: 'TCP'
-                      }
-                    ]
+                    {
+                      containerPort: port,
+                      name: 'http',
+                      protocol: 'TCP',
+                    },
+                  ]
                   : [],
               resources,
               livenessProbe: port
                 ? {
-                    httpGet: {
-                      path: healthCheckPath,
-                      port: 'http'
-                    },
-                    initialDelaySeconds: 30,
-                    periodSeconds: 10,
-                    timeoutSeconds: 5,
-                    failureThreshold: 3
-                  }
+                  httpGet: {
+                    path: healthCheckPath,
+                    port: 'http',
+                  },
+                  initialDelaySeconds: 30,
+                  periodSeconds: 10,
+                  timeoutSeconds: 5,
+                  failureThreshold: 3,
+                }
                 : undefined,
               readinessProbe: port
                 ? {
-                    httpGet: {
-                      path: healthCheckPath,
-                      port: 'http'
-                    },
-                    initialDelaySeconds: 5,
-                    periodSeconds: 5,
-                    timeoutSeconds: 3,
-                    failureThreshold: 3
-                  }
+                  httpGet: {
+                    path: healthCheckPath,
+                    port: 'http',
+                  },
+                  initialDelaySeconds: 5,
+                  periodSeconds: 5,
+                  timeoutSeconds: 3,
+                  failureThreshold: 3,
+                }
                 : undefined,
               env: [
                 ...Object.entries(input.configMap).map(([key, _value]) => ({
@@ -195,19 +196,19 @@ function generateDeployment(input: KubernetesManifestsInput): KubernetesManifest
                   valueFrom: {
                     configMapKeyRef: {
                       name: `${appName}-config`,
-                      key
-                    }
-                  }
+                      key,
+                    },
+                  },
                 })),
                 ...Object.keys(input.secrets ?? {}).map((key) => ({
                   name: key,
                   valueFrom: {
                     secretKeyRef: {
                       name: `${appName}-secrets`,
-                      key
-                    }
-                  }
-                }))
+                      key,
+                    },
+                  },
+                })),
               ],
               imagePullPolicy: 'IfNotPresent',
               securityContext: {
@@ -216,23 +217,23 @@ function generateDeployment(input: KubernetesManifestsInput): KubernetesManifest
                 allowPrivilegeEscalation: false,
                 readOnlyRootFilesystem: false,
                 capabilities: {
-                  drop: ['ALL']
-                }
-              }
-            }
+                  drop: ['ALL'],
+                },
+              },
+            },
           ],
           restartPolicy: 'Always',
-          terminationGracePeriodSeconds: 30
-        }
+          terminationGracePeriodSeconds: 30,
+        },
       },
       strategy: {
         type: 'RollingUpdate',
         rollingUpdate: {
           maxSurge: 1,
-          maxUnavailable: 0
-        }
-      }
-    }
+          maxUnavailable: 0,
+        },
+      },
+    },
   };
 }
 
@@ -250,26 +251,26 @@ function generateService(input: KubernetesManifestsInput): KubernetesManifest {
       namespace,
       labels: {
         app: appName,
-        'managed-by': 'container-kit-mcp'
-      }
+        'managed-by': 'container-kit-mcp',
+      },
     },
     spec: {
       type: serviceType,
       selector: {
-        app: appName
+        app: appName,
       },
       ports: port
         ? [
-            {
-              port,
-              targetPort: 'http',
-              protocol: 'TCP',
-              name: 'http'
-            }
-          ]
+          {
+            port,
+            targetPort: 'http',
+            protocol: 'TCP',
+            name: 'http',
+          },
+        ]
         : [],
-      sessionAffinity: 'None'
-    }
+      sessionAffinity: 'None',
+    },
   };
 }
 
@@ -291,12 +292,12 @@ function generateConfigMap(input: KubernetesManifestsInput): KubernetesManifest 
       namespace,
       labels: {
         app: appName,
-        'managed-by': 'container-kit-mcp'
-      }
+        'managed-by': 'container-kit-mcp',
+      },
     },
     spec: {
-      data: configMap
-    }
+      data: configMap,
+    },
   };
 }
 
@@ -324,13 +325,13 @@ function generateSecret(input: KubernetesManifestsInput): KubernetesManifest | n
       namespace,
       labels: {
         app: appName,
-        'managed-by': 'container-kit-mcp'
-      }
+        'managed-by': 'container-kit-mcp',
+      },
     },
     spec: {
       type: 'Opaque',
-      data: encodedSecrets
-    }
+      data: encodedSecrets,
+    },
   };
 }
 
@@ -352,20 +353,20 @@ function generateIngress(input: KubernetesManifestsInput): KubernetesManifest | 
       namespace,
       labels: {
         app: appName,
-        'managed-by': 'container-kit-mcp'
+        'managed-by': 'container-kit-mcp',
       },
       annotations: {
         'kubernetes.io/ingress.class': 'nginx',
         'cert-manager.io/cluster-issuer': 'letsencrypt-prod',
-        'nginx.ingress.kubernetes.io/ssl-redirect': 'true'
-      }
+        'nginx.ingress.kubernetes.io/ssl-redirect': 'true',
+      },
     },
     spec: {
       tls: [
         {
           hosts: [ingressHost],
-          secretName: `${appName}-tls`
-        }
+          secretName: `${appName}-tls`,
+        },
       ],
       rules: [
         {
@@ -379,16 +380,16 @@ function generateIngress(input: KubernetesManifestsInput): KubernetesManifest | 
                   service: {
                     name: appName,
                     port: {
-                      number: port
-                    }
-                  }
-                }
-              }
-            ]
-          }
-        }
-      ]
-    }
+                      number: port,
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
   };
 }
 
@@ -410,14 +411,14 @@ function generateHPA(input: KubernetesManifestsInput): KubernetesManifest | null
       namespace,
       labels: {
         app: appName,
-        'managed-by': 'container-kit-mcp'
-      }
+        'managed-by': 'container-kit-mcp',
+      },
     },
     spec: {
       scaleTargetRef: {
         apiVersion: 'apps/v1',
         kind: 'Deployment',
-        name: appName
+        name: appName,
       },
       minReplicas,
       maxReplicas,
@@ -428,10 +429,10 @@ function generateHPA(input: KubernetesManifestsInput): KubernetesManifest | null
             name: 'cpu',
             target: {
               type: 'Utilization',
-              averageUtilization: targetCPU
-            }
-          }
-        }
+              averageUtilization: targetCPU,
+            },
+          },
+        },
       ],
       behavior: {
         scaleDown: {
@@ -440,9 +441,9 @@ function generateHPA(input: KubernetesManifestsInput): KubernetesManifest | null
             {
               type: 'Percent',
               value: 50,
-              periodSeconds: 60
-            }
-          ]
+              periodSeconds: 60,
+            },
+          ],
         },
         scaleUp: {
           stabilizationWindowSeconds: 60,
@@ -450,12 +451,12 @@ function generateHPA(input: KubernetesManifestsInput): KubernetesManifest | null
             {
               type: 'Percent',
               value: 100,
-              periodSeconds: 60
-            }
-          ]
-        }
-      }
-    }
+              periodSeconds: 60,
+            },
+          ],
+        },
+      },
+    },
   };
 }
 
@@ -473,17 +474,17 @@ function generatePDB(input: KubernetesManifestsInput): KubernetesManifest {
       namespace,
       labels: {
         app: appName,
-        'managed-by': 'container-kit-mcp'
-      }
+        'managed-by': 'container-kit-mcp',
+      },
     },
     spec: {
       minAvailable: 1,
       selector: {
         matchLabels: {
-          app: appName
-        }
-      }
-    }
+          app: appName,
+        },
+      },
+    },
   };
 }
 
@@ -535,7 +536,7 @@ function generateWarnings(input: KubernetesManifestsInput): string[] {
 
   if (Object.keys(input.secrets).length > 0) {
     warnings.push(
-      'Secrets are stored in base64 encoding - consider using external secret management'
+      'Secrets are stored in base64 encoding - consider using external secret management',
     );
   }
 
@@ -561,7 +562,7 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
 
   handler: async (
     input: KubernetesManifestsInput,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<KubernetesManifestsOutput> => {
     const { logger, sessionService, progressEmitter, aiService } = context;
     const { sessionId, outputPath } = input;
@@ -571,9 +572,9 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
         sessionId,
         appName: input.appName,
         namespace: input.namespace,
-        environment: input.environment
+        environment: input.environment,
       },
-      'Starting K8s manifest generation'
+      'Starting K8s manifest generation',
     );
 
     try {
@@ -621,7 +622,7 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
           step: 'generate_k8s_manifests',
           status: 'in_progress',
           message: 'Generating Kubernetes manifests',
-          progress: 0.2
+          progress: 0.2,
         });
       }
 
@@ -637,7 +638,7 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
         { kind: 'Service', name: input.appName, manifest: generateService(input) },
         { kind: 'Ingress', name: input.appName, manifest: generateIngress(input) },
         { kind: 'HorizontalPodAutoscaler', name: input.appName, manifest: generateHPA(input) },
-        { kind: 'PodDisruptionBudget', name: input.appName, manifest: generatePDB(input) }
+        { kind: 'PodDisruptionBudget', name: input.appName, manifest: generatePDB(input) },
       ];
 
       // Filter out null manifests
@@ -658,7 +659,7 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
           const defaultAnalysis: AnalysisResult = {
             language: 'unknown',
             has_tests: false,
-            docker_compose_exists: false
+            docker_compose_exists: false,
           };
           const builder = AIRequestBuilder.for('k8s-generation')
             .withContext(analysis ?? defaultAnalysis)
@@ -673,13 +674,13 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
               appName: input.appName,
               namespace: input.namespace,
               serviceType: input.serviceType,
-              autoscaling: input.autoscaling
+              autoscaling: input.autoscaling,
             })
             .withKubernetesContext({
               ingressEnabled: input.ingressEnabled,
               ...(input.ingressHost && { ingressHost: input.ingressHost }),
               ...(Object.keys(input.configMap).length > 0 && { configMap: input.configMap }),
-              ...(Object.keys(input.secrets).length > 0 && { secrets: Object.keys(input.secrets) })
+              ...(Object.keys(input.secrets).length > 0 && { secrets: Object.keys(input.secrets) }),
             });
 
           const result = await aiService.generate(builder);
@@ -712,7 +713,7 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
           step: 'generate_k8s_manifests',
           status: 'in_progress',
           message: 'Writing manifest files',
-          progress: 0.7
+          progress: 0.7,
         });
       }
 
@@ -743,7 +744,7 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
           kind,
           name,
           path: filepath,
-          content
+          content,
         });
 
         logger.info({ kind, path: filepath }, `Generated ${kind}`);
@@ -757,8 +758,8 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
         resources: outputManifests.filter((m) => m.path).map((m) => path.basename(m.path!)),
         commonLabels: {
           app: input.appName,
-          environment: input.environment
-        }
+          environment: input.environment,
+        },
       };
 
       const kustomizationPath = path.join(manifestDir, 'kustomization.yaml');
@@ -769,7 +770,7 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
 
       // Update session with manifest info
       if (sessionId && sessionService) {
-        await sessionService.updateAtomic(sessionId, (session) => ({
+        await sessionService.updateAtomic(sessionId, (session: Session) => ({
           ...session,
           workflow_state: {
             ...session.workflow_state,
@@ -780,13 +781,13 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
                   kind: m.kind,
                   name: m.name,
                   content: m.content!,
-                  file_path: m.path!
+                  file_path: m.path!,
                 })),
               replicas: input.replicas,
               image,
-              output_path: manifestDir
-            }
-          }
+              output_path: manifestDir,
+            },
+          },
         }));
       }
 
@@ -797,16 +798,16 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
           step: 'generate_k8s_manifests',
           status: 'completed',
           message: `Generated ${outputManifests.length} Kubernetes manifests`,
-          progress: 1.0
+          progress: 1.0,
         });
       }
 
       logger.info(
         {
           totalResources: outputManifests.length,
-          outputPath: manifestDir
+          outputPath: manifestDir,
         },
-        'K8s manifest generation completed'
+        'K8s manifest generation completed',
       );
 
       const result: any = {
@@ -815,15 +816,15 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
           kind: m.kind,
           name: m.name,
           path: m.path ?? '',
-          content: m.content ?? ''
+          content: m.content ?? '',
         })),
         outputPath: manifestDir,
         metadata: {
           totalResources: outputManifests.length,
           namespace: input.namespace,
           image,
-          estimatedCost: estimateMonthlyCost(input)
-        }
+          estimatedCost: estimateMonthlyCost(input),
+        },
       };
 
       if (warnings.length > 0) {
@@ -840,7 +841,7 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
           step: 'generate_k8s_manifests',
           status: 'failed',
           message: 'Manifest generation failed',
-          progress: 0
+          progress: 0,
         });
       }
 
@@ -853,9 +854,9 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
     reason: 'Deploy generated manifests to Kubernetes cluster',
     paramMapper: (output) => ({
       manifests_path: output.outputPath,
-      namespace: output.metadata.namespace
-    })
-  }
+      namespace: output.metadata.namespace,
+    }),
+  },
 };
 
 // Default export for registry
