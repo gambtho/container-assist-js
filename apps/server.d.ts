@@ -22,7 +22,7 @@ export interface Tool {
   chainHint?: any;
 }
 
-export declare class ContainerKitMCPServer {
+export declare class ContainerizationAssistMCPServer {
   private server;
   private services;
   private toolRegistry;

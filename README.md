@@ -1,4 +1,4 @@
-# Container Kit MCP Server
+# Containerization Assist MCP Server
 
 A Model Context Protocol (MCP) server for AI-powered containerization workflows with Docker and Kubernetes support.
 
@@ -37,8 +37,8 @@ Add to your `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "container-kit": {
-      "command": "container-kit-mcp",
+    "containerization-assist": {
+      "command": "containerization-assist-mcp",
       "args": ["start"],
       "env": {
         "DOCKER_SOCKET": "/var/run/docker.sock",
@@ -53,8 +53,8 @@ For Windows users:
 ```json
 {
   "mcpServers": {
-    "container-kit": {
-      "command": "container-kit-mcp",
+    "containerization-assist": {
+      "command": "containerization-assist-mcp",
       "args": ["start"],
       "env": {
         "DOCKER_SOCKET": "//./pipe/docker_engine",
@@ -68,15 +68,15 @@ For Windows users:
 #### With MCP Inspector
 
 ```bash
-npx @modelcontextprotocol/inspector container-kit-mcp start
+npx @modelcontextprotocol/inspector containerization-assist-mcp start
 ```
 
 #### Programmatic Usage
 
 ```typescript
-import { ContainerKitMCPServer } from '@thgamble/containerization-assist-mcp';
+import { ContainerizationAssistMCPServer } from '@thgamble/containerization-assist-mcp';
 
-const server = new ContainerKitMCPServer();
+const server = new ContainerizationAssistMCPServer();
 await server.start();
 ```
 
@@ -119,7 +119,7 @@ await server.start();
 | `DOCKER_SOCKET` | Docker daemon socket path | `/var/run/docker.sock` |
 | `KUBECONFIG` | Kubernetes config path | `~/.kube/config` |
 | `LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` |
-| `SESSION_DIR` | Session storage directory | `~/.container-kit/sessions` |
+| `SESSION_DIR` | Session storage directory | `~/.containerization-assist/sessions` |
 | `AI_CACHE_TTL` | AI response cache duration (ms) | `900000` (15 min) |
 | `K8S_NAMESPACE` | Default Kubernetes namespace | `default` |
 | `DOCKER_REGISTRY` | Default Docker registry | `docker.io` |
@@ -129,8 +129,8 @@ await server.start();
 ```json
 {
   "mcpServers": {
-    "container-kit": {
-      "command": "container-kit-mcp",
+    "containerization-assist": {
+      "command": "containerization-assist-mcp",
       "args": [
         "start",
         "--mode", "production",
@@ -141,7 +141,7 @@ await server.start();
         "DOCKER_SOCKET": "/var/run/docker.sock",
         "KUBECONFIG": "/home/user/.kube/config",
         "LOG_LEVEL": "debug",
-        "SESSION_DIR": "/home/user/.container-kit",
+        "SESSION_DIR": "/home/user/.containerization-assist",
         "ENABLE_CACHE": "true",
         "AI_CACHE_TTL": "1800000"
       }
@@ -274,13 +274,13 @@ sudo usermod -aG docker $USER
 ```
 
 ### Tools Not Available
-**Error**: Claude doesn't see Container Kit tools
+**Error**: Claude doesn't see Containerization Assist tools
 
 **Solution**:
-1. Verify server is installed: `container-kit-mcp --version`
+1. Verify server is installed: `containerization-assist-mcp --version`
 2. Check configuration file syntax (valid JSON)
 3. Restart Claude Desktop
-4. Check logs: `~/.container-kit/logs/`
+4. Check logs: `~/.containerization-assist/logs/`
 
 ## Documentation
 

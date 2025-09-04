@@ -1,6 +1,6 @@
 /**
- * Main entry point for ContainerKit MCP Server
+ * Main entry point for ContainerizationAssist MCP Server
  */
 
-export { ContainerKitMCPServer } from '../apps/server.js';
+export { ContainerizationAssistMCPServer } from '../apps/server.js';
 export type { ApplicationConfig } from './config/index.js';

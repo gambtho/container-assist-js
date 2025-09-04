@@ -1,5 +1,5 @@
 /**
- * Unified Test Setup - Container Kit MCP Server
+ * Unified Test Setup - Containerization Assist MCP Server
  * Consolidates all test configuration, mocks, and utilities
  */
 
@@ -7,7 +7,7 @@ import { createPinoLogger } from '../src/infrastructure/core/logger.js';
 import { nanoid } from 'nanoid';
 import type { Logger } from 'pino';
 
-console.log('Setting up tests for Container Kit MCP TypeScript implementation');
+console.log('Setting up tests for Containerization Assist MCP TypeScript implementation');
 
 // Set test environment
 process.env.NODE_ENV = 'test';
@@ -34,8 +34,8 @@ const originalError = console.error;
 // Only show test progress logs, not verbose component logs
 console.log = (...args: any[]) => {
   const message = args.join(' ');
-  if (message.includes('✓') || message.includes('⚠') || message.includes('ℹ') || 
-      message.includes('Docker') || message.includes('PASS') || message.includes('FAIL')) {
+  if (message.includes('✓') || message.includes('⚠') || message.includes('ℹ') ||
+    message.includes('Docker') || message.includes('PASS') || message.includes('FAIL')) {
     originalLog(...args);
   }
 };
@@ -55,7 +55,7 @@ export class TestMCPServer {
   private tools = new Map();
   private sessions = new Map();
   private logger: Logger;
-  
+
   constructor(config: any = {}) {
     this.logger = createPinoLogger({ level: 'error' }); // Reduce noise in tests
     this.setupTools();
@@ -147,12 +147,12 @@ export class TestMCPServer {
 
   private async mockAnalyzeRepository(params: any) {
     const { repoPath, sessionId } = params || {};
-    
+
     // Determine language based on repo path
     let language = 'java';
     let framework = 'spring-boot';
     let ports = [8080];
-    
+
     if (repoPath?.includes('node-express')) {
       language = 'javascript';
       framework = 'express';
@@ -271,4 +271,4 @@ export function createMockSession(overrides: any = {}) {
 }
 
 // Export empty object to make this a module
-export {};
+export { };
