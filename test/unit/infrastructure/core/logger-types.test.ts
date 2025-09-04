@@ -5,7 +5,7 @@
 
 import { describe, test, expect } from '@jest/globals';
 import type { Logger } from 'pino';
-import { createMockLogger } from '../../../utils/test-helpers.js';
+import { createMockLogger } from '../../../utils/test-helpers';
 
 describe('Logger Types Interface', () => {
   let mockLogger: Logger;

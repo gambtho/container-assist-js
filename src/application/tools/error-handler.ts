@@ -8,7 +8,7 @@ import type { Logger } from 'pino';
 import { convertToMcpError } from '../errors/mcp-error-mapper.js';
 import { createValidationHandler } from '../errors/validation.js';
 // import { withRetry as recoveryWithRetry, withTimeout as recoveryWithTimeout } from '../errors/recovery.js''; // Unused imports'
-import type { MCPTool, MCPToolContext, MCPToolHandler } from './tool-types';
+import type { ToolDescriptor, ToolContext, ToolHandler } from './tool-types';
 
 /**
  * Tool execution options
@@ -42,7 +42,7 @@ export class ToolProgressReporter {
   constructor(
     private server: MCPServer,
     private progressToken?: string,
-    private logger?: Logger
+    private logger?: Logger,
   ) {}
 
   async reportProgress(current: number, total?: number, message?: string): Promise<void> {
@@ -56,9 +56,9 @@ export class ToolProgressReporter {
           progress: {
             current,
             total,
-            message
-          }
-        }
+            message,
+          },
+        },
       });
     } catch (error) {
       this.logger?.warn({ error }, 'Failed to report progress');
@@ -78,12 +78,12 @@ export class ToolProgressReporter {
  * Enhanced tool context with progress reporting
  */
 export function createProgressContext(
-  baseContext: MCPToolContext,
-  progressReporter: ToolProgressReporter
-): MCPToolContext & { progress: ToolProgressReporter } {
+  baseContext: ToolContext,
+  progressReporter: ToolProgressReporter,
+): ToolContext & { progress: ToolProgressReporter } {
   return {
     ...baseContext,
-    progress: progressReporter
+    progress: progressReporter,
   };
 }
 
@@ -91,15 +91,19 @@ export function createProgressContext(
  * Execute a tool with comprehensive error handling
  */
 export async function executeToolSafely<TInput, TOutput>(
-  tool: MCPTool<TInput, TOutput>,
+  tool: ToolDescriptor<TInput, TOutput>,
   params: TInput,
-  context: MCPToolContext,
-  options: ToolExecutionOptions = {}
+  context: ToolContext,
+  options: ToolExecutionOptions = {},
 ): Promise<TOutput> {
   const { timeout = 30000, retries = 0, retryDelay = 1000, progressReporting = true } = options;
 
   const logger = context.logger.child({ tool: tool.name });
-  const progressReporter = new ToolProgressReporter(context.server, context.progressToken, logger);
+  const progressReporter = new ToolProgressReporter(
+    context.server as MCPServer,
+    context.progressToken,
+    logger,
+  );
 
   // Create enhanced context with progress reporting
   const enhancedContext = progressReporting
@@ -127,7 +131,7 @@ export async function executeToolSafely<TInput, TOutput>(
         // Add signal to context
         const contextWithSignal = {
           ...enhancedContext,
-          signal: controller.signal
+          signal: controller.signal,
         };
 
         try {
@@ -165,13 +169,13 @@ export async function executeToolSafely<TInput, TOutput>(
           {
             attempt,
             maxAttempts: retries + 1,
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           },
-          'Tool execution attempt failed'
+          'Tool execution attempt failed',
         );
 
         // If this is the last attempt or error is not retryable, throw
-        if (attempt === retries + 1 ?? !isRetryableError(error)) {
+        if (attempt === retries + 1 || !isRetryableError(error)) {
           throw convertToMcpError(error);
         }
 
@@ -194,21 +198,21 @@ export async function executeToolSafely<TInput, TOutput>(
  * Create a validated tool handler with built-in error handling
  */
 export function createValidatedTool<TInput, TOutput>(
-  descriptor: Omit<MCPTool<TInput, TOutput>, 'handler'> & {
-    handler: MCPToolHandler<TInput, TOutput>;
+  descriptor: Omit<ToolDescriptor<TInput, TOutput>, 'handler'> & {
+    handler: ToolHandler<TInput, TOutput>;
   },
-  options: ToolExecutionOptions = {}
-): MCPTool<TInput, TOutput> {
+  options: ToolExecutionOptions = {},
+): ToolDescriptor<TInput, TOutput> {
   return {
     ...descriptor,
-    handler: async (params: TInput, context: MCPToolContext): Promise<TOutput> => {
+    handler: async (params: TInput, context: ToolContext): Promise<TOutput> => {
       return executeToolSafely(
         { ...descriptor, handler: descriptor.handler },
         params,
         context,
-        options
+        options,
       );
-    }
+    },
   };
 }
 
@@ -216,17 +220,17 @@ export function createValidatedTool<TInput, TOutput>(
  * Create a tool handler with automatic timeout
  */
 export function withTimeout<TInput, TOutput>(
-  handler: MCPToolHandler<TInput, TOutput>,
-  timeoutMs: number = 30000
-): MCPToolHandler<TInput, TOutput> {
-  return async (params: TInput, context: MCPToolContext): Promise<TOutput> => {
+  handler: ToolHandler<TInput, TOutput>,
+  timeoutMs: number = 30000,
+): ToolHandler<TInput, TOutput> {
+  return async (params: TInput, context: ToolContext): Promise<TOutput> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const result = await handler(params, {
         ...context,
-        signal: controller.signal
+        signal: controller.signal,
       });
       clearTimeout(timeoutId);
       return result;
@@ -241,11 +245,11 @@ export function withTimeout<TInput, TOutput>(
  * Create a tool handler with automatic retry logic
  */
 export function withRetry<TInput, TOutput>(
-  handler: MCPToolHandler<TInput, TOutput>,
+  handler: ToolHandler<TInput, TOutput>,
   maxRetries: number = 3,
-  retryDelay: number = 1000
-): MCPToolHandler<TInput, TOutput> {
-  return async (params: TInput, context: MCPToolContext): Promise<TOutput> => {
+  retryDelay: number = 1000,
+): ToolHandler<TInput, TOutput> {
+  return async (params: TInput, context: ToolContext): Promise<TOutput> => {
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -258,13 +262,13 @@ export function withRetry<TInput, TOutput>(
           {
             attempt,
             maxRetries,
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           },
-          'Tool handler attempt failed'
+          'Tool handler attempt failed',
         );
 
         // If this is the last attempt or error is not retryable, throw
-        if (attempt === maxRetries ?? !isRetryableError(error)) {
+        if (attempt === maxRetries || !isRetryableError(error)) {
           throw convertToMcpError(error);
         }
 
@@ -283,14 +287,14 @@ export function withRetry<TInput, TOutput>(
  * Create a tool handler with progress reporting
  */
 export function withProgress<TInput, TOutput>(
-  handler: MCPToolHandler<TInput, TOutput>,
-  progressStages: string[] = ['Starting', 'Processing', 'Completing']
-): MCPToolHandler<TInput, TOutput> {
-  return async (params: TInput, context: MCPToolContext): Promise<TOutput> => {
+  handler: ToolHandler<TInput, TOutput>,
+  progressStages: string[] = ['Starting', 'Processing', 'Completing'],
+): ToolHandler<TInput, TOutput> {
+  return async (params: TInput, context: ToolContext): Promise<TOutput> => {
     const progressReporter = new ToolProgressReporter(
-      context.server,
+      context.server as MCPServer,
       context.progressToken,
-      context.logger
+      context.logger,
     );
 
     const enhancedContext = createProgressContext(context, progressReporter);
@@ -310,7 +314,7 @@ export function withProgress<TInput, TOutput>(
         await progressReporter.reportStage(
           finalStage,
           progressStages.length,
-          progressStages.length
+          progressStages.length,
         );
       }
 
@@ -325,11 +329,9 @@ export function withProgress<TInput, TOutput>(
  * Compose multiple tool handler decorators
  */
 export function composeTool<TInput, TOutput>(
-  baseHandler: MCPToolHandler<TInput, TOutput>,
-  ...decorators: Array<
-    (handler: MCPToolHandler<TInput, TOutput>) => MCPToolHandler<TInput, TOutput>
-  >
-): MCPToolHandler<TInput, TOutput> {
+  baseHandler: ToolHandler<TInput, TOutput>,
+  ...decorators: Array<(handler: ToolHandler<TInput, TOutput>) => ToolHandler<TInput, TOutput>>
+): ToolHandler<TInput, TOutput> {
   return decorators.reduce((handler, decorator) => decorator(handler), baseHandler);
 }
 
@@ -359,19 +361,19 @@ function isRetryableError(error: unknown): boolean {
  * Create a complete tool with all safety measures
  */
 export function createSafeTool<TInput, TOutput>(
-  descriptor: Omit<MCPTool<TInput, TOutput>, 'handler'> & {
-    handler: MCPToolHandler<TInput, TOutput>;
+  descriptor: Omit<ToolDescriptor<TInput, TOutput>, 'handler'> & {
+    handler: ToolHandler<TInput, TOutput>;
   },
   options: ToolExecutionOptions & {
     progressStages?: string[];
-  } = {}
-): MCPTool<TInput, TOutput> {
+  } = {},
+): ToolDescriptor<TInput, TOutput> {
   const {
     timeout = 30000,
     retries = 2,
     retryDelay = 1000,
     progressReporting = true,
-    progressStages = ['Starting', 'Processing', 'Completing']
+    progressStages = ['Starting', 'Processing', 'Completing'],
   } = options;
 
   let handler = descriptor.handler;
@@ -391,6 +393,6 @@ export function createSafeTool<TInput, TOutput>(
 
   return {
     ...descriptor,
-    handler
+    handler,
   };
 }

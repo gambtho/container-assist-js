@@ -1,110 +1,259 @@
 /**
- * Generate Dockerfile - Main Orchestration Logic
+ * Generate Dockerfile - MCP SDK Compatible Version
  */
 
-import { z } from 'zod';
 import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
-import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
-import type { AnalysisResult } from '../../../contracts/types/session.js';
 import {
-  generateDockerfileContent,
-  analyzeDockerfileSecurity,
-  estimateImageSize
-} from './helper';
+  GenerateDockerfileInput,
+  type GenerateDockerfileParams,
+  DockerfileResultSchema,
+  type DockerfileResult,
+} from '../schemas.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
+import type { AnalysisResult, Session } from '../../../contracts/types/session.js';
 
-// Input schema with support for both snake_case and camelCase
-const GenerateDockerfileInput = z
-  .object({
-    session_id: z.string().optional(),
-    sessionId: z.string().optional(),
-    target_path: z.string().optional(),
-    targetPath: z.string().optional(),
-    base_image: z.string().optional(),
-    baseImage: z.string().optional(),
-    optimization: z.enum(['size', 'build-speed', 'security', 'balanced']).default('balanced'),
-    multistage: z.boolean().default(true),
-    optimize_size: z.boolean().default(true),
-    security_hardening: z.boolean().default(true),
-    include_healthcheck: z.boolean().default(true),
-    includeHealthcheck: z.boolean().optional(),
-    include_security_scanning: z.boolean().default(true),
-    includeSecurityScanning: z.boolean().optional(),
-    custom_commands: z.array(z.string()).optional(),
-    customCommands: z.array(z.string()).optional(),
-    custom_instructions: z.string().optional(),
-    customInstructions: z.string().optional(),
-    force_regenerate: z.boolean().default(false),
-    forceRegenerate: z.boolean().optional()
-  })
-  .transform((data) => ({
-    sessionId: data.session_id ?? (data.sessionId || ''),
-    targetPath: data.target_path ?? (data.targetPath || './Dockerfile'),
-    baseImage: data.base_image ?? data.baseImage ?? undefined,
-    optimization: data.optimization,
-    multistage: data.multistage,
-    optimizeSize: data.optimize_size,
-    securityHardening: data.security_hardening,
-    includeHealthcheck: data.include_healthcheck ?? data.includeHealthcheck ?? true,
-    includeSecurityScanning: data.include_security_scanning ?? data.includeSecurityScanning ?? true,
-    customCommands: data.custom_commands ?? (data.customCommands || []),
-    customInstructions: data.custom_instructions ?? data.customInstructions ?? undefined,
-    forceRegenerate: data.force_regenerate ?? data.forceRegenerate ?? false
-  }));
+/**
+ * Simple interface for generation options
+ */
+interface GenerationOptions {
+  baseImage?: string;
+  optimization?: boolean;
+  multistage?: boolean;
+  securityHardening?: boolean;
+  includeHealthcheck?: boolean;
+  customInstructions?: string;
+  optimizeSize?: boolean;
+  customCommands?: string[];
+}
 
-// Output schema
-const GenerateDockerfileOutput = z.object({
-  success: z.boolean(),
-  dockerfile: z.string(),
-  path: z.string(),
-  baseImage: z.string(),
-  stages: z.array(
-    z.object({
-      name: z.string(),
-      baseImage: z.string(),
-      purpose: z.string()
-    })
-  ),
-  optimizations: z.array(z.string()),
-  warnings: z.array(z.string()).optional(),
-  metadata: z
-    .object({
-      estimatedSize: z.string().optional(),
-      layers: z.number().optional(),
-      securityFeatures: z.array(z.string()).optional(),
-      buildTime: z.string().optional(),
-      generated: z.string()
-    })
-    .optional()
-});
+/**
+ * Generate optimized Dockerfile based on analysis and options
+ */
+function generateOptimizedDockerfile(analysis: AnalysisResult, options: GenerationOptions): string {
+  const baseImage = options.baseImage ?? getRecommendedBaseImage(analysis.language);
+  const framework = analysis.framework ?? '';
+  const deps = analysis.dependencies?.map((d) => d.name) || [];
 
-// Type aliases
-export type DockerfileInput = z.infer<typeof GenerateDockerfileInput>;
-export type DockerfileOutput = z.infer<typeof GenerateDockerfileOutput>;
+  // Build optimized Dockerfile content
+  let dockerfile = `# AI-Optimized Dockerfile for ${analysis.language}${framework ? ` (${framework})` : ''}
+# Generated on ${new Date().toISOString()}
+
+`;
+
+  if (options.multistage && deps.length > 5) {
+    dockerfile += `# Build stage
+FROM ${baseImage} AS builder
+WORKDIR /app
+
+# Copy dependency files first for better caching
+${getBuildCommands(analysis, 'build')}
+
+# Runtime stage
+FROM ${baseImage.includes('alpine') ? baseImage : baseImage.replace(/:\d+/, ':alpine')}
+WORKDIR /app
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser
+
+# Copy built artifacts
+${getBuildCommands(analysis, 'runtime')}
+
+`;
+  } else {
+    dockerfile += `FROM ${baseImage}
+WORKDIR /app
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser
+
+${getBuildCommands(analysis, 'single')}
+
+`;
+  }
+
+  // Add ports
+  const ports = analysis.ports ?? [3000];
+  ports.forEach((port) => {
+    dockerfile += `EXPOSE ${port}\n`;
+  });
+
+  // Add health check if requested
+  if (options.includeHealthcheck) {
+    const primaryPort = ports[0] || 3000;
+    dockerfile += `
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${primaryPort}/health || exit 1
+`;
+  }
+
+  // Add custom commands if provided
+  if (options.customCommands && options.customCommands.length > 0) {
+    dockerfile += `
+# Custom commands
+${options.customCommands?.map((cmd: string) => `RUN ${cmd}`).join('\n') || ''}
+`;
+  }
+
+  // Switch to non-root user
+  dockerfile += `\nUSER appuser\n`;
+
+  // Add start command based on language/framework
+  dockerfile += getStartCommand(analysis);
+
+  return dockerfile;
+}
+
+/**
+ * Get build commands for different languages
+ */
+function getBuildCommands(analysis: AnalysisResult, stage: 'build' | 'runtime' | 'single'): string {
+  const lang = analysis.language;
+  const buildSystem = analysis.build_system?.type;
+
+  if (lang === 'javascript' || lang === 'typescript') {
+    if (stage === 'build') {
+      return 'COPY package*.json ./\nRUN npm ci --only=production\n';
+    } else if (stage === 'runtime') {
+      return 'COPY --from=builder --chown=appuser:appuser /app/node_modules ./node_modules\nCOPY --chown=appuser:appuser . .\n';
+    } else {
+      return 'COPY package*.json ./\nRUN npm ci --only=production\nCOPY --chown=appuser:appuser . .\n';
+    }
+  } else if (lang === 'python') {
+    if (stage === 'build') {
+      return 'RUN python -m venv /opt/venv\nENV PATH="/opt/venv/bin:$PATH"\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n';
+    } else if (stage === 'runtime') {
+      return 'COPY --from=builder /opt/venv /opt/venv\nENV PATH="/opt/venv/bin:$PATH"\nCOPY --chown=appuser:appuser . .\n';
+    } else {
+      return 'COPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY --chown=appuser:appuser . .\n';
+    }
+  } else if (lang === 'java') {
+    if (buildSystem === 'maven') {
+      if (stage === 'build') {
+        return 'COPY pom.xml .\nRUN mvn dependency:go-offline\nCOPY src ./src\nRUN mvn clean package -DskipTests\n';
+      } else if (stage === 'runtime') {
+        return 'COPY --from=builder --chown=appuser:appuser /app/target/*.jar app.jar\n';
+      }
+    }
+  } else if (lang === 'go') {
+    if (stage === 'build') {
+      return 'COPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .\n';
+    } else if (stage === 'runtime') {
+      return 'RUN apk --no-cache add ca-certificates\nCOPY --from=builder --chown=appuser:appuser /app/main .\n';
+    }
+  }
+
+  return 'COPY --chown=appuser:appuser . .\n';
+}
+
+/**
+ * Get start command based on language/framework
+ */
+function getStartCommand(analysis: AnalysisResult): string {
+  const lang = analysis.language;
+  const framework = analysis.framework;
+
+  if (lang === 'javascript' || lang === 'typescript') {
+    if (framework === 'nextjs') return 'CMD ["npm", "start"]';
+    return 'CMD ["node", "index.js"]';
+  } else if (lang === 'python') {
+    if (framework === 'django') return 'CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]';
+    if (framework === 'flask') return 'CMD ["python", "app.py"]';
+    if (framework === 'fastapi')
+      return 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]';
+    return 'CMD ["python", "main.py"]';
+  } else if (lang === 'java') {
+    return 'ENTRYPOINT ["java", "-jar", "app.jar"]';
+  } else if (lang === 'go') {
+    return 'CMD ["./main"]';
+  }
+
+  return 'CMD ["echo", "No start command defined"]';
+}
+
+/**
+ * Get recommended base image for language
+ */
+function getRecommendedBaseImage(language: string): string {
+  const imageMap: Record<string, string> = {
+    javascript: 'node:20-alpine',
+    typescript: 'node:20-alpine',
+    python: 'python:3.11-slim',
+    java: 'openjdk:17-jdk-slim',
+    go: 'golang:1.21-alpine',
+    rust: 'rust:1.75-slim',
+    ruby: 'ruby:3.2-slim',
+    php: 'php:8.2-fpm-alpine',
+  };
+
+  return imageMap[language] || 'alpine:3.19';
+}
+
+/**
+ * Analyze Dockerfile for security issues
+ */
+function analyzeDockerfileSecurity(content: string): string[] {
+  const warnings: string[] = [];
+
+  // Check for running as root
+  if (!content.includes('USER ') || content.includes('USER root')) {
+    warnings.push('Container runs as root user - consider adding a non-root user');
+  }
+
+  // Check for latest tags
+  if (content.includes(':latest')) {
+    warnings.push('Using :latest tag - consider pinning to specific versions');
+  }
+
+  // Check for sudo usage
+  if (content.includes('sudo ')) {
+    warnings.push('Avoid using sudo in containers');
+  }
+
+  // Check for exposed sensitive ports
+  const sensitiveports = [22, 23, 135, 139, 445];
+  for (const port of sensitiveports) {
+    if (content.includes(`EXPOSE ${port}`)) {
+      warnings.push(`Exposing potentially sensitive port ${port}`);
+    }
+  }
+
+  // Check for package manager cleanup
+  if (content.includes('apt-get install') && !content.includes('rm -rf /var/lib/apt/lists')) {
+    warnings.push('Consider cleaning apt cache after installation');
+  }
+
+  if (content.includes('yum install') && !content.includes('yum clean all')) {
+    warnings.push('Consider cleaning yum cache after installation');
+  }
+
+  return warnings;
+}
 
 /**
  * Main handler implementation
  */
-const generateDockerfileHandler: MCPTool<DockerfileInput, DockerfileOutput> = {
+const generateDockerfileHandler: ToolDescriptor<GenerateDockerfileParams, DockerfileResult> = {
   name: 'generate_dockerfile',
   description: 'Generate optimized Dockerfile using AI with security best practices',
   category: 'workflow',
   inputSchema: GenerateDockerfileInput,
-  outputSchema: GenerateDockerfileOutput,
+  outputSchema: DockerfileResultSchema,
 
-  handler: async (input: DockerfileInput, context: MCPToolContext): Promise<DockerfileOutput> => {
-    const { logger, sessionService, progressEmitter } = context;
-    const { sessionId, targetPath, forceRegenerate } = input;
+  handler: async (
+    input: GenerateDockerfileParams,
+    context: ToolContext,
+  ): Promise<DockerfileResult> => {
+    const { logger, sessionService } = context;
+    const { sessionId } = input;
 
     logger.info(
       {
         sessionId,
-        optimization: input.optimization,
-        multistage: input.multistage
       },
-      'Starting Dockerfile generation'
+      'Starting Dockerfile generation',
     );
 
     try {
@@ -122,166 +271,67 @@ const generateDockerfileHandler: MCPTool<DockerfileInput, DockerfileOutput> = {
       if (!analysis) {
         throw new DomainError(
           ErrorCode.VALIDATION_ERROR,
-          'No analysis result found. Run analyze_repository first'
+          'No analysis result found. Run analyze_repository first',
         );
       }
 
-      // Check if Dockerfile already exists and not forcing regeneration
-      const dockerfilePath = path.isAbsolute(targetPath)
-        ? targetPath
-        : path.join(process.cwd(), targetPath);
-      if (!forceRegenerate) {
-        try {
-          await fs.access(dockerfilePath);
-          logger.info('Dockerfile already exists, skipping generation');
-          const existingContent = await fs.readFile(dockerfilePath, 'utf-8');
-
-          return {
-            success: true,
-            dockerfile: existingContent,
-            path: dockerfilePath,
-            baseImage: input.baseImage ?? (analysis.recommendations?.baseImage || 'alpine:latest'),
-            stages: [],
-            optimizations: ['Using existing Dockerfile'],
-            warnings: analyzeDockerfileSecurity(existingContent),
-            metadata: {
-              generated: new Date().toISOString()
-            }
-          };
-        } catch {
-          // File doesn't exist, continue with generation
-        }
-      }
-
-      // Emit progress
-      if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
-          sessionId,
-          step: 'generate_dockerfile',
-          status: 'in_progress',
-          message: 'Generating optimized Dockerfile',
-          progress: 0.3
-        });
-      }
-
-      // Generate Dockerfile content
-      const { content, stages, optimizations } = await generateDockerfileContent(
-        analysis,
-        input,
-        context
-      );
-
-      // Analyze for security issues
-      const warnings = analyzeDockerfileSecurity(content);
-
-      // Emit progress
-      if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
-          sessionId,
-          step: 'generate_dockerfile',
-          status: 'in_progress',
-          message: 'Writing Dockerfile',
-          progress: 0.8
-        });
-      }
-
-      // Write Dockerfile
-      const dockerfileDir = path.dirname(dockerfilePath);
-      await fs.mkdir(dockerfileDir, { recursive: true });
-      await fs.writeFile(dockerfilePath, content, 'utf-8');
-
-      // Determine base image
-      const baseImage = input.baseImage ?? (analysis.recommendations?.baseImage || 'alpine:latest');
-
-      // Estimate size
-      const estimatedSize = estimateImageSize(
-        analysis.language,
-        (analysis.dependencies ?? []).map((dep: any) => dep.name),
-        input.multistage
-      );
-
-      // Build metadata
-      const metadata = {
-        estimatedSize,
-        layers: content.split('\nRUN ').length + content.split('\nCOPY ').length,
-        securityFeatures: [
-          input.securityHardening ? 'Non-root user' : '',
-          input.includeHealthcheck ? 'Health check' : '',
-          input.multistage ? 'Multi-stage build' : ''
-        ].filter(Boolean),
-        buildTime: analysis.build_system?.build_command,
-        generated: new Date().toISOString()
+      // Use simple options for generation
+      const generationOptions = {
+        baseImage: analysis.recommendations?.baseImage || 'node:20-alpine',
+        optimization: true,
+        multistage: true,
+        securityHardening: true,
+        includeHealthcheck: true,
+        customInstructions: '',
+        optimizeSize: true,
+        customCommands: [],
       };
 
+      // Generate Dockerfile content
+      const dockerfileContent = generateOptimizedDockerfile(analysis, generationOptions);
+
+      // Define output path
+      const dockerfilePath = path.join(process.cwd(), 'Dockerfile');
+
+      // Write Dockerfile
+      await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
+
+      // Analyze for security issues
+      const validation = analyzeDockerfileSecurity(dockerfileContent);
+
       // Update session with Dockerfile info
-      await sessionService.updateAtomic(sessionId, (session: any) => ({
+      await sessionService.updateAtomic(sessionId, (session: Session) => ({
         ...session,
         workflow_state: {
           ...session.workflow_state,
           dockerfile_result: {
-            content,
+            content: dockerfileContent,
             path: dockerfilePath,
-            base_image: baseImage,
+            base_image: generationOptions.baseImage,
             stages: [],
-            optimizations,
-            multistage: input.multistage ?? false
-          }
-        }
+            optimizations: ['Multi-stage build', 'Security hardening', 'Health checks'],
+            multistage: true,
+          },
+        },
       }));
-
-      // Emit completion
-      if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
-          sessionId,
-          step: 'generate_dockerfile',
-          status: 'completed',
-          message: 'Dockerfile generated successfully',
-          progress: 1.0
-        });
-      }
 
       logger.info(
         {
           path: dockerfilePath,
-          stages: stages ? stages.length : 0,
-          warnings: warnings.length
+          validationIssues: validation.length,
         },
-        'Dockerfile generated successfully'
+        'Dockerfile generated successfully',
       );
 
-      const result: any = {
+      return {
         success: true,
-        dockerfile: content,
+        sessionId,
+        dockerfile: dockerfileContent,
         path: dockerfilePath,
-        baseImage,
-        metadata
+        validation,
       };
-
-      if (stages && stages.length > 0) {
-        result.stages = stages;
-      }
-
-      if (optimizations && optimizations.length > 0) {
-        result.optimizations = optimizations;
-      }
-
-      if (warnings && warnings.length > 0) {
-        result.warnings = warnings;
-      }
-
-      return result;
     } catch (error) {
-      logger.error({ error }, 'Error occurred');
-
-      if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
-          sessionId,
-          step: 'generate_dockerfile',
-          status: 'failed',
-          message: 'Dockerfile generation failed'
-        });
-      }
-
+      logger.error({ error }, 'Error generating Dockerfile');
       throw error instanceof Error ? error : new Error(String(error));
     }
   },
@@ -292,9 +342,9 @@ const generateDockerfileHandler: MCPTool<DockerfileInput, DockerfileOutput> = {
     paramMapper: (output) => ({
       session_id: output.path.includes('/') ? undefined : output.path,
       dockerfile_path: output.path,
-      tags: [`app:${Date.now()}`]
-    })
-  }
+      tags: [`app:${Date.now()}`],
+    }),
+  },
 };
 
 // Default export for registry

@@ -63,7 +63,7 @@ export async function withTimeout<T>(fn: () => Promise<T>, options: TimeoutOptio
     fn(),
     sleep(timeoutMs).then(() => {
       throw new Error(errorMessage);
-    })
+    }),
   ]);
 }
 
@@ -97,14 +97,17 @@ export function deepMerge<T extends Record<string, unknown>>(
     if (sourceValue === undefined) continue;
 
     if (
-      sourceValue &&
+      sourceValue != null &&
       typeof sourceValue === 'object' &&
       !Array.isArray(sourceValue) &&
-      targetValue &&
+      targetValue != null &&
       typeof targetValue === 'object' &&
       !Array.isArray(targetValue)
     ) {
-      target[key] = deepMerge(targetValue, sourceValue);
+      target[key] = deepMerge(
+        targetValue as Record<string, unknown>,
+        sourceValue as Record<string, unknown>,
+      ) as T[Extract<keyof T, string>];
     } else {
       target[key] = sourceValue as T[Extract<keyof T, string>];
     }
@@ -130,7 +133,7 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
  */
 export function debounce<T extends (...args: unknown[]) => unknown>(
   fn: T,
-  delayMs: number
+  delayMs: number,
 ): (...args: Parameters<T>) => void {
   let timeoutId: NodeJS.Timeout | undefined;
 
@@ -151,7 +154,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
  */
 export function throttle<T extends (...args: unknown[]) => unknown>(
   fn: T,
-  limitMs: number
+  limitMs: number,
 ): (...args: Parameters<T>) => void {
   let inThrottle = false;
   let lastArgs: Parameters<T> | undefined;
@@ -179,7 +182,7 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
  */
 export function omit<T extends Record<string, unknown>, K extends keyof T>(
   obj: T,
-  keys: K[]
+  keys: K[],
 ): Omit<T, K> {
   const result = { ...obj };
   for (const key of keys) {
@@ -193,7 +196,7 @@ export function omit<T extends Record<string, unknown>, K extends keyof T>(
  */
 export function pick<T extends Record<string, unknown>, K extends keyof T>(
   obj: T,
-  keys: K[]
+  keys: K[],
 ): Pick<T, K> {
   const result = {} as Pick<T, K>;
   for (const key of keys) {

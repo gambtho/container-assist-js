@@ -2,7 +2,7 @@
  * Verify Deployment - Helper Functions
  */
 
-import type { MCPToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types.js';
 
 /**
  * Check deployment health
@@ -10,7 +10,7 @@ import type { MCPToolContext } from '../tool-types.js';
 export async function checkDeploymentHealth(
   deploymentName: string,
   namespace: string,
-  context: MCPToolContext
+  context: ToolContext,
 ): Promise<{
   name: string;
   endpoint: string;
@@ -19,17 +19,18 @@ export async function checkDeploymentHealth(
 }> {
   const { kubernetesService, logger } = context;
 
-  if (kubernetesService && 'getStatus' in kubernetesService) {
-    const result = await (kubernetesService as any).getStatus(
-      `deployment/${deploymentName}`,
-      namespace
-    );
+  if (
+    kubernetesService != null &&
+    'getStatus' in kubernetesService &&
+    typeof kubernetesService.getStatus === 'function'
+  ) {
+    const result = await kubernetesService.getStatus(`deployment/${deploymentName}`, namespace);
 
-    if (result.success && result.data) {
+    if (result?.success === true && result?.data != null) {
       return result.data;
     }
 
-    throw new Error(result.error?.message ?? 'Failed to get deployment status');
+    throw new Error(String(result?.error?.message) ?? 'Failed to get deployment status');
   }
 
   // Mock health check for testing
@@ -39,17 +40,17 @@ export async function checkDeploymentHealth(
     name: deploymentName,
     endpoint: `http://${deploymentName}.${namespace}`,
     status: 'healthy' as const,
-    response_time_ms: 50
+    response_time_ms: 50,
   };
 }
 
 /**
  * Get pod information
  */
-export async function getPodInfo(
+export function getPodInfo(
   namespace: string,
   deploymentName: string,
-  context: MCPToolContext
+  context: ToolContext,
 ): Promise<
   Array<{ name: string; ready: boolean; status: string; restarts?: number; node?: string }>
 > {
@@ -59,22 +60,22 @@ export async function getPodInfo(
   logger.info({ namespace, deployment: deploymentName }, 'Getting pod information');
 
   // Mock pod info for testing
-  return [
+  return Promise.resolve([
     {
       name: `${deploymentName}-abc123`,
       ready: true,
       status: 'Running',
       restarts: 0,
-      node: 'node-1'
+      node: 'node-1',
     },
     {
       name: `${deploymentName}-def456`,
       ready: true,
       status: 'Running',
       restarts: 0,
-      node: 'node-2'
-    }
-  ];
+      node: 'node-2',
+    },
+  ]);
 }
 
 /**
@@ -83,24 +84,24 @@ export async function getPodInfo(
 export async function getServiceEndpoints(
   namespace: string,
   serviceName: string,
-  context: MCPToolContext
+  context: ToolContext,
 ): Promise<
   Array<{ service: string; type: string; url?: string; port?: number; external: boolean }>
 > {
   const { kubernetesService, logger } = context;
 
-  if (kubernetesService && 'getEndpoints' in kubernetesService) {
-    const result = await (kubernetesService as any).getEndpoints(namespace);
+  if (kubernetesService != null && 'getEndpoints' in kubernetesService) {
+    const result = await kubernetesService.getEndpoints(namespace);
 
-    if (result.success && result.data) {
-      return result.data
-        .filter((e: any) => !serviceName || e.service === serviceName)
+    if (result?.success === true && result?.data != null) {
+      return (result.data as any[])
+        .filter((e: any) => serviceName == null || serviceName === '' || e.service === serviceName)
         .map((e: any) => ({
           service: e.service,
           type: 'ClusterIP',
           url: e.url,
           port: 80,
-          external: !!e.url && !e.url.includes('cluster.local')
+          external: Boolean(e.url) && !String(e.url).includes('cluster.local'),
         }));
     }
   }
@@ -114,8 +115,8 @@ export async function getServiceEndpoints(
       type: 'LoadBalancer',
       url: 'http://app.example.com',
       port: 80,
-      external: true
-    }
+      external: true,
+    },
   ];
 }
 
@@ -125,7 +126,7 @@ export async function getServiceEndpoints(
 export function analyzeIssues(
   deployments: Array<{ name: string; ready?: boolean; replicas?: any }>,
   pods: Array<{ ready: boolean; status?: string; restarts?: number }>,
-  minReadyPods: number
+  minReadyPods: number,
 ): string[] {
   const issues: string[] = [];
 
@@ -137,7 +138,7 @@ export function analyzeIssues(
 
     if (deployment.replicas && deployment.replicas.ready < deployment.replicas.desired) {
       issues.push(
-        `Deployment ${deployment.name}: Only ${deployment.replicas.ready}/${deployment.replicas.desired} replicas ready`
+        `Deployment ${deployment.name}: Only ${deployment.replicas.ready}/${deployment.replicas.desired} replicas ready`,
       );
     }
 
@@ -167,7 +168,7 @@ export async function getTargetResources(
   deployments: string[],
   services: string[],
   sessionId: string | undefined,
-  sessionService: any
+  sessionService: any,
 ): Promise<{ targetDeployments: string[]; targetServices: string[] }> {
   let targetDeployments = deployments;
   let targetServices = services;
@@ -200,19 +201,21 @@ export async function getTargetResources(
 export async function checkAllDeployments(
   targetDeployments: string[],
   namespace: string,
-  context: MCPToolContext
-): Promise<Array<{
-  name: string;
-  ready: boolean;
-  replicas: any;
-  conditions?: any[];
-}>> {
+  context: ToolContext,
+): Promise<
+  Array<{
+    name: string;
+    ready: boolean;
+    replicas: any;
+    conditions?: unknown[];
+  }>
+> {
   const { logger } = context;
   const deploymentResults: Array<{
     name: string;
     ready: boolean;
     replicas: any;
-    conditions?: any[];
+    conditions?: unknown[];
   }> = [];
 
   for (const deploymentName of targetDeployments) {
@@ -227,9 +230,9 @@ export async function checkAllDeployments(
         replicas: {
           desired: 3,
           current: 3,
-          ready: 3
+          ready: 3,
         },
-        conditions: []
+        conditions: [],
       });
     } catch (error) {
       logger.error({ error }, `Failed to check deployment ${deploymentName}`);
@@ -240,8 +243,8 @@ export async function checkAllDeployments(
         replicas: {
           desired: 0,
           current: 0,
-          ready: 0
-        }
+          ready: 0,
+        },
       });
     }
   }
@@ -255,14 +258,16 @@ export async function checkAllDeployments(
 export async function checkAllPods(
   targetDeployments: string[],
   namespace: string,
-  context: MCPToolContext
-): Promise<Array<{
-  name: string;
-  ready: boolean;
-  status: string;
-  restarts?: number;
-  node?: string;
-}>> {
+  context: ToolContext,
+): Promise<
+  Array<{
+    name: string;
+    ready: boolean;
+    status: string;
+    restarts?: number;
+    node?: string;
+  }>
+> {
   const podResults: Array<{
     name: string;
     ready: boolean;
@@ -286,14 +291,16 @@ export async function getAllEndpoints(
   targetServices: string[],
   targetDeployments: string[],
   namespace: string,
-  context: MCPToolContext
-): Promise<Array<{
-  service: string;
-  type: string;
-  url?: string;
-  port?: number;
-  external: boolean;
-}>> {
+  context: ToolContext,
+): Promise<
+  Array<{
+    service: string;
+    type: string;
+    url?: string;
+    port?: number;
+    external: boolean;
+  }>
+> {
   const endpointResults: Array<{
     service: string;
     type: string;
@@ -324,7 +331,7 @@ export async function getAllEndpoints(
 export function determineOverallHealth(
   deploymentResults: Array<{ ready: boolean }>,
   podResults: Array<{ ready: boolean }>,
-  issues: string[]
+  issues: string[],
 ): boolean {
   return (
     deploymentResults.every((d) => d.ready) &&

@@ -4,7 +4,7 @@
 
 import type { Logger } from 'pino';
 import type { CoreServices } from '../services/interfaces.js';
-import type { SimpleToolConfig } from './simple-config';
+import type { ToolConfig } from './tool-config';
 
 /**
  * Tool request structure
@@ -15,23 +15,28 @@ export interface ToolRequest {
 }
 
 /**
- * Tool response structure
+ * Tool result using discriminated union - much cleaner than mixed interface
  */
-export interface ToolResult {
-  success: boolean;
-  error?: string;
-  message?: string;
-  tool?: string;
-  sessionId?: string;
-  status?: string;
-  arguments?: Record<string, unknown>;
-  data?: unknown;
-  nextStep?: {
-    tool: string;
-    reason: string | null;
-  };
-  [key: string]: unknown;
-}
+export type ToolResult =
+  | {
+      success: true;
+      tool: string;
+      data: unknown;
+      sessionId?: string;
+      message?: string;
+      arguments?: Record<string, unknown>;
+      nextStep?: {
+        tool: string;
+        reason: string;
+      };
+    }
+  | {
+      success: false;
+      tool: string;
+      error: string;
+      code?: string;
+      arguments?: Record<string, unknown>;
+    };
 
 /**
  * Chain hint for tool workflows
@@ -46,13 +51,13 @@ export interface ChainHint<TOutput = any> {
  * Abstract base class for all tool handlers
  * Uses constructor injection instead of service locator
  */
-export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
+export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
   protected readonly logger: Logger;
-  protected readonly config: SimpleToolConfig;
+  protected readonly config: ToolConfig;
 
   constructor(
     protected readonly services: CoreServices,
-    config: SimpleToolConfig
+    config: ToolConfig,
   ) {
     this.config = config;
     this.logger = services.logger.child({ tool: config.name });
@@ -66,7 +71,7 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
   /**
    * Output validation schema - optional
    */
-  get outputSchema(): any | undefined {
+  get outputSchema(): any {
     return undefined;
   }
 
@@ -92,9 +97,9 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
     this.logger.info(
       {
         tool: this.config.name,
-        hasSession: !!(args.session_id ?? args.sessionId)
+        hasSession: (args.session_id ?? args.sessionId) != null,
       },
-      'Handling tool request'
+      'Handling tool request',
     );
 
     try {
@@ -106,31 +111,26 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
 
       // Validate output if schema provided
       if (this.outputSchema) {
-        this.outputSchema.parse(result);
+        const schema = this.outputSchema as { parse: (input: unknown) => void };
+        schema.parse(result);
       }
 
-      // Format successful response
-      const toolResult = this.formatSuccess(result, args);
+      // Format successful response with chain hint if available
+      const chainStep = this.chainHint
+        ? {
+            tool: this.chainHint.nextTool,
+            reason: this.chainHint.reason,
+          }
+        : undefined;
 
-      // Add chain hint if available
-      if (this.chainHint) {
-        toolResult.nextStep = {
-          tool: this.chainHint.nextTool,
-          reason: this.chainHint.reason
-        };
-
-        // Apply parameter mapping if provided
-        if (this.chainHint.paramMapper) {
-          toolResult.nextStepParams = this.chainHint.paramMapper(result);
-        }
-      }
+      const toolResult = this.formatSuccess(result, args, chainStep);
 
       this.logger.info(
         {
           tool: this.config.name,
-          success: true
+          success: true,
         },
-        'Tool executed successfully'
+        'Tool executed successfully',
       );
 
       return toolResult;
@@ -144,11 +144,12 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
    */
   private validateInput(args: Record<string, unknown>): TInput {
     try {
-      return this.inputSchema.parse(args);
+      const schema = this.inputSchema as { parse: (input: unknown) => TInput };
+      return schema.parse(args);
     } catch (error) {
       throw new ValidationError(
         `Input validation failed: ${error instanceof Error ? error.message : String(error)}`,
-        ['input']
+        ['input'],
       );
     }
   }
@@ -156,17 +157,22 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
   /**
    * Format successful tool response
    */
-  private formatSuccess(result: TOutput, args: Record<string, unknown>): ToolResult {
+  private formatSuccess(
+    result: TOutput,
+    args: Record<string, unknown>,
+    nextStep?: { tool: string; reason: string },
+  ): ToolResult {
     // Extract session ID from various possible locations
     const sessionId = this.extractSessionId(args, result);
 
     return {
       success: true,
       tool: this.config.name,
+      data: result,
       message: `Tool ${this.config.name} executed successfully`,
       arguments: args,
-      data: result,
-      ...(sessionId && { sessionId })
+      ...(sessionId && { sessionId }),
+      ...(nextStep && { nextStep }),
     };
   }
 
@@ -181,16 +187,16 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
       {
         error: errorMessage,
         stack: errorStack,
-        tool: this.config.name
+        tool: this.config.name,
       },
-      'Tool execution failed'
+      'Tool execution failed',
     );
 
     return {
       success: false,
       tool: this.config.name,
       error: errorMessage,
-      arguments: args
+      arguments: args,
     };
   }
 
@@ -199,14 +205,21 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
    */
   private extractSessionId(args: Record<string, unknown>, result?: TOutput): string | undefined {
     // Try multiple common field names
-    return (
-      (args.session_id as string) ||
-      (args.sessionId as string) ||
-      (result &&
-        typeof result === 'object' &&
-        result !== null &&
-        ((result as unknown).sessionId ?? (result as unknown).session_id))
-    );
+    const sessionFromArgs = args.session_id ?? args.sessionId;
+    if (typeof sessionFromArgs === 'string') {
+      return sessionFromArgs;
+    }
+
+    // Check result object for session ID
+    if (result && typeof result === 'object' && result !== null) {
+      const resultObj = result as Record<string, unknown>;
+      const sessionFromResult = resultObj.sessionId ?? resultObj.session_id;
+      if (typeof sessionFromResult === 'string') {
+        return sessionFromResult;
+      }
+    }
+
+    return undefined;
   }
 
   /**
@@ -220,7 +233,7 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
     progress: number;
     data?: unknown;
   }): Promise<void> {
-    if (this.services.progress && this.services.progress.length > 0) {
+    if (this.services.progress && typeof this.services.progress.emit === 'function') {
       try {
         await this.services.progress.emit(update);
       } catch (error) {
@@ -236,7 +249,7 @@ export abstract class BaseMCPToolDescriptor<TInput = any, TOutput = any> {
 export class ValidationError extends Error {
   constructor(
     message: string,
-    public fields: string[]
+    public fields: string[],
   ) {
     super(message);
     this.name = 'ValidationError';
@@ -251,6 +264,3 @@ export interface ToolHandlerConfig {
   description: string;
   category: string;
 }
-
-// Export alias for backward compatibility
-export { BaseMCPToolDescriptor as BaseToolHandler };

@@ -1,25 +1,22 @@
 /**
- * Build Image - Main Orchestration Logic
+ * Build Image - MCP SDK Compatible Version
  */
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { DockerBuildOptions, DockerBuildResult } from '../../../contracts/types/index.js';
+import type { DockerBuildOptions } from '../../../contracts/types/index.js';
 import { executeWithRetry } from '../error-recovery.js';
 import { ValidationError, NotFoundError } from '../../../errors/index.js';
+import type { Session } from '../../../contracts/types/session.js';
 import {
   BuildImageInput as BuildImageInputSchema,
   BuildResultSchema,
   BuildImageParams,
-  BuildResult
+  BuildResult,
 } from '../schemas.js';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 import { fileExists } from '../utils.js';
-import {
-  prepareBuildArgs,
-  buildDockerImage,
-  analyzeBuildSecurity
-} from './helper';
+import { prepareBuildArgs, buildDockerImage, analyzeBuildSecurity } from './helper.js';
 
 const BuildImageInput = BuildImageInputSchema;
 const BuildImageOutput = BuildResultSchema;
@@ -28,18 +25,20 @@ const BuildImageOutput = BuildResultSchema;
 export type BuildInput = BuildImageParams;
 export type BuildOutput = BuildResult;
 
+// Helper functions are now imported from ./helper.js
+
 /**
  * Main handler implementation
  */
-const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
+const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
   name: 'build_image',
   description: 'Build Docker image from Dockerfile with progress tracking',
   category: 'workflow',
   inputSchema: BuildImageInput,
   outputSchema: BuildImageOutput,
 
-  handler: async (input: BuildInput, context: MCPToolContext): Promise<BuildOutput> => {
-    const { logger, sessionService, progressEmitter, dockerService } = context;
+  handler: async (input: BuildInput, context: ToolContext): Promise<BuildOutput> => {
+    const { logger, sessionService, progressEmitter } = context;
     const {
       sessionId,
       context: buildContext,
@@ -48,8 +47,10 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
       buildArgs,
       target,
       noCache,
-      platform
+      platform,
     } = input;
+
+    // Progress tracking handled via progressEmitter
 
     logger.info(
       {
@@ -57,9 +58,9 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
         context: buildContext,
         dockerfile,
         tags,
-        noCache
+        noCache,
       },
-      'Starting Docker image build'
+      'Starting Docker image build',
     );
 
     const startTime = Date.now();
@@ -77,23 +78,41 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
 
       // Determine paths
       const repoPath = (session.metadata?.repoPath as string) || buildContext;
-      const dockerfilePath = path.isAbsolute(dockerfile)
+      let dockerfilePath = path.isAbsolute(dockerfile)
         ? dockerfile
         : path.join(repoPath, dockerfile);
 
-      // Check if Dockerfile exists
+      // Check if we should use a generated Dockerfile
+      const generatedPath = session.workflow_state?.dockerfile_result?.path;
+
       if (!(await fileExists(dockerfilePath))) {
-        // Check if it was generated in the session
-        const generatedPath = session.workflow_state?.dockerfile_result?.path;
+        // If the specified Dockerfile doesn't exist, check for generated one
         if (generatedPath && (await fileExists(generatedPath))) {
-          logger.info({ path: generatedPath }, 'Using generated Dockerfile');
+          dockerfilePath = generatedPath;
+          logger.info(
+            {
+              generatedPath,
+              originalPath: dockerfile,
+            },
+            'Using generated Dockerfile',
+          );
         } else {
           throw new NotFoundError(
             `Dockerfile not found: ${dockerfilePath}`,
             'dockerfile',
-            dockerfilePath
+            dockerfilePath,
           );
         }
+      } else if (generatedPath && (await fileExists(generatedPath))) {
+        // If both exist, prefer the generated one if it's newer
+        dockerfilePath = generatedPath;
+        logger.info(
+          {
+            generatedPath,
+            originalPath: dockerfile,
+          },
+          'Using generated Dockerfile instead of original',
+        );
       }
 
       // Read Dockerfile for analysis
@@ -102,7 +121,7 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
       // Analyze for security issues
       const warnings = analyzeBuildSecurity(dockerfileContent, buildArgs ?? {});
       if (warnings.length > 0) {
-        logger.warn({ warnings }, 'Security warnings detected');
+        logger.warn({ warnings }); // Fixed logger call
       }
 
       // Prepare tags
@@ -114,7 +133,7 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
         ? imageTags.map((tag) => `${input.registry}/${tag}`)
         : imageTags;
 
-      // Report progress
+      // Report progress using callback (fallback to progressEmitter for compatibility)
       if (progressEmitter && sessionId) {
         await progressEmitter.emit({
           sessionId,
@@ -122,7 +141,7 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
           status: 'in_progress',
           message: 'Preparing Docker build',
           progress: 0.1,
-          metadata: { sessionId, dockerfile: dockerfilePath }
+          metadata: { sessionId, dockerfile: dockerfilePath },
         });
       }
 
@@ -134,10 +153,10 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
         buildArgs: prepareBuildArgs(buildArgs ?? {}, session),
         ...(target && { target }),
         noCache,
-        ...(platform && { platform })
+        ...(platform && { platform }),
       };
 
-      logger.info(buildOptions, 'Executing Docker build');
+      logger.info(buildOptions as unknown, 'Executing Docker build');
 
       // Report build start
       if (progressEmitter && sessionId) {
@@ -147,7 +166,7 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
           status: 'in_progress',
           message: 'Building Docker image',
           progress: 0.3,
-          metadata: { sessionId, tags: fullTags, context: buildOptions.context }
+          metadata: { sessionId, tags: fullTags, context: buildOptions.context },
         });
       }
 
@@ -156,7 +175,7 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
         async () => {
           return await buildDockerImage(buildOptions, context);
         },
-        { maxAttempts: 2 }
+        { maxAttempts: 2 },
       );
 
       // Report build progress
@@ -167,7 +186,7 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
           status: 'in_progress',
           message: 'Finalizing image',
           progress: 0.9,
-          metadata: { sessionId, imageId: buildResult.imageId }
+          metadata: { sessionId, imageId: buildResult.imageId },
         });
       }
 
@@ -179,7 +198,7 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
       const baseImage = baseImageMatch ? baseImageMatch[1] : 'unknown';
 
       // Update session with build result
-      await sessionService.updateAtomic(sessionId, (session) => ({
+      await sessionService.updateAtomic(sessionId, (session: Session) => ({
         ...session,
         workflow_state: {
           ...session.workflow_state,
@@ -193,20 +212,21 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
               : (buildResult.layers ?? 0),
             buildTime,
             logs: buildResult.logs ?? [],
-            success: buildResult.success ?? true
-          }
-        }
+            success: buildResult.success ?? true,
+          },
+        },
       }));
 
       // Push to registry if requested
+      const dockerService = (context as any).dockerService;
       if (input.push && input.registry && dockerService && fullTags) {
         logger.info({ registry: input.registry }, 'Pushing to registry');
 
         for (const tag of fullTags) {
           if ('push' in dockerService) {
-            await (dockerService as any).push({
+            await dockerService.push({
               image: tag,
-              registry: input.registry
+              registry: input.registry,
             });
           }
         }
@@ -215,7 +235,6 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
       // Report completion
       if (progressEmitter && sessionId) {
         await progressEmitter.emit({
-          sessionId,
           step: 'build_image',
           status: 'completed',
           message: 'Docker image built successfully',
@@ -225,8 +244,8 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
             imageId: buildResult.imageId,
             tags: buildResult.tags,
             buildTime,
-            size: buildResult.size
-          }
+            size: buildResult.size,
+          },
         });
       }
 
@@ -234,9 +253,9 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
         {
           imageId: buildResult.imageId,
           tags: buildResult.tags,
-          buildTime: `${buildTime}ms`
+          buildTime: `${buildTime}ms`,
         },
-        'Docker image built successfully'
+        'Docker image built successfully',
       );
 
       return {
@@ -254,8 +273,8 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
           platform: platform ?? 'linux/amd64',
           dockerfile: dockerfilePath,
           context: buildContext,
-          cached: !noCache
-        }
+          cached: !noCache,
+        },
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -267,7 +286,7 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
           step: 'build_image',
           status: 'failed',
           message: 'Docker build failed',
-          progress: 0
+          progress: 0,
         });
       }
 
@@ -281,9 +300,9 @@ const buildImageHandler: MCPTool<BuildInput, BuildOutput> = {
     reason: 'Scan built image for vulnerabilities',
     paramMapper: (output) => ({
       image_id: output.imageId,
-      image_tag: output.tags[0]
-    })
-  }
+      image_tag: output.tags[0],
+    }),
+  },
 };
 
 // Default export for registry

@@ -16,7 +16,7 @@ import type {
 
   // Service interfaces (essential only)
   SessionStore,
-  EventPublisher
+  EventPublisher,
 } from '../contracts/types/index.js';
 
 // Import Logger from pino
@@ -39,12 +39,11 @@ export type {
   // Session and workflow types commonly used in service coordination
   Session,
   WorkflowState,
-  AnalysisResult
+  AnalysisResult,
 };
 
 // Configuration types - unified in the main config module
 export type { ApplicationConfig } from '../config/index.js';
-// DependenciesConfig is deprecated - use ApplicationConfig instead
 export type { ApplicationConfig as DependenciesConfig } from '../config/index.js';
 
 // Workflow step parameters (service-specific)
@@ -73,24 +72,13 @@ export type {
   ToolDescriptor,
   MCPToolCallRequest,
   MCPToolCallResponse,
-  ToolRegistry
 } from './tools/tool-types';
 
 // Additional service types needed by factories
 // These are already imported and re-exported above, no need for aliases
 
-// Import MCPSampler for AI integration
-export type {
-  MCPSampler,
-  MCPSampleResponse,
-  MCPSampleError
-} from '../infrastructure/ai/mcp-sampler.js';
-
-// Service aggregation types for dependency injection
-export interface AIServices {
-  // Empty interface maintained for backward compatibility
-  // Services now use EnhancedAIService directly
-}
+// Import modern sampling functions for AI integration
+export type { SampleFunction, SampleResult } from '../infrastructure/ai/index.js';
 
 export interface InfrastructureServices {
   // Note: Services use concrete classes, not interfaces
@@ -113,7 +101,7 @@ export interface HealthStatus {
   component: string;
   status: 'healthy' | 'unhealthy' | 'degraded' | 'unknown';
   message?: string;
-  details?: Record<string, any>;
+  details?: Readonly<Record<string, unknown>>;
   lastCheck: string;
   checkDuration: number;
 }

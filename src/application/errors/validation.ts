@@ -44,7 +44,7 @@ export function createSafeValidationHandler<T>(schema: z.ZodSchema<T>) {
     } else {
       return {
         success: false,
-        error: convertToMcpError(new Error('Input validation failed'))
+        error: convertToMcpError(new Error('Input validation failed')),
       };
     }
   };
@@ -56,7 +56,7 @@ export function createSafeValidationHandler<T>(schema: z.ZodSchema<T>) {
 export function withValidation<TInput, TOutput>(
   inputSchema: z.ZodSchema<TInput>,
   outputSchema: z.ZodSchema<TOutput>,
-  handler: (input: TInput) => Promise<TOutput>
+  handler: (input: TInput) => Promise<TOutput>,
 ) {
   return async (input: unknown): Promise<TOutput> => {
     // Validate input
@@ -84,7 +84,7 @@ export function withValidationAndLogging<TInput, TOutput>(
   outputSchema: z.ZodSchema<TOutput>,
   handler: (input: TInput, logger: Logger) => Promise<TOutput>,
   logger: Logger,
-  toolName: string
+  toolName: string,
 ) {
   return async (input: unknown): Promise<TOutput> => {
     const toolLogger = logger.child({ tool: toolName });
@@ -139,7 +139,7 @@ export const CommonSchemas = {
     .string()
     .regex(
       /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*(?::[a-zA-Z0-9._-]+)?$/,
-      'Invalid Docker image name format'
+      'Invalid Docker image name format',
     ),
 
   /**
@@ -190,7 +190,7 @@ export const CommonSchemas = {
   /**
    * Timeout in milliseconds
    */
-  timeout: z.number().int().min(1000).max(300000).optional().default(30000)
+  timeout: z.number().int().min(1000).max(300000).optional().default(30000),
 };
 
 /**
@@ -203,7 +203,7 @@ export const CommonOutputSchemas = {
   success: z.object({
     success: z.boolean(),
     message: z.string(),
-    timestamp: z.string().optional()
+    timestamp: z.string().optional(),
   }),
 
   /**
@@ -214,7 +214,7 @@ export const CommonOutputSchemas = {
       success: z.boolean(),
       message: z.string(),
       data: dataSchema,
-      timestamp: z.string().optional()
+      timestamp: z.string().optional(),
     }),
 
   /**
@@ -226,7 +226,7 @@ export const CommonOutputSchemas = {
     tags: z.array(z.string()),
     buildTime: z.number(),
     size: z.number().optional(),
-    layers: z.number().optional()
+    layers: z.number().optional(),
   }),
 
   /**
@@ -239,11 +239,11 @@ export const CommonOutputSchemas = {
         kind: z.string(),
         name: z.string(),
         namespace: z.string().optional(),
-        status: z.string()
-      })
+        status: z.string(),
+      }),
     ),
     deploymentTime: z.number(),
-    message: z.string()
+    message: z.string(),
   }),
 
   /**
@@ -257,12 +257,12 @@ export const CommonOutputSchemas = {
         severity: z.enum(['low', 'medium', 'high', 'critical']),
         message: z.string(),
         file: z.string().optional(),
-        line: z.number().optional()
-      })
+        line: z.number().optional(),
+      }),
     ),
     summary: z.string(),
-    recommendations: z.array(z.string()).optional()
-  })
+    recommendations: z.array(z.string()).optional(),
+  }),
 };
 
 /**
@@ -306,7 +306,9 @@ export class ToolParameterBuilder {
    * Add a boolean parameter
    */
   boolean(name: string, defaultValue?: boolean, description?: string): this {
-    let schema: any = z.boolean().describe(description ?? name);
+    let schema: z.ZodDefault<z.ZodBoolean> | z.ZodBoolean = z
+      .boolean()
+      .describe(description ?? name);
     if (defaultValue !== undefined) {
       schema = schema.default(defaultValue);
     }
@@ -336,7 +338,7 @@ export class ToolParameterBuilder {
   /**
    * Build the final schema
    */
-  build(): z.ZodObject<any> {
+  build(): z.ZodObject<Record<string, z.ZodTypeAny>> {
     return z.object(this.schema);
   }
 }

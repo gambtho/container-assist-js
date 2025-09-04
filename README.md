@@ -22,8 +22,8 @@ npm install -g @thgamble/containerization-assist-mcp
 
 #### For Development
 ```bash
-git clone https://github.com/gambtho/container-assist-js
-cd containerization-assist-js
+git clone https://github.com/gambtho/container-assist-js.git
+cd container-assist-js
 npm install
 npm run build
 ```
@@ -85,7 +85,6 @@ await server.start();
 | Tool | Category | Description |
 |------|----------|-------------|
 | `analyze_repository` | Analysis | Analyze repository structure and detect language/framework |
-| `analyze_repository_v2` | Analysis | Enhanced repository analysis with AI |
 | `resolve_base_images` | Build | Find optimal base images for applications |
 | `generate_dockerfile` | Build | Create optimized Dockerfiles |
 | `generate_dockerfile_ext` | Build | Extended Dockerfile generation with AI |
@@ -100,7 +99,6 @@ await server.start();
 | `verify_deployment` | Deploy | Verify deployment health and status |
 | `start_workflow` | Workflow | Start complete containerization workflow |
 | `workflow_status` | Workflow | Check workflow progress and status |
-| `list_tools` | Ops | List all available tools |
 | `ping` | Ops | Test server connectivity |
 | `server_status` | Ops | Get server health status |
 | `registry` | Ops | Tool registry operations |
@@ -192,6 +190,7 @@ src/
 ├── infrastructure/  # External adapters (docker, k8s, ai, core)
 ├── application/     # Business logic (tools, workflow, factories)
 └── platform/        # Entry points (bin, server)
+apps/                # CLI entry points
 ```
 
 ## Example Usage
@@ -286,47 +285,41 @@ sudo usermod -aG docker $USER
 ## Documentation
 
 - [User Setup Guide](docs/user/SETUP_GUIDE.md)
-- [Developer Guide](docs/developer/ARCHITECTURE.md)
-- [Tool Development](docs/developer/TOOL_DEVELOPMENT.md)
-- [API Reference](docs/api/TOOLS_REFERENCE.md)
 
 ## Development
 
 ### Commands
 
 ```bash
-# Build and Development
-npm run build          # Compile TypeScript
-npm run build:watch    # Watch mode compilation
-npm run start:dev      # Development server with auto-reload
+# Build and Development (Ultra-Fast with tsup)
+npm run build          # Fast development build (90ms)
+npm run build:prod     # Minified production build (710ms)
+npm run build:watch    # Live rebuild on changes
+npm run dev            # Development server with auto-reload
 
 # Code Quality
 npm run lint           # ESLint linting
 npm run lint:fix       # Auto-fix linting issues
 npm run typecheck      # TypeScript type checking
 npm run format         # Prettier formatting
-npm run validate       # Run all checks
+npm run validate       # Run all quality checks
 
 # Testing
 npm test               # Run all tests
-npm run test:unit      # Unit tests only
+npm run test:unit      # Unit tests with bail
 npm run test:integration # Integration tests
 npm run test:coverage  # Coverage report
 ```
 
 ### Code Standards
 
-- **TypeScript**: Strict mode with ES2022 modules
-- **Imports**: Relative paths only (no path aliases)
-- **Architecture**: Clean separation between layers
+- **Build System**: Ultra-fast tsup (esbuild-based) - 10-100x faster than tsc
+- **TypeScript**: Strict mode with ES2022 modules and native ESM support
+- **Imports**: Relative paths only (no path aliases, no import extension hacks)
+- **Architecture**: Clean separation between layers with strict boundaries
 - **Error Handling**: Result monad pattern throughout
-- **Testing**: Comprehensive unit and integration tests
+- **Testing**: Comprehensive unit and integration tests (146 passing)
 
-See [CLAUDE.md](CLAUDE.md) for detailed development guidelines.
-
-## Contributing
-
-Please read [CONTRIBUTING.md](docs/developer/CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 

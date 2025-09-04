@@ -58,6 +58,7 @@ export interface KubernetesConfig {
 
 // AI/ML Configuration
 export interface AIConfig {
+  provider?: string;
   apiKey: string;
   model: string;
   baseUrl: string;
@@ -66,6 +67,8 @@ export interface AIConfig {
   retryDelayMs?: number;
   temperature?: number;
   maxTokens?: number;
+  required?: boolean;
+  requireConnection?: boolean;
 }
 
 // MCP Sampler Configuration
@@ -188,6 +191,7 @@ export interface ApplicationConfig {
   logging: LoggingConfig;
   infrastructure: InfrastructureConfig;
   aiServices: AIServicesConfig;
+  ai?: AIConfig; // Direct AI config access for compatibility
   workflow: WorkflowConfig;
   features: FeatureFlags;
 }

@@ -145,7 +145,7 @@ describe('Integration Completion Validation', () => {
     ];
     
     console.log('Test dependency resolution completed:');
-    resolvedDependencies.forEach(dep => console.log(`  ✅ ${dep}`);
+    resolvedDependencies.forEach(dep => console.log(`  ✅ ${dep}`));
     
     expect(resolvedDependencies).toHaveLength(4);
     expect(resolvedDependencies[0]).toContain('Unified logger');

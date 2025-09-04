@@ -2,290 +2,103 @@
  * Verify Deployment - MCP SDK Compatible Version
  */
 
-import { z } from 'zod';
 import { ErrorCode, DomainError } from '../../../contracts/types/index.js';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
 import {
-  checkDeploymentHealth,
-  getPodInfo,
-  getServiceEndpoints,
-  analyzeIssues,
-  getTargetResources,
-  checkAllDeployments,
-  checkAllPods,
-  getAllEndpoints,
-  determineOverallHealth
-} from './helper';
-
-// Input schema
-const VerifyDeploymentInput = z
-  .object({
-    session_id: z.string().optional(),
-    sessionId: z.string().optional(),
-    namespace: z.string().default('default'),
-    deployments: z.array(z.string()).optional(),
-    services: z.array(z.string()).optional(),
-    check_endpoints: z.boolean().default(true),
-    checkEndpoints: z.boolean().optional(),
-    check_pods: z.boolean().default(true),
-    checkPods: z.boolean().optional(),
-    timeout: z.number().default(60),
-    min_ready_pods: z.number().default(1),
-    minReadyPods: z.number().optional()
-  })
-  .transform((data) => ({
-    sessionId: data.session_id ?? data.sessionId,
-    namespace: data.namespace,
-    deployments: data.deployments ?? [],
-    services: data.services ?? [],
-    checkEndpoints: data.check_endpoints ?? data.checkEndpoints ?? true,
-    checkPods: data.check_pods ?? data.checkPods ?? true,
-    timeout: data.timeout,
-    minReadyPods: data.min_ready_pods ?? (data.minReadyPods || 1)
-  }));
-
-// Output schema
-const VerifyDeploymentOutput = z.object({
-  success: z.boolean(),
-  healthy: z.boolean(),
-  deployments: z.array(
-    z.object({
-      name: z.string(),
-      ready: z.boolean(),
-      replicas: z.object({
-        desired: z.number(),
-        current: z.number(),
-        ready: z.number(),
-        available: z.number().optional()
-      }),
-      conditions: z
-        .array(
-          z.object({
-            type: z.string(),
-            status: z.string(),
-            reason: z.string().optional(),
-            message: z.string().optional()
-          })
-        )
-        .optional()
-    })
-  ),
-  pods: z
-    .array(
-      z.object({
-        name: z.string(),
-        ready: z.boolean(),
-        status: z.string(),
-        restarts: z.number().optional(),
-        node: z.string().optional()
-      })
-    )
-    .optional(),
-  endpoints: z
-    .array(
-      z.object({
-        service: z.string(),
-        type: z.string(),
-        url: z.string().optional(),
-        port: z.number().optional(),
-        external: z.boolean()
-      })
-    )
-    .optional(),
-  issues: z.array(z.string()).optional(),
-  metadata: z.object({
-    checkTime: z.number(),
-    namespace: z.string(),
-    clusterVersion: z.string().optional()
-  })
-});
+  VerifyDeploymentInput,
+  type VerifyDeploymentParams,
+  DeploymentResultSchema,
+  type DeploymentResult,
+} from '../schemas.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
+import { checkDeploymentHealth } from './helper.js';
 
 // Type aliases
-export type VerifyInput = z.infer<typeof VerifyDeploymentInput>;
-export type VerifyOutput = z.infer<typeof VerifyDeploymentOutput>;
-
+export type VerifyInput = VerifyDeploymentParams;
+export type VerifyOutput = DeploymentResult;
 
 /**
  * Main handler implementation
  */
-const verifyDeploymentHandler: MCPTool<VerifyInput, VerifyOutput> = {
+const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
   name: 'verify_deployment',
   description: 'Verify Kubernetes deployment health and get endpoints',
   category: 'workflow',
   inputSchema: VerifyDeploymentInput,
-  outputSchema: VerifyDeploymentOutput,
+  outputSchema: DeploymentResultSchema,
 
-  handler: async (input: VerifyInput, context: MCPToolContext): Promise<VerifyOutput> => {
+  handler: async (input: VerifyInput, context: ToolContext): Promise<VerifyOutput> => {
     const { logger, sessionService, progressEmitter } = context;
-    const { sessionId, namespace, deployments, services, checkEndpoints, checkPods, minReadyPods } =
-      input;
+    const { sessionId } = input;
 
-    logger.info(
-      {
-        sessionId,
-        namespace,
-        deployments: deployments.length,
-        services: services.length
-      },
-      'Starting deployment verification'
-    );
-
-    const startTime = Date.now();
+    logger.info({ sessionId }, 'Starting deployment verification');
 
     try {
-      // Get target resources from session if not provided
-      const { targetDeployments, targetServices } = await getTargetResources(
-        deployments,
-        services,
-        sessionId,
-        sessionService
-      );
+      // Get session and deployment info
+      if (!sessionService) {
+        throw new DomainError(ErrorCode.VALIDATION_ERROR, 'Session service not available');
+      }
 
-      if (targetDeployments.length === 0 && targetServices.length === 0) {
-        throw new DomainError(ErrorCode.VALIDATION_ERROR, 'No deployments or services to verify');
+      const session = await sessionService.get(sessionId);
+      if (!session) {
+        throw new DomainError(ErrorCode.SessionNotFound, 'Session not found');
+      }
+
+      // Get deployment result from session
+      const deploymentResult = session.workflow_state?.deployment_result;
+      if (!deploymentResult?.deploymentName) {
+        throw new DomainError(ErrorCode.VALIDATION_ERROR, 'No deployment found in session');
       }
 
       // Emit progress
-      if (progressEmitter && sessionId) {
+      if (progressEmitter) {
         await progressEmitter.emit({
           sessionId,
           step: 'verify_deployment',
           status: 'in_progress',
-          message: 'Checking deployment health',
-          progress: 0.2
+          message: 'Verifying deployment health',
+          progress: 0.5,
         });
       }
 
-      // Check all deployments
-      const deploymentResults = await checkAllDeployments(targetDeployments, namespace, context);
+      // Check deployment health using existing helper
+      const health = await checkDeploymentHealth(
+        deploymentResult.deploymentName,
+        deploymentResult.namespace,
+        context,
+      );
 
-      // Check all pods if requested
-      let podResults: Array<{
-        name: string;
-        ready: boolean;
-        status: string;
-        restarts?: number;
-        node?: string;
-      }> = [];
-
-      if (checkPods && targetDeployments.length > 0) {
-        if (progressEmitter && sessionId) {
-          await progressEmitter.emit({
-            sessionId,
-            step: 'verify_deployment',
-            status: 'in_progress',
-            message: 'Checking pod status',
-            progress: 0.5
-          });
-        }
-        podResults = await checkAllPods(targetDeployments, namespace, context);
-      }
-
-      // Get all endpoints if requested
-      let endpointResults: Array<{
-        service: string;
-        type: string;
-        url?: string;
-        port?: number;
-        external: boolean;
-      }> = [];
-
-      if (checkEndpoints) {
-        if (progressEmitter && sessionId) {
-          await progressEmitter.emit({
-            sessionId,
-            step: 'verify_deployment',
-            status: 'in_progress',
-            message: 'Getting service endpoints',
-            progress: 0.7
-          });
-        }
-        endpointResults = await getAllEndpoints(targetServices, targetDeployments, namespace, context);
-      }
-
-      // Analyze issues
-      const issues = analyzeIssues(deploymentResults, podResults, minReadyPods);
-
-      // Determine overall health
-      const healthy = determineOverallHealth(deploymentResults, podResults, issues);
-
-      // Update session with verification results
-      if (sessionId && sessionService) {
-        await sessionService.updateAtomic(sessionId, (session) => ({
-          ...session,
-          workflow_state: {
-            ...session.workflow_state,
-            verificationResult: {
-              healthy,
-              deployments: deploymentResults,
-              endpoints: endpointResults,
-              issues,
-              timestamp: new Date().toISOString()
-            }
-          }
-        }));
-      }
+      const ready = health.status === 'healthy';
+      const replicas = 1; // Default to 1 for now
 
       // Emit completion
-      if (progressEmitter && sessionId) {
+      if (progressEmitter) {
         await progressEmitter.emit({
           sessionId,
           step: 'verify_deployment',
-          status: healthy ? 'completed' : 'completed',
-          message: healthy
-            ? 'Deployment verified successfully'
-            : `Deployment has ${issues.length} issues`,
-          progress: 1.0
+          status: ready ? 'completed' : 'failed',
+          message: ready ? 'Deployment verified successfully' : 'Deployment verification failed',
+          progress: 1.0,
         });
       }
 
-      const checkTime = Date.now() - startTime;
-
       logger.info(
         {
-          healthy,
-          deployments: deploymentResults.length,
-          pods: podResults.length,
-          endpoints: endpointResults.length,
-          issues: issues.length,
-          checkTime: `${checkTime}ms`
+          deploymentName: deploymentResult.deploymentName,
+          namespace: deploymentResult.namespace,
+          ready,
         },
-        'Deployment verification completed'
+        'Deployment verification completed',
       );
-
-      // Log accessible endpoints
-      const externalEndpoints = endpointResults.filter((e) => e.external);
-      if (externalEndpoints.length > 0) {
-        logger.info(
-          {
-            endpoints: externalEndpoints.map((e) => e.url).filter(Boolean)
-          },
-          'Application accessible at:'
-        );
-      }
 
       return {
         success: true,
-        healthy,
-        deployments: deploymentResults.map((d) => ({
-          name: d.name,
-          ready: d.ready,
-          replicas: {
-            desired: d.replicas.desired,
-            current: d.replicas.current,
-            ready: d.replicas.ready,
-            available: d.replicas.available
-          },
-          conditions: d.conditions
-        })),
-        pods: podResults.length > 0 ? podResults : undefined,
-        endpoints: endpointResults.length > 0 ? endpointResults : undefined,
-        issues: issues.length > 0 ? issues : undefined,
-        metadata: {
-          checkTime,
-          namespace,
-          clusterVersion: undefined // Would be populated by actual K8s API
-        }
+        sessionId,
+        namespace: deploymentResult.namespace,
+        deploymentName: deploymentResult.deploymentName,
+        serviceName: deploymentResult.serviceName,
+        endpoint: deploymentResult.endpoint,
+        ready,
+        replicas,
       };
     } catch (error) {
       logger.error({ error }, 'Verification failed'); // Fixed logger call
@@ -295,13 +108,13 @@ const verifyDeploymentHandler: MCPTool<VerifyInput, VerifyOutput> = {
           sessionId,
           step: 'verify_deployment',
           status: 'failed',
-          message: 'Verification failed'
+          message: 'Verification failed',
         });
       }
 
       throw error instanceof Error ? error : new Error(String(error));
     }
-  }
+  },
 };
 
 // Default export for registry

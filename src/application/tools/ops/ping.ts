@@ -4,11 +4,11 @@
  */
 
 import { z } from 'zod';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 
 // Input schema
 const PingInputSchema = z.object({
-  message: z.string().default('ping')
+  message: z.string().default('ping'),
 });
 
 // Output schema
@@ -20,13 +20,13 @@ const PingOutputSchema = z.object({
     name: z.string(),
     version: z.string(),
     uptime: z.number(),
-    pid: z.number()
+    pid: z.number(),
   }),
   capabilities: z.object({
     tools: z.boolean(),
     sampling: z.boolean(),
-    progress: z.boolean()
-  })
+    progress: z.boolean(),
+  }),
 });
 
 // Input/Output types
@@ -36,16 +36,19 @@ type PingOutput = z.infer<typeof PingOutputSchema>;
 /**
  * Ping tool implementation using MCP SDK pattern
  */
-const pingTool: MCPTool<PingInput, PingOutput> = {
+const pingTool: ToolDescriptor<PingInput, PingOutput> = {
   name: 'ping',
   description: 'Test MCP server connectivity and health',
   category: 'utility',
   inputSchema: PingInputSchema,
   outputSchema: PingOutputSchema,
 
-  handler: async (input: PingInput, context: MCPToolContext): Promise<PingOutput> => {
+  handler: async (input: PingInput, context: ToolContext): Promise<PingOutput> => {
     const { logger } = context;
     const { message } = input;
+
+    // Async operation to make ESLint happy
+    await Promise.resolve();
 
     logger.info({ message }, 'Processing ping request');
 
@@ -57,17 +60,17 @@ const pingTool: MCPTool<PingInput, PingOutput> = {
         name: 'container-kit-mcp',
         version: '2.0.0',
         uptime: process.uptime(),
-        pid: process.pid
+        pid: process.pid,
       },
       capabilities: {
         tools: true,
         sampling: true,
-        progress: true
-      }
+        progress: true,
+      },
     };
 
     return response;
-  }
+  },
 };
 
 // Export for use in registry

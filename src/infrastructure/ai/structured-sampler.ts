@@ -5,8 +5,8 @@
 
 import type { Logger } from 'pino';
 import { z } from 'zod';
-import type { MCPSampler } from './mcp-sampler';
-import type { AIRequest } from '../ai-request-builder.js';
+import type { SampleFunction } from './sampling';
+import type { AIRequest } from './requests.js';
 
 /**
  * Security issue detected during generation
@@ -61,10 +61,10 @@ export interface StructuredSampleResult<T = any> {
  * Structured Sampler implementation
  */
 export class StructuredSampler {
-  private sampler: MCPSampler;
+  private sampler: SampleFunction;
   private logger: Logger;
 
-  constructor(sampler: MCPSampler, logger: Logger) {
+  constructor(sampler: SampleFunction, logger: Logger) {
     this.sampler = sampler;
     this.logger = logger.child({ component: 'structured-sampler' });
   }
@@ -74,7 +74,7 @@ export class StructuredSampler {
    */
   async generateStructured<T = any>(
     prompt: string,
-    options: StructuredSampleOptions = {}
+    options: StructuredSampleOptions = {},
   ): Promise<StructuredSampleResult<T>> {
     const {
       schema,
@@ -82,7 +82,7 @@ export class StructuredSampler {
       validateSecurity = true,
       maxRetries = 3,
       temperature = 0.3,
-      maxTokens = 2000
+      maxTokens = 2000,
     } = options;
 
     let attempts = 0;
@@ -99,16 +99,17 @@ export class StructuredSampler {
           maxTokens,
           context: {
             format,
-            structured: true
-          }
+            structured: true,
+          },
         };
 
-        // Sample from the AI
-        const response = await this.sampler.sample(request);
+        // Sample from the AI using function directly
+        const response = await this.sampler(request);
 
-        if ('error' in response) {
-          lastError = response.error;
-          this.logger.warn({ attempt: attempts, error: response.error }, 'Sampling failed');
+        if (!response.success) {
+          const failedResponse = response;
+          lastError = failedResponse.error;
+          this.logger.warn({ attempt: attempts, error: failedResponse.error }, 'Sampling failed');
           continue;
         }
 
@@ -123,9 +124,9 @@ export class StructuredSampler {
             this.logger.warn(
               {
                 attempt: attempts,
-                errors: parseResult.error.errors
+                errors: parseResult.error.errors,
               },
-              'Schema validation failed'
+              'Schema validation failed',
             );
             continue;
           }
@@ -144,17 +145,17 @@ export class StructuredSampler {
           metadata: {
             attempts,
             ...(response.model && { model: response.model }),
-            ...(response.tokenCount !== undefined && { tokensUsed: response.tokenCount })
-          }
+            ...(response.tokenCount !== undefined && { tokensUsed: response.tokenCount }),
+          },
         };
       } catch (error) {
         lastError = error instanceof Error ? error.message : 'Unknown error';
         this.logger.warn(
           {
             attempt: attempts,
-            error: lastError
+            error: lastError,
           },
-          'Structured generation error'
+          'Structured generation error',
         );
       }
     }
@@ -162,7 +163,7 @@ export class StructuredSampler {
     return {
       success: false,
       error: lastError ?? 'Max retries exceeded',
-      metadata: { attempts }
+      metadata: { attempts },
     };
   }
 
@@ -251,7 +252,7 @@ export class StructuredSampler {
       /api[_-]?key\s*[:=]\s*["']?[\w-]{20,}/gi,
       /password\s*[:=]\s*["']?[^"'\s]+/gi,
       /token\s*[:=]\s*["']?[\w-]{20,}/gi,
-      /secret\s*[:=]\s*["']?[\w-]{20,}/gi
+      /secret\s*[:=]\s*["']?[\w-]{20,}/gi,
     ];
 
     for (const pattern of credentialPatterns) {
@@ -260,7 +261,7 @@ export class StructuredSampler {
           type: 'credential',
           severity: 'high',
           description: 'Potential credential exposure detected',
-          recommendation: 'Use environment variables or secrets management'
+          recommendation: 'Use environment variables or secrets management',
         });
       }
     }
@@ -269,7 +270,7 @@ export class StructuredSampler {
     const vulnerablePatterns = [
       { pattern: /eval\s*\(/, desc: 'eval() usage detected' },
       { pattern: /exec\s*\(/, desc: 'exec() usage detected' },
-      { pattern: /\$\{.*\}/, desc: 'Template injection risk' }
+      { pattern: /\$\{.*\}/, desc: 'Template injection risk' },
     ];
 
     for (const { pattern, desc } of vulnerablePatterns) {
@@ -279,7 +280,7 @@ export class StructuredSampler {
     }
 
     const result: ValidationResult = {
-      valid: issues.length === 0
+      valid: issues.length === 0,
     };
 
     if (issues.length > 0) {
@@ -298,7 +299,7 @@ export class StructuredSampler {
    */
   async generateDockerfile(
     requirements: string,
-    constraints?: Record<string, any>
+    constraints?: Record<string, any>,
   ): Promise<StructuredSampleResult<string>> {
     const prompt = `Generate a production-ready Dockerfile based on these requirements:
 ${requirements}
@@ -315,7 +316,7 @@ Follow best practices for:
       format: 'text',
       validateSecurity: true,
       temperature: 0.2,
-      maxTokens: 3000
+      maxTokens: 3000,
     });
   }
 
@@ -324,7 +325,7 @@ Follow best practices for:
    */
   async generateKubernetesManifests(
     appDescription: string,
-    options?: Record<string, unknown>
+    options?: Record<string, unknown>,
   ): Promise<StructuredSampleResult<unknown>> {
     const prompt = `Generate Kubernetes manifests for:
 ${appDescription}
@@ -341,7 +342,7 @@ Include:
       format: 'yaml',
       validateSecurity: true,
       temperature: 0.2,
-      maxTokens: 4000
+      maxTokens: 4000,
     });
   }
 
@@ -350,7 +351,7 @@ Include:
    */
   async sampleStructured<T = any>(
     prompt: string,
-    options: StructuredSampleOptions = {}
+    options: StructuredSampleOptions = {},
   ): Promise<StructuredSampleResult<T>> {
     return this.generateStructured<T>(prompt, options);
   }
@@ -360,11 +361,11 @@ Include:
    */
   async sampleJSON<T = any>(
     prompt: string,
-    options: Omit<StructuredSampleOptions, 'format'> = {}
+    options: Omit<StructuredSampleOptions, 'format'> = {},
   ): Promise<StructuredSampleResult<T>> {
     return this.generateStructured<T>(prompt, {
       ...options,
-      format: 'json'
+      format: 'json',
     });
   }
 }

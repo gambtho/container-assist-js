@@ -6,10 +6,10 @@
 import type { Logger } from 'pino';
 import { createDockerService, type DockerServiceConfig } from './docker';
 import { createKubernetesService, type KubernetesConfig } from './kubernetes';
-import { type AIConfig } from './ai';
+import { type AIConfig, AIService, createAIService } from './ai';
 import { createSessionService, SessionService } from './session.js';
 import { EventEmitter } from 'events';
-import type { MCPSampler } from '../application/interfaces.js';
+import type { SampleFunction } from '../infrastructure/ai/index.js';
 
 export interface ServicesConfig {
   docker?: DockerServiceConfig;
@@ -21,7 +21,7 @@ export interface ServicesConfig {
 export interface Services {
   docker: Awaited<ReturnType<typeof createDockerService>>;
   kubernetes: Awaited<ReturnType<typeof createKubernetesService>>;
-  ai: any; // Will be updated when AI service is fixed
+  ai: AIService;
   session: SessionService;
   events: EventEmitter;
 }
@@ -33,7 +33,7 @@ export interface Services {
 export async function initializeServices(
   config: ServicesConfig,
   logger: Logger,
-  sampler?: MCPSampler
+  sampler?: SampleFunction,
 ): Promise<Services> {
   logger.info('Initializing services...');
 
@@ -44,20 +44,20 @@ export async function initializeServices(
   const [docker, kubernetes, session] = await Promise.all([
     createDockerService(config.docker ?? {}, logger),
     createKubernetesService(config.kubernetes ?? {}, logger),
-    createSessionService(config.session ?? {}, logger)
+    createSessionService(config.session ?? {}, logger),
   ]);
 
-  // AI service placeholder - will be updated when fixed
-  const ai = null;
+  // Create AI service
+  const ai = createAIService(config.ai ?? {}, sampler, logger);
 
   logger.info(
     {
       docker: true,
       kubernetes: true,
-      ai: false,
-      session: true
+      ai: ai.isAvailable(),
+      session: true,
     },
-    'Services initialized'
+    'Services initialized',
   );
 
   return {
@@ -65,7 +65,7 @@ export async function initializeServices(
     kubernetes,
     ai,
     session,
-    events
+    events,
   };
 }
 
@@ -79,7 +79,7 @@ export async function cleanupServices(services: Services, logger: Logger): Promi
     await Promise.all([
       services.docker.close(),
       services.kubernetes.close(),
-      services.session.close()
+      services.session.close(),
     ]);
 
     // Clean up event emitters

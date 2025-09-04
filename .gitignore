@@ -30,6 +30,7 @@ build/
 # Test
 coverage/
 .nyc_output/
+WEEK5_PERFORMANCE_*.json
 
 # Temporary
 tmp/

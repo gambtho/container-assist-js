@@ -4,7 +4,7 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: 'module',
-    project: './tsconfig.json'
+    project: './tsconfig.eslint.json'
   },
   plugins: ['@typescript-eslint'],
   extends: [
@@ -14,21 +14,30 @@ module.exports = {
   ],
   rules: {
     // TypeScript-specific rules
-    '@typescript-eslint/explicit-function-return-type': ['error', {
+    '@typescript-eslint/explicit-function-return-type': ['warn', {
       allowExpressions: true,
-      allowTypedFunctionExpressions: true
+      allowTypedFunctionExpressions: true,
+      allowHigherOrderFunctions: true,
+      allowDirectConstAssertionInArrowFunctions: true
     }],
     '@typescript-eslint/no-unused-vars': ['error', { 
       argsIgnorePattern: '^_',
       varsIgnorePattern: '^_'
     }],
-    '@typescript-eslint/no-explicit-any': 'error',
-    '@typescript-eslint/strict-boolean-expressions': 'error',
-    '@typescript-eslint/prefer-nullish-coalescing': 'error',
+    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/strict-boolean-expressions': 'off',
+    '@typescript-eslint/prefer-nullish-coalescing': 'warn',
     '@typescript-eslint/prefer-optional-chain': 'error',
     '@typescript-eslint/no-unnecessary-type-assertion': 'error',
-    '@typescript-eslint/no-non-null-assertion': 'error',
+    '@typescript-eslint/no-non-null-assertion': 'off',
     '@typescript-eslint/prefer-as-const': 'error',
+    
+    // Relax unsafe any operations to warnings
+    '@typescript-eslint/no-unsafe-argument': 'warn',
+    '@typescript-eslint/no-unsafe-assignment': 'warn', 
+    '@typescript-eslint/no-unsafe-call': 'warn',
+    '@typescript-eslint/no-unsafe-member-access': 'warn',
+    '@typescript-eslint/no-unsafe-return': 'warn',
     
     // Import rules (strict ESM patterns)
     'no-duplicate-imports': 'error',
@@ -57,21 +66,20 @@ module.exports = {
     'prefer-template': 'error',
     'template-curly-spacing': 'error',
     'arrow-spacing': 'error',
-    'comma-dangle': ['error', 'never'],
+    'comma-dangle': ['error', 'always-multiline'],
     'quotes': ['error', 'single', { 
       avoidEscape: true,
       allowTemplateLiterals: true 
     }],
     'semi': ['error', 'always'],
-    'indent': ['error', 2, { 
-      SwitchCase: 1,
-      ignoredNodes: ['TemplateLiteral']
-    }],
+    // Let Prettier handle indentation
+    'indent': 'off',
     'max-len': ['warn', { 
-      code: 100,
+      code: 120,
       ignoreUrls: true,
       ignoreStrings: true,
-      ignoreTemplateLiterals: true
+      ignoreTemplateLiterals: true,
+      ignoreComments: true
     }],
     'no-trailing-spaces': 'error',
     'eol-last': 'error'

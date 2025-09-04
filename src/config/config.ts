@@ -25,7 +25,7 @@ const ENV_MAPPINGS = {
   DOCKER_SOCKET: {
     path: 'infrastructure.docker.socketPath',
     type: 'string',
-    default: '/var/run/docker.sock'
+    default: '/var/run/docker.sock',
   },
   DOCKER_REGISTRY: { path: 'infrastructure.docker.registry', type: 'string', default: 'docker.io' },
 
@@ -33,7 +33,7 @@ const ENV_MAPPINGS = {
   K8S_NAMESPACE: {
     path: 'infrastructure.kubernetes.namespace',
     type: 'string',
-    default: 'default'
+    default: 'default',
   },
   KUBECONFIG: { path: 'infrastructure.kubernetes.kubeconfig', type: 'string', default: '' },
 
@@ -41,7 +41,7 @@ const ENV_MAPPINGS = {
   AI_API_KEY: { path: 'aiServices.ai.apiKey', type: 'string', default: '' },
   AI_MODEL: { path: 'aiServices.ai.model', type: 'string', default: 'claude-3-sonnet-20241022' },
   AI_BASE_URL: { path: 'aiServices.ai.baseUrl', type: 'string', default: '' },
-  MOCK_MODE: { path: 'features.mockMode', type: 'boolean', default: false }
+  MOCK_MODE: { path: 'features.mockMode', type: 'boolean', default: false },
 } as const;
 
 // Base configuration with sensible defaults
@@ -50,14 +50,14 @@ const BASE_CONFIG: ApplicationConfig = {
     nodeEnv: 'development' as const,
     logLevel: 'info' as const,
     port: 3000,
-    host: 'localhost'
+    host: 'localhost',
   },
   mcp: {
     storePath: './data/sessions.db',
     sessionTTL: '24h',
     maxSessions: 100,
     enableMetrics: false,
-    enableEvents: true
+    enableEvents: true,
   },
   session: {
     store: 'memory' as const,
@@ -65,12 +65,12 @@ const BASE_CONFIG: ApplicationConfig = {
     maxSessions: 100,
     persistencePath: './data/sessions.db',
     persistenceInterval: 3600, // 1h in seconds
-    cleanupInterval: 3600 // 1h in seconds
+    cleanupInterval: 3600, // 1h in seconds
   },
   workspace: {
     workspaceDir: process.cwd(),
     tempDir: './tmp',
-    cleanupOnExit: true
+    cleanupOnExit: true,
   },
   infrastructure: {
     docker: {
@@ -79,14 +79,14 @@ const BASE_CONFIG: ApplicationConfig = {
       host: 'localhost',
       port: 2376,
       timeout: 300000,
-      apiVersion: '1.41'
+      apiVersion: '1.41',
     },
     kubernetes: {
       kubeconfig: '',
       namespace: 'default',
       context: '',
       timeout: 300000,
-      dryRun: false
+      dryRun: false,
     },
     scanning: {
       enabled: true,
@@ -94,7 +94,7 @@ const BASE_CONFIG: ApplicationConfig = {
       severityThreshold: 'high' as const,
       failOnVulnerabilities: false,
       skipUpdate: false,
-      timeout: 300000
+      timeout: 300000,
     },
     build: {
       enableCache: true,
@@ -103,15 +103,15 @@ const BASE_CONFIG: ApplicationConfig = {
       buildArgs: {},
       labels: {},
       target: '',
-      squash: false
+      squash: false,
     },
     java: {
       defaultVersion: '17',
       defaultJvmHeapPercentage: 75,
       enableNativeImage: false,
       enableJmx: false,
-      enableProfiling: false
-    }
+      enableProfiling: false,
+    },
   },
   aiServices: {
     ai: {
@@ -122,14 +122,14 @@ const BASE_CONFIG: ApplicationConfig = {
       retryAttempts: 3,
       retryDelayMs: 1000,
       temperature: 0.1,
-      maxTokens: 4096
+      maxTokens: 4096,
     },
     sampler: {
       mode: 'auto' as const,
       templateDir: './templates',
       cacheEnabled: true,
       retryAttempts: 3,
-      retryDelayMs: 1000
+      retryDelayMs: 1000,
     },
     mock: {
       enabled: false,
@@ -139,9 +139,9 @@ const BASE_CONFIG: ApplicationConfig = {
       errorRate: 0,
       latencyRange: {
         min: 100,
-        max: 500
-      }
-    }
+        max: 500,
+      },
+    },
   },
   logging: {
     level: 'info' as const,
@@ -150,7 +150,7 @@ const BASE_CONFIG: ApplicationConfig = {
     filePath: './logs/app.log',
     maxFileSize: '10MB',
     maxFiles: 5,
-    enableColors: true
+    enableColors: true,
   },
   workflow: {
     mode: 'interactive' as const,
@@ -158,7 +158,7 @@ const BASE_CONFIG: ApplicationConfig = {
     maxRetries: 3,
     retryDelayMs: 5000,
     parallelSteps: false,
-    skipOptionalSteps: false
+    skipOptionalSteps: false,
   },
   features: {
     aiEnabled: true,
@@ -168,19 +168,20 @@ const BASE_CONFIG: ApplicationConfig = {
     enablePerformanceMonitoring: false,
     enableDebugLogs: false,
     enableTracing: false,
-    nonInteractive: false
-  }
+    nonInteractive: false,
+  },
 };
 
 // Simple value parsing without over-engineering
-function parseValue(value: string, type: string): any {
+function parseValue(value: string, type: string): unknown {
   switch (type) {
     case 'string':
       return value;
-    case 'number':
+    case 'number': {
       const num = Number(value);
       if (isNaN(num)) throw new Error(`Invalid number: ${value}`);
       return num;
+    }
     case 'boolean':
       return value.toLowerCase() === 'true';
     default:
@@ -191,12 +192,12 @@ function parseValue(value: string, type: string): any {
 // Simple nested object path setting
 function setPath(obj: unknown, path: string, value: unknown): void {
   const keys = path.split('.');
-  let current = obj;
+  let current = obj as Record<string, any>;
 
   for (let i = 0; i < keys.length - 1; i++) {
     const key = keys[i]!;
     if (!(key in current)) current[key] = {};
-    current = current[key];
+    current = current[key] as Record<string, any>;
   }
 
   current[keys[keys.length - 1]!] = value;
@@ -217,7 +218,9 @@ export function createConfiguration(): ApplicationConfig {
         const parsedValue = parseValue(value, mapping.type);
         setPath(config, mapping.path, parsedValue);
       } catch (error) {
-        console.warn(`Invalid ${envVar}: ${error instanceof Error ? error.message : error}`);
+        console.warn(
+          `Invalid ${envVar}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   }
@@ -229,7 +232,7 @@ export function createConfiguration(): ApplicationConfig {
  * Create configuration for specific environment
  */
 export function createConfigurationForEnv(
-  env: 'development' | 'production' | 'test'
+  env: 'development' | 'production' | 'test',
 ): ApplicationConfig {
   const config = createConfiguration();
   config.server.nodeEnv = env;
@@ -289,6 +292,6 @@ export function getConfigurationSummary(config: ApplicationConfig): Record<strin
     mockMode: config.features.mockMode,
     aiEnabled: config.features.aiEnabled,
     maxSessions: config.session.maxSessions,
-    dockerRegistry: config.infrastructure.docker.registry
+    dockerRegistry: config.infrastructure.docker.registry,
   };
 }

@@ -3,8 +3,9 @@
  */
 
 import { z } from 'zod';
+import { promises as fs } from 'node:fs';
 import { ErrorCode, DomainError } from '../../contracts/types/index.js';
-import type { MCPToolContext } from './tool-types';
+import type { ToolContext } from './tool-types';
 import type { Logger } from 'pino';
 
 /**
@@ -13,7 +14,7 @@ import type { Logger } from 'pino';
 export function validateInput<T>(input: unknown, schema: z.ZodType<T>): T {
   const result = schema.safeParse(input);
 
-  if (result.success && result.success.length > 0) {
+  if (result.success) {
     return result.data;
   }
 
@@ -37,8 +38,8 @@ export async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): 
   return Promise.race([
     operation,
     new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs)
-    )
+      setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs),
+    ),
   ]);
 }
 
@@ -46,11 +47,14 @@ export async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): 
  * Handle errors consistently
  */
 export function handleError(error: unknown, context?: string): never {
-  const message = context
-    ? `${context}: ${error?.message ?? String(error)}`
-    : (error?.message ?? String(error));
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const message = context ? `${context}: ${errorMessage}` : errorMessage;
 
-  throw new DomainError(ErrorCode.OPERATION_FAILED, message, error);
+  throw new DomainError(
+    ErrorCode.OPERATION_FAILED,
+    message,
+    error instanceof Error ? error : undefined,
+  );
 }
 
 /**
@@ -64,22 +68,26 @@ export function logAction(logger: Logger, action: string, metadata?: Record<stri
  * Emit progress updates
  */
 export async function emitProgress(
-  context: MCPToolContext,
+  context: ToolContext,
   data: {
     step: string;
     status: string;
     progress: number;
     message: string;
     metadata?: unknown;
-  }
+  },
 ): Promise<void> {
   if (context.progressEmitter) {
-    await context.progressEmitter.emit({
+    const update: any = {
       ...data,
       status: data.status as 'starting' | 'in_progress' | 'completed' | 'failed',
       sessionId: context.sessionId ?? 'system',
-      timestamp: new Date().toISOString()
-    });
+      timestamp: new Date().toISOString(),
+    };
+    if (data.metadata !== undefined) {
+      update.metadata = data.metadata as Record<string, unknown>;
+    }
+    await context.progressEmitter.emit(update);
   }
 }
 
@@ -87,20 +95,28 @@ export async function emitProgress(
  * Create a simple tool handler from a function
  * This replaces the class-based approach with a functional one
  */
-export function createMCPToolDescriptor<TInput, TOutput>(config: {
+export function createToolDescriptor<TInput, TOutput>(config: {
   name: string;
   description: string;
   inputSchema: z.ZodType<TInput>;
-  execute: (input: TInput, context: MCPToolContext) => Promise<TOutput>;
-}) {
+  outputSchema: z.ZodType<TOutput>;
+  execute: (input: TInput, context: ToolContext) => Promise<TOutput>;
+}): {
+  name: string;
+  description: string;
+  category: 'utility';
+  inputSchema: z.ZodType<TInput>;
+  outputSchema: z.ZodType<TOutput>;
+  handler: (rawInput: unknown, context: ToolContext) => Promise<TOutput>;
+} {
   return {
     name: config.name,
     description: config.description,
     category: 'utility' as const,
     inputSchema: config.inputSchema,
-    outputSchema: z.unknown() as z.ZodType<TOutput>,
+    outputSchema: config.outputSchema,
 
-    async handler(rawInput: unknown, context: MCPToolContext): Promise<TOutput> {
+    async handler(rawInput: unknown, context: ToolContext): Promise<TOutput> {
       const logger = context.logger.child({ tool: config.name });
 
       try {
@@ -119,7 +135,7 @@ export function createMCPToolDescriptor<TInput, TOutput>(config: {
         logger.error({ error }, `${config.name} failed`);
         handleError(error, `Tool ${config.name} execution failed`);
       }
-    }
+    },
   };
 }
 
@@ -133,7 +149,7 @@ export async function retryOperation<T>(
     delayMs?: number;
     backoffMultiplier?: number;
     logger?: Logger;
-  } = {}
+  } = {},
 ): Promise<T> {
   const { maxAttempts = 3, delayMs = 1000, backoffMultiplier = 2, logger } = options;
 
@@ -155,9 +171,9 @@ export async function retryOperation<T>(
               attempt,
               maxAttempts,
               delay,
-              error: lastError
+              error: lastError,
             },
-            'Operation failed, retrying...'
+            'Operation failed, retrying...',
           );
         }
 
@@ -169,17 +185,14 @@ export async function retryOperation<T>(
   throw new DomainError(
     ErrorCode.OPERATION_FAILED,
     `Operation failed after ${maxAttempts} attempts`,
-    lastError
+    lastError instanceof Error ? lastError : undefined,
   );
 }
 
 /**
  * Helper to get session from context
  */
-export async function getSessionFromContext(
-  context: MCPToolContext,
-  sessionId: string
-): Promise<any> {
+export async function getSessionFromContext(context: ToolContext, sessionId: string): Promise<any> {
   if (!context.sessionService) {
     throw new Error('Session service not available');
   }

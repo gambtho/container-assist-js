@@ -26,7 +26,7 @@ export type {
   LogLevel,
   WorkflowMode,
   StoreType,
-  SamplerMode
+  SamplerMode,
 } from './types';
 
 // Export configuration functions
@@ -34,12 +34,16 @@ export {
   createConfiguration,
   createConfigurationForEnv,
   validateConfiguration,
-  getConfigurationSummary
-} from './config';
+  getConfigurationSummary,
+} from './config.js';
 
 // Import configuration
-import { createConfiguration, createConfigurationForEnv, getConfigurationSummary } from './config';
-import type { ApplicationConfig } from './types';
+import {
+  createConfiguration,
+  createConfigurationForEnv,
+  getConfigurationSummary,
+} from './config.js';
+import type { ApplicationConfig } from './types.js';
 
 /**
  * Lazy-loaded configuration instance
@@ -74,7 +78,7 @@ export const config = new Proxy({} as ApplicationConfig, {
   set(_target, prop, value) {
     getConfig()[prop as keyof ApplicationConfig] = value;
     return true;
-  }
+  },
 });
 
 /**
@@ -85,12 +89,12 @@ export const createConfig = createConfiguration;
 /**
  * Create configuration for testing
  */
-export const createTestConfig = () => createConfigurationForEnv('test');
+export const createTestConfig = (): ApplicationConfig => createConfigurationForEnv('test');
 
 /**
  * Create minimal configuration
  */
-export const createMinimalConfig = () => createConfigurationForEnv('test');
+export const createMinimalConfig = (): ApplicationConfig => createConfigurationForEnv('test');
 
 /**
  * Get configuration summary
@@ -132,7 +136,7 @@ export const ConfigHelpers = {
    * Check if AI services are available
    */
   hasAI: (config: ApplicationConfig) =>
-    config.features.aiEnabled && (!!config.aiServices.ai.apiKey ?? config.features.mockMode),
+    config.features.aiEnabled && (config.aiServices.ai.apiKey != null ?? config.features.mockMode),
 
   /**
    * Parse TTL string to milliseconds
@@ -141,7 +145,8 @@ export const ConfigHelpers = {
     const match = ttl.match(/^(\d+)(h|m|s)$/);
     if (!match) throw new Error(`Invalid TTL format: ${ttl}`);
     const [, value, unit] = match;
-    const num = parseInt(value!, 10);
+    if (!value) throw new Error(`Invalid TTL format: ${ttl}`);
+    const num = parseInt(value, 10);
     return unit === 'h' ? num * 3600000 : unit === 'm' ? num * 60000 : num * 1000;
-  }
+  },
 };

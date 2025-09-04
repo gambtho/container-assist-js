@@ -8,7 +8,8 @@ import type { Logger } from 'pino';
 import { SessionStore, SessionFilter } from '../../contracts/types/session-store.js';
 import { SessionUtils } from './utils';
 import { EventEmitter } from 'events';
-import path from 'path';
+import * as path from 'node:path';
+import { promises as fs } from 'node:fs';
 
 // Time constants (in seconds)
 const DEFAULT_SESSION_TTL = 86400; // 24 hours
@@ -27,7 +28,7 @@ function validateSessionConfig(config?: SessionServiceConfig): Required<SessionS
     defaultTTL: config?.defaultTTL ?? DEFAULT_SESSION_TTL,
     maxActiveSessions: config?.maxActiveSessions ?? DEFAULT_MAX_SESSIONS,
     persistencePath: config?.persistencePath ?? '',
-    persistenceInterval: config?.persistenceInterval ?? DEFAULT_PERSISTENCE_INTERVAL
+    persistenceInterval: config?.persistenceInterval ?? DEFAULT_PERSISTENCE_INTERVAL,
   };
 
   // Validate ranges
@@ -95,8 +96,8 @@ export class SessionService extends EventEmitter {
     // Optional persistence to JSON for development/recovery
     if (this.config.persistencePath != null) {
       this.startPersistence();
-      this.loadPersistedSessions().catch((err) =>
-        this.logger.warn({ error: err }, 'Failed to load persisted sessions')
+      void this.loadPersistedSessions().catch((err: unknown) =>
+        this.logger.warn({ error: err }, 'Failed to load persisted sessions'),
       );
     }
 
@@ -104,33 +105,31 @@ export class SessionService extends EventEmitter {
       {
         maxActiveSessions: this.config.maxActiveSessions,
         defaultTTL: this.config.defaultTTL,
-        persistence: !!this.config.persistencePath
+        persistence: !!this.config.persistencePath,
       },
-      'Session service initialized'
+      'Session service initialized',
     );
   }
 
   private startPersistence(): void {
     if (!this.config.persistencePath) return;
 
-    this.persistenceTimer = setInterval(async () => {
-      try {
-        await this.persistSessions();
-      } catch (error) {
-        this.logger.error({ error }); // Fixed logger call
-      }
+    this.persistenceTimer = setInterval(() => {
+      void this.persistSessions().catch((error: unknown) => {
+        this.logger.error({ error }, 'Failed to persist sessions');
+      });
     }, this.config.persistenceInterval * MILLISECONDS_PER_SECOND);
 
-    // Don't keep process alive just for persistence'
-    if (this.persistenceTimer.unref) {
+    // Don't keep process alive just for persistence
+    if (this.persistenceTimer?.unref != null) {
       this.persistenceTimer.unref();
     }
 
     // Also persist on process signals
     const persistOnExit = (): void => {
-      this.persistSessions()
+      void this.persistSessions()
         .then(() => this.logger.info('Sessions persisted on exit'))
-        .catch((err) => this.logger.error({ error: err })); // Fixed logger call
+        .catch((err: unknown) => this.logger.error({ error: err }, 'Failed to persist on exit'));
     };
 
     process.once('SIGTERM', persistOnExit);
@@ -145,7 +144,7 @@ export class SessionService extends EventEmitter {
       version: '1.0.0',
       persisted_at: new Date().toISOString(),
       session_count: sessions.length,
-      sessions
+      sessions,
     };
 
     const dir = path.dirname(this.config.persistencePath);
@@ -156,7 +155,10 @@ export class SessionService extends EventEmitter {
     await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8');
     await fs.rename(tempPath, this.config.persistencePath);
 
-    this.logger.debug({ count: sessions.length, path: this.config.persistencePath }); // Fixed logger call
+    this.logger.debug(
+      { count: sessions.length, path: this.config.persistencePath },
+      'Sessions persisted',
+    );
   }
 
   private async loadPersistedSessions(): Promise<void> {
@@ -164,11 +166,18 @@ export class SessionService extends EventEmitter {
 
     try {
       const data = await fs.readFile(this.config.persistencePath, 'utf-8');
-      const parsed = JSON.parse(data);
+      const parsed = JSON.parse(data) as unknown;
 
-      if (parsed.sessions && Array.isArray(parsed.sessions)) {
+      if (
+        parsed != null &&
+        typeof parsed === 'object' &&
+        'sessions' in parsed &&
+        Array.isArray(parsed.sessions)
+      ) {
         // Only load non-expired sessions
-        const validSessions = parsed.sessions.filter((s: Session) => !SessionUtils.isExpired(s));
+        const validSessions = parsed.sessions.filter((s: unknown) => {
+          return typeof s === 'object' && s != null && !SessionUtils.isExpired(s as Session);
+        }) as Session[];
 
         if (validSessions.length > 0) {
           await this.store.createBatch(validSessions);
@@ -178,14 +187,18 @@ export class SessionService extends EventEmitter {
           {
             loaded: validSessions.length,
             total: parsed.sessions.length,
-            expired: parsed.sessions.length - validSessions.length
+            expired: parsed.sessions.length - validSessions.length,
           },
-          'Loaded persisted sessions'
+          'Loaded persisted sessions',
         );
       }
     } catch (error: unknown) {
-      if (error.code !== 'ENOENT') {
-        this.logger.error({ error: error.message ?? error }); // Fixed logger call
+      const err = error as Error & { code?: string };
+      if (err.code !== 'ENOENT') {
+        this.logger.error(
+          { error: err.message ?? String(err) },
+          'Failed to load persisted sessions',
+        );
         throw error;
       }
       // File doesn't exist yet, that's ok
@@ -197,7 +210,10 @@ export class SessionService extends EventEmitter {
    * Create a new session (simplified interface for handlers)
    */
   async create(data: { projectName?: string; metadata?: unknown }): Promise<Session> {
-    return this.createSession('', data);
+    return this.createSession('', {
+      ...data,
+      metadata: data.metadata as Record<string, unknown> | undefined,
+    });
   }
 
   /**
@@ -247,7 +263,7 @@ export class SessionService extends EventEmitter {
     if (activeCount >= this.config.maxActiveSessions) {
       throw new ServiceError(
         ErrorCode.ResourceLimitExceeded,
-        `Maximum active sessions (${this.config.maxActiveSessions}) reached`
+        `Maximum active sessions (${this.config.maxActiveSessions}) reached`,
       );
     }
 
@@ -255,12 +271,12 @@ export class SessionService extends EventEmitter {
       ...data,
       expires_at:
         data?.expires_at ??
-        new Date(Date.now() + this.config.defaultTTL * MILLISECONDS_PER_SECOND).toISOString()
+        new Date(Date.now() + this.config.defaultTTL * MILLISECONDS_PER_SECOND).toISOString(),
     });
 
     await this.store.create(session);
 
-    this.logger.info({ sessionId: session.id, repoPath }); // Fixed logger call
+    this.logger.info({ sessionId: session.id, repoPath }, 'Session created');
     this.emit('session:created', session);
 
     return session;
@@ -288,7 +304,7 @@ export class SessionService extends EventEmitter {
       ...updates,
       id: current.id, // Prevent ID changes
       created_at: current.created_at, // Preserve creation time
-      version: current.version // Will be incremented by store
+      version: current.version, // Will be incremented by store
     }));
 
     const updated = await this.store.get(id);
@@ -308,7 +324,7 @@ export class SessionService extends EventEmitter {
   async updateWorkflowState(id: string, stateUpdate: Partial<WorkflowState>): Promise<Session> {
     await this.store.updateAtomic(id, (current) => ({
       ...current,
-      workflow_state: SessionUtils.mergeWorkflowState(current.workflow_state ?? {}, stateUpdate)
+      workflow_state: SessionUtils.mergeWorkflowState(current.workflow_state ?? {}, stateUpdate),
     }));
 
     const updated = await this.store.get(id);
@@ -320,9 +336,9 @@ export class SessionService extends EventEmitter {
       {
         sessionId: id,
         stage: updated.stage,
-        progress: updated.progress?.percentage
+        progress: updated.progress?.percentage,
       },
-      'Workflow state updated'
+      'Workflow state updated',
     );
 
     this.emit('workflow:updated', { session: updated, update: stateUpdate });
@@ -341,7 +357,10 @@ export class SessionService extends EventEmitter {
       throw new Error(`Failed to retrieve updated session ${id}`);
     }
 
-    this.logger.info({ sessionId: id, step, progress: updated.progress?.percentage }); // Fixed logger call
+    this.logger.info(
+      { sessionId: id, step, progress: updated.progress?.percentage },
+      'Step completed',
+    );
 
     return updated;
   }
@@ -386,8 +405,8 @@ export class SessionService extends EventEmitter {
     return this.updateSession(id, {
       status: success ? 'completed' : 'failed',
       expires_at: new Date(
-        Date.now() + COMPLETED_SESSION_RETENTION * MILLISECONDS_PER_SECOND
-      ).toISOString()
+        Date.now() + COMPLETED_SESSION_RETENTION * MILLISECONDS_PER_SECOND,
+      ).toISOString(),
     });
   }
 
@@ -396,15 +415,14 @@ export class SessionService extends EventEmitter {
    */
   async extendSession(id: string, additionalSeconds: number): Promise<Session> {
     await this.store.updateAtomic(id, (current) => {
-      const currentExpiry = current.expires_at
-        ? new Date(current.expires_at).getTime()
-        : Date.now();
+      const currentExpiry =
+        current.expires_at != null ? new Date(current.expires_at).getTime() : Date.now();
 
       return {
         ...current,
         expires_at: new Date(
-          currentExpiry + additionalSeconds * MILLISECONDS_PER_SECOND
-        ).toISOString()
+          currentExpiry + additionalSeconds * MILLISECONDS_PER_SECOND,
+        ).toISOString(),
       };
     });
 
@@ -464,7 +482,7 @@ export class SessionService extends EventEmitter {
         this.store.getByStatus('pending'),
         this.store.getByStatus('analyzing'),
         this.store.getByStatus('building'),
-        this.store.getByStatus('deploying')
+        this.store.getByStatus('deploying'),
       ]);
 
     return {
@@ -484,7 +502,7 @@ export class SessionService extends EventEmitter {
       pending: pending.length,
       analyzing: analyzing.length,
       building: building.length,
-      deploying: deploying.length
+      deploying: deploying.length,
     };
   }
 

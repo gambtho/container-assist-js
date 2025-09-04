@@ -60,7 +60,10 @@ describe('Week 5: Comprehensive Integration Testing', () => {
         SessionStore: { get: jest.fn(), set: jest.fn(), delete: jest.fn() },
         DockerBuildOptions: { validate: jest.fn() },
         DockerScanResult: { parse: jest.fn() },
-        Result: { ok: jest.fn(), fail: jest.fn() },
+        Result: { 
+          ok: jest.fn().mockReturnValue({ success: true, data: 'test' }), 
+          fail: jest.fn().mockReturnValue({ success: false, error: 'test' }) 
+        },
         DomainError: jest.fn(),
         InfrastructureError: jest.fn(),
         ServiceError: jest.fn()
@@ -90,9 +93,15 @@ describe('Week 5: Comprehensive Integration Testing', () => {
       },
       services: {
         sessionManager: {
-          createSession: jest.fn().mockResolvedValue({ id: 'test-session', status: 'active' }),
-          getSession: jest.fn().mockResolvedValue({ id: 'test-session', status: 'active' }),
-          updateSession: jest.fn().mockResolvedValue({ id: 'test-session', status: 'updated' }),
+          createSession: jest.fn().mockImplementation((args) => 
+            Promise.resolve({ id: args?.sessionId || 'test-session', status: 'active' })
+          ),
+          getSession: jest.fn().mockImplementation((sessionId) => 
+            Promise.resolve({ id: sessionId, status: 'active' })
+          ),
+          updateSession: jest.fn().mockImplementation((sessionId) => 
+            Promise.resolve({ id: sessionId, status: 'updated' })
+          ),
           deleteSession: jest.fn().mockResolvedValue({ success: true })
         },
         workflowManager: {
@@ -268,10 +277,10 @@ describe('Week 5: Comprehensive Integration Testing', () => {
       
       // 4. Execute workflow steps using consolidated architecture
       const steps = [
-        { name: 'analyze-repository', args: { sessionId } },
-        { name: 'generate-dockerfile', args: { sessionId } },
-        { name: 'build-image', args: { sessionId, tag: 'e2e-test:latest' } },
-        { name: 'scan-image', args: { sessionId, image: 'e2e-test:latest' } }
+        { name: 'analyze-repository', args: { sessionId: session.id } },
+        { name: 'generate-dockerfile', args: { sessionId: session.id } },
+        { name: 'build-image', args: { sessionId: session.id, tag: 'e2e-test:latest' } },
+        { name: 'scan-image', args: { sessionId: session.id, image: 'e2e-test:latest' } }
       ];
       
       for (const step of steps) {
@@ -284,8 +293,8 @@ describe('Week 5: Comprehensive Integration Testing', () => {
       expect(completion.success).toBe(true);
       
       // 6. Verify final state
-      const finalSession = await components.services.sessionManager.getSession(sessionId);
-      expect(finalSession.id).toBe(sessionId);
+      const finalSession = await components.services.sessionManager.getSession(session.id);
+      expect(finalSession.id).toBe(session.id);
       
       const duration = performance.now() - startTime;
       performanceBaseline.set('e2e-workflow', duration);

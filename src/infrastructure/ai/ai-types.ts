@@ -3,10 +3,7 @@
  * Core types for AI/ML functionality
  */
 
-import type { MCPSampler } from './mcp-sampler';
-
-// Re-export MCPSampler for backward compatibility
-export type { MCPSampler, MCPSampleResponse, MCPSampleError } from './mcp-sampler';
+import type { SampleFunction } from './sampling';
 
 /**
  * Anthropic-like client interface for AI operations
@@ -60,7 +57,7 @@ export interface AIClientResponse {
  * AI Service Configuration
  */
 export interface AIServiceConfig {
-  sampler?: MCPSampler;
+  sampler?: SampleFunction;
   model?: string;
   temperature?: number;
   maxTokens?: number;

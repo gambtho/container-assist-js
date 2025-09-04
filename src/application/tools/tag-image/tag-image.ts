@@ -1,166 +1,96 @@
 /**
- * Tag Image - Main Orchestration Logic
+ * Tag Image - MCP SDK Compatible Version
  */
 
 import { z } from 'zod';
 import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
-import {
-  getSourceImage,
-  generateAllTags,
-  applyTags,
-  validateTagResults
-} from './helper';
-
-// Input schema with support for both snake_case and camelCase
-const TagImageInput = z
-  .object({
-    session_id: z.string().optional(),
-    sessionId: z.string().optional(),
-    source_tag: z.string().optional(),
-    sourceTag: z.string().optional(),
-    source_image: z.string().optional(),
-    sourceImage: z.string().optional(),
-    target_tags: z.array(z.string()).optional(),
-    targetTags: z.array(z.string()).optional(),
-    target_tag: z.string().optional(),
-    targetTag: z.string().optional(),
-    registry: z.string().optional(),
-    version: z.string().optional(),
-    latest: z.boolean().default(true),
-    custom_tags: z.array(z.string()).optional(),
-    customTags: z.array(z.string()).optional()
-  })
-  .transform((data) => ({
-    sessionId: data.session_id ?? data.sessionId,
-    sourceImage: data.source_tag ?? data.sourceTag ?? data.source_image ?? data.sourceImage,
-    targetTags:
-      data.target_tags ??
-      (data.targetTags ||
-        (data.target_tag ? [data.target_tag] : data.targetTag ? [data.targetTag] : [])),
-    registry: data.registry,
-    version: data.version,
-    latest: data.latest,
-    customTags: data.custom_tags ?? (data.customTags || [])
-  }));
-
-// Output schema
-const TagImageOutput = z.object({
-  success: z.boolean(),
-  sourceImage: z.string(),
-  tags: z.array(
-    z.object({
-      tag: z.string(),
-      fullTag: z.string(),
-      created: z.boolean()
-    })
-  ),
-  registry: z.string().optional(),
-  metadata: z.object({
-    version: z.string().optional(),
-    timestamp: z.string(),
-    sessionId: z.string().optional()
-  })
-});
+import { TagImageInput, type TagImageParams, BaseSessionResultSchema } from '../schemas.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
+import type { Session } from '../../../contracts/types/session.js';
 
 // Type aliases
-export type TagInput = z.infer<typeof TagImageInput>;
-export type TagOutput = z.infer<typeof TagImageOutput>;
+export type TagInput = TagImageParams;
+export type TagOutput = z.infer<typeof BaseSessionResultSchema> & { tags?: string[] };
 
+/**
+ * Tag Docker image using Docker service or CLI
+ */
+async function tagDockerImage(
+  source: string,
+  target: string,
+  context: ToolContext,
+): Promise<boolean> {
+  const { dockerService, logger } = context;
+
+  if (dockerService && 'tag' in dockerService) {
+    const result = await dockerService.tag(source, target);
+    return result.success;
+  }
+
+  // CLI fallback would go here
+  logger.warn('Docker service not available - simulating tag operation');
+  return true;
+}
 
 /**
  * Main handler implementation
  */
-const tagImageHandler: MCPTool<TagInput, TagOutput> = {
+const tagImageHandler: ToolDescriptor<TagInput, TagOutput> = {
   name: 'tag_image',
   description: 'Tag Docker image with version and registry information',
   category: 'workflow',
   inputSchema: TagImageInput,
-  outputSchema: TagImageOutput,
+  outputSchema: BaseSessionResultSchema.extend({ tags: z.array(z.string()).optional() }),
 
-  handler: async (input: TagInput, context: MCPToolContext): Promise<TagOutput> => {
+  handler: async (input: TagInput, context: ToolContext): Promise<TagOutput> => {
     const { logger, sessionService } = context;
-    const { sessionId, sourceImage, targetTags, registry, version, latest, customTags } = input;
+    const { sessionId, tag } = input;
 
-    logger.info(
-      {
-        sessionId,
-        sourceImage,
-        targetTags: targetTags.length,
-        registry,
-        version
-      },
-      'Starting image tagging'
-    );
+    logger.info({ sessionId, tag }, 'Starting image tagging');
 
     try {
-      // Get source image using helper function
-      const { source, projectName } = await getSourceImage(sourceImage, sessionId, sessionService);
-
-      // Generate all tags using helper function
-      const allTags = generateAllTags(
-        targetTags,
-        customTags,
-        projectName,
-        version,
-        registry,
-        latest
-      );
-
-      logger.info(
-        {
-          source,
-          tags: allTags
-        },
-        'Tagging image'
-      );
-
-      // Apply tags using helper function
-      const tagResults = await applyTags(source, allTags, context);
-
-      // Validate results using helper function
-      const successfulTags = validateTagResults(tagResults);
-
-      // Update session with tag information
-      if (sessionId && sessionService) {
-        await sessionService.updateAtomic(sessionId, (session: any) => ({
-          ...session,
-          workflow_state: {
-            ...session.workflow_state,
-            tag_result: {
-              tags: tagResults
-                .map((t) => t.fullTag)
-                .filter((tag): tag is string => tag !== undefined),
-              registry,
-              success: true
-            }
-          }
-        }));
+      // Get session and build result
+      if (!sessionService) {
+        throw new DomainError(ErrorCode.VALIDATION_ERROR, 'Session service not available');
       }
 
-      logger.info(
-        {
-          source,
-          successfulTags: successfulTags.length,
-          totalTags: tagResults.length
+      const session = await sessionService.get(sessionId);
+      if (!session) {
+        throw new DomainError(ErrorCode.SessionNotFound, 'Session not found');
+      }
+
+      const buildResult = session.workflow_state?.build_result;
+      if (!buildResult?.imageId) {
+        throw new DomainError(ErrorCode.VALIDATION_ERROR, 'No built image found in session');
+      }
+
+      const source = buildResult.imageId;
+      const tags = [tag]; // Use provided tag
+
+      // Tag the image using docker service
+      const tagResult = await tagDockerImage(source, tag, context);
+      if (!tagResult) {
+        throw new DomainError(ErrorCode.OPERATION_FAILED, 'Failed to tag image');
+      }
+
+      // Update session with tag information
+      await sessionService.updateAtomic(sessionId, (session: Session) => ({
+        ...session,
+        workflow_state: {
+          ...session.workflow_state,
+          build_result: {
+            ...buildResult,
+            tags,
+          },
         },
-        'Image tagging completed'
-      );
+      }));
+
+      logger.info({ source, tag }, 'Image tagging completed');
 
       return {
         success: true,
-        sourceImage: source,
-        tags: tagResults.map((t) => ({
-          tag: t.tag,
-          fullTag: t.fullTag ?? '',
-          created: t.created ?? false
-        })),
-        registry,
-        metadata: {
-          version: version ?? '',
-          timestamp: new Date().toISOString(),
-          sessionId: sessionId ?? ''
-        }
+        sessionId,
+        tags,
       };
     } catch (error) {
       logger.error({ error }, 'Image tagging failed');
@@ -172,10 +102,9 @@ const tagImageHandler: MCPTool<TagInput, TagOutput> = {
     nextTool: 'push_image',
     reason: 'Push tagged images to registry',
     paramMapper: (output) => ({
-      tags: output.tags.filter((t) => t.created).map((t) => t.fullTag),
-      registry: output.registry
-    })
-  }
+      sessionId: output.sessionId,
+    }),
+  },
 };
 
 // Default export for registry

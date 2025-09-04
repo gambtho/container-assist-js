@@ -101,7 +101,6 @@ export class TestMCPServer {
       { name: 'verify_deployment', category: 'workflow' },
       { name: 'start_workflow', category: 'orchestration' },
       { name: 'workflow_status', category: 'orchestration' },
-      { name: 'list_tools', category: 'utility' },
       { name: 'ping', category: 'utility' },
       { name: 'server_status', category: 'utility' }
     ];

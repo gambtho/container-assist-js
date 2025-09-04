@@ -57,20 +57,20 @@ export class CircuitBreaker {
 
   constructor(
     private options: CircuitBreakerOptions = {},
-    private logger?: Logger
+    private logger?: Logger,
   ) {
     this.options = {
       failureThreshold: 5,
       successThreshold: 3,
       timeout: 60000, // 1 minute
       monitoringWindow: 300000, // 5 minutes
-      ...options
+      ...options,
     };
   }
 
   async execute<T>(operation: () => Promise<T>): Promise<T> {
     if (this.state === 'open') {
-      if (Date.now() - this.lastFailureTime < this.options.timeout!) {
+      if (Date.now() - this.lastFailureTime < (this.options.timeout ?? 60000)) {
         throw new Error('Circuit breaker is open');
       } else {
         this.state = 'half-open';
@@ -93,7 +93,7 @@ export class CircuitBreaker {
     this.lastSuccessTime = Date.now();
 
     if (this.state === 'half-open') {
-      if (this.successes >= this.options.successThreshold!) {
+      if (this.successes >= (this.options.successThreshold ?? 3)) {
         this.state = 'closed';
         this.failures = 0;
         this.successes = 0;
@@ -101,7 +101,7 @@ export class CircuitBreaker {
       }
     } else if (this.state === 'closed') {
       // Reset failure count after successful operations
-      if (Date.now() - this.lastFailureTime > this.options.monitoringWindow!) {
+      if (Date.now() - this.lastFailureTime > (this.options.monitoringWindow ?? 300000)) {
         this.failures = 0;
       }
     }
@@ -112,15 +112,15 @@ export class CircuitBreaker {
     this.lastFailureTime = Date.now();
 
     if (this.state === 'closed' || this.state === 'half-open') {
-      if (this.failures >= this.options.failureThreshold!) {
+      if (this.failures >= (this.options.failureThreshold ?? 5)) {
         this.state = 'open';
         this.successes = 0;
         this.logger?.warn(
           {
             failures: this.failures,
-            threshold: this.options.failureThreshold
+            threshold: this.options.failureThreshold,
           },
-          'Circuit breaker opened due to failures'
+          'Circuit breaker opened due to failures',
         );
       }
     }
@@ -130,13 +130,19 @@ export class CircuitBreaker {
     return this.state;
   }
 
-  getMetrics() {
+  getMetrics(): {
+    state: CircuitBreakerState;
+    failures: number;
+    successes: number;
+    lastFailureTime: number;
+    lastSuccessTime: number;
+  } {
     return {
       state: this.state,
       failures: this.failures,
       successes: this.successes,
       lastFailureTime: this.lastFailureTime,
-      lastSuccessTime: this.lastSuccessTime
+      lastSuccessTime: this.lastSuccessTime,
     };
   }
 
@@ -156,7 +162,7 @@ export class CircuitBreaker {
 export async function withRetry<T>(
   operation: () => Promise<T>,
   options: RetryOptions = {},
-  logger?: Logger
+  logger?: Logger,
 ): Promise<T> {
   const {
     maxRetries = 3,
@@ -164,7 +170,7 @@ export async function withRetry<T>(
     maxDelay = 30000,
     backoffMultiplier = 2,
     jitter = true,
-    retryCondition = safeRetryCondition
+    retryCondition = safeRetryCondition,
   } = options;
 
   let lastError: unknown;
@@ -184,9 +190,9 @@ export async function withRetry<T>(
           {
             attempt,
             maxRetries,
-            finalError: error instanceof Error ? error.message : String(error)
+            finalError: error instanceof Error ? error.message : String(error),
           },
-          'Operation failed after all retry attempts'
+          'Operation failed after all retry attempts',
         );
         throw convertToMcpError(error);
       }
@@ -195,9 +201,9 @@ export async function withRetry<T>(
         logger?.warn(
           {
             attempt,
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           },
-          'Error not retryable, failing immediately'
+          'Error not retryable, failing immediately',
         );
         throw convertToMcpError(error);
       }
@@ -215,9 +221,9 @@ export async function withRetry<T>(
           attempt,
           maxRetries,
           delayMs: Math.round(delay),
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         },
-        'Operation failed, retrying after delay'
+        'Operation failed, retrying after delay',
       );
 
       await new Promise((resolve) => setTimeout(resolve, delay));
@@ -234,7 +240,7 @@ export async function withTimeout<T>(
   operation: () => Promise<T>,
   timeoutMs: number,
   fallback?: () => Promise<T> | T,
-  logger?: Logger
+  logger?: Logger,
 ): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -265,32 +271,36 @@ export async function withTimeout<T>(
 export class Bulkhead {
   private active = 0;
   private queue: Array<{
-    operation: () => Promise<any>;
-    resolve: (value: any) => void;
+    operation: () => Promise<unknown>;
+    resolve: (value: unknown) => void;
     reject: (error: unknown) => void;
   }> = [];
 
   constructor(
     private maxConcurrent: number,
     private maxQueue: number = 100,
-    private logger?: Logger
+    private logger?: Logger,
   ) {}
 
   async execute<T>(operation: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      const task = { operation, resolve, reject };
+      const task = {
+        operation: async () => (await operation()) as unknown,
+        resolve: (value: unknown) => resolve(value as T),
+        reject: (error: unknown) => reject(error),
+      };
 
       if (this.active < this.maxConcurrent) {
-        this.executeTask(task);
+        void this.executeTask(task);
       } else if (this.queue.length < this.maxQueue) {
         this.queue.push(task);
         this.logger?.debug(
           {
             active: this.active,
             queued: this.queue.length,
-            maxConcurrent: this.maxConcurrent
+            maxConcurrent: this.maxConcurrent,
           },
-          'Operation queued due to bulkhead limits'
+          'Operation queued due to bulkhead limits',
         );
       } else {
         reject(convertToMcpError(new Error('Bulkhead queue is full')));
@@ -299,8 +309,8 @@ export class Bulkhead {
   }
 
   private async executeTask(task: {
-    operation: () => Promise<any>;
-    resolve: (value: any) => void;
+    operation: () => Promise<unknown>;
+    resolve: (value: unknown) => void;
     reject: (error: unknown) => void;
   }): Promise<void> {
     this.active++;
@@ -318,17 +328,24 @@ export class Bulkhead {
 
   private processQueue(): void {
     if (this.queue.length > 0 && this.active < this.maxConcurrent) {
-      const task = this.queue.shift()!;
-      this.executeTask(task);
+      const task = this.queue.shift();
+      if (task != null) {
+        void this.executeTask(task);
+      }
     }
   }
 
-  getMetrics() {
+  getMetrics(): {
+    active: number;
+    queued: number;
+    maxConcurrent: number;
+    maxQueue: number;
+  } {
     return {
       active: this.active,
       queued: this.queue.length,
       maxConcurrent: this.maxConcurrent,
-      maxQueue: this.maxQueue
+      maxQueue: this.maxQueue,
     };
   }
 }
@@ -354,14 +371,14 @@ export class GracefulDegradation {
    */
   registerService(
     serviceName: string,
-    levels: { level: number; fallback?: () => Promise<unknown> }[]
+    levels: { level: number; fallback?: () => Promise<unknown> }[],
   ): void {
     // Start at highest level (0)
     this.serviceLevels.set(serviceName, {
       level: 0,
       fallback: levels.find((l) => l.level === 0)?.fallback ?? null,
       lastCheck: Date.now(),
-      failures: 0
+      failures: 0,
     });
   }
 
@@ -390,9 +407,9 @@ export class GracefulDegradation {
         {
           service: serviceName,
           failures: service.failures,
-          level: service.level
+          level: service.level,
         },
-        'Service operation failed'
+        'Service operation failed',
       );
 
       // Try fallback if available
@@ -400,9 +417,9 @@ export class GracefulDegradation {
         this.logger?.info(
           {
             service: serviceName,
-            level: service.level
+            level: service.level,
           },
-          'Using fallback due to service failure'
+          'Using fallback due to service failure',
         );
 
         try {
@@ -412,9 +429,9 @@ export class GracefulDegradation {
             {
               service: serviceName,
               fallbackError:
-                fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+                fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
             },
-            'Fallback also failed'
+            'Fallback also failed',
           );
         }
       }
@@ -443,9 +460,9 @@ export class GracefulDegradation {
           {
             service: serviceName,
             newLevel: service.level,
-            failures: service.failures
+            failures: service.failures,
           },
-          'Service degraded to lower level'
+          'Service degraded to lower level',
         );
       }
     } else if (service.failures === 0 && timeSinceLastCheck > 600000) {
@@ -456,15 +473,15 @@ export class GracefulDegradation {
         this.logger?.info(
           {
             service: serviceName,
-            newLevel: service.level
+            newLevel: service.level,
           },
-          'Service recovered to higher level'
+          'Service recovered to higher level',
         );
       }
     }
   }
 
-  getServiceMetrics() {
+  getServiceMetrics(): Record<string, unknown> {
     const metrics: Record<string, unknown> = {};
 
     this.serviceLevels.forEach((service, name) => {
@@ -472,7 +489,7 @@ export class GracefulDegradation {
         level: service.level,
         failures: service.failures,
         lastCheck: service.lastCheck,
-        hasFallback: !!service.fallback
+        hasFallback: !!service.fallback,
       };
     });
 
@@ -496,27 +513,30 @@ export function withErrorRecovery<T>(
       serviceName: string;
     };
   } = {},
-  logger?: Logger
+  logger?: Logger,
 ) {
   return async (): Promise<T> => {
     let wrappedOperation = operation;
 
     // Apply bulkhead if provided
     if (options.bulkhead) {
+      const bulkhead = options.bulkhead;
       const originalOp = wrappedOperation;
-      wrappedOperation = () => options.bulkhead!.execute(originalOp);
+      wrappedOperation = () => bulkhead.execute(originalOp);
     }
 
     // Apply circuit breaker if provided
     if (options.circuitBreaker) {
+      const circuitBreaker = options.circuitBreaker;
       const originalOp = wrappedOperation;
-      wrappedOperation = () => options.circuitBreaker!.execute(originalOp);
+      wrappedOperation = () => circuitBreaker.execute(originalOp);
     }
 
     // Apply timeout if specified
-    if (options.timeout) {
+    if (options.timeout != null && options.timeout > 0) {
       const originalOp = wrappedOperation;
-      wrappedOperation = () => withTimeout(originalOp, options.timeout!, options.fallback, logger);
+      wrappedOperation = () =>
+        withTimeout(originalOp, options.timeout ?? 0, options.fallback, logger);
     }
 
     // Apply graceful degradation if provided
@@ -548,7 +568,7 @@ export function createResilientOperation<T>(
     fallback?: () => Promise<T> | T;
     serviceName?: string;
   } = {},
-  logger?: Logger
+  logger?: Logger,
 ): () => Promise<T> {
   const circuitBreaker = options.circuitBreaker
     ? new CircuitBreaker(options.circuitBreaker, logger)
@@ -558,28 +578,30 @@ export function createResilientOperation<T>(
     ? new Bulkhead(options.bulkhead.maxConcurrent, options.bulkhead.maxQueue, logger)
     : undefined;
 
-  const gracefulDegradation = options.serviceName ? new GracefulDegradation(logger) : undefined;
+  const gracefulDegradation =
+    options.serviceName != null && options.serviceName !== ''
+      ? new GracefulDegradation(logger)
+      : undefined;
 
-  if (gracefulDegradation && options.serviceName) {
+  if (gracefulDegradation && options.serviceName != null && options.serviceName !== '') {
+    const fallbackFn = options.fallback;
     gracefulDegradation.registerService(options.serviceName, [
       { level: 0 },
-      ...(options.fallback
-        ? [{ level: 1, fallback: async () => Promise.resolve(options.fallback!()) }]
-        : [])
+      ...(fallbackFn ? [{ level: 1, fallback: async () => Promise.resolve(fallbackFn()) }] : []),
     ]);
   }
 
   const recoveryOptions: Parameters<typeof withErrorRecovery>[1] = {};
 
   if (options.retry) recoveryOptions.retry = options.retry;
-  if (options.timeout) recoveryOptions.timeout = options.timeout;
+  if (options.timeout != null && options.timeout > 0) recoveryOptions.timeout = options.timeout;
   if (options.fallback) recoveryOptions.fallback = options.fallback;
   if (circuitBreaker) recoveryOptions.circuitBreaker = circuitBreaker;
   if (bulkhead) recoveryOptions.bulkhead = bulkhead;
-  if (gracefulDegradation && options.serviceName) {
+  if (gracefulDegradation && options.serviceName != null && options.serviceName !== '') {
     recoveryOptions.gracefulDegradation = {
       manager: gracefulDegradation,
-      serviceName: options.serviceName
+      serviceName: options.serviceName,
     };
   }
 

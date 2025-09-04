@@ -37,7 +37,12 @@ export function ok<T>(value: T): Ok<T> {
  * Create a failure result
  */
 export function fail(error: string, code?: string, details?: unknown): Fail {
-  return { kind: 'fail', error, code, details };
+  return {
+    kind: 'fail',
+    error,
+    ...(code !== undefined && { code }),
+    ...(details !== undefined && { details }),
+  };
 }
 
 /**
@@ -109,7 +114,7 @@ export function tap<T>(result: Result<T>, fn: (value: T) => void): Result<T> {
  */
 export function tapError<T>(
   result: Result<T>,
-  fn: (error: string, code?: string) => void
+  fn: (error: string, code?: string) => void,
 ): Result<T> {
   if (isFail(result)) {
     fn(result.error, result.code);
@@ -145,13 +150,3 @@ export function combine<T>(results: Result<T>[]): Result<T[]> {
 
   return ok(values);
 }
-
-/**
- * Helper type aliases for common patterns
- */
-export type Success<T> = Ok<T>;
-export type Failure = Fail;
-
-// Re-export for backward compatibility
-export const Success = ok;
-export const Failure = fail;

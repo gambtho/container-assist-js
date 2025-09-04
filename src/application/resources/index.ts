@@ -3,14 +3,12 @@
  * Central manager for all MCP resource providers
  */
 
-import type { Server } from '@modelcontextprotocol/sdk/server/index';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Logger } from 'pino';
-import { z } from 'zod';
 import type { ApplicationConfig } from '../../config/index.js';
 import type { SessionService } from '../../services/session.js';
 import type { DockerService } from '../../services/docker.js';
 import type { ToolRegistry } from '../tools/ops/registry.js';
-import type { ToolFactory } from '../tools/factory.js';
 
 import { WorkflowResourceProvider } from './workflow-resource';
 import { SessionResourceProvider } from './session-resource';
@@ -18,58 +16,20 @@ import { DockerResourceProvider } from './docker-resource';
 import { ConfigResourceProvider } from './config-resource';
 import { ToolsResourceProvider } from './tools-resource';
 
-// Define resource schemas for MCP protocol
-const ResourceListRequestSchema = z.object({
-  method: z.literal('resources/list')
-});
-
-const ResourceReadRequestSchema = z.object({
-  method: z.literal('resources/read'),
-  params: z.object({
-    uri: z.string()
-  })
-});
-
 export class ResourceManager {
-  private providers: Map<string, any> = new Map();
-  private resources: Map<string, any> = new Map();
+  private providers: Map<string, unknown> = new Map();
+  private resources: Map<string, unknown> = new Map();
   private isRegistered = false;
 
   constructor(
     private config: ApplicationConfig,
     private sessionService: SessionService,
     private dockerService: DockerService,
-    private toolRegistryOrFactory: ToolRegistry | ToolFactory,
-    private logger: Logger
+    private toolRegistry: ToolRegistry,
+    private logger: Logger,
   ) {
     this.logger = logger.child({ component: 'ResourceManager' });
     this.initializeProviders();
-  }
-
-  /**
-   * Create a tool registry adapter for ToolFactory compatibility
-   */
-  private createToolRegistryAdapter(): ToolRegistry {
-    if ('listTools' in this.toolRegistryOrFactory) {
-      // It's a ToolRegistry'
-      return this.toolRegistryOrFactory;
-    }
-
-    // Create adapter for ToolFactory
-    const toolFactory = this.toolRegistryOrFactory;
-    return {
-      listTools: () => {
-        const tools = toolFactory.getAllTools();
-        return {
-          tools: tools.map((tool: unknown) => ({
-            name: tool.config?.name ?? 'unknown',
-            description: tool.config?.description ?? '',
-            inputSchema: tool.inputSchema ?? { type: 'object', properties: {} }
-          }))
-        };
-      },
-      getToolCount: () => toolFactory.getAllTools().length
-    } as unknown;
   }
 
   /**
@@ -92,8 +52,8 @@ export class ResourceManager {
     const configProvider = new ConfigResourceProvider(this.config, this.logger);
     this.providers.set('config', configProvider);
 
-    // Tools resources - create adapter for ToolFactory if needed
-    const toolsProvider = new ToolsResourceProvider(this.createToolRegistryAdapter(), this.logger);
+    // Tools resources - direct registry access
+    const toolsProvider = new ToolsResourceProvider(this.toolRegistry, this.logger);
     this.providers.set('tools', toolsProvider);
 
     // Register meta-resources
@@ -101,77 +61,131 @@ export class ResourceManager {
 
     this.logger.info(
       {
-        providers: Array.from(this.providers.keys())
+        providers: Array.from(this.providers.keys()),
       },
-      'Resource providers initialized'
+      'Resource providers initialized',
     );
   }
 
   /**
    * Register all resource providers with MCP server
    */
-  registerWithServer(server: Server): void {
+  registerWithServer(server: McpServer): void {
     if (this.isRegistered) {
       this.logger.warn('Resources already registered with server');
       return;
     }
 
     try {
-      // Collect resources from all providers
-      for (const [name, provider] of this.providers.entries()) {
-        this.logger.debug({ provider: name }, 'Collecting resources');
-        const providerResources = provider.getResources();
+      // Register resources from all providers using new API
+      for (const [providerName, provider] of Array.from(this.providers.entries())) {
+        this.logger.debug({ provider: providerName }, 'Registering resources');
+        const providerResources = (provider as { getResources: () => unknown[] }).getResources();
         for (const resource of providerResources) {
-          this.resources.set(resource.uri, resource);
+          const resourceObj = resource as {
+            uri: string;
+            name: string;
+            description: string;
+            mimeType?: string;
+            handler: () => Promise<unknown>;
+          };
+
+          // Register each resource using the new API
+          server.registerResource(
+            resourceObj.name,
+            resourceObj.uri,
+            {
+              title: resourceObj.name,
+              description: resourceObj.description,
+              mimeType: resourceObj.mimeType ?? 'application/json',
+            },
+            async () => {
+              try {
+                const result = await resourceObj.handler();
+                return {
+                  contents: [
+                    {
+                      uri: resourceObj.uri,
+                      mimeType: resourceObj.mimeType ?? 'application/json',
+                      text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
+                    },
+                  ],
+                };
+              } catch (error) {
+                this.logger.error({ error, uri: resourceObj.uri }, 'Resource handler failed');
+                throw new Error(
+                  `Resource handler failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                );
+              }
+            },
+          );
+
+          this.resources.set(resourceObj.uri, resource);
         }
       }
 
-      // Register resource list handler
-      server.setRequestHandler(ResourceListRequestSchema as unknown, async () => {
-        const resourceList = Array.from(this.resources.values()).map((r) => ({
-          uri: r.uri,
-          name: r.name,
-          description: r.description,
-          mimeType: r.mimeType ?? 'application/json'
-        }));
-
-        return { resources: resourceList };
-      });
-
-      // Register resource read handler
-      server.setRequestHandler(ResourceReadRequestSchema as unknown, async (request: unknown) => {
-        const { uri } = request.params;
-        const resource = this.resources.get(uri);
-
-        if (!resource) {
-          throw new Error(`Resource not found: ${uri}`);
-        }
-
-        try {
-          // Execute the resource handler
-          const result = await resource.handler();
-
-          return {
-            contents: [
-              {
-                uri,
-                mimeType: resource.mimeType ?? 'application/json',
-                text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
-              }
-            ]
+      // Register meta-resources that were added directly to this.resources
+      for (const [uri, resource] of Array.from(this.resources.entries())) {
+        // Skip resources that were already registered from providers
+        if (
+          !Array.from(this.providers.values()).some((provider) => {
+            const providerResources =
+              (provider as { getResources?: () => unknown[] }).getResources?.() || [];
+            return providerResources.some((r: any) => r.uri === uri);
+          })
+        ) {
+          const resourceObj = resource as {
+            uri: string;
+            name: string;
+            description: string;
+            mimeType?: string;
+            handler: () => unknown;
           };
-        } catch (error) {
-          this.logger.error({ error, uri }, 'Failed to read resource');
-          throw error;
+
+          // Register meta-resource using the new API
+          server.registerResource(
+            resourceObj.name,
+            resourceObj.uri,
+            {
+              title: resourceObj.name,
+              description: resourceObj.description,
+              mimeType: resourceObj.mimeType ?? 'application/json',
+            },
+            async () => {
+              try {
+                const result = await Promise.resolve(resourceObj.handler());
+                return {
+                  contents: [
+                    {
+                      uri: resourceObj.uri,
+                      mimeType: resourceObj.mimeType ?? 'application/json',
+                      text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
+                    },
+                  ],
+                };
+              } catch (error) {
+                this.logger.error({ error, uri: resourceObj.uri }, 'Meta-resource handler failed');
+                throw new Error(
+                  `Meta-resource handler failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                );
+              }
+            },
+          );
+
+          this.logger.debug({ uri: resourceObj.uri }, 'Registered meta-resource');
         }
-      });
+      }
 
       this.isRegistered = true;
       this.logger.info(
         {
-          resourceCount: this.resources.size
+          providers: Array.from(this.providers.keys()),
+          metaResources: Array.from(this.resources.keys()).filter((uri) =>
+            uri.startsWith('resources://'),
+          ),
+          totalResources: this.resources.size,
         },
-        'All resources registered with MCP server'
+        'All resources registered with server',
       );
     } catch (error) {
       this.logger.error({ error }, 'Failed to register resource providers');
@@ -189,7 +203,7 @@ export class ResourceManager {
       name: 'Resource Catalog',
       description: 'Complete catalog of available MCP resources',
       mimeType: 'application/json',
-      handler: async () => {
+      handler: () => {
         try {
           const catalog = {
             categories: {
@@ -198,16 +212,16 @@ export class ResourceManager {
                 resources: [
                   { uri: 'workflow://current', name: 'Current Workflow State' },
                   { uri: 'workflow://history', name: 'Workflow History' },
-                  { uri: 'workflow://stats', name: 'Workflow Statistics' }
-                ]
+                  { uri: 'workflow://stats', name: 'Workflow Statistics' },
+                ],
               },
               session: {
                 description: 'Session management and tracking',
                 resources: [
                   { uri: 'session://active', name: 'Active Sessions' },
                   { uri: 'session://details/{sessionId}', name: 'Session Details' },
-                  { uri: 'session://management', name: 'Session Management' }
-                ]
+                  { uri: 'session://management', name: 'Session Management' },
+                ],
               },
               docker: {
                 description: 'Docker system and container information',
@@ -215,8 +229,8 @@ export class ResourceManager {
                   { uri: 'docker://system', name: 'Docker System Information' },
                   { uri: 'docker://images', name: 'Docker Images' },
                   { uri: 'docker://containers', name: 'Docker Containers' },
-                  { uri: 'docker://build-context', name: 'Docker Build Context' }
-                ]
+                  { uri: 'docker://build-context', name: 'Docker Build Context' },
+                ],
               },
               config: {
                 description: 'Server configuration and capabilities',
@@ -224,8 +238,8 @@ export class ResourceManager {
                   { uri: 'config://current', name: 'Current Server Configuration' },
                   { uri: 'config://capabilities', name: 'Server Capabilities' },
                   { uri: 'config://environment', name: 'Server Environment' },
-                  { uri: 'config://validation', name: 'Configuration Validation' }
-                ]
+                  { uri: 'config://validation', name: 'Configuration Validation' },
+                ],
               },
               tools: {
                 description: 'Tool registry and analytics',
@@ -233,12 +247,12 @@ export class ResourceManager {
                   { uri: 'tools://registry', name: 'Tool Registry' },
                   { uri: 'tools://analytics', name: 'Tool Usage Analytics' },
                   { uri: 'tools://dependencies', name: 'Tool Dependencies' },
-                  { uri: 'tools://documentation', name: 'Tool Documentation' }
-                ]
-              }
+                  { uri: 'tools://documentation', name: 'Tool Documentation' },
+                ],
+              },
             },
             totalResources: this.resources.size,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
 
           return catalog;
@@ -247,10 +261,10 @@ export class ResourceManager {
           return {
             status: 'error',
             message: error instanceof Error ? error.message : 'Unknown error',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         }
-      }
+      },
     });
 
     // Resource health check
@@ -259,27 +273,27 @@ export class ResourceManager {
       name: 'Resource Health',
       description: 'Health status of all resource providers',
       mimeType: 'application/json',
-      handler: async () => {
+      handler: () => {
         try {
           const health = {
             overall: 'healthy',
-            providers: {} as Record<string, any>,
+            providers: {} as Record<string, unknown>,
             issues: [] as string[],
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
 
           // Check each provider
-          for (const [name, _provider] of this.providers.entries()) {
+          for (const [name, _provider] of Array.from(this.providers.entries())) {
             try {
               // Basic health check - providers are healthy if they exist
               health.providers[name] = {
                 status: 'healthy',
-                message: 'Provider operational'
+                message: 'Provider operational',
               };
             } catch (error) {
               health.providers[name] = {
                 status: 'unhealthy',
-                message: error instanceof Error ? error.message : 'Unknown error'
+                message: error instanceof Error ? error.message : 'Unknown error',
               };
               health.issues.push(`${name} provider is unhealthy`);
             }
@@ -287,7 +301,11 @@ export class ResourceManager {
 
           // Set overall status
           const unhealthyProviders = Object.values(health.providers).filter(
-            (p: unknown) => p.status === 'unhealthy'
+            (p): p is { status: string } =>
+              typeof p === 'object' &&
+              p !== null &&
+              'status' in p &&
+              (p as { status: unknown }).status === 'unhealthy',
           );
 
           if (unhealthyProviders.length > 0) {
@@ -300,10 +318,10 @@ export class ResourceManager {
           return {
             overall: 'error',
             message: error instanceof Error ? error.message : 'Unknown error',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         }
-      }
+      },
     });
   }
 
@@ -324,7 +342,7 @@ export class ResourceManager {
   /**
    * Get a specific provider
    */
-  getProvider(name: string): any {
+  getProvider(name: string): unknown {
     return this.providers.get(name);
   }
 

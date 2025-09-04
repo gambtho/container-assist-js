@@ -3,7 +3,7 @@
  */
 
 import { MockMCPSampler } from './mock-mcp-sampler.js';
-import { createTestLogger } from './test-logger.js';
+import { createMockLogger } from './test-helpers.js';
 import type { Logger } from '../../src/infrastructure/core/logger-types.js';
 
 export interface TestDependencies {
@@ -41,7 +41,7 @@ export interface TestDependencies {
 }
 
 export async function createTestDependencies(): Promise<TestDependencies> {
-  const logger = createTestLogger();
+  const logger = createMockLogger();
   const mockSampler = new MockMCPSampler();
   
   return {

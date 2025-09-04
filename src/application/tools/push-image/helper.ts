@@ -2,16 +2,25 @@
  * Push Image - Helper Functions
  */
 
-import type { MCPToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types.js';
+
+/**
+ * Mask sensitive string for logging
+ */
+function maskSensitive(value: string | undefined): string {
+  if (!value) return '<empty>';
+  if (value.length <= 4) return '***';
+  return `${value.substring(0, 2)}***${value.substring(value.length - 2)}`;
+}
 
 /**
  * Authenticate with registry
  */
-export async function authenticateRegistry(
+export function authenticateRegistry(
   registry: string,
   credentials: { username?: string; password?: string; authToken?: string },
-  context: MCPToolContext
-): Promise<boolean> {
+  context: ToolContext,
+): boolean {
   const { logger } = context;
 
   if (!credentials.username && !credentials.authToken) {
@@ -19,11 +28,15 @@ export async function authenticateRegistry(
     const envAuth = {
       username: process.env.DOCKER_USERNAME,
       password: process.env.DOCKER_PASSWORD,
-      authToken: process.env.DOCKER_AUTH_TOKEN
+      authToken: process.env.DOCKER_AUTH_TOKEN,
     };
 
     if (envAuth.username ?? envAuth.authToken) {
-      logger.info('Using registry credentials from environment');
+      logger.info({
+        message: 'Using registry credentials from environment',
+        username: maskSensitive(envAuth.username),
+        hasToken: !!envAuth.authToken,
+      });
       Object.assign(credentials, envAuth);
     }
   }
@@ -34,7 +47,12 @@ export async function authenticateRegistry(
   }
 
   // Would implement actual Docker registry authentication here
-  logger.info({ registry, username: credentials.username });
+  logger.info({
+    registry,
+    username: maskSensitive(credentials.username),
+    hasToken: !!credentials.authToken,
+    authenticated: true,
+  });
   return true;
 }
 
@@ -45,7 +63,7 @@ export async function pushImage(
   tag: string,
   registry: string,
   auth: { username?: string; password?: string },
-  context: MCPToolContext
+  context: ToolContext,
 ): Promise<{ digest: string; size?: number; pushTime?: number }> {
   const { dockerService, logger } = context;
   const startTime = Date.now();
@@ -54,13 +72,13 @@ export async function pushImage(
     const result = await (dockerService as unknown as any).push({
       image: tag,
       registry,
-      auth: auth.username && auth.password ? auth : undefined
+      auth: auth.username && auth.password ? auth : undefined,
     });
 
     if (result.success && result.data) {
       const pushResult: { digest: string; size?: number; pushTime?: number } = {
         digest: result.data.digest,
-        pushTime: Date.now() - startTime
+        pushTime: Date.now() - startTime,
       };
 
       // Only add size if it's defined
@@ -79,7 +97,7 @@ export async function pushImage(
   return {
     digest: `sha256:${Math.random().toString(36).substring(7)}`,
     size: 100 * 1024 * 1024,
-    pushTime: Date.now() - startTime
+    pushTime: Date.now() - startTime,
   };
 }
 
@@ -90,8 +108,8 @@ export async function pushWithRetry(
   tag: string,
   registry: string,
   auth: { username?: string; password?: string },
-  context: MCPToolContext,
-  maxRetries: number = 3
+  context: ToolContext,
+  maxRetries: number = 3,
 ): Promise<{ digest: string; size?: number; pushTime?: number }> {
   const { logger } = context;
   let lastError: Error | undefined;
@@ -121,7 +139,7 @@ export async function pushWithRetry(
 export async function getImagesToPush(
   tags: string[],
   sessionId: string | undefined,
-  sessionService: any
+  sessionService: any,
 ): Promise<string[]> {
   let imagesToPush = tags;
 
@@ -137,8 +155,7 @@ export async function getImagesToPush(
       imagesToPush = session.workflow_state.tag_result.tags ?? [];
     } else if (session.workflow_state?.build_result) {
       const tag =
-        session.workflow_state.build_result.tag ??
-        session.workflow_state.build_result.tags?.[0];
+        session.workflow_state.build_result.tag ?? session.workflow_state.build_result.tags?.[0];
       imagesToPush = tag ? [tag] : [];
     }
   }
@@ -154,7 +171,7 @@ export async function pushImagesParallel(
   targetRegistry: string,
   auth: { username?: string; password?: string },
   retryOnFailure: boolean,
-  context: MCPToolContext
+  context: ToolContext,
 ): Promise<{
   pushed: Array<{ tag: string; digest: string; size?: number; pushTime?: number }>;
   failed: Array<{ tag: string; error?: string }>;
@@ -190,8 +207,8 @@ export async function pushImagesSequential(
   targetRegistry: string,
   auth: { username?: string; password?: string },
   retryOnFailure: boolean,
-  context: MCPToolContext,
-  progressCallback?: (index: number, tag: string) => Promise<void>
+  context: ToolContext,
+  progressCallback?: (index: number, tag: string) => Promise<void>,
 ): Promise<{
   pushed: Array<{ tag: string; digest: string; size?: number; pushTime?: number }>;
   failed: Array<{ tag: string; error?: string }>;
@@ -234,7 +251,7 @@ export async function pushImagesSequential(
  * Calculate push totals
  */
 export function calculatePushTotals(
-  pushed: Array<{ tag: string; digest: string; size?: number; pushTime?: number }>
+  pushed: Array<{ tag: string; digest: string; size?: number; pushTime?: number }>,
 ): { totalSize: number; totalPushTime: number } {
   const totalSize = pushed.reduce((sum, p) => sum + (p.size ?? 0), 0);
   const totalPushTime = pushed.reduce((sum, p) => sum + (p.pushTime ?? 0), 0);

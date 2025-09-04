@@ -3,7 +3,7 @@
  */
 
 import { DockerScanResult } from '../../../contracts/types/index.js';
-import type { MCPToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types.js';
 
 /**
  * Severity level priority for sorting
@@ -12,7 +12,8 @@ const SEVERITY_PRIORITY: Record<string, number> = {
   critical: 4,
   high: 3,
   medium: 2,
-  low: 1
+  low: 1,
+  unknown: 0,
 };
 
 /**
@@ -20,11 +21,11 @@ const SEVERITY_PRIORITY: Record<string, number> = {
  */
 export function filterBySeverity(
   vulnerabilities: DockerScanResult['vulnerabilities'],
-  threshold: string
+  threshold: string,
 ): DockerScanResult['vulnerabilities'] {
   const thresholdPriority = SEVERITY_PRIORITY[threshold] || 0;
   return vulnerabilities.filter(
-    (vuln) => (SEVERITY_PRIORITY[vuln.severity] || 0) >= thresholdPriority
+    (vuln) => (SEVERITY_PRIORITY[vuln.severity] || 0) >= thresholdPriority,
   );
 }
 
@@ -33,7 +34,7 @@ export function filterBySeverity(
  */
 export function generateRecommendations(
   vulnerabilities: DockerScanResult['vulnerabilities'],
-  summary: DockerScanResult['summary']
+  summary: DockerScanResult['summary'],
 ): string[] {
   const recommendations: string[] = [];
 
@@ -66,7 +67,7 @@ export function generateRecommendations(
   const fixableVulns = vulnerabilities.filter((v) => v.fixedVersion);
   if (fixableVulns.length > 0) {
     recommendations.push(
-      `${fixableVulns.length} vulnerabilities have fixes available - run updates`
+      `${fixableVulns.length} vulnerabilities have fixes available - run updates`,
     );
   }
 
@@ -85,7 +86,7 @@ export function generateRecommendations(
 /**
  * Mock scan function for testing/fallback
  */
-export async function mockScan(_imageId: string): Promise<DockerScanResult> {
+export function mockScan(_imageId: string): DockerScanResult {
   return {
     vulnerabilities: [
       {
@@ -94,17 +95,17 @@ export async function mockScan(_imageId: string): Promise<DockerScanResult> {
         package: 'example-package',
         version: '1.0.0',
         fixedVersion: '1.0.1',
-        description: 'Mock vulnerability for testing'
-      }
+        description: 'Mock vulnerability for testing',
+      },
     ],
     summary: {
       critical: 0,
       high: 1,
       medium: 2,
       low: 3,
-      total: 6
+      total: 6,
     },
-    scanTime: new Date().toISOString()
+    scanTime: new Date().toISOString(),
   };
 }
 
@@ -115,7 +116,7 @@ export async function getScanTarget(
   imageId: string | undefined,
   imageTag: string | undefined,
   sessionId: string | undefined,
-  sessionService: any
+  sessionService: any,
 ): Promise<string> {
   let scanTarget = imageId ?? imageTag;
 
@@ -141,7 +142,7 @@ export async function getScanTarget(
 export async function performDockerScan(
   scanTarget: string,
   dockerService: any,
-  context: MCPToolContext
+  context: ToolContext,
 ): Promise<DockerScanResult> {
   const { logger } = context;
 
@@ -149,10 +150,10 @@ export async function performDockerScan(
     // Use Docker service for scanning
     logger.info('Using Docker service for vulnerability scan');
     if ('scan' in dockerService) {
-      const result = await (dockerService as any).scan(scanTarget);
+      const result = await dockerService.scan(scanTarget);
 
-      if (!result.success ?? !result.data) {
-        throw new Error(result.error?.message ?? 'Scan failed');
+      if (!result.success || !result.data) {
+        throw new Error(result.error?.message || 'Scan failed');
       }
 
       return result.data;
@@ -161,7 +162,7 @@ export async function performDockerScan(
     }
   } else {
     logger.warn('Docker service not available, using mock scan');
-    return await mockScan(scanTarget);
+    return mockScan(scanTarget);
   }
 }
 
@@ -171,16 +172,13 @@ export async function performDockerScan(
 export function processScanResults(
   scanResult: DockerScanResult,
   severityThreshold: string,
-  ignoreUnfixed: boolean
+  ignoreUnfixed: boolean,
 ): {
   filteredVulnerabilities: DockerScanResult['vulnerabilities'];
   fixableCount: number;
 } {
   // Filter vulnerabilities based on threshold
-  const filteredVulnerabilities = filterBySeverity(
-    scanResult.vulnerabilities,
-    severityThreshold
-  );
+  const filteredVulnerabilities = filterBySeverity(scanResult.vulnerabilities, severityThreshold);
 
   // Filter unfixed if requested
   const finalVulnerabilities = ignoreUnfixed
@@ -189,7 +187,7 @@ export function processScanResults(
 
   // Sort by severity
   finalVulnerabilities.sort(
-    (a, b) => (SEVERITY_PRIORITY[b.severity] || 0) - (SEVERITY_PRIORITY[a.severity] || 0)
+    (a, b) => (SEVERITY_PRIORITY[b.severity] || 0) - (SEVERITY_PRIORITY[a.severity] || 0),
   );
 
   // Calculate fixable count
@@ -197,7 +195,7 @@ export function processScanResults(
 
   return {
     filteredVulnerabilities: finalVulnerabilities,
-    fixableCount
+    fixableCount,
   };
 }
 
@@ -206,13 +204,16 @@ export function processScanResults(
  */
 export async function getImageDetails(
   sessionId: string | undefined,
-  sessionService: any
-): Promise<{
-  size?: number;
-  layers?: number;
-  os?: string;
-  architecture?: string;
-} | undefined> {
+  sessionService: any,
+): Promise<
+  | {
+      size?: number;
+      layers?: number;
+      os?: string;
+      architecture?: string;
+    }
+  | undefined
+> {
   if (!sessionId || !sessionService) {
     return undefined;
   }
@@ -224,7 +225,7 @@ export async function getImageDetails(
         size: buildResult.size ?? 0,
         layers: Array.isArray(buildResult.layers) ? buildResult.layers.length : 0,
         os: 'linux',
-        architecture: 'amd64'
+        architecture: 'amd64',
       }
     : undefined;
 }
@@ -233,9 +234,9 @@ export async function getImageDetails(
  * Sort vulnerabilities by severity priority
  */
 export function sortVulnerabilitiesBySeverity(
-  vulnerabilities: DockerScanResult['vulnerabilities']
+  vulnerabilities: DockerScanResult['vulnerabilities'],
 ): DockerScanResult['vulnerabilities'] {
   return vulnerabilities.sort(
-    (a, b) => (SEVERITY_PRIORITY[b.severity] || 0) - (SEVERITY_PRIORITY[a.severity] || 0)
+    (a, b) => (SEVERITY_PRIORITY[b.severity] || 0) - (SEVERITY_PRIORITY[a.severity] || 0),
   );
 }

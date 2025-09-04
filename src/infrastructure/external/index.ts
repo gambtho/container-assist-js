@@ -11,13 +11,15 @@ export * from '../kubernetes-client.js';
 
 // AI service exports
 export * from '../ai-client.js';
-export * from '../enhanced-ai-service.js';
+export * from '../ai-service.js';
 
 // Request builder
-export * from '../ai-request-builder.js';
+export * from '../ai/requests.js';
 
 // Sampling strategy
 export * from '../sampling-strategy.js';
 
 // Types and interfaces
+// AI types now come from unified API
+export type { SampleFunction, SampleResult } from '../ai/index.js';
 export type { AIServiceConfig, AIAnalysisResult, AIGenerationResult } from '../ai/ai-types.js';

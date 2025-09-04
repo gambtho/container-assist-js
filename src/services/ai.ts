@@ -4,7 +4,8 @@
 
 import type { Logger } from 'pino';
 import { AIClient } from '../infrastructure/ai-client.js';
-import type { MCPSampler } from '../application/interfaces.js';
+import type { SampleFunction } from '../infrastructure/ai/index.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export interface AIConfig {
   modelPreferences?: {
@@ -21,8 +22,8 @@ export interface AIConfig {
  */
 export function createAIService(
   config: AIConfig,
-  sampler: MCPSampler | undefined,
-  logger: Logger
+  sampler: SampleFunction | undefined,
+  logger: Logger,
 ): AIService {
   return new AIService(config, sampler, logger);
 }
@@ -31,9 +32,28 @@ export class AIService {
   private client: AIClient;
   private logger: Logger;
 
-  constructor(config: AIConfig, sampler: MCPSampler | undefined, logger: Logger) {
+  constructor(config: AIConfig, sampler: SampleFunction | undefined, logger: Logger) {
     this.logger = logger.child({ service: 'ai' });
-    this.client = new AIClient(config, sampler, this.logger);
+    this.client = new AIClient(config, this.logger, sampler);
+  }
+
+  async initialize(): Promise<void> {
+    await Promise.resolve();
+    this.logger.debug('AI service initialized');
+  }
+
+  /**
+   * Update the sampler function (used after server initialization)
+   */
+  setSampler(sampler: SampleFunction): void {
+    this.client.setSampler(sampler);
+  }
+
+  /**
+   * Set MCP server directly (convenience method)
+   */
+  setMCPServer(server: McpServer): void {
+    this.client.setMCPServer(server);
   }
 
   async generateDockerfile(context: {
@@ -47,7 +67,7 @@ export class AIService {
 
   async analyzeRepository(
     repoPath: string,
-    files?: string[]
+    files?: string[],
   ): Promise<{
     language: string;
     buildSystem: string;
@@ -83,8 +103,8 @@ let _aiService: AIService | undefined;
 
 export function getAIService(
   config: AIConfig,
-  sampler: MCPSampler | undefined,
-  logger: Logger
+  sampler: SampleFunction | undefined,
+  logger: Logger,
 ): AIService {
   if (!_aiService) {
     _aiService = createAIService(config, sampler, logger);

@@ -26,9 +26,11 @@ export class SessionStore {
     // Start cleanup timer
     const cleanupInterval = options.cleanupIntervalMs ?? 5 * 60 * 1000; // 5 minutes
     this.cleanup = setInterval(() => {
-      this.cleanExpired().catch((err) =>
-        this.logger.warn({ error: err }, 'Session cleanup failed')
-      );
+      try {
+        this.cleanExpired();
+      } catch (err) {
+        this.logger.warn({ error: err }, 'Session cleanup failed');
+      }
     }, cleanupInterval);
 
     // Don't keep process alive for cleanup
@@ -40,7 +42,7 @@ export class SessionStore {
   /**
    * Get a session by ID
    */
-  async get(id: string): Promise<Session | null> {
+  get(id: string): Session | null {
     const session = this.sessions.get(id);
 
     if (!session) {
@@ -60,7 +62,7 @@ export class SessionStore {
   /**
    * Create or update a session
    */
-  async set(id: string, session: Partial<Session>): Promise<void> {
+  set(id: string, session: Partial<Session>): void {
     // Validate and complete session data
     const now = new Date().toISOString();
     const fullSession: Session = {
@@ -74,10 +76,10 @@ export class SessionStore {
         completed_steps: [],
         errors: {},
         metadata: {},
-        dockerfile_fix_history: []
+        dockerfile_fix_history: [],
       },
       version: (session.version ?? 0) + 1,
-      ...session
+      ...session,
     };
 
     // Validate schema
@@ -85,7 +87,7 @@ export class SessionStore {
 
     // Enforce session limit
     if (!this.sessions.has(id) && this.sessions.size >= this.maxSessions) {
-      await this.evictOldest();
+      this.evictOldest();
     }
 
     this.sessions.set(id, validated);
@@ -95,37 +97,34 @@ export class SessionStore {
   /**
    * Update an existing session
    */
-  async update(
-    id: string,
-    updater: (session: Session) => Partial<Session>
-  ): Promise<Session | null> {
-    const existing = await this.get(id);
+  update(id: string, updater: (session: Session) => Partial<Session>): Session | null {
+    const existing = this.get(id);
     if (!existing) {
       return null;
     }
 
     const updated = updater(existing);
-    await this.set(id, { ...existing, ...updated });
-    return await this.get(id);
+    this.set(id, { ...existing, ...updated });
+    return this.get(id);
   }
 
   /**
    * Atomic update operation
    */
-  async updateAtomic(id: string, updater: (session: Session) => Session): Promise<void> {
-    const existing = await this.get(id);
+  updateAtomic(id: string, updater: (session: Session) => Session): void {
+    const existing = this.get(id);
     if (!existing) {
       throw new Error(`Session ${id} not found`);
     }
 
     const updated = updater(existing);
-    await this.set(id, updated);
+    this.set(id, updated);
   }
 
   /**
    * Delete a session
    */
-  async delete(id: string): Promise<boolean> {
+  delete(id: string): boolean {
     const deleted = this.sessions.delete(id);
     if (deleted) {
       this.logger.debug({ sessionId: id }, 'Session deleted');
@@ -136,11 +135,7 @@ export class SessionStore {
   /**
    * List sessions with optional filtering
    */
-  async list(filter?: {
-    status?: Session['status'];
-    limit?: number;
-    createdAfter?: Date;
-  }): Promise<Session[]> {
+  list(filter?: { status?: Session['status']; limit?: number; createdAfter?: Date }): Session[] {
     let sessions = Array.from(this.sessions.values());
 
     // Remove expired sessions during listing
@@ -152,7 +147,8 @@ export class SessionStore {
     }
 
     if (filter?.createdAfter) {
-      sessions = sessions.filter((s) => new Date(s.created_at) > filter.createdAfter!);
+      const createdAfter = filter.createdAfter;
+      sessions = sessions.filter((s) => new Date(s.created_at) > createdAfter);
     }
 
     // Sort by updated_at desc
@@ -169,14 +165,14 @@ export class SessionStore {
   /**
    * Get active session count
    */
-  async getActiveCount(): Promise<number> {
-    return (await this.list({ status: 'active' })).length;
+  getActiveCount(): number {
+    return this.list({ status: 'active' }).length;
   }
 
   /**
    * Clean up expired sessions
    */
-  private async cleanExpired(): Promise<number> {
+  private cleanExpired(): number {
     let removed = 0;
     const now = Date.now();
 
@@ -205,7 +201,7 @@ export class SessionStore {
   /**
    * Evict oldest session to make room
    */
-  private async evictOldest(): Promise<void> {
+  private evictOldest(): void {
     let oldest: [string, Session] | null = null;
 
     for (const [id, session] of Array.from(this.sessions)) {
@@ -232,14 +228,14 @@ export class SessionStore {
       totalSessions: this.sessions.size,
       activeSessions: Array.from(this.sessions.values()).filter((s) => s.status === 'active')
         .length,
-      maxSessions: this.maxSessions
+      maxSessions: this.maxSessions,
     };
   }
 
   /**
    * Shutdown and cleanup
    */
-  async close(): Promise<void> {
+  close(): void {
     if (this.cleanup) {
       clearInterval(this.cleanup);
     }
@@ -257,7 +253,7 @@ export class SessionStore {
   /**
    * Import sessions from backup/migration
    */
-  async importSessions(sessions: Session[]): Promise<void> {
+  importSessions(sessions: Session[]): void {
     for (const session of sessions) {
       if (!this.isExpired(session)) {
         this.sessions.set(session.id, session);

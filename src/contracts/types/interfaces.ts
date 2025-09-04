@@ -81,7 +81,7 @@ export interface CommandExecutor {
   execute(
     command: string,
     args?: string[],
-    options?: unknown
+    options?: unknown,
   ): Promise<
     Result<{
       stdout: string;

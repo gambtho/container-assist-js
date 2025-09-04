@@ -13,7 +13,7 @@ const mockLogger: Logger = {
   debug: jest.fn(),
   info: jest.fn(),
   warn: jest.fn(),
-  error: jest.fn()
+  error: jest.fn(),
 } as any;
 
 describe('AIResponseCache', () => {
@@ -28,13 +28,13 @@ describe('AIResponseCache', () => {
     context: {
       language: 'python',
       framework: 'fastapi',
-      port: 8000
-    }
+      port: 8000,
+    },
   };
 
   const sampleResponse = {
     dockerfile:
-      'FROM python:3.9\nWORKDIR /app\nCOPY . .\nRUN pip install -r requirements.txt\nEXPOSE 8000\nCMD ["python", "app.py"]'
+      'FROM python:3.9\nWORKDIR /app\nCOPY . .\nRUN pip install -r requirements.txt\nEXPOSE 8000\nCMD ["python", "app.py"]',
   };
 
   beforeEach(() => {
@@ -44,7 +44,7 @@ describe('AIResponseCache', () => {
       advance: (ms: number) => {
         mockClock.now += ms;
         jest.setSystemTime(mockClock.now);
-      }
+      },
     };
     jest.setSystemTime(mockClock.now);
 
@@ -53,7 +53,7 @@ describe('AIResponseCache', () => {
       defaultTtlMs: 1000, // 1 second for fast testing
       maxSize: 5,
       cleanupIntervalMs: 500, // 0.5 seconds
-      enableDetailedLogging: false
+      enableDetailedLogging: false,
     };
     cache = new AIResponseCache(mockLogger, options);
   });
@@ -97,7 +97,7 @@ describe('AIResponseCache', () => {
     it('should handle different response types', async () => {
       const stringResponse = 'text response';
       const objectResponse = { key: 'value', array: [1, 2, 3] };
-      const numberResponse = 42;
+      const _numberResponse = 42;
 
       await cache.set(sampleRequest, stringResponse, true);
       expect(await cache.get(sampleRequest)).toBe(stringResponse);
@@ -185,7 +185,7 @@ describe('AIResponseCache', () => {
     it('should track access counts and last accessed time', async () => {
       await cache.set(sampleRequest, sampleResponse, true);
 
-      const initialTime = mockClock.now;
+      const _initialTime = mockClock.now;
 
       // Access multiple times
       await cache.get(sampleRequest);
@@ -226,7 +226,7 @@ describe('AIResponseCache', () => {
       const smallMemoryCache = new AIResponseCache(mockLogger, {
         defaultTtlMs: 10000,
         maxMemoryBytes: 2000, // 2KB limit
-        maxSize: 100 // High size limit so memory is the constraint
+        maxSize: 100, // High size limit so memory is the constraint
       });
 
       try {
@@ -274,12 +274,12 @@ describe('AIResponseCache', () => {
       // Add entries with different template IDs
       const dockerRequest = {
         ...sampleRequest,
-        context: { ...sampleRequest.context, _templateId: 'dockerfile-generation' }
+        context: { ...sampleRequest.context, _templateId: 'dockerfile-generation' },
       };
       const k8sRequest = {
         ...sampleRequest,
         prompt: 'Generate Kubernetes',
-        context: { _templateId: 'k8s-generation' }
+        context: { _templateId: 'k8s-generation' },
       };
 
       await cache.set(dockerRequest, 'dockerfile response', true);
@@ -294,7 +294,7 @@ describe('AIResponseCache', () => {
 
       // Docker template should have higher access count
       const dockerTemplate = stats.topTemplates.find(
-        (t) => t.templateId === 'dockerfile-generation'
+        (t) => t.templateId === 'dockerfile-generation',
       );
       const k8sTemplate = stats.topTemplates.find((t) => t.templateId === 'k8s-generation');
 
@@ -365,7 +365,7 @@ describe('AIResponseCache', () => {
     it('should cache failures when explicitly enabled', async () => {
       const failureCachingCache = new AIResponseCache(mockLogger, {
         cacheFailures: true,
-        defaultTtlMs: 1000
+        defaultTtlMs: 1000,
       });
 
       try {
@@ -382,14 +382,14 @@ describe('AIResponseCache', () => {
         defaultTtlMs: 1000,
         templateTtlMs: {
           'dockerfile-generation': 2000, // 2 seconds for dockerfile
-          'k8s-generation': 500 // 0.5 seconds for k8s
-        }
+          'k8s-generation': 500, // 0.5 seconds for k8s
+        },
       });
 
       try {
         const dockerRequest = {
           ...sampleRequest,
-          context: { _templateId: 'dockerfile-generation' }
+          context: { _templateId: 'dockerfile-generation' },
         };
         const k8sRequest = { ...sampleRequest, context: { _templateId: 'k8s-generation' } };
 

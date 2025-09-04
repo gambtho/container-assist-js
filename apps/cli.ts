@@ -5,9 +5,8 @@
  */
 
 import { program } from 'commander';
-import { ContainerKitMCPServerV2 as ContainerKitMCPServer } from './server.js';
-import { createConfig } from '../src/config/index';
-import { logConfigSummaryIfDev } from '../src/config/index';
+import { ContainerKitMCPServer } from './server.js';
+import { createConfig, logConfigSummaryIfDev } from '../src/config/index.js';
 import { createPinoLogger } from '../src/infrastructure/logger.js';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
@@ -17,7 +16,12 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8'));
+
+// Handle both development (apps/) and production (dist/apps/) paths
+const packageJsonPath = __dirname.includes('dist')
+  ? join(__dirname, '../../package.json') // dist/apps/ -> root
+  : join(__dirname, '../package.json'); // apps/ -> root
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
 const logger = createPinoLogger({ service: 'cli' });
 
@@ -35,9 +39,19 @@ program
   .option('--validate', 'validate configuration and exit')
   .option('--list-tools', 'list all available MCP tools and exit')
   .option('--health-check', 'perform system health check and exit')
-  .option('--docker-socket <path>', 'Docker socket path (default: /var/run/docker.sock)', '/var/run/docker.sock')
-  .option('--k8s-namespace <namespace>', 'default Kubernetes namespace (default: default)', 'default')
-  .addHelpText('after', `
+  .option(
+    '--docker-socket <path>',
+    'Docker socket path (default: /var/run/docker.sock)',
+    '/var/run/docker.sock',
+  )
+  .option(
+    '--k8s-namespace <namespace>',
+    'default Kubernetes namespace (default: default)',
+    'default',
+  )
+  .addHelpText(
+    'after',
+    `
 
 Examples:
   $ container-kit-mcp                           Start server with stdio transport
@@ -59,7 +73,7 @@ MCP Tools Available:
   • Registry: tag_image, push_image
   • Deploy: generate_k8s_manifests, deploy_application
   • Orchestration: start_workflow, workflow_status
-  • Utilities: ping, list_tools, server_status
+  • Utilities: ping, server_status
 
 For detailed documentation, see: docs/tools/README.md
 For examples and tutorials, see: examples/README.md
@@ -71,7 +85,8 @@ Environment Variables:
   K8S_NAMESPACE            Default Kubernetes namespace
   MOCK_MODE                Enable mock mode for testing
   NODE_ENV                 Environment (development, production)
-`);
+`,
+  );
 
 program.parse(argv);
 
@@ -81,7 +96,6 @@ const options = program.opts();
 function validateOptions(opts: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  // Validate log level
   const validLogLevels = ['debug', 'info', 'warn', 'error'];
   if (opts.logLevel && !validLogLevels.includes(opts.logLevel)) {
     errors.push(`Invalid log level: ${opts.logLevel}. Valid options: ${validLogLevels.join(', ')}`);
@@ -109,7 +123,9 @@ function validateOptions(opts: any): { valid: boolean; errors: string[] } {
     try {
       statSync(opts.dockerSocket);
     } catch (error) {
-      errors.push(`Docker socket not found: ${opts.dockerSocket}. Try --mock for testing without Docker.`);
+      errors.push(
+        `Docker socket not found: ${opts.dockerSocket}. Try --mock for testing without Docker.`,
+      );
     }
   }
 
@@ -131,7 +147,7 @@ async function main(): Promise<void> {
     const validation = validateOptions(options);
     if (!validation.valid) {
       console.error('❌ Configuration errors:');
-      validation.errors.forEach(error => console.error(`  • ${error}`));
+      validation.errors.forEach((error) => console.error(`  • ${error}`));
       console.error('\nUse --help for usage information');
       exit(1);
     }
@@ -150,11 +166,8 @@ async function main(): Promise<void> {
     // Log configuration summary in development mode
     logConfigSummaryIfDev(config);
 
-    // Validate configuration mode
     if (options.validate) {
       console.log('🔍 Validating Container Kit MCP configuration...\n');
-
-      // Check configuration details
       console.log('📋 Configuration Summary:');
       console.log(`  • Log Level: ${config.server.logLevel}`);
       console.log(`  • Workspace: ${config.workspace.workspaceDir}`);
@@ -195,10 +208,8 @@ async function main(): Promise<void> {
     // Create server
     const server = new ContainerKitMCPServer(config);
 
-    // List tools mode
     if (options.listTools) {
       logger.info('Listing available tools');
-      // We need to initialize to get tools, but don't start the server
       await server.initialize();
 
       const toolList = await server.listTools();
@@ -227,7 +238,6 @@ async function main(): Promise<void> {
       process.exit(0);
     }
 
-    // Health check mode
     if (options.healthCheck) {
       logger.info('Performing health check');
       await server.initialize();
@@ -248,7 +258,7 @@ async function main(): Promise<void> {
       if (health.metrics) {
         console.log('\nMetrics:');
         for (const [metric, value] of Object.entries(health.metrics)) {
-          console.log(`  📊 ${metric}: ${value}`);
+          console.log(`  📊 ${metric}: ${String(value)}`);
         }
       }
 
@@ -256,15 +266,17 @@ async function main(): Promise<void> {
       process.exit(health.status === 'healthy' ? 0 : 1);
     }
 
-    // Normal server startup
-    logger.info({
-      config: {
-        logLevel: config.server.logLevel,
-        workspace: config.workspace.workspaceDir,
-        mockMode: options.mock,
-        devMode: options.dev
-      }
-    }, 'Starting Container Kit MCP Server');
+    logger.info(
+      {
+        config: {
+          logLevel: config.server.logLevel,
+          workspace: config.workspace.workspaceDir,
+          mockMode: options.mock,
+          devMode: options.dev,
+        },
+      },
+      'Starting Container Kit MCP Server',
+    );
 
     console.log('🚀 Starting Container Kit MCP Server...');
     console.log(`📦 Version: ${packageJson.version}`);
@@ -284,7 +296,6 @@ async function main(): Promise<void> {
     console.log('✅ Server started successfully');
     console.log('🔌 Listening on stdio transport');
 
-    // Setup graceful shutdown
     const shutdown = async (signal: string): Promise<void> => {
       logger.info({ signal }, 'Shutting down');
       console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
@@ -296,13 +307,23 @@ async function main(): Promise<void> {
       } catch (error) {
         logger.error({ error }, 'Shutdown error');
         console.error('❌ Shutdown error:', error);
-        exit(1);
+        process.exit(1);
       }
     };
 
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => {
+      shutdown('SIGTERM').catch((error) => {
+        logger.error({ error }, 'Error during SIGTERM shutdown');
+        process.exit(1);
+      });
+    });
 
+    process.on('SIGINT', () => {
+      shutdown('SIGINT').catch((error) => {
+        logger.error({ error }, 'Error during SIGINT shutdown');
+        process.exit(1);
+      });
+    });
   } catch (error) {
     logger.error({ error }, 'Server startup failed');
     console.error('❌ Server startup failed');
@@ -359,7 +380,6 @@ async function main(): Promise<void> {
   }
 }
 
-// Handle uncaught errors
 process.on('uncaughtException', (error) => {
   logger.fatal({ error }, 'Uncaught exception in CLI');
   console.error('❌ Uncaught exception:', error);
@@ -373,5 +393,4 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Run the CLI
-main();
-
+void main();

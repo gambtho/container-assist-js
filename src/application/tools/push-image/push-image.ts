@@ -1,273 +1,133 @@
 /**
- * Push Image - Main Orchestration Logic
+ * Push Image - MCP SDK Compatible Version
  */
 
 import { z } from 'zod';
 import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
-import type { MCPTool, MCPToolContext } from '../tool-types.js';
-import {
-  authenticateRegistry,
-  getImagesToPush,
-  pushImagesParallel,
-  pushImagesSequential,
-  calculatePushTotals
-} from './helper';
-
-// Input schema with support for both snake_case and camelCase
-const PushImageInput = z
-  .object({
-    session_id: z.string().optional(),
-    sessionId: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-    image_tags: z.array(z.string()).optional(),
-    imageTags: z.array(z.string()).optional(),
-    image: z.string().optional(),
-    registry: z.string().optional(),
-    username: z.string().optional(),
-    password: z.string().optional(),
-    auth_token: z.string().optional(),
-    authToken: z.string().optional(),
-    retry_on_failure: z.boolean().default(true),
-    retryOnFailure: z.boolean().optional(),
-    parallel: z.boolean().default(false)
-  })
-  .transform((data) => ({
-    sessionId: data.session_id ?? data.sessionId,
-    tags: data.tags ?? data.image_tags ?? data.imageTags ?? (data.image ? [data.image] : []),
-    registry: data.registry,
-    username: data.username,
-    password: data.password,
-    authToken: data.auth_token ?? data.authToken,
-    retryOnFailure: data.retry_on_failure ?? data.retryOnFailure ?? true,
-    parallel: data.parallel
-  }));
-
-// Output schema
-const PushImageOutput = z.object({
-  success: z.boolean(),
-  pushed: z.array(
-    z.object({
-      tag: z.string(),
-      digest: z.string(),
-      size: z.number().optional(),
-      pushTime: z.number()
-    })
-  ),
-  failed: z.array(
-    z.object({
-      tag: z.string(),
-      error: z.string()
-    })
-  ),
-  registry: z.string(),
-  metadata: z.object({
-    totalSize: z.number().optional(),
-    totalPushTime: z.number(),
-    timestamp: z.string()
-  })
-});
+import { PushImageInput, type PushImageParams, BaseSessionResultSchema } from '../schemas.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types.js';
+import type { Session } from '../../../contracts/types/session.js';
+import { authenticateRegistry, pushImage } from './helper.js';
 
 // Type aliases
-export type PushInput = z.infer<typeof PushImageInput>;
-export type PushOutput = z.infer<typeof PushImageOutput>;
+export type PushInput = PushImageParams;
+export type PushOutput = z.infer<typeof BaseSessionResultSchema> & { registry?: string };
 
+// Helper functions are now imported from ./helper.js
 
 /**
  * Main handler implementation
  */
-const pushImageHandler: MCPTool<PushInput, PushOutput> = {
+const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
   name: 'push_image',
   description: 'Push Docker images to container registry',
   category: 'workflow',
   inputSchema: PushImageInput,
-  outputSchema: PushImageOutput,
+  outputSchema: BaseSessionResultSchema.extend({ registry: z.string().optional() }),
 
-  handler: async (input: PushInput, context: MCPToolContext): Promise<PushOutput> => {
+  handler: async (input: PushInput, context: ToolContext): Promise<PushOutput> => {
     const { logger, sessionService, progressEmitter } = context;
-    const { sessionId, tags, registry, username, password, authToken, retryOnFailure, parallel } =
-      input;
+    const { sessionId, registry } = input;
 
-    logger.info(
-      {
-        sessionId,
-        tags: tags.length,
-        registry,
-        parallel
-      },
-      'Starting image push'
-    );
+    logger.info({ sessionId, registry }, 'Starting image push');
 
     try {
-      // Determine images to push using helper function
-      const imagesToPush = await getImagesToPush(tags, sessionId, sessionService);
-      let targetRegistry = registry;
-
-      // Get registry from session if not provided
-      if (!targetRegistry && sessionId && sessionService) {
-        const session = await sessionService.get(sessionId);
-        if (session?.workflow_state?.tag_result) {
-          targetRegistry = session.workflow_state.tag_result.registry;
-        }
+      // Get session and image info
+      if (!sessionService) {
+        throw new DomainError(ErrorCode.VALIDATION_ERROR, 'Session service not available');
       }
 
-      if (imagesToPush.length === 0) {
-        throw new DomainError(ErrorCode.VALIDATION_ERROR, 'No images specified for push');
+      const session = await sessionService.get(sessionId);
+      if (!session) {
+        throw new DomainError(ErrorCode.SessionNotFound, 'Session not found');
       }
 
-      if (!targetRegistry) {
-        // Default to Docker Hub
-        targetRegistry = 'docker.io';
-        logger.info('No registry specified - using Docker Hub');
+      // Get build result from session
+      const buildResult = session.workflow_state?.build_result;
+      if (!buildResult?.tags || buildResult.tags.length === 0) {
+        throw new DomainError(ErrorCode.VALIDATION_ERROR, 'No tagged images found in session');
       }
 
-      // Authenticate with registry
-      const credentials: { username?: string; password?: string; authToken?: string } = {};
-
-      if (username !== undefined) credentials.username = username;
-      if (password !== undefined) credentials.password = password;
-      if (authToken !== undefined) credentials.authToken = authToken;
-
-      const authenticated = await authenticateRegistry(targetRegistry, credentials, context);
-
-      if (!authenticated) {
-        throw new DomainError(
-          ErrorCode.AUTHENTICATION_ERROR,
-          'Failed to authenticate with registry'
-        );
-      }
+      const targetRegistry = registry || 'docker.io';
+      const imagesToPush = buildResult.tags;
 
       // Emit progress
-      if (progressEmitter && sessionId) {
+      if (progressEmitter) {
         await progressEmitter.emit({
           sessionId,
           step: 'push_image',
           status: 'in_progress',
           message: `Pushing ${imagesToPush.length} images to ${targetRegistry}`,
-          progress: 0.1
+          progress: 0.5,
         });
       }
 
-      // Setup authentication
-      const auth: { username?: string; password?: string } = {};
-      if (username !== undefined) auth.username = username;
-      if (password !== undefined) auth.password = password;
+      // Authenticate and push images using helper functions
+      const credentials = {};
+      const authenticated = authenticateRegistry(targetRegistry, credentials, context);
 
-      // Push images using helper functions
-      let pushed: Array<{ tag: string; digest: string; size?: number; pushTime?: number }>;
-      let failed: Array<{ tag: string; error?: string }>;
-
-      if (parallel) {
-        // Push in parallel
-        const result = await pushImagesParallel(
-          imagesToPush,
-          targetRegistry ?? '',
-          auth,
-          retryOnFailure,
-          context
+      if (!authenticated) {
+        throw new DomainError(
+          ErrorCode.AUTHENTICATION_ERROR,
+          'Failed to authenticate with registry',
         );
-        pushed = result.pushed;
-        failed = result.failed;
-      } else {
-        // Push sequentially with progress updates
-        const progressCallback = async (i: number, tag: string) => {
-          if (progressEmitter && sessionId) {
-            await progressEmitter.emit({
-              sessionId,
-              step: 'push_image',
-              status: 'in_progress',
-              message: `Pushing ${tag} (${i + 1}/${imagesToPush.length})`,
-              progress: 0.1 + 0.8 * (i / imagesToPush.length)
-            });
-          }
-        };
-
-        const result = await pushImagesSequential(
-          imagesToPush,
-          targetRegistry ?? '',
-          auth,
-          retryOnFailure,
-          context,
-          progressCallback
-        );
-        pushed = result.pushed;
-        failed = result.failed;
       }
 
-      // Calculate totals using helper function
-      const { totalSize, totalPushTime } = calculatePushTotals(pushed);
+      // Push first image (simplified for consolidated schema)
+      const firstTag = imagesToPush[0];
+      if (!firstTag) {
+        throw new DomainError(ErrorCode.VALIDATION_ERROR, 'No image tags to push');
+      }
+
+      const result = await pushImage(firstTag, targetRegistry, credentials, context);
+      logger.info({ tag: firstTag, digest: result.digest }, 'Successfully pushed image');
 
       // Update session with push results
-      if (sessionId && sessionService) {
-        await sessionService.updateAtomic(sessionId, (session: any) => ({
-          ...session,
-          workflow_state: {
-            ...session.workflow_state,
-            pushResult: {
-              pushed: pushed.map((p) => ({ tag: p.tag, digest: p.digest })),
-              failed,
-              registry: targetRegistry,
-              timestamp: new Date().toISOString()
-            }
-          }
-        }));
-      }
+      await sessionService.updateAtomic(sessionId, (session: Session) => ({
+        ...session,
+        workflow_state: {
+          ...session.workflow_state,
+          pushResult: {
+            pushed: [{ tag: firstTag, digest: result.digest }],
+            registry: targetRegistry,
+            timestamp: new Date().toISOString(),
+          },
+        },
+      }));
 
       // Emit completion
-      if (progressEmitter && sessionId) {
+      if (progressEmitter) {
         await progressEmitter.emit({
           sessionId,
           step: 'push_image',
-          status: pushed.length > 0 ? 'completed' : 'failed',
-          message: `Pushed ${pushed.length}/${imagesToPush.length} images`,
-          progress: 1.0
+          status: 'completed',
+          message: `Successfully pushed image to ${targetRegistry}`,
+          progress: 1.0,
         });
-      }
-
-      // Check if any pushes succeeded
-      if (pushed.length === 0) {
-        throw new DomainError(
-          ErrorCode.OPERATION_FAILED,
-          `All ${failed.length} image pushes failed`
-        );
       }
 
       logger.info(
         {
-          pushed: pushed.length,
-          failed: failed.length,
-          registry: targetRegistry
+          tag: firstTag,
+          registry: targetRegistry,
         },
-        'Image push completed'
+        'Image push completed',
       );
 
       return {
         success: true,
-        pushed: pushed.map((p) => ({
-          tag: p.tag,
-          digest: p.digest,
-          size: p.size,
-          pushTime: p.pushTime ?? 0
-        })),
-        failed: failed.map((f) => ({
-          tag: f.tag,
-          error: f.error ?? 'Unknown error'
-        })),
+        sessionId,
         registry: targetRegistry,
-        metadata: {
-          totalSize: totalSize > 0 ? totalSize : undefined,
-          totalPushTime,
-          timestamp: new Date().toISOString()
-        }
       };
     } catch (error) {
-      logger.error({ error }, 'Error occurred during image push');
+      logger.error({ error }, 'Image push failed');
 
-      if (progressEmitter && sessionId) {
+      if (progressEmitter) {
         await progressEmitter.emit({
           sessionId,
           step: 'push_image',
           status: 'failed',
-          message: 'Image push failed'
+          message: `Image push failed: ${error instanceof Error ? error.message : String(error)}`,
         });
       }
 
@@ -279,10 +139,9 @@ const pushImageHandler: MCPTool<PushInput, PushOutput> = {
     nextTool: 'generate_k8s_manifests',
     reason: 'Generate Kubernetes manifests for deployment',
     paramMapper: (output) => ({
-      image: output.pushed[0]?.tag,
-      registry: output.registry
-    })
-  }
+      registry: output.registry,
+    }),
+  },
 };
 
 // Default export for registry

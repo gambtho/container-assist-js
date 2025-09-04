@@ -49,9 +49,9 @@ export const CONTAINERIZATION_WORKFLOW: WorkflowConfig = {
         const mapped = mapWorkflowStateProperties(state);
         return {
           session_id: sessionId,
-          repo_path: mapped.repoPath ?? process.cwd()
+          repo_path: mapped.repoPath ?? process.cwd(),
         };
-      }
+      },
     },
     {
       name: 'generate_dockerfile',
@@ -65,8 +65,8 @@ export const CONTAINERIZATION_WORKFLOW: WorkflowConfig = {
       condition: (state) => state.analysis_result != null,
       paramMapper: (state, sessionId) => ({
         session_id: sessionId,
-        analysis_result: state.analysis_result
-      })
+        analysis_result: state.analysis_result,
+      }),
     },
     {
       name: 'build_image',
@@ -80,8 +80,8 @@ export const CONTAINERIZATION_WORKFLOW: WorkflowConfig = {
       condition: (state) => state.dockerfile_result != null,
       paramMapper: (state, sessionId) => ({
         session_id: sessionId,
-        dockerfile_path: getDockerfilePath(state.dockerfile_result)
-      })
+        dockerfile_path: getDockerfilePath(state.dockerfile_result),
+      }),
     },
     {
       name: 'scan_image',
@@ -95,8 +95,8 @@ export const CONTAINERIZATION_WORKFLOW: WorkflowConfig = {
       condition: (state) => hasValidImageId(state),
       paramMapper: (state, sessionId) => ({
         session_id: sessionId,
-        image_id: getImageIdFromBuildResult(state.build_result as DockerBuildResult) ?? ''
-      })
+        image_id: getImageIdFromBuildResult(state.build_result as DockerBuildResult) ?? '',
+      }),
     },
     {
       name: 'tag_image',
@@ -115,9 +115,9 @@ export const CONTAINERIZATION_WORKFLOW: WorkflowConfig = {
         return {
           session_id: sessionId,
           image_id: getImageIdFromBuildResult(buildResult) ?? '',
-          tag: `${mapped.projectName ?? 'app'}:latest`
+          tag: `${mapped.projectName ?? 'app'}:latest`,
         };
-      }
+      },
     },
     {
       name: 'push_image',
@@ -137,9 +137,9 @@ export const CONTAINERIZATION_WORKFLOW: WorkflowConfig = {
         return {
           session_id: sessionId,
           image_tag: mapped.imageTag,
-          registry_url: state.registry_url
+          registry_url: state.registry_url,
         };
-      }
+      },
     },
     {
       name: 'generate_k8s',
@@ -156,9 +156,9 @@ export const CONTAINERIZATION_WORKFLOW: WorkflowConfig = {
         return {
           session_id: sessionId,
           image_tag: mapped.imageTag ?? getImageIdFromBuildResult(mapped.buildResult),
-          analysis_result: mapped.analysisResult
+          analysis_result: mapped.analysisResult,
         };
-      }
+      },
     },
     {
       name: 'prepare_cluster',
@@ -173,9 +173,9 @@ export const CONTAINERIZATION_WORKFLOW: WorkflowConfig = {
         const mapped = mapWorkflowStateProperties(state);
         return {
           session_id: sessionId,
-          namespace: mapped.namespace
+          namespace: mapped.namespace,
         };
-      }
+      },
     },
     {
       name: 'deploy',
@@ -192,9 +192,9 @@ export const CONTAINERIZATION_WORKFLOW: WorkflowConfig = {
         return {
           session_id: sessionId,
           manifests: getK8sManifests(state.k8s_result),
-          namespace: mapped.namespace
+          namespace: mapped.namespace,
         };
-      }
+      },
     },
     {
       name: 'verify',
@@ -214,10 +214,10 @@ export const CONTAINERIZATION_WORKFLOW: WorkflowConfig = {
         return {
           session_id: sessionId,
           deployment_name: mapped.deploymentName,
-          namespace: mapped.deploymentNamespace
+          namespace: mapped.deploymentNamespace,
         };
-      }
-    }
+      },
+    },
   ],
   // Define rollback steps (executed in reverse order if workflow fails)
   rollbackSteps: [
@@ -235,11 +235,11 @@ export const CONTAINERIZATION_WORKFLOW: WorkflowConfig = {
         return {
           session_id: sessionId,
           deployment_name: mapped.deploymentName,
-          namespace: mapped.deploymentNamespace
+          namespace: mapped.deploymentNamespace,
         };
-      }
-    }
-  ]
+      },
+    },
+  ],
 };
 
 /**
@@ -263,9 +263,9 @@ export const BUILD_ONLY_WORKFLOW: WorkflowConfig = {
         const mapped = mapWorkflowStateProperties(state);
         return {
           session_id: sessionId,
-          repo_path: mapped.repoPath ?? process.cwd()
+          repo_path: mapped.repoPath ?? process.cwd(),
         };
-      }
+      },
     },
     {
       name: 'generate_dockerfile',
@@ -279,8 +279,8 @@ export const BUILD_ONLY_WORKFLOW: WorkflowConfig = {
       condition: (state) => state.analysis_result != null,
       paramMapper: (state, sessionId) => ({
         session_id: sessionId,
-        analysis_result: state.analysis_result
-      })
+        analysis_result: state.analysis_result,
+      }),
     },
     {
       name: 'build_image',
@@ -294,8 +294,8 @@ export const BUILD_ONLY_WORKFLOW: WorkflowConfig = {
       condition: (state) => state.dockerfile_result != null,
       paramMapper: (state, sessionId) => ({
         session_id: sessionId,
-        dockerfile_path: getDockerfilePath(state.dockerfile_result)
-      })
+        dockerfile_path: getDockerfilePath(state.dockerfile_result),
+      }),
     },
     {
       name: 'scan_image',
@@ -309,10 +309,10 @@ export const BUILD_ONLY_WORKFLOW: WorkflowConfig = {
       condition: (state) => hasValidImageId(state),
       paramMapper: (state, sessionId) => ({
         session_id: sessionId,
-        image_id: getImageIdFromBuildResult(state.build_result as DockerBuildResult) ?? ''
-      })
-    }
-  ]
+        image_id: getImageIdFromBuildResult(state.build_result as DockerBuildResult) ?? '',
+      }),
+    },
+  ],
 };
 
 /**
@@ -337,9 +337,9 @@ export const DEPLOY_ONLY_WORKFLOW: WorkflowConfig = {
         return {
           session_id: sessionId,
           image_tag: mapped.imageTag,
-          analysis_result: mapped.analysisResult ?? {}
+          analysis_result: mapped.analysisResult ?? {},
         };
-      }
+      },
     },
     {
       name: 'prepare_cluster',
@@ -354,9 +354,9 @@ export const DEPLOY_ONLY_WORKFLOW: WorkflowConfig = {
         const mapped = mapWorkflowStateProperties(state);
         return {
           session_id: sessionId,
-          namespace: mapped.namespace
+          namespace: mapped.namespace,
         };
-      }
+      },
     },
     {
       name: 'deploy',
@@ -373,9 +373,9 @@ export const DEPLOY_ONLY_WORKFLOW: WorkflowConfig = {
         return {
           session_id: sessionId,
           manifests: getK8sManifests(state.k8s_result),
-          namespace: mapped.namespace
+          namespace: mapped.namespace,
         };
-      }
+      },
     },
     {
       name: 'verify',
@@ -395,11 +395,11 @@ export const DEPLOY_ONLY_WORKFLOW: WorkflowConfig = {
         return {
           session_id: sessionId,
           deployment_name: mapped.deploymentName,
-          namespace: mapped.deploymentNamespace
+          namespace: mapped.deploymentNamespace,
         };
-      }
-    }
-  ]
+      },
+    },
+  ],
 };
 
 /**
@@ -424,9 +424,9 @@ export const QUICK_WORKFLOW: WorkflowConfig = {
         return {
           session_id: sessionId,
           repo_path: mapped.repoPath ?? process.cwd(),
-          quick_mode: true
+          quick_mode: true,
         };
-      }
+      },
     },
     {
       name: 'generate_dockerfile',
@@ -441,10 +441,10 @@ export const QUICK_WORKFLOW: WorkflowConfig = {
       paramMapper: (state, sessionId) => ({
         session_id: sessionId,
         analysis_result: state.analysis_result,
-        quick_mode: true
-      })
-    }
-  ]
+        quick_mode: true,
+      }),
+    },
+  ],
 };
 
 /**
@@ -458,7 +458,7 @@ export function getWorkflowConfig(workflowId: string): WorkflowConfig | null {
     build: BUILD_ONLY_WORKFLOW, // Alias
     'deploy-only': DEPLOY_ONLY_WORKFLOW,
     deploy: DEPLOY_ONLY_WORKFLOW, // Alias
-    quick: QUICK_WORKFLOW
+    quick: QUICK_WORKFLOW,
   };
 
   return workflows[workflowId] ?? null;
@@ -496,7 +496,7 @@ export function validateWorkflowConfig(config: WorkflowConfig): {
   // Step validation
   const stepNames = new Set<string>();
   for (const step of config.steps ?? []) {
-    if (!step.name ?? !step.tool) {
+    if (!step.name || !step.tool) {
       errors.push('Each step must have a name and tool');
     }
 
@@ -529,6 +529,6 @@ export function validateWorkflowConfig(config: WorkflowConfig): {
 
   return {
     valid: errors.length === 0,
-    errors
+    errors,
   };
 }

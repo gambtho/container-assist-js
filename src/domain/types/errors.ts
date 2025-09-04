@@ -10,7 +10,7 @@ export enum ErrorSeverity {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
-  CRITICAL = 'critical'
+  CRITICAL = 'critical',
 }
 
 /**
@@ -42,7 +42,7 @@ export enum ErrorCode {
   // Tool-specific errors
   BUILD_ERROR = 'BUILD_ERROR',
   SCAN_ERROR = 'SCAN_ERROR',
-  DEPLOYMENT_ERROR = 'DEPLOYMENT_ERROR'
+  DEPLOYMENT_ERROR = 'DEPLOYMENT_ERROR',
 }
 
 /**
@@ -121,7 +121,7 @@ export function isRetryable(error: DomainError): boolean {
     [
       ErrorCode.DOCKER_CONNECTION,
       ErrorCode.KUBERNETES_CONNECTION,
-      ErrorCode.AI_SERVICE_ERROR
+      ErrorCode.AI_SERVICE_ERROR,
     ].includes(error.code)
   ) {
     return true;
@@ -167,13 +167,16 @@ export function normalizeError(error: unknown): DomainError {
   }
 
   if (error instanceof Error) {
-    return {
+    const result: DomainError = {
       code: ErrorCode.UNKNOWN,
       message: error.message,
       severity: ErrorSeverity.MEDIUM,
       timestamp: new Date().toISOString(),
-      stack: error.stack
     };
+    if (error.stack !== undefined) {
+      result.stack = error.stack;
+    }
+    return result;
   }
 
   if (typeof error === 'string') {
@@ -181,7 +184,7 @@ export function normalizeError(error: unknown): DomainError {
       code: ErrorCode.UNKNOWN,
       message: error,
       severity: ErrorSeverity.MEDIUM,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -190,7 +193,7 @@ export function normalizeError(error: unknown): DomainError {
     message: 'An unknown error occurred',
     severity: ErrorSeverity.MEDIUM,
     timestamp: new Date().toISOString(),
-    context: { originalError: error }
+    context: { originalError: error },
   };
 }
 
@@ -200,15 +203,18 @@ export function normalizeError(error: unknown): DomainError {
 export function createDomainError(
   code: ErrorCode,
   message: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): DomainError {
-  return {
+  const result: DomainError = {
     code,
     message,
     severity: getErrorSeverity(code),
     timestamp: new Date().toISOString(),
-    context
   };
+  if (context !== undefined) {
+    result.context = context;
+  }
+  return result;
 }
 
 /**
@@ -219,17 +225,20 @@ export function createInfrastructureError(
   message: string,
   service: string,
   retryable: boolean = true,
-  endpoint?: string
+  endpoint?: string,
 ): InfrastructureError {
-  return {
+  const result: InfrastructureError = {
     code,
     message,
     severity: getErrorSeverity(code),
     timestamp: new Date().toISOString(),
     service,
-    endpoint,
-    retryable
+    retryable,
   };
+  if (endpoint !== undefined) {
+    result.endpoint = endpoint;
+  }
+  return result;
 }
 
 /**
@@ -239,15 +248,22 @@ export function createValidationError(
   message: string,
   field?: string,
   value?: unknown,
-  expectedType?: string
+  expectedType?: string,
 ): ValidationError {
-  return {
+  const result: ValidationError = {
     code: ErrorCode.VALIDATION,
     message,
     severity: ErrorSeverity.MEDIUM,
     timestamp: new Date().toISOString(),
-    field,
-    value,
-    expectedType
   };
+  if (field !== undefined) {
+    result.field = field;
+  }
+  if (value !== undefined) {
+    result.value = value;
+  }
+  if (expectedType !== undefined) {
+    result.expectedType = expectedType;
+  }
+  return result;
 }

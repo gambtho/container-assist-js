@@ -7,10 +7,37 @@
 import type { Logger } from 'pino';
 import type { SessionService } from '../../services/session.js';
 
+// Type definitions for session data
+interface SessionData {
+  id: string;
+  status: string;
+  stage?: string;
+  progress?: number;
+  workflow_state?: unknown;
+  created_at: string;
+  updated_at?: string;
+  repo_path?: string;
+  metadata?: unknown;
+}
+
+// Type guard for SessionData
+function isSessionData(obj: unknown): obj is SessionData {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'id' in obj &&
+    'status' in obj &&
+    'created_at' in obj &&
+    typeof (obj as { id: unknown; status: unknown; created_at: unknown }).id === 'string' &&
+    typeof (obj as { id: unknown; status: unknown; created_at: unknown }).status === 'string' &&
+    typeof (obj as { id: unknown; status: unknown; created_at: unknown }).created_at === 'string'
+  );
+}
+
 export class WorkflowResourceProvider {
   constructor(
     private sessionService: SessionService,
-    private logger: Logger
+    private logger: Logger,
   ) {
     this.logger = logger.child({ component: 'WorkflowResourceProvider' });
   }
@@ -18,7 +45,7 @@ export class WorkflowResourceProvider {
   /**
    * Register workflow-related MCP resources
    */
-  getResources(): Array<any> {
+  getResources(): Array<unknown> {
     return [
       // Current workflow resource
       {
@@ -26,14 +53,14 @@ export class WorkflowResourceProvider {
         name: 'Current Workflow State',
         description: 'Active workflow state and progress information',
         mimeType: 'application/json',
-        handler: async () => {
+        handler: () => {
           try {
             // Get the most recent active session
-            const sessions = await this.sessionService.list({
-              status: 'active'
+            const sessions = this.sessionService.list({
+              status: 'active',
             });
 
-            if (!sessions || sessions.length === 0) {
+            if (sessions == null || sessions.length === 0) {
               return {
                 content: [
                   {
@@ -42,13 +69,13 @@ export class WorkflowResourceProvider {
                       {
                         status: 'no_active_workflow',
                         message: 'No active workflow sessions found',
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
                       },
                       null,
-                      2
-                    )
-                  }
-                ]
+                      2,
+                    ),
+                  },
+                ],
               };
             }
 
@@ -62,13 +89,13 @@ export class WorkflowResourceProvider {
                       {
                         status: 'no_active_workflow',
                         message: 'No active workflow sessions found',
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
                       },
                       null,
-                      2
-                    )
-                  }
-                ]
+                      2,
+                    ),
+                  },
+                ],
               };
             }
 
@@ -86,15 +113,15 @@ export class WorkflowResourceProvider {
                       metadata: {
                         created: activeSession.created_at,
                         updated: activeSession.updated_at,
-                        repoPath: activeSession.repo_path
+                        repoPath: activeSession.repo_path,
                       },
-                      timestamp: new Date().toISOString()
+                      timestamp: new Date().toISOString(),
                     },
                     null,
-                    2
-                  )
-                }
-              ]
+                    2,
+                  ),
+                },
+              ],
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to get current workflow');
@@ -106,16 +133,16 @@ export class WorkflowResourceProvider {
                     {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString()
+                      timestamp: new Date().toISOString(),
                     },
                     null,
-                    2
-                  )
-                }
-              ]
+                    2,
+                  ),
+                },
+              ],
             };
           }
-        }
+        },
       },
       // Workflow history resource
       {
@@ -123,28 +150,38 @@ export class WorkflowResourceProvider {
         name: 'Workflow History',
         description: 'Recent workflow execution history',
         mimeType: 'application/json',
-        handler: async () => {
+        handler: () => {
           try {
-            const sessions = await this.sessionService.list({
-              limit: 20
+            const sessions = this.sessionService.list({
+              limit: 20,
             });
 
-            if (!sessions) {
+            if (sessions == null) {
               throw new Error('Failed to retrieve workflow history');
             }
 
-            const history = sessions.map((session: unknown) => ({
-              id: session.id,
-              status: session.status,
-              stage: session.stage,
-              created: session.created_at,
-              updated: session.updated_at,
-              duration: session.updated_at
-                ? new Date(session.updated_at).getTime() - new Date(session.created_at).getTime()
-                : null,
-              repoPath: session.repo_path,
-              metadata: session.metadata
-            }));
+            const history = sessions
+              .map((session: unknown) => {
+                if (!isSessionData(session)) {
+                  this.logger.warn({ session }, 'Invalid session format in history');
+                  return null;
+                }
+                return {
+                  id: session.id,
+                  status: session.status,
+                  stage: session.stage,
+                  created: session.created_at,
+                  updated: session.updated_at,
+                  duration:
+                    session.updated_at != null && session.updated_at !== ''
+                      ? new Date(session.updated_at).getTime() -
+                        new Date(session.created_at).getTime()
+                      : null,
+                  repoPath: session.repo_path,
+                  metadata: session.metadata,
+                };
+              })
+              .filter((s): s is NonNullable<typeof s> => s !== null);
 
             return {
               content: [
@@ -154,13 +191,13 @@ export class WorkflowResourceProvider {
                     {
                       count: history.length,
                       workflows: history,
-                      timestamp: new Date().toISOString()
+                      timestamp: new Date().toISOString(),
                     },
                     null,
-                    2
-                  )
-                }
-              ]
+                    2,
+                  ),
+                },
+              ],
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to get workflow history');
@@ -172,16 +209,16 @@ export class WorkflowResourceProvider {
                     {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString()
+                      timestamp: new Date().toISOString(),
                     },
                     null,
-                    2
-                  )
-                }
-              ]
+                    2,
+                  ),
+                },
+              ],
             };
           }
-        }
+        },
       },
       // Workflow statistics resource
       {
@@ -189,11 +226,11 @@ export class WorkflowResourceProvider {
         name: 'Workflow Statistics',
         description: 'Aggregate workflow execution statistics',
         mimeType: 'application/json',
-        handler: async () => {
+        handler: () => {
           try {
-            const sessions = await this.sessionService.list({});
+            const sessions = this.sessionService.list({});
 
-            if (!sessions) {
+            if (sessions == null) {
               throw new Error('Failed to retrieve workflow statistics');
             }
 
@@ -204,7 +241,7 @@ export class WorkflowResourceProvider {
               averageDuration: 0,
               successRate: 0,
               completedCount: 0,
-              failedCount: 0
+              failedCount: 0,
             };
 
             let totalDuration = 0;
@@ -212,15 +249,15 @@ export class WorkflowResourceProvider {
 
             for (const session of sessions ?? []) {
               // Count by status
-              stats.byStatus[session.status] = (stats.byStatus[session.status] || 0) + 1;
+              stats.byStatus[session.status] = (stats.byStatus[session.status] ?? 0) + 1;
 
               // Count by stage
-              if (session.stage) {
-                stats.byStage[session.stage] = (stats.byStage[session.stage] || 0) + 1;
+              if (session.stage != null && session.stage !== '') {
+                stats.byStage[session.stage] = (stats.byStage[session.stage] ?? 0) + 1;
               }
 
               // Calculate durations
-              if (session.updated_at) {
+              if (session.updated_at != null && session.updated_at !== '') {
                 const duration =
                   new Date(session.updated_at).getTime() - new Date(session.created_at).getTime();
                 totalDuration += duration;
@@ -243,13 +280,13 @@ export class WorkflowResourceProvider {
                   text: JSON.stringify(
                     {
                       ...stats,
-                      timestamp: new Date().toISOString()
+                      timestamp: new Date().toISOString(),
                     },
                     null,
-                    2
-                  )
-                }
-              ]
+                    2,
+                  ),
+                },
+              ],
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to get workflow statistics');
@@ -261,17 +298,17 @@ export class WorkflowResourceProvider {
                     {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString()
+                      timestamp: new Date().toISOString(),
                     },
                     null,
-                    2
-                  )
-                }
-              ]
+                    2,
+                  ),
+                },
+              ],
             };
           }
-        }
-      }
+        },
+      },
     ];
   }
 }

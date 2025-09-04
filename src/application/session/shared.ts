@@ -3,7 +3,7 @@
  * Common interfaces and types used across session management
  */
 
-import type { WorkflowState, Session } from '../../contracts/types/index.js';
+import type { Session } from '../../contracts/types/index.js';
 
 /**
  * Session metadata
@@ -28,26 +28,6 @@ export interface SessionConfig {
 }
 
 /**
- * Session data structure
- */
-export interface SessionData {
-  id: string;
-  metadata: SessionMetadata;
-  config: SessionConfig;
-  state: WorkflowState;
-  data: Record<string, any>;
-}
-
-/**
- * Session update operation
- */
-export interface SessionUpdate {
-  id: string;
-  updates: Partial<SessionData>;
-  merge?: boolean; // Whether to merge or replace
-}
-
-/**
  * Session query options
  */
 export interface SessionQuery {
@@ -63,7 +43,7 @@ export interface SessionQuery {
 /**
  * Session operation result
  */
-export interface SessionResult<T = any> {
+export interface SessionResult<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -72,20 +52,6 @@ export interface SessionResult<T = any> {
     operationType: string;
   };
 }
-
-/**
- * Session event types
- */
-export type SessionEvent =
-  | { type: 'created'; sessionId: string; data: SessionData }
-  | { type: 'updated'; sessionId: string; changes: Partial<SessionData> }
-  | { type: 'deleted'; sessionId: string }
-  | { type: 'expired'; sessionId: string };
-
-/**
- * Session listener callback
- */
-export type SessionEventListener = (event: SessionEvent) => void;
 
 /**
  * Common session utilities
@@ -99,71 +65,28 @@ export class SessionUtils {
   }
 
   /**
-   * Validate session data
-   */
-  static isValidSessionData(data: unknown): data is SessionData {
-    return (
-      typeof data === 'object' &&
-      typeof data.id === 'string' &&
-      data.metadata &&
-      typeof data.metadata.createdAt !== 'undefined' &&
-      data.state
-    );
-  }
-
-  /**
-   * Calculate session age
-   */
-  static getSessionAge(session: SessionData): number {
-    return Date.now() - session.metadata.createdAt.getTime();
-  }
-
-  /**
    * Check if session has expired
+   * Supports both ISO string and timestamp formats
    */
-  static isExpired(session: Session | SessionData): boolean {
-    // Handle Session type (from contracts/types/session.ts)
-    if ('expires_at' in session) {
-      if (!session.expires_at) {
-        return false;
-      }
-      return new Date(session.expires_at).getTime() < Date.now();
-    }
-
-    // Handle SessionData type (legacy)
-    const sessionData = session as SessionData;
-    if (!sessionData.config?.ttl) {
+  static isExpired(session: Session): boolean {
+    if (session.expires_at == null || session.expires_at === '') {
       return false;
     }
 
-    return SessionUtils.getSessionAge(sessionData) > sessionData.config.ttl;
-  }
+    // Handle both ISO string and timestamp formats
+    let expirationTime: number;
+    if (typeof session.expires_at === 'string') {
+      // ISO string format
+      expirationTime = new Date(session.expires_at).getTime();
+    } else if (typeof session.expires_at === 'number') {
+      // Timestamp format
+      expirationTime = session.expires_at;
+    } else {
+      // Unknown format, assume not expired
+      return false;
+    }
 
-  /**
-   * Merge session data
-   */
-  static mergeSessionData(existing: SessionData, updates: Partial<SessionData>): SessionData {
-    return {
-      ...existing,
-      ...updates,
-      metadata: {
-        ...existing.metadata,
-        ...updates.metadata,
-        updatedAt: new Date()
-      },
-      config: {
-        ...existing.config,
-        ...updates.config
-      },
-      state: {
-        ...existing.state,
-        ...updates.state
-      },
-      data: {
-        ...existing.data,
-        ...updates.data
-      }
-    };
+    return expirationTime < Date.now();
   }
 
   /**
@@ -175,7 +98,7 @@ export class SessionUtils {
       maxSize: 10 * 1024 * 1024, // 10MB
       compression: true,
       encryption: false,
-      backup: true
+      backup: true,
     };
   }
 
@@ -186,10 +109,10 @@ export class SessionUtils {
     const result: SessionMetadata = {
       createdAt: new Date(),
       updatedAt: new Date(),
-      version: '1.0.0'
+      version: '1.0.0',
     };
 
-    if (userId) {
+    if (userId != null && userId !== '') {
       result.userId = userId;
     }
 
@@ -201,11 +124,64 @@ export class SessionUtils {
   }
 
   /**
-   * Calculate session progress
+   * Calculate session progress based on workflow state
    */
-  static calculateProgress(_session: unknown): { current: number; total: number } {
-    // Stub implementation - session parameter will be used in future
-    return { current: 0, total: 100 };
+  static calculateProgress(session: Session): { current: number; total: number } {
+    // Define the standard workflow steps
+    const WORKFLOW_STEPS = [
+      'analysis',
+      'base_images',
+      'dockerfile',
+      'build',
+      'scan',
+      'tag',
+      'push',
+      'k8s_manifests',
+      'deployment',
+      'verification',
+    ];
+
+    // If no session or workflow_state, return initial state
+    if (
+      session == null ||
+      typeof session !== 'object' ||
+      !('workflow_state' in session) ||
+      session.workflow_state == null
+    ) {
+      return { current: 0, total: WORKFLOW_STEPS.length };
+    }
+
+    const workflowState = session.workflow_state as Record<string, unknown>;
+    let completedSteps = 0;
+
+    // Check each step for completion based on result presence
+    if (workflowState.analysis_result != null) completedSteps++;
+    if (
+      workflowState.base_images_result != null ||
+      (workflowState.dockerfile_result != null &&
+        typeof workflowState.dockerfile_result === 'object' &&
+        'base_image' in workflowState.dockerfile_result)
+    )
+      completedSteps++;
+    if (workflowState.dockerfile_result != null) completedSteps++;
+    if (workflowState.build_result != null) completedSteps++;
+    if (workflowState.scan_result != null) completedSteps++;
+    if (workflowState.tag_result != null) completedSteps++;
+    if (workflowState.push_result != null) completedSteps++;
+    if (workflowState.k8s_result != null) completedSteps++;
+    if (workflowState.deployment_result != null) completedSteps++;
+    if (workflowState.verification_result != null) completedSteps++;
+
+    // Alternative: Use completed_steps array if available
+    if (workflowState.completed_steps != null && Array.isArray(workflowState.completed_steps)) {
+      // Use the maximum of explicit completed steps and detected results
+      completedSteps = Math.max(completedSteps, workflowState.completed_steps.length);
+    }
+
+    return {
+      current: Math.min(completedSteps, WORKFLOW_STEPS.length),
+      total: WORKFLOW_STEPS.length,
+    };
   }
 
   /**
@@ -213,18 +189,29 @@ export class SessionUtils {
    */
   static getCurrentStage(workflowState: unknown): string {
     // Handle WorkflowState type
-    if (workflowState?.current_step) {
-      return workflowState.current_step;
+    if (typeof workflowState === 'object' && workflowState !== null) {
+      const state = workflowState as Record<string, unknown>;
+      if (state.current_step != null) {
+        return String(state.current_step);
+      }
+      if (state.stage != null) {
+        return String(state.stage);
+      }
     }
-    return workflowState?.stage ?? 'pending';
+    return 'pending';
   }
 
   /**
    * Update session status based on workflow state
    */
-  static updateSessionStatus(session: Session | any, status?: string): Session | any {
-    if (status && status.length > 0) {
-      session.status = status;
+  static updateSessionStatus(
+    session: Session | Record<string, unknown>,
+    status?: string,
+  ): Session | Record<string, unknown> {
+    if (status != null && status.length > 0) {
+      if (typeof session === 'object' && session != null) {
+        (session as Record<string, unknown>).status = status;
+      }
     }
     return session;
   }
@@ -238,7 +225,7 @@ export const SESSION_CONSTANTS = {
   MAX_SESSION_SIZE: 10 * 1024 * 1024, // 10MB
   CLEANUP_INTERVAL: 60 * 60 * 1000, // 1 hour
   MAX_SESSIONS_PER_USER: 10,
-  ID_PREFIX: 'session_'
+  ID_PREFIX: 'session_',
 } as const;
 
 /**
@@ -248,7 +235,7 @@ export class SessionError extends Error {
   constructor(
     message: string,
     public readonly code: string,
-    public readonly sessionId?: string
+    public readonly sessionId?: string,
   ) {
     super(message);
     this.name = 'SessionError';
