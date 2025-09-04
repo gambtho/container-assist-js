@@ -19,7 +19,7 @@ export type { ToolDescriptor, ToolContext } from '../tool-types.js';
 export class ToolRegistry {
   private tools = new Map<string, ToolDescriptor>();
   private toolList: Array<{ name: string; description?: string; inputSchema?: unknown }> = [];
-  private server!: McpServer; 
+  private server!: McpServer;
 
   constructor(
     private readonly services: Services,
@@ -36,11 +36,14 @@ export class ToolRegistry {
 
   private logToolExecution(toolName: string, params: unknown): void {
     // Log to our logger instead of server.log to avoid stdout interference
-    this.logger.info({
-      tool: toolName,
-      params: this.sanitizeParams(params) as any,
-      timestamp: new Date().toISOString(),
-    }, 'Tool execution started');
+    this.logger.info(
+      {
+        tool: toolName,
+        params: this.sanitizeParams(params) as any,
+        timestamp: new Date().toISOString(),
+      },
+      'Tool execution started',
+    );
   }
 
   private sanitizeParams(params: unknown): unknown {
@@ -452,7 +455,10 @@ export class ToolRegistry {
             if (this.server != null && module.default?.handler != null) {
               this.registerTool(module.default as any);
               this.logger.debug({ module: name, type: 'mcp' }, 'Tool loaded');
-            } else if (module.default?.handler != null || (module.default as any)?.execute != null) {
+            } else if (
+              module.default?.handler != null ||
+              (module.default as any)?.execute != null
+            ) {
               // Fallback to basic registration for testing
               this.register(module.default);
               this.logger.debug({ module: name, type: 'basic' }, 'Tool loaded');

@@ -85,10 +85,13 @@ export function createPinoLogger(config?: PinoConfig): Logger {
     };
 
     if (config?.useStderr) {
-      return pino({
-        ...options,
-        transport: prettyTransport,
-      }, pino.destination(2)); // Force to stderr
+      return pino(
+        {
+          ...options,
+          transport: prettyTransport,
+        },
+        pino.destination(2),
+      ); // Force to stderr
     } else {
       return pino({
         ...options,
