@@ -198,6 +198,10 @@ jobs:
       - name: Validate MCP tools
         run: |
           node -e "
-            const server = require('./dist/index.js');
-            console.log('MCP server tools validation passed');
+            import('./dist/src/index.js').then(() => {
+              console.log('MCP server tools validation passed');
+            }).catch(err => {
+              console.error('Failed to import MCP server:', err);
+              process.exit(1);
+            });
           "
