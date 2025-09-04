@@ -1,7 +1,7 @@
 {
-  "name": "container-kit-mcp",
+  "name": "containerization-assist-mcp",
   "version": "2.0.0",
-  "description": "Container Kit MCP Server - Complete Architecture",
+  "description": "Containerization Assist MCP Server - Complete Architecture",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -41,21 +41,23 @@
   },
   "keywords": [
     "mcp",
-    "containerization", 
+    "containerization",
     "docker",
     "kubernetes",
     "ai",
     "mcp-server-architecture"
   ],
-  "author": "Container Kit Team",
+  "author": "Containerization Assist Team",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/example/container-kit-mcp"
+    "url": "https://github.com/example/containerization-assist-mcp"
   },
   "jest": {
     "preset": "ts-jest/presets/default-esm",
-    "extensionsToTreatAsEsm": [".ts"],
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
     "testEnvironment": "node",
     "coverageThreshold": {
       "global": {
@@ -69,7 +71,7 @@
   "mcpServerArchitecture": {
     "components": {
       "types": "Type system implemented",
-      "infrastructure": "Infrastructure layer implemented", 
+      "infrastructure": "Infrastructure layer implemented",
       "service": "Service layer implemented",
       "testing": "Testing framework implemented"
     },

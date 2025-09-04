@@ -57,7 +57,7 @@ const pingTool: ToolDescriptor<PingInput, PingOutput> = {
       message: `pong: ${message}`,
       timestamp: new Date().toISOString(),
       server: {
-        name: 'container-kit-mcp',
+        name: 'containerization-assist-mcp',
         version: '2.0.0',
         uptime: process.uptime(),
         pid: process.pid,

@@ -61,7 +61,7 @@ export async function runContainerizationWorkflow(
     // Simulate build
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    imageId = `containerkit:${Date.now()}`;
+    imageId = `containerizationassist:${Date.now()}`;
 
     await buildReporter.complete('Docker image built successfully', {
       imageId,

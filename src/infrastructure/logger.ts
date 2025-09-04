@@ -53,7 +53,7 @@ export function createPinoLogger(config?: PinoConfig): Logger {
     base: {
       pid: process.pid,
       hostname: process.env.HOSTNAME ?? 'localhost',
-      service: config?.service ?? 'container-kit-mcp',
+      service: config?.service ?? 'containerization-assist-mcp',
       version: config?.version ?? '2.0.0',
     },
     formatters: {

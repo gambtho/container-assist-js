@@ -1,5 +1,5 @@
 /**
- * Error types and taxonomy for the Container Kit MCP Server
+ * Error types and taxonomy for the Containerization Assist MCP Server
  * Provides structured error handling with categorization
  */
 

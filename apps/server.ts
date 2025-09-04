@@ -1,5 +1,5 @@
 /**
- * Container Kit MCP Server - Constructor Injection Version
+ * Containerization Assist MCP Server - Constructor Injection Version
  * Uses direct service instantiation instead of service locator pattern
  */
 
@@ -24,7 +24,7 @@ import { ResourceManager } from '../src/application/resources/index.js';
 // Import interfaces for proper MCP sampling
 import { createSampler, type SampleFunction } from '../src/infrastructure/ai/sampling.js';
 
-export class ContainerKitMCPServer {
+export class ContainerizationAssistMCPServer {
   private server: McpServer;
   private services: Services;
   private toolRegistry: ToolRegistry;
@@ -54,7 +54,7 @@ export class ContainerKitMCPServer {
 
     // Initialize MCP server using the new API
     this.server = new McpServer({
-      name: 'container-kit-mcp',
+      name: 'containerization-assist-mcp',
       version: '2.0.0',
     });
 

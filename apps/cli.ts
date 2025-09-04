@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Container Kit MCP CLI
- * Command-line interface for the Container Kit MCP Server
+ * Containerization Assist MCP CLI
+ * Command-line interface for the Containerization Assist MCP Server
  */
 
 import { program } from 'commander';
-import { ContainerKitMCPServer } from './server.js';
+import { ContainerizationAssistMCPServer } from './server.js';
 import { createConfig, logConfigSummaryIfDev } from '../src/config/index.js';
 import { createPinoLogger } from '../src/infrastructure/logger.js';
 import { exit, argv, env, cwd } from 'node:process';
@@ -26,7 +26,7 @@ const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 const logger = createPinoLogger({ service: 'cli' });
 
 program
-  .name('container-kit-mcp')
+  .name('containerization-assist-mcp')
   .description('MCP server for AI-powered containerization workflows')
   .version(packageJson.version)
   .option('--config <path>', 'path to configuration file (.env)')
@@ -54,18 +54,18 @@ program
     `
 
 Examples:
-  $ container-kit-mcp                           Start server with stdio transport
-  $ container-kit-mcp --port 3000              Start server on HTTP port 3000
-  $ container-kit-mcp --dev --log-level debug  Start in development mode with debug logs
-  $ container-kit-mcp --list-tools             Show all available MCP tools
-  $ container-kit-mcp --health-check           Check system dependencies
-  $ container-kit-mcp --validate               Validate configuration
+  $ containerization-assist-mcp                           Start server with stdio transport
+  $ containerization-assist-mcp --port 3000              Start server on HTTP port 3000
+  $ containerization-assist-mcp --dev --log-level debug  Start in development mode with debug logs
+  $ containerization-assist-mcp --list-tools             Show all available MCP tools
+  $ containerization-assist-mcp --health-check           Check system dependencies
+  $ containerization-assist-mcp --validate               Validate configuration
 
 Quick Start:
   1. Copy .env.example to .env and configure
-  2. Run: container-kit-mcp --health-check
-  3. Start server: container-kit-mcp
-  4. Test with: echo '{"method":"tools/ping","params":{},"id":1}' | container-kit-mcp
+  2. Run: containerization-assist-mcp --health-check
+  3. Start server: containerization-assist-mcp
+  4. Test with: echo '{"method":"tools/ping","params":{},"id":1}' | containerization-assist-mcp
 
 MCP Tools Available:
   • Analysis: analyze_repository, resolve_base_images
@@ -167,7 +167,7 @@ async function main(): Promise<void> {
     logConfigSummaryIfDev(config);
 
     if (options.validate) {
-      console.log('🔍 Validating Container Kit MCP configuration...\n');
+      console.log('🔍 Validating Containerization Assist MCP configuration...\n');
       console.log('📋 Configuration Summary:');
       console.log(`  • Log Level: ${config.server.logLevel}`);
       console.log(`  • Workspace: ${config.workspace.workspaceDir}`);
@@ -199,14 +199,14 @@ async function main(): Promise<void> {
       logger.info('Configuration validation completed');
       console.log('\n✅ Configuration validation complete!');
       console.log('\nNext steps:');
-      console.log('  • Start server: container-kit-mcp');
-      console.log('  • List tools: container-kit-mcp --list-tools');
-      console.log('  • Health check: container-kit-mcp --health-check');
+      console.log('  • Start server: containerization-assist-mcp');
+      console.log('  • List tools: containerization-assist-mcp --list-tools');
+      console.log('  • Health check: containerization-assist-mcp --health-check');
       process.exit(0);
     }
 
     // Create server
-    const server = new ContainerKitMCPServer(config);
+    const server = new ContainerizationAssistMCPServer(config);
 
     if (options.listTools) {
       logger.info('Listing available tools');
@@ -275,10 +275,10 @@ async function main(): Promise<void> {
           devMode: options.dev,
         },
       },
-      'Starting Container Kit MCP Server',
+      'Starting Containerization Assist MCP Server',
     );
 
-    console.log('🚀 Starting Container Kit MCP Server...');
+    console.log('🚀 Starting Containerization Assist MCP Server...');
     console.log(`📦 Version: ${packageJson.version}`);
     console.log(`🏠 Workspace: ${config.workspace.workspaceDir}`);
     console.log(`📊 Log Level: ${config.server.logLevel}`);
@@ -362,9 +362,9 @@ async function main(): Promise<void> {
       }
 
       console.error('\n🛠️ Troubleshooting steps:');
-      console.error('  1. Run health check: container-kit-mcp --health-check');
-      console.error('  2. Validate config: container-kit-mcp --validate');
-      console.error('  3. Try mock mode: container-kit-mcp --mock');
+      console.error('  1. Run health check: containerization-assist-mcp --health-check');
+      console.error('  2. Validate config: containerization-assist-mcp --validate');
+      console.error('  3. Try mock mode: containerization-assist-mcp --mock');
       console.error('  4. Enable debug logging: --log-level debug');
       console.error('  5. Check the documentation: docs/TROUBLESHOOTING.md');
 

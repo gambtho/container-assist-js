@@ -175,7 +175,7 @@ jobs:
             ## Usage
             
             ```bash
-            container-kit-mcp --help
+            containerization-assist-mcp --help
             # or
             ck-mcp --help
             ```
