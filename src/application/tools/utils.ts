@@ -99,6 +99,7 @@ export function createToolDescriptor<TInput, TOutput>(config: {
   name: string;
   description: string;
   inputSchema: z.ZodType<TInput>;
+  outputSchema: z.ZodType<TOutput>;
   execute: (input: TInput, context: ToolContext) => Promise<TOutput>;
 }): {
   name: string;
@@ -113,7 +114,7 @@ export function createToolDescriptor<TInput, TOutput>(config: {
     description: config.description,
     category: 'utility' as const,
     inputSchema: config.inputSchema,
-    outputSchema: z.unknown() as z.ZodType<TOutput>,
+    outputSchema: config.outputSchema,
 
     async handler(rawInput: unknown, context: ToolContext): Promise<TOutput> {
       const logger = context.logger.child({ tool: config.name });

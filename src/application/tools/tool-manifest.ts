@@ -13,7 +13,15 @@ export enum ToolStatus {
 export interface ToolManifestEntry {
   name: string;
   status: ToolStatus;
-  category: string;
+  category:
+    | 'workflow'
+    | 'orchestration'
+    | 'utility'
+    | 'analysis'
+    | 'generation'
+    | 'docker'
+    | 'kubernetes'
+    | 'optimization';
   description: string;
   dependencies?: string[];
   requiredServices?: string[];
@@ -248,7 +256,17 @@ export function getToolInfo(toolName: string): ToolManifestEntry | undefined {
 /**
  * Get tools by category
  */
-export function getToolsByCategory(category: string): ToolManifestEntry[] {
+export function getToolsByCategory(
+  category:
+    | 'workflow'
+    | 'orchestration'
+    | 'utility'
+    | 'analysis'
+    | 'generation'
+    | 'docker'
+    | 'kubernetes'
+    | 'optimization',
+): ToolManifestEntry[] {
   return Object.values(TOOL_MANIFEST).filter((entry) => entry.category === category);
 }
 

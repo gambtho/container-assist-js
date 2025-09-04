@@ -175,7 +175,7 @@ export async function executeToolSafely<TInput, TOutput>(
         );
 
         // If this is the last attempt or error is not retryable, throw
-        if (attempt === retries + 1 ?? !isRetryableError(error)) {
+        if (attempt === retries + 1 || !isRetryableError(error)) {
           throw convertToMcpError(error);
         }
 
@@ -268,7 +268,7 @@ export function withRetry<TInput, TOutput>(
         );
 
         // If this is the last attempt or error is not retryable, throw
-        if (attempt === maxRetries ?? !isRetryableError(error)) {
+        if (attempt === maxRetries || !isRetryableError(error)) {
           throw convertToMcpError(error);
         }
 

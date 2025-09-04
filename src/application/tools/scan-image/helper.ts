@@ -13,6 +13,7 @@ const SEVERITY_PRIORITY: Record<string, number> = {
   high: 3,
   medium: 2,
   low: 1,
+  unknown: 0,
 };
 
 /**
@@ -151,8 +152,8 @@ export async function performDockerScan(
     if ('scan' in dockerService) {
       const result = await dockerService.scan(scanTarget);
 
-      if (!result.success ?? !result.data) {
-        throw new Error(result.error?.message ?? 'Scan failed');
+      if (!result.success || !result.data) {
+        throw new Error(result.error?.message || 'Scan failed');
       }
 
       return result.data;

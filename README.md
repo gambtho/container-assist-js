@@ -292,32 +292,34 @@ sudo usermod -aG docker $USER
 ### Commands
 
 ```bash
-# Build and Development
-npm run build          # Compile TypeScript
-npm run build:watch    # Watch mode compilation
-npm run start:dev      # Development server with auto-reload
+# Build and Development (Ultra-Fast with tsup)
+npm run build          # Fast development build (90ms)
+npm run build:prod     # Minified production build (710ms)
+npm run build:watch    # Live rebuild on changes
+npm run dev            # Development server with auto-reload
 
 # Code Quality
 npm run lint           # ESLint linting
 npm run lint:fix       # Auto-fix linting issues
 npm run typecheck      # TypeScript type checking
 npm run format         # Prettier formatting
-npm run validate       # Run all checks
+npm run validate       # Run all quality checks
 
 # Testing
 npm test               # Run all tests
-npm run test:unit      # Unit tests only
+npm run test:unit      # Unit tests with bail
 npm run test:integration # Integration tests
 npm run test:coverage  # Coverage report
 ```
 
 ### Code Standards
 
-- **TypeScript**: Strict mode with ES2022 modules
-- **Imports**: Relative paths only (no path aliases)
-- **Architecture**: Clean separation between layers
+- **Build System**: Ultra-fast tsup (esbuild-based) - 10-100x faster than tsc
+- **TypeScript**: Strict mode with ES2022 modules and native ESM support
+- **Imports**: Relative paths only (no path aliases, no import extension hacks)
+- **Architecture**: Clean separation between layers with strict boundaries
 - **Error Handling**: Result monad pattern throughout
-- **Testing**: Comprehensive unit and integration tests
+- **Testing**: Comprehensive unit and integration tests (146 passing)
 
 
 ## License

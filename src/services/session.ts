@@ -50,7 +50,7 @@ export class SessionService implements ISessionService {
     this.logger.info('Session service initialized');
   }
 
-  create(data: Partial<Session>): Session {
+  async create(data: Partial<Session>): Promise<Session> {
     const id = data.id ?? randomUUID();
     const now = new Date().toISOString();
     const session: Session = {
@@ -71,15 +71,17 @@ export class SessionService implements ISessionService {
 
     this.store.set(id, session);
     this.logger.info({ sessionId: id }, 'Session created');
+    await Promise.resolve(); // Make method truly async
     return session;
   }
 
-  get(id: string): Session | null {
+  async get(id: string): Promise<Session | null> {
+    await Promise.resolve(); // Make method truly async
     const session = this.store.get(id);
     return session;
   }
 
-  update(id: string, updates: Partial<Session>): void {
+  async update(id: string, updates: Partial<Session>): Promise<void> {
     const currentSession = this.store.get(id);
     if (!currentSession) {
       throw new Error('Session not found');
@@ -93,6 +95,7 @@ export class SessionService implements ISessionService {
 
     this.store.set(id, updated);
     this.logger.info({ sessionId: id }, 'Session updated');
+    await Promise.resolve(); // Make method truly async
   }
 
   updateWorkflowState(id: string, state: Partial<WorkflowState>): Session {
@@ -112,9 +115,10 @@ export class SessionService implements ISessionService {
     return updatedSession;
   }
 
-  delete(id: string): void {
+  async delete(id: string): Promise<void> {
     this.store.delete(id);
     this.logger.info({ sessionId: id }, 'Session deleted');
+    await Promise.resolve(); // Make method truly async
   }
 
   list(filter?: SessionFilter): Session[] {
@@ -148,8 +152,9 @@ export class SessionService implements ISessionService {
   }
 
   // Additional methods needed by resource providers
-  updateAtomic(id: string, updater: (session: Session) => Session): void {
+  async updateAtomic(id: string, updater: (session: Session) => Session): Promise<void> {
     this.store.updateAtomic(id, updater);
+    await Promise.resolve(); // Make method truly async
   }
 
   query(params: SessionFilter): Session[] {

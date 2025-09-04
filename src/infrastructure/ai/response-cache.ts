@@ -315,7 +315,7 @@ export class AIResponseCache {
 
     // Get top templates by access count
     const templateStats = new Map<string, number>();
-    for (const cached of this.cache.values()) {
+    for (const cached of Array.from(this.cache.values())) {
       const current = templateStats.get(cached.metadata.templateId) || 0;
       templateStats.set(cached.metadata.templateId, current + cached.accessCount);
     }
@@ -366,7 +366,7 @@ export class AIResponseCache {
     const now = Date.now();
     let cleanedCount = 0;
 
-    for (const [key, cached] of this.cache.entries()) {
+    for (const [key, cached] of Array.from(this.cache.entries())) {
       if (now > cached.expiresAt) {
         this.cache.delete(key);
         this.stats.totalEntries--;
@@ -500,7 +500,7 @@ export class AIResponseCache {
     let oldestKey: string | null = null;
     let oldestTime = Date.now();
 
-    for (const [key, cached] of this.cache.entries()) {
+    for (const [key, cached] of Array.from(this.cache.entries())) {
       if (cached.lastAccessed < oldestTime) {
         oldestTime = cached.lastAccessed;
         oldestKey = key;

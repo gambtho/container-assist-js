@@ -104,7 +104,7 @@ export class RepositoryAnalyzer {
         validateSecurity: includeSecurityAnalysis,
       });
 
-      if (!result.success ?? !result.data) {
+      if (!result.success || !result.data) {
         this.logger.error(
           {
             error: result.error,

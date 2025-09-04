@@ -72,15 +72,20 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
       // Create or get session
       let sessionId = inputSessionId;
       if ((sessionId == null || sessionId === '') && sessionService != null) {
-        const session = await sessionService.create({
-          projectName: path.basename(repoPath),
-          metadata: {
-            repoPath,
-            analysisDepth: depth,
-            includeTests,
-          },
-        });
-        sessionId = session.id;
+        try {
+          const session = await sessionService.create({
+            projectName: path.basename(repoPath),
+            metadata: {
+              repoPath,
+              analysisDepth: depth,
+              includeTests,
+            },
+          });
+          sessionId = session.id;
+        } catch (error) {
+          logger.warn({ error }, 'Failed to create session for repo analysis');
+          // Continue without session
+        }
       }
 
       // Emit progress

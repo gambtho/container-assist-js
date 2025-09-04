@@ -99,15 +99,16 @@ function getSystemInfo(): {
     loadAverage?: number[];
   };
 } {
-  const memUsage = process.memoryUsage();
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
 
   return {
     platform: process.platform,
     arch: process.arch,
     memory: {
-      used: memUsage.heapUsed,
-      total: memUsage.heapTotal,
-      free: memUsage.heapTotal - memUsage.heapUsed,
+      used: totalMem - freeMem,
+      total: totalMem,
+      free: freeMem,
     },
     cpu: {
       cores: os.cpus().length,

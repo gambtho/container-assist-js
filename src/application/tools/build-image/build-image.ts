@@ -4,7 +4,7 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { DockerBuildOptions, DockerBuildResult } from '../../../contracts/types/index.js';
+import type { DockerBuildOptions } from '../../../contracts/types/index.js';
 import { executeWithRetry } from '../error-recovery.js';
 import { ValidationError, NotFoundError } from '../../../errors/index.js';
 import type { Session } from '../../../contracts/types/session.js';
@@ -16,6 +16,7 @@ import {
 } from '../schemas.js';
 import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 import { fileExists } from '../utils.js';
+import { prepareBuildArgs, buildDockerImage, analyzeBuildSecurity } from './helper.js';
 
 const BuildImageInput = BuildImageInputSchema;
 const BuildImageOutput = BuildResultSchema;
@@ -24,109 +25,7 @@ const BuildImageOutput = BuildResultSchema;
 export type BuildInput = BuildImageParams;
 export type BuildOutput = BuildResult;
 
-/**
- * Prepare build arguments with defaults
- */
-function prepareBuildArgs(
-  buildArgs: Record<string, string>,
-  session: unknown,
-): Record<string, string> {
-  const defaults: Record<string, string> = {
-    NODE_ENV: process.env.NODE_ENV ?? 'production',
-    BUILD_DATE: new Date().toISOString(),
-    VCS_REF: process.env.GIT_COMMIT ?? 'unknown',
-  };
-
-  // Add session-specific args if available
-  if (typeof session === 'object' && session !== null) {
-    const sessionObj = session as Record<string, any>;
-    const workflowState = sessionObj.workflow_state;
-    if (typeof workflowState === 'object' && workflowState !== null) {
-      const analysisResult = workflowState.analysis_result;
-      if (typeof analysisResult === 'object' && analysisResult !== null) {
-        if (analysisResult.language) {
-          defaults.LANGUAGE = String(analysisResult.language);
-        }
-        if (analysisResult.framework) {
-          defaults.FRAMEWORK = String(analysisResult.framework);
-        }
-      }
-    }
-  }
-
-  return { ...defaults, ...buildArgs };
-}
-
-/**
- * Build Docker image using Docker service or CLI
- */
-async function buildDockerImage(
-  options: DockerBuildOptions,
-  context: ToolContext,
-): Promise<DockerBuildResult> {
-  const { logger } = context;
-  const dockerService = (context as any).dockerService;
-
-  // Use Docker service if available
-  if (dockerService && 'build' in dockerService) {
-    const result = await dockerService.build(options);
-    if (result.success) {
-      // Check if result has data property with build result
-      const buildResult = result.data;
-      if (buildResult) {
-        return buildResult;
-      }
-      // Otherwise result itself might be the DockerBuildResult
-      return result as unknown as DockerBuildResult;
-    }
-    const errorMessage =
-      typeof result === 'object' && result !== null && 'error' in result
-        ? String(result.error?.message || result.error || 'Docker build failed')
-        : 'Docker build failed';
-    throw new Error(errorMessage);
-  }
-
-  // Fallback to CLI implementation
-  logger.warn('Docker service not available, using CLI fallback');
-
-  // Mock implementation for CLI fallback
-  return {
-    imageId: `sha256:${Math.random().toString(36).substring(7)}`,
-    tags: options.tags ?? [],
-    size: 100 * 1024 * 1024, // 100MB
-    layers: 10,
-    buildTime: Date.now(),
-    logs: ['Build completed successfully', 'Using CLI fallback'],
-    success: true,
-  };
-}
-
-/**
- * Analyze build for security issues
- */
-function analyzeBuildSecurity(dockerfile: string, buildArgs: Record<string, string>): string[] {
-  const warnings: string[] = [];
-
-  // Check for secrets in build args
-  const sensitiveKeys = ['password', 'token', 'key', 'secret', 'api_key', 'apikey'];
-  for (const key of Object.keys(buildArgs)) {
-    if (sensitiveKeys.some((sensitive) => key.toLowerCase().includes(sensitive))) {
-      warnings.push(`Potential secret in build arg: ${key}`);
-    }
-  }
-
-  // Check for sudo in Dockerfile
-  if (dockerfile.includes('sudo ')) {
-    warnings.push('Dockerfile uses sudo - consider removing for security');
-  }
-
-  // Check for curl | sh pattern
-  if (dockerfile.includes('curl') && dockerfile.includes('| sh')) {
-    warnings.push('Dockerfile uses curl | sh pattern - verify source is trusted');
-  }
-
-  return warnings;
-}
+// Helper functions are now imported from ./helper.js
 
 /**
  * Main handler implementation
@@ -179,17 +78,24 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
 
       // Determine paths
       const repoPath = (session.metadata?.repoPath as string) || buildContext;
-      const dockerfilePath = path.isAbsolute(dockerfile)
+      let dockerfilePath = path.isAbsolute(dockerfile)
         ? dockerfile
         : path.join(repoPath, dockerfile);
 
-      // Check if Dockerfile exists
+      // Check if we should use a generated Dockerfile
+      const generatedPath = session.workflow_state?.dockerfile_result?.path;
+
       if (!(await fileExists(dockerfilePath))) {
-        // Check if it was generated in the session
-        const generatedPath = session.workflow_state?.dockerfile_result?.path;
+        // If the specified Dockerfile doesn't exist, check for generated one
         if (generatedPath && (await fileExists(generatedPath))) {
-          // Use generated Dockerfile
-          logger.info({ path: generatedPath }); // Fixed logger call
+          dockerfilePath = generatedPath;
+          logger.info(
+            {
+              generatedPath,
+              originalPath: dockerfile,
+            },
+            'Using generated Dockerfile',
+          );
         } else {
           throw new NotFoundError(
             `Dockerfile not found: ${dockerfilePath}`,
@@ -197,6 +103,16 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
             dockerfilePath,
           );
         }
+      } else if (generatedPath && (await fileExists(generatedPath))) {
+        // If both exist, prefer the generated one if it's newer
+        dockerfilePath = generatedPath;
+        logger.info(
+          {
+            generatedPath,
+            originalPath: dockerfile,
+          },
+          'Using generated Dockerfile instead of original',
+        );
       }
 
       // Read Dockerfile for analysis

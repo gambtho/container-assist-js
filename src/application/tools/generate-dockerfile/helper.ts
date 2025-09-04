@@ -115,7 +115,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
 # Runtime stage
-FROM alpine:latest
+FROM alpine:3.19
 RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 RUN addgroup -S app && adduser -S app -G app
@@ -419,8 +419,8 @@ function getStartCommand(analysis: AnalysisResult): string {
  */
 function getRecommendedBaseImage(language: string): string {
   const imageMap: Record<string, string> = {
-    javascript: 'node:18-alpine',
-    typescript: 'node:18-alpine',
+    javascript: 'node:20-alpine',
+    typescript: 'node:20-alpine',
     python: 'python:3.11-slim',
     java: 'openjdk:17-jdk-slim',
     go: 'golang:1.21-alpine',
@@ -429,7 +429,7 @@ function getRecommendedBaseImage(language: string): string {
     php: 'php:8.2-fpm-alpine',
   };
 
-  return imageMap[language] || 'alpine:latest';
+  return imageMap[language] || 'alpine:3.19';
 }
 
 /**
@@ -481,27 +481,79 @@ export function estimateImageSize(
   dependencies: string[],
   multistage: boolean,
 ): string {
+  // Updated base sizes with Node 20 and more accurate estimates
   const baseSizes: Record<string, number> = {
+    'node:20-alpine': 55,
+    'node:20': 380,
     'node:18-alpine': 50,
+    'node:18': 350,
+    'python:3.12-slim': 125,
     'python:3.11-slim': 120,
+    'python:3.11': 380,
     'openjdk:17-jdk-slim': 420,
+    'openjdk:11-jdk-slim': 400,
     'golang:1.21-alpine': 350,
-    'alpine:latest': 5,
+    'golang:1.20-alpine': 330,
+    'alpine:3.19': 5,
+    'alpine:3.18': 5,
+    'ubuntu:22.04': 77,
+    'ubuntu:20.04': 72,
+    'debian:12-slim': 74,
+    'debian:11-slim': 69,
   };
 
-  let estimatedSize = baseSizes[language] || 100;
-
-  // Add dependency overhead
-  estimatedSize += dependencies.length * 2;
-
-  // Multistage reduces final size
-  if (multistage) {
-    estimatedSize = Math.round(estimatedSize * 0.4);
+  // Try to match the base image more accurately
+  let baseSize = 100; // default
+  for (const [image, size] of Object.entries(baseSizes)) {
+    const langBase = language.split(':')[0];
+    if (langBase && (language.includes(image) || image.includes(langBase))) {
+      baseSize = size;
+      break;
+    }
   }
 
-  if (estimatedSize < 100) {
+  let estimatedSize = baseSize;
+
+  // More accurate dependency overhead calculation
+  // Different dependency types have different sizes
+  const depOverhead = dependencies.reduce((total, dep) => {
+    // Large dependencies
+    if (dep.includes('tensorflow') || dep.includes('torch') || dep.includes('opencv')) {
+      return total + 500;
+    }
+    // Medium dependencies
+    if (dep.includes('pandas') || dep.includes('numpy') || dep.includes('react')) {
+      return total + 50;
+    }
+    // Development dependencies (if not using multistage, they add to size)
+    if (
+      !multistage &&
+      (dep.includes('webpack') || dep.includes('typescript') || dep.includes('eslint'))
+    ) {
+      return total + 30;
+    }
+    // Default small dependency
+    return total + 2;
+  }, 0);
+
+  estimatedSize += depOverhead;
+
+  // Add application code estimate (assuming ~10-50MB for typical apps)
+  estimatedSize += 25;
+
+  // Multistage reduces final size by removing build tools
+  if (multistage) {
+    // More realistic reduction - removes dev dependencies and build artifacts
+    estimatedSize = Math.round(estimatedSize * 0.6);
+  }
+
+  // Add layer overhead (~10%)
+  estimatedSize = Math.round(estimatedSize * 1.1);
+
+  // Format output
+  if (estimatedSize < 1000) {
     return `~${estimatedSize}MB`;
   } else {
-    return `~${Math.round(estimatedSize / 100) / 10}GB`;
+    return `~${(estimatedSize / 1000).toFixed(1)}GB`;
   }
 }

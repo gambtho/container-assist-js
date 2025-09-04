@@ -372,7 +372,7 @@ export function getRecommendedBaseImage(language: string, framework?: string): s
   if (framework === 'django') return 'python:3.11-slim';
   if (framework === 'spring') return 'openjdk:17-jdk-slim';
 
-  return imageMap[language] || 'alpine:latest';
+  return imageMap[language] || 'alpine:3.19';
 }
 
 /**

@@ -5,6 +5,15 @@
 import type { ToolContext } from '../tool-types.js';
 
 /**
+ * Mask sensitive string for logging
+ */
+function maskSensitive(value: string | undefined): string {
+  if (!value) return '<empty>';
+  if (value.length <= 4) return '***';
+  return `${value.substring(0, 2)}***${value.substring(value.length - 2)}`;
+}
+
+/**
  * Authenticate with registry
  */
 export function authenticateRegistry(
@@ -23,7 +32,11 @@ export function authenticateRegistry(
     };
 
     if (envAuth.username ?? envAuth.authToken) {
-      logger.info('Using registry credentials from environment');
+      logger.info({
+        message: 'Using registry credentials from environment',
+        username: maskSensitive(envAuth.username),
+        hasToken: !!envAuth.authToken,
+      });
       Object.assign(credentials, envAuth);
     }
   }
@@ -34,7 +47,12 @@ export function authenticateRegistry(
   }
 
   // Would implement actual Docker registry authentication here
-  logger.info({ registry, username: credentials.username });
+  logger.info({
+    registry,
+    username: maskSensitive(credentials.username),
+    hasToken: !!credentials.authToken,
+    authenticated: true,
+  });
   return true;
 }
 

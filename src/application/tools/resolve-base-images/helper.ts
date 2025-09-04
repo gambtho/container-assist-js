@@ -107,7 +107,7 @@ export function getSuggestedImagesForReference(
     go: [
       {
         category: 'minimal',
-        image: 'alpine:latest',
+        image: 'alpine:3.19',
         notes: 'Smallest possible size for static binaries',
       },
       {
@@ -120,7 +120,7 @@ export function getSuggestedImagesForReference(
     rust: [
       {
         category: 'minimal',
-        image: 'alpine:latest',
+        image: 'alpine:3.19',
         notes: 'Smallest possible size for static binaries',
       },
       {
@@ -144,7 +144,7 @@ export function getSuggestedImagesForReference(
 
   return (
     references[language.toLowerCase()] || [
-      { category: 'minimal', image: 'alpine:latest', notes: 'Generic minimal base' },
+      { category: 'minimal', image: 'alpine:3.19', notes: 'Generic minimal base' },
       { category: 'standard', image: 'ubuntu:22.04', notes: 'Full-featured Linux base' },
     ]
   );
@@ -174,7 +174,7 @@ export function validateBaseImageRecommendation(
   }
 
   // Check for empty alternatives array
-  if (!recommendation.alternatives ?? recommendation.alternatives.length === 0) {
+  if (!recommendation.alternatives || recommendation.alternatives.length === 0) {
     issues.push('Missing alternative recommendations');
   }
 

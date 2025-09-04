@@ -5,6 +5,7 @@
 import type { Logger } from 'pino';
 import { AIClient } from '../infrastructure/ai-client.js';
 import type { SampleFunction } from '../infrastructure/ai/index.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export interface AIConfig {
   modelPreferences?: {
@@ -51,7 +52,7 @@ export class AIService {
   /**
    * Set MCP server directly (convenience method)
    */
-  setMCPServer(server: any): void {
+  setMCPServer(server: McpServer): void {
     this.client.setMCPServer(server);
   }
 

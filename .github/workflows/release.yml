@@ -13,6 +13,8 @@ on:
 
 env:
   NODE_VERSION: '20'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   validate-release:
@@ -139,7 +141,20 @@ jobs:
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg NODE_VERSION=20 \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-release.outputs.version }} \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            --label "org.opencontainers.image.version=${{ needs.validate-release.outputs.version }}" \
+            --label "org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            .
+
       - name: Create Release
+        id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -164,8 +179,23 @@ jobs:
             # or
             ck-mcp --help
             ```
+            
+            ## Docker Image
+            
+            ```bash
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-release.outputs.version }}
+            ```
           draft: false
           prerelease: ${{ contains(needs.validate-release.outputs.version, '-') }}
+
+      - name: Create release tarball
+        run: |
+          tar -czf containerization-assist-mcp-${{ needs.validate-release.outputs.version }}.tar.gz \
+            dist/ \
+            package.json \
+            package-lock.json \
+            README.md \
+            LICENSE
 
       - name: Upload Release Assets
         uses: actions/upload-release-asset@v1
@@ -173,6 +203,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist
+          asset_path: ./containerization-assist-mcp-${{ needs.validate-release.outputs.version }}.tar.gz
           asset_name: containerization-assist-mcp-${{ needs.validate-release.outputs.version }}.tar.gz
           asset_content_type: application/gzip

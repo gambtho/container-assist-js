@@ -99,7 +99,7 @@ export class SamplingStrategy {
    */
   static getParameters(templateId: string, context?: SamplingContext): SamplingParams {
     // Start with template-specific base parameters
-    const baseParams = TEMPLATE_STRATEGIES[templateId] || {
+    const baseParams = TEMPLATE_STRATEGIES[templateId] ?? {
       temperature: 0.2,
       maxTokens: 1000,
       topP: 0.9,
@@ -323,6 +323,6 @@ export class SamplingStrategy {
    * Get template-specific base parameters (for inspection/testing)
    */
   static getTemplateDefaults(templateId: string): SamplingParams | null {
-    return TEMPLATE_STRATEGIES[templateId] || null;
+    return TEMPLATE_STRATEGIES[templateId] ?? null;
   }
 }

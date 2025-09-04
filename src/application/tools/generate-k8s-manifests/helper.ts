@@ -15,6 +15,51 @@ import {
 } from '../../../infrastructure/ai/index.js';
 import type { ToolContext } from '../tool-types.js';
 
+/**
+ * Sanitize filename to be safe for filesystem
+ */
+function sanitizeFilename(name: string): string {
+  // Replace unsafe characters with hyphens
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/--+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 100); // Limit length
+}
+
+/**
+ * Get default API version for a Kubernetes resource kind
+ */
+function getDefaultApiVersion(kind?: string): string {
+  if (!kind) return 'v1';
+
+  const apiVersionMap: Record<string, string> = {
+    Deployment: 'apps/v1',
+    StatefulSet: 'apps/v1',
+    DaemonSet: 'apps/v1',
+    ReplicaSet: 'apps/v1',
+    Service: 'v1',
+    Pod: 'v1',
+    ConfigMap: 'v1',
+    Secret: 'v1',
+    PersistentVolume: 'v1',
+    PersistentVolumeClaim: 'v1',
+    ServiceAccount: 'v1',
+    Role: 'rbac.authorization.k8s.io/v1',
+    RoleBinding: 'rbac.authorization.k8s.io/v1',
+    ClusterRole: 'rbac.authorization.k8s.io/v1',
+    ClusterRoleBinding: 'rbac.authorization.k8s.io/v1',
+    Ingress: 'networking.k8s.io/v1',
+    NetworkPolicy: 'networking.k8s.io/v1',
+    HorizontalPodAutoscaler: 'autoscaling/v2',
+    Job: 'batch/v1',
+    CronJob: 'batch/v1',
+  };
+
+  return apiVersionMap[kind] || 'v1';
+}
+
 // Type for input options
 interface K8sManifestInput {
   sessionId: string;
@@ -138,6 +183,11 @@ export async function generateK8sManifests(
         ingressEnabled: input.ingressEnabled,
         ...(input.ingressHost && { ingressHost: input.ingressHost }),
         autoscaling: input.autoscaling?.enabled || false,
+        ...(input.autoscaling?.enabled && {
+          minReplicas: input.autoscaling.minReplicas ?? input.replicas,
+          maxReplicas: input.autoscaling.maxReplicas ?? input.replicas * 3,
+          targetCPU: input.autoscaling.targetCPU ?? 80,
+        }),
       };
 
       const builder = buildK8sRequest(k8sVariables, {
@@ -176,7 +226,15 @@ export async function generateK8sManifests(
     for (const doc of documents) {
       if (doc && typeof doc === 'object' && 'kind' in doc && 'metadata' in doc) {
         const manifest = doc as KubernetesManifest;
-        if (manifest.kind && manifest.metadata?.name) {
+
+        // Require apiVersion for all manifests
+        if (!manifest.apiVersion) {
+          logger.warn({ kind: manifest.kind }, 'Manifest missing apiVersion, adding default');
+          // Add default apiVersion based on kind
+          manifest.apiVersion = getDefaultApiVersion(manifest.kind);
+        }
+
+        if (manifest.kind && manifest.metadata?.name && manifest.apiVersion) {
           validManifests.push({
             kind: manifest.kind,
             name: manifest.metadata.name,
@@ -221,7 +279,9 @@ export async function generateK8sManifests(
     for (const { kind, name, manifest } of validManifests) {
       if (!manifest || !name) continue;
 
-      const filename = `${kind.toLowerCase()}-${name}.yaml`;
+      const sanitizedKind = sanitizeFilename(kind);
+      const sanitizedName = sanitizeFilename(name);
+      const filename = `${sanitizedKind}-${sanitizedName}.yaml`;
       const filepath = path.join(manifestDir, filename);
       const content = yaml.dump(manifest, { lineWidth: -1 });
 

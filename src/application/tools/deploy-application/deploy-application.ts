@@ -85,6 +85,17 @@ export type DeployInput = z.infer<typeof DeployApplicationInput>;
 export type DeployOutput = z.infer<typeof DeployApplicationOutput>;
 
 /**
+ * Validate Kubernetes resource name (RFC 1123)
+ */
+function isValidK8sName(name: string): boolean {
+  // Must be lowercase alphanumeric or '-'
+  // Must start and end with alphanumeric
+  // Max 253 characters (63 for labels)
+  const regex = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+  return regex.test(name) && name.length <= 253;
+}
+
+/**
  * Load manifests from directory
  */
 async function loadManifests(manifestsPath: string): Promise<KubernetesManifest[]> {
@@ -102,8 +113,15 @@ async function loadManifests(manifestsPath: string): Promise<KubernetesManifest[
     try {
       const docs = yaml.loadAll(content) as KubernetesManifest[];
       manifests.push(
-        ...docs.filter((d: KubernetesManifest | null): d is KubernetesManifest => d?.kind != null),
-      ); // Filter out null docs
+        ...docs.filter(
+          (d: KubernetesManifest | null): d is KubernetesManifest =>
+            d != null &&
+            typeof d === 'object' &&
+            'kind' in d &&
+            d.metadata?.name != null &&
+            isValidK8sName(d.metadata.name),
+        ),
+      ); // Filter out null/invalid docs
     } catch (error) {
       throw new Error(`Failed to parse ${file}: ${String(error)}`);
     }
@@ -220,7 +238,9 @@ async function rollbackDeployment(
   logger.info({ resources: deployed.length }, 'Starting rollback'); // Fixed logger call
 
   if (kubernetesService) {
-    for (const resource of deployed.reverse()) {
+    // Create a copy and reverse it to avoid mutation
+    const reversedDeployed = [...deployed].reverse();
+    for (const resource of reversedDeployed) {
       // Delete in reverse order
       try {
         if ('delete' in kubernetesService) {
@@ -369,7 +389,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
       }
 
       // Deploy to cluster
-      let deploymentResult: KubernetesDeploymentResult;
+      let deploymentResult: KubernetesDeploymentResult | undefined;
 
       try {
         deploymentResult = await deployToCluster(orderedManifests, input, context);
@@ -380,25 +400,27 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
         if (rollbackOnFailure && !dryRun) {
           logger.info('Attempting rollback due to deployment failure');
 
-          // Get partially deployed resources
-          const partialResult = await deployToCluster(
-            orderedManifests.slice(0, 1), // Try to get what was deployed
-            { ...input, dryRun: true },
-            context,
-          );
-
-          if (partialResult.deployed.length > 0) {
-            await rollbackDeployment(partialResult.deployed, namespace, context);
+          // Keep track of successfully deployed resources before failure
+          // The deploymentResult.deployed array should contain what was actually deployed
+          if (deploymentResult?.deployed && deploymentResult.deployed.length > 0) {
+            await rollbackDeployment(deploymentResult.deployed, namespace, context);
 
             throw new DomainError(
               ErrorCode.OPERATION_FAILED,
-              'Deployment failed and was rolled back',
+              `Deployment failed and was rolled back. Rolled back ${deploymentResult.deployed.length} resources`,
               error instanceof Error ? error : undefined,
             );
+          } else {
+            logger.warn('No resources to rollback');
           }
         }
 
         throw error;
+      }
+
+      // Ensure we have deploymentResult
+      if (!deploymentResult) {
+        throw new DomainError(ErrorCode.OPERATION_FAILED, 'Deployment result not available');
       }
 
       // Wait for deployment to be ready

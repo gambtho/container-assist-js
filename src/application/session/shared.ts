@@ -66,12 +66,27 @@ export class SessionUtils {
 
   /**
    * Check if session has expired
+   * Supports both ISO string and timestamp formats
    */
   static isExpired(session: Session): boolean {
     if (session.expires_at == null || session.expires_at === '') {
       return false;
     }
-    return new Date(session.expires_at).getTime() < Date.now();
+
+    // Handle both ISO string and timestamp formats
+    let expirationTime: number;
+    if (typeof session.expires_at === 'string') {
+      // ISO string format
+      expirationTime = new Date(session.expires_at).getTime();
+    } else if (typeof session.expires_at === 'number') {
+      // Timestamp format
+      expirationTime = session.expires_at;
+    } else {
+      // Unknown format, assume not expired
+      return false;
+    }
+
+    return expirationTime < Date.now();
   }
 
   /**

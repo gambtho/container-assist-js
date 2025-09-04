@@ -19,7 +19,11 @@ export async function checkDeploymentHealth(
 }> {
   const { kubernetesService, logger } = context;
 
-  if (kubernetesService != null && 'getStatus' in kubernetesService) {
+  if (
+    kubernetesService != null &&
+    'getStatus' in kubernetesService &&
+    typeof kubernetesService.getStatus === 'function'
+  ) {
     const result = await kubernetesService.getStatus(`deployment/${deploymentName}`, namespace);
 
     if (result?.success === true && result?.data != null) {

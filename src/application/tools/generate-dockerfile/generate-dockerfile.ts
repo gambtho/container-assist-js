@@ -97,13 +97,13 @@ export type DockerfileOutput = z.infer<typeof GenerateDockerfileOutput>;
 // Dockerfile templates for different languages
 const DOCKERFILE_TEMPLATES: Record<string, string> = {
   javascript: `# Build stage
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
 # Runtime stage
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
@@ -113,7 +113,7 @@ EXPOSE 3000
 CMD ["node", "index.js"]
 `,
   typescript: `# Build stage
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json tsconfig.json ./
 RUN npm ci
@@ -121,7 +121,7 @@ COPY src ./src
 RUN npm run build
 
 # Runtime stage
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 COPY --from=builder /app/package*.json ./
@@ -176,7 +176,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
 # Runtime stage
-FROM alpine:latest
+FROM alpine:3.19
 RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 RUN addgroup -S app && adduser -S app -G app
@@ -480,8 +480,8 @@ function getStartCommand(analysis: AnalysisResult): string {
  */
 function getRecommendedBaseImage(language: string): string {
   const imageMap: Record<string, string> = {
-    javascript: 'node:18-alpine',
-    typescript: 'node:18-alpine',
+    javascript: 'node:20-alpine',
+    typescript: 'node:20-alpine',
     python: 'python:3.11-slim',
     java: 'openjdk:17-jdk-slim',
     go: 'golang:1.21-alpine',
@@ -490,7 +490,7 @@ function getRecommendedBaseImage(language: string): string {
     php: 'php:8.2-fpm-alpine',
   };
 
-  return imageMap[language] || 'alpine:latest';
+  return imageMap[language] || 'alpine:3.19';
 }
 
 /**
@@ -539,11 +539,12 @@ function analyzeDockerfileSecurity(content: string): string[] {
  */
 function estimateImageSize(language: string, dependencies: string[], multistage: boolean): string {
   const baseSizes: Record<string, number> = {
+    'node:20-alpine': 55,
     'node:18-alpine': 50,
     'python:3.11-slim': 120,
     'openjdk:17-jdk-slim': 420,
     'golang:1.21-alpine': 350,
-    'alpine:latest': 5,
+    'alpine:3.19': 5,
   };
 
   let estimatedSize = baseSizes[language] || 100;
@@ -619,7 +620,7 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
             success: true,
             dockerfile: existingContent,
             path: dockerfilePath,
-            baseImage: input.baseImage ?? (analysis.recommendations?.baseImage || 'alpine:latest'),
+            baseImage: input.baseImage ?? (analysis.recommendations?.baseImage || 'alpine:3.19'),
             stages: [],
             optimizations: ['Using existing Dockerfile'],
             warnings: analyzeDockerfileSecurity(existingContent),
@@ -670,7 +671,7 @@ const generateDockerfileHandler: ToolDescriptor<DockerfileInput, DockerfileOutpu
       await fs.writeFile(dockerfilePath, content, 'utf-8');
 
       // Determine base image
-      const baseImage = input.baseImage ?? (analysis.recommendations?.baseImage || 'alpine:latest');
+      const baseImage = input.baseImage ?? (analysis.recommendations?.baseImage || 'alpine:3.19');
 
       // Estimate size
       const estimatedSize = estimateImageSize(

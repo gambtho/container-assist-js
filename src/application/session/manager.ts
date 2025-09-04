@@ -8,7 +8,7 @@ import type { Logger } from 'pino';
 import { SessionStore, SessionFilter } from '../../contracts/types/session-store.js';
 import { SessionUtils } from './utils';
 import { EventEmitter } from 'events';
-import path from 'path';
+import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
 
 // Time constants (in seconds)

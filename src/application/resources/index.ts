@@ -78,7 +78,7 @@ export class ResourceManager {
 
     try {
       // Register resources from all providers using new API
-      for (const [providerName, provider] of this.providers.entries()) {
+      for (const [providerName, provider] of Array.from(this.providers.entries())) {
         this.logger.debug({ provider: providerName }, 'Registering resources');
         const providerResources = (provider as { getResources: () => unknown[] }).getResources();
         for (const resource of providerResources) {
@@ -124,12 +124,68 @@ export class ResourceManager {
         }
       }
 
+      // Register meta-resources that were added directly to this.resources
+      for (const [uri, resource] of Array.from(this.resources.entries())) {
+        // Skip resources that were already registered from providers
+        if (
+          !Array.from(this.providers.values()).some((provider) => {
+            const providerResources =
+              (provider as { getResources?: () => unknown[] }).getResources?.() || [];
+            return providerResources.some((r: any) => r.uri === uri);
+          })
+        ) {
+          const resourceObj = resource as {
+            uri: string;
+            name: string;
+            description: string;
+            mimeType?: string;
+            handler: () => unknown;
+          };
+
+          // Register meta-resource using the new API
+          server.registerResource(
+            resourceObj.name,
+            resourceObj.uri,
+            {
+              title: resourceObj.name,
+              description: resourceObj.description,
+              mimeType: resourceObj.mimeType ?? 'application/json',
+            },
+            async () => {
+              try {
+                const result = await Promise.resolve(resourceObj.handler());
+                return {
+                  contents: [
+                    {
+                      uri: resourceObj.uri,
+                      mimeType: resourceObj.mimeType ?? 'application/json',
+                      text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
+                    },
+                  ],
+                };
+              } catch (error) {
+                this.logger.error({ error, uri: resourceObj.uri }, 'Meta-resource handler failed');
+                throw new Error(
+                  `Meta-resource handler failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                );
+              }
+            },
+          );
+
+          this.logger.debug({ uri: resourceObj.uri }, 'Registered meta-resource');
+        }
+      }
+
       this.isRegistered = true;
       this.logger.info(
         {
           providers: Array.from(this.providers.keys()),
+          metaResources: Array.from(this.resources.keys()).filter((uri) =>
+            uri.startsWith('resources://'),
+          ),
+          totalResources: this.resources.size,
         },
-        'Resource providers initialized',
+        'All resources registered with server',
       );
     } catch (error) {
       this.logger.error({ error }, 'Failed to register resource providers');
@@ -227,7 +283,7 @@ export class ResourceManager {
           };
 
           // Check each provider
-          for (const [name, _provider] of this.providers.entries()) {
+          for (const [name, _provider] of Array.from(this.providers.entries())) {
             try {
               // Basic health check - providers are healthy if they exist
               health.providers[name] = {

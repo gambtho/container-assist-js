@@ -191,9 +191,12 @@ export function serviceErrorToMcp(error: ServiceError): MCPError {
  * Universal error converter - handles any error type and converts to McpError
  */
 export function convertToMcpError(error: unknown): MCPError {
-  // Handle already converted MCP errors
+  // Handle already converted MCP errors (check for numeric code to distinguish from DomainError)
   if (typeof error === 'object' && error != null && 'code' in error && 'message' in error) {
-    return error as MCPError;
+    const errorObj = error as { code: unknown; message: string };
+    if (typeof errorObj.code === 'number') {
+      return error as MCPError;
+    }
   }
 
   // Handle tool-specific errors

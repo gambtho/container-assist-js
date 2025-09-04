@@ -6,7 +6,26 @@
 import type { Logger } from 'pino';
 import type { ApplicationConfig } from '../../config/index.js';
 
+/**
+ * MCP Resource interface
+ */
+export interface MCPResource {
+  uri: string;
+  name: string;
+  description: string;
+  mimeType: string;
+  handler: () => {
+    content: Array<{
+      type: string;
+      text: string;
+    }>;
+  };
+}
+
 export class ConfigResourceProvider {
+  // Maximum recursion depth for sanitization to prevent stack overflow
+  private static readonly MAX_RECURSION_DEPTH = 10;
+
   constructor(
     private config: ApplicationConfig,
     private logger: Logger,
@@ -17,7 +36,7 @@ export class ConfigResourceProvider {
   /**
    * Get configuration-related MCP resources
    */
-  getResources(): Array<unknown> {
+  getResources(): Array<MCPResource> {
     return [
       {
         uri: 'config://current',
@@ -292,15 +311,24 @@ export class ConfigResourceProvider {
     // Remove sensitive fields
     const sensitiveKeys = ['password', 'token', 'secret', 'key', 'credential', 'auth'];
 
-    const removeSensitive = (obj: unknown): void => {
+    const removeSensitive = (
+      obj: unknown,
+      depth = 0,
+      maxDepth = ConfigResourceProvider.MAX_RECURSION_DEPTH,
+    ): void => {
       if (typeof obj !== 'object' || obj === null) return;
+
+      if (depth > maxDepth) {
+        this.logger.warn({ depth }, 'Maximum recursion depth reached in sanitization');
+        return;
+      }
 
       const record = obj as Record<string, unknown>;
       for (const key in record) {
         if (sensitiveKeys.some((k) => key.toLowerCase().includes(k))) {
           record[key] = '[REDACTED]';
         } else if (typeof record[key] === 'object' && record[key] !== null) {
-          removeSensitive(record[key]);
+          removeSensitive(record[key], depth + 1, maxDepth);
         }
       }
     };

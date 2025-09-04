@@ -10,6 +10,7 @@ import { withValidationAndLogging } from '../../errors/validation.js';
 import { ToolNotImplementedError, suggestAlternativeTools } from '../../errors/tool-errors.js';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { getImplementedTools, isToolImplemented, getToolInfo } from '../tool-manifest.js';
+import type { ApplicationConfig } from '../../../config/types.js';
 
 // Re-export types
 export type { ToolDescriptor, ToolContext } from '../tool-types.js';
@@ -22,6 +23,7 @@ export class ToolRegistry {
   constructor(
     private readonly services: Services,
     private readonly logger: Logger,
+    private readonly config: ApplicationConfig,
   ) {
     this.logger = logger.child({ component: 'ToolRegistry' });
   }
@@ -515,7 +517,9 @@ export class ToolRegistry {
     contextOrSignal?: unknown,
     logger?: Logger,
   ): Promise<ToolContext> {
-    const signal = logger ? (contextOrSignal as AbortSignal) : (contextOrSignal as AbortSignal);
+    // When logger is provided, contextOrSignal is interpreted as AbortSignal
+    // Otherwise, contextOrSignal could be either signal or context (legacy support)
+    const signal = contextOrSignal as AbortSignal | undefined;
     const contextLogger = logger ?? this.logger;
 
     const { WorkflowManager } = await import('../../workflow/manager');
@@ -540,113 +544,7 @@ export class ToolRegistry {
       eventPublisher: this.services.events as any,
       workflowManager,
       workflowOrchestrator,
-      config: {
-        session: { store: 'memory', ttl: 3600, maxSessions: 100 },
-        server: { nodeEnv: 'development', logLevel: 'info', port: 3000, host: 'localhost' },
-        mcp: {
-          storePath: './data/sessions.db',
-          sessionTTL: '24h',
-          maxSessions: 100,
-          enableMetrics: false,
-          enableEvents: true,
-        },
-        workspace: { workspaceDir: process.cwd(), tempDir: './tmp', cleanupOnExit: true },
-        infrastructure: {
-          docker: {
-            socketPath: '/var/run/docker.sock',
-            registry: 'docker.io',
-            host: 'localhost',
-            port: 2376,
-            timeout: 300000,
-            apiVersion: '1.41',
-          },
-          kubernetes: {
-            kubeconfig: '',
-            namespace: 'default',
-            context: '',
-            timeout: 300000,
-            dryRun: false,
-          },
-          scanning: {
-            enabled: true,
-            scanner: 'trivy' as const,
-            severityThreshold: 'high' as const,
-            failOnVulnerabilities: false,
-            skipUpdate: false,
-            timeout: 300000,
-          },
-          build: {
-            enableCache: true,
-            parallel: false,
-            maxParallel: 4,
-            buildArgs: {},
-            labels: {},
-            target: '',
-            squash: false,
-          },
-          java: {
-            defaultVersion: '17',
-            defaultJvmHeapPercentage: 75,
-            enableNativeImage: false,
-            enableJmx: false,
-            enableProfiling: false,
-          },
-        },
-        aiServices: {
-          ai: {
-            apiKey: '',
-            model: 'claude-3-sonnet-20241022',
-            baseUrl: '',
-            timeout: 30000,
-            retryAttempts: 3,
-            retryDelayMs: 1000,
-            temperature: 0.1,
-            maxTokens: 4096,
-          },
-          sampler: {
-            mode: 'auto' as const,
-            templateDir: './templates',
-            cacheEnabled: true,
-            retryAttempts: 3,
-            retryDelayMs: 1000,
-          },
-          mock: {
-            enabled: false,
-            responsesDir: './mock-responses',
-            deterministicMode: false,
-            simulateLatency: false,
-            errorRate: 0,
-            latencyRange: { min: 100, max: 500 },
-          },
-        },
-        logging: {
-          level: 'info' as const,
-          format: 'pretty' as const,
-          destination: 'console' as const,
-          filePath: './logs/app.log',
-          maxFileSize: '10MB',
-          maxFiles: 5,
-          enableColors: true,
-        },
-        workflow: {
-          mode: 'interactive' as const,
-          autoRetry: true,
-          maxRetries: 3,
-          retryDelayMs: 5000,
-          parallelSteps: false,
-          skipOptionalSteps: false,
-        },
-        features: {
-          aiEnabled: true,
-          mockMode: false,
-          enableMetrics: false,
-          enableEvents: true,
-          enablePerformanceMonitoring: false,
-          enableDebugLogs: false,
-          enableTracing: false,
-          nonInteractive: false,
-        },
-      } as any,
+      config: this.config,
       logPerformanceMetrics: (operation: string, duration: number, metadata?: unknown) => {
         try {
           this.server?.notification({

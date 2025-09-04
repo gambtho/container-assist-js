@@ -7,6 +7,11 @@ import { z } from 'zod';
 
 // ============= Base Input Schemas =============
 
+/**
+ * Base schema for tools requiring a session ID.
+ * The session ID persists workflow state across tool invocations.
+ * @property sessionId - Unique identifier for the workflow session
+ */
 export const SessionIdInput = z.object({
   sessionId: z.string().min(1, 'Session ID is required'),
 });
@@ -60,7 +65,15 @@ export const DeployApplicationInput = SessionIdInput;
 
 export const VerifyDeploymentInput = SessionIdInput;
 
+/**
+ * Input for starting a workflow. Creates a new session if no sessionId provided.
+ * @property sessionId - Optional session ID to continue an existing workflow
+ * @property automated - Whether to run the workflow automatically
+ * @property deploy - Whether to include deployment steps
+ * @property scan - Whether to include security scanning
+ */
 export const StartWorkflowInput = RepoPathInput.extend({
+  sessionId: z.string().optional(),
   automated: z.boolean().default(true),
   deploy: z.boolean().default(true),
   scan: z.boolean().default(true),
@@ -238,8 +251,8 @@ export const WorkflowStateSchema = z.object({
   scanResult: z.any().optional(),
   k8sManifests: z.any().optional(),
   deploymentResult: z.any().optional(),
-  errors: z.record(z.string(), z.string()),
-  metadata: z.record(z.string(), z.unknown()),
+  errors: z.record(z.string(), z.string()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const SessionSchema = z.object({

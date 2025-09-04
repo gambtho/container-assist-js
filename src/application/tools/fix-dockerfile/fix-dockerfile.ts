@@ -187,14 +187,14 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileInputType, FixDoc
             try {
               await context.sessionService.updateAtomic(input.sessionId, (session: any) => ({
                 ...session,
-                workflowState: {
-                  ...(session.workflowState || {}),
+                workflow_state: {
+                  ...(session.workflow_state || {}),
                   dockerfile_result: {
-                    ...(session.workflowState?.dockerfile_result || {}),
+                    ...(session.workflow_state?.dockerfile_result || {}),
                     content: fix.data.fixed_dockerfile,
                   },
                   dockerfile_fix_history: [
-                    ...(session.workflowState?.dockerfile_fix_history ?? []),
+                    ...(session.workflow_state?.dockerfile_fix_history ?? []),
                     {
                       error: input.errorMessage,
                       fix: fix.data,

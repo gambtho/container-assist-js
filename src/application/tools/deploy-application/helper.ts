@@ -4,7 +4,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-// import * as yaml from 'js-yaml'; // TODO: Add js-yaml dependency
+import * as yaml from 'js-yaml';
 import { KubernetesManifest, KubernetesDeploymentResult } from '../../../contracts/types/index.js';
 
 export type { KubernetesDeploymentResult };
@@ -38,15 +38,24 @@ export async function loadManifests(manifestsPath: string): Promise<KubernetesMa
     const content = await fs.readFile(filepath, 'utf-8');
 
     try {
-      // TODO: Replace with actual yaml parsing when js-yaml is available
-      // const docs = yaml.loadAll(content) as KubernetesManifest[];
-      // For now, just try to parse as JSON (temporary workaround)
-      const docs = [JSON.parse(content)] as KubernetesManifest[];
+      // Parse YAML (supports both single and multi-document files)
+      const docs = yaml.loadAll(content) as KubernetesManifest[];
       manifests.push(
-        ...docs.filter((d: KubernetesManifest | null): d is KubernetesManifest => d?.kind != null),
-      ); // Filter out null docs
+        ...docs.filter(
+          (d: KubernetesManifest | null): d is KubernetesManifest =>
+            d != null && typeof d === 'object' && 'kind' in d,
+        ),
+      ); // Filter out null/invalid docs
     } catch (error) {
-      throw new Error(`Failed to parse ${file}: ${String(error)}`);
+      // Try JSON as fallback
+      try {
+        const jsonDoc = JSON.parse(content) as KubernetesManifest;
+        if (jsonDoc && typeof jsonDoc === 'object' && 'kind' in jsonDoc) {
+          manifests.push(jsonDoc);
+        }
+      } catch {
+        throw new Error(`Failed to parse ${file}: ${String(error)}`);
+      }
     }
   }
 
@@ -147,7 +156,10 @@ export async function rollbackDeployment(
   logger.info({ resources: deployed.length }, 'Starting rollback');
 
   if (kubernetesService) {
-    for (const resource of deployed.reverse()) {
+    // Create a copy and reverse it to avoid mutation
+    const resourcesToRollback = [...deployed].reverse();
+
+    for (const resource of resourcesToRollback) {
       // Delete in reverse order
       try {
         if ('delete' in kubernetesService) {

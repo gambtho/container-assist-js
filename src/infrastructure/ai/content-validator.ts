@@ -323,7 +323,7 @@ export class ContentValidator {
     const errors: string[] = [];
 
     // Apply security patterns
-    for (const [key, rule] of this.securityPatterns) {
+    for (const [key, rule] of Array.from(this.securityPatterns.entries())) {
       if (rule.pattern && rule.pattern.test(content)) {
         // Find all matches with line numbers
         const lines = content.split('\n');

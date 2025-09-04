@@ -119,32 +119,44 @@ export interface SessionService {
   /**
    * Get session by ID
    */
-  get(sessionId: string): Session | null;
+  get(sessionId: string): Promise<Session | null>;
 
   /**
    * Create new session
    */
-  create(data: Partial<Session>): Session;
+  create(data: Partial<Session>): Promise<Session>;
 
   /**
    * Update session atomically
    */
-  updateAtomic(sessionId: string, updater: (session: Session) => Session): void;
+  updateAtomic(sessionId: string, updater: (session: Session) => Session): Promise<void>;
 
   /**
    * Update session data
    */
-  update(sessionId: string, data: Partial<Session>): void;
+  update(sessionId: string, data: Partial<Session>): Promise<void>;
 
   /**
    * Delete session
    */
-  delete(sessionId: string): void;
+  delete(sessionId: string): Promise<void>;
 
   /**
    * Initialize the service (async setup)
    */
   initialize(): Promise<void>;
+}
+
+/**
+ * Progress update for workflow tracking
+ */
+export interface ProgressUpdate {
+  sessionId: string;
+  step: string;
+  status: 'in_progress' | 'completed' | 'failed';
+  message: string;
+  progress: number;
+  data?: unknown;
 }
 
 /**
@@ -154,14 +166,7 @@ export interface ProgressEmitter {
   /**
    * Emit progress update
    */
-  emit(update: {
-    sessionId: string;
-    step: string;
-    status: 'in_progress' | 'completed' | 'failed';
-    message: string;
-    progress: number;
-    data?: unknown;
-  }): Promise<void>;
+  emit(update: ProgressUpdate): Promise<void>;
 }
 
 /**

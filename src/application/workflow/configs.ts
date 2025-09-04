@@ -496,7 +496,7 @@ export function validateWorkflowConfig(config: WorkflowConfig): {
   // Step validation
   const stepNames = new Set<string>();
   for (const step of config.steps ?? []) {
-    if (!step.name ?? !step.tool) {
+    if (!step.name || !step.tool) {
       errors.push('Each step must have a name and tool');
     }
 

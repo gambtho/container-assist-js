@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
 import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 import type { Session } from '../../../contracts/types/session.js';
+import { authenticateRegistry, pushImage, pushWithRetry } from './helper.js';
 
 // Input schema with support for both snake_case and camelCase
 const PushImageInput = z
@@ -65,116 +66,7 @@ const PushImageOutput = z.object({
 export type PushInput = z.infer<typeof PushImageInput>;
 export type PushOutput = z.infer<typeof PushImageOutput>;
 
-/**
- * Authenticate with registry
- */
-function authenticateRegistry(
-  registry: string,
-  credentials: { username?: string; password?: string; authToken?: string },
-  context: ToolContext,
-): boolean {
-  const { logger } = context;
-
-  if (!credentials.username && !credentials.authToken) {
-    // Try to use environment variables
-    const envAuth = {
-      username: process.env.DOCKER_USERNAME,
-      password: process.env.DOCKER_PASSWORD,
-      authToken: process.env.DOCKER_AUTH_TOKEN,
-    };
-
-    if (envAuth.username ?? envAuth.authToken) {
-      logger.info('Using registry credentials from environment');
-      Object.assign(credentials, envAuth);
-    }
-  }
-
-  if (!credentials.username && !credentials.authToken) {
-    logger.warn('No registry credentials provided, attempting anonymous push');
-    return true;
-  }
-
-  // Would implement actual Docker registry authentication here
-  logger.info({ registry, username: credentials.username }); // Fixed logger call
-  return true;
-}
-
-/**
- * Push single image to registry
- */
-async function pushImage(
-  tag: string,
-  registry: string,
-  auth: { username?: string; password?: string },
-  context: ToolContext,
-): Promise<{ digest: string; size?: number; pushTime?: number }> {
-  const { dockerService, logger } = context;
-  const startTime = Date.now();
-
-  if (dockerService && 'push' in dockerService) {
-    const result = await dockerService.push({
-      image: tag,
-      registry,
-      auth: auth.username && auth.password ? auth : undefined,
-    });
-
-    if (result.success && result.data) {
-      const pushResult: { digest: string; size?: number; pushTime?: number } = {
-        digest: result.data.digest,
-        pushTime: Date.now() - startTime,
-      };
-
-      // Only add size if it's defined'
-      if (result.data.size !== undefined) {
-        pushResult.size = result.data.size;
-      }
-
-      return pushResult;
-    }
-
-    throw new Error(result.error?.message ?? 'Push failed');
-  }
-
-  // Fallback simulation
-  logger.warn('Simulating push - Docker service not available');
-  return {
-    digest: `sha256:${Math.random().toString(36).substring(7)}`,
-    size: 100 * 1024 * 1024,
-    pushTime: Date.now() - startTime,
-  };
-}
-
-/**
- * Retry logic for push operations
- */
-async function pushWithRetry(
-  tag: string,
-  registry: string,
-  auth: { username?: string; password?: string },
-  context: ToolContext,
-  maxRetries: number = 3,
-): Promise<{ digest: string; size?: number; pushTime?: number }> {
-  const { logger } = context;
-  let lastError: Error | undefined;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      logger.info({ tag, attempt, maxRetries }, `Pushing image (attempt ${attempt}/${maxRetries})`);
-      return await pushImage(tag, registry, auth, context);
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      logger.warn({ tag, error: lastError.message }, `Push attempt ${attempt} failed`);
-
-      if (attempt < maxRetries) {
-        // Exponential backoff
-        const delay = Math.pow(2, attempt) * 1000;
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-  }
-
-  throw lastError ?? new Error('Push failed after retries');
-}
+// Helper functions are now imported from ./helper.js
 
 /**
  * Main handler implementation
@@ -394,12 +286,11 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
 
       if (progressEmitter && sessionId) {
         await progressEmitter.emit({
+          sessionId,
           step: 'push_image',
-          message: 'Image push failed',
-          metadata: {
-            sessionId,
-            error: error instanceof Error ? error.message : String(error),
-          },
+          status: 'failed',
+          message: `Image push failed: ${error instanceof Error ? error.message : String(error)}`,
+          progress: 0,
         });
       }
 

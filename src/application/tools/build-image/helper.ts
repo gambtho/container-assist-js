@@ -51,12 +51,15 @@ export async function buildDockerImage(
   logger.warn('Docker service not available, using CLI fallback');
 
   // Mock implementation for CLI fallback
+  // Simulate build time between 5-15 seconds
+  const mockBuildTime = Math.floor(Math.random() * 10000) + 5000;
+
   return {
     imageId: `sha256:${Math.random().toString(36).substring(7)}`,
     tags: options.tags ?? [],
     size: 100 * 1024 * 1024, // 100MB
     layers: 10,
-    buildTime: Date.now(),
+    buildTime: mockBuildTime, // Build time in milliseconds
     logs: ['Build completed successfully', 'Using CLI fallback'],
     success: true,
   };

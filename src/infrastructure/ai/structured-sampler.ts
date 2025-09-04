@@ -107,8 +107,9 @@ export class StructuredSampler {
         const response = await this.sampler(request);
 
         if (!response.success) {
-          lastError = response.error;
-          this.logger.warn({ attempt: attempts, error: response.error }, 'Sampling failed');
+          const failedResponse = response;
+          lastError = failedResponse.error;
+          this.logger.warn({ attempt: attempts, error: failedResponse.error }, 'Sampling failed');
           continue;
         }
 

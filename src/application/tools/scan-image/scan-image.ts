@@ -91,6 +91,7 @@ const SEVERITY_PRIORITY: Record<string, number> = {
   high: 3,
   medium: 2,
   low: 1,
+  unknown: 0,
 };
 
 /**
@@ -141,7 +142,7 @@ function generateRecommendations(
     recommendations.push('Consider updating base image to reduce vulnerability count');
   }
 
-  const fixableVulns = vulnerabilities.filter((v) => v.fixedVersion);
+  const fixableVulns = vulnerabilities.filter((v) => v.fixedVersion || v.fixed_version);
   if (fixableVulns.length > 0) {
     recommendations.push(
       `${fixableVulns.length} vulnerabilities have fixes available - run updates`,
@@ -171,13 +172,21 @@ function mockScan(_imageId: string): DockerScanResult {
         fixedVersion: '1.0.1',
         description: 'Mock vulnerability for testing',
       },
+      {
+        severity: 'unknown',
+        cve: 'CVE-2024-9999',
+        package: 'unknown-package',
+        version: '2.0.0',
+        description: 'Unknown severity vulnerability',
+      },
     ],
     summary: {
       critical: 0,
       high: 1,
       medium: 2,
       low: 3,
-      total: 6,
+      unknown: 1,
+      total: 7,
     },
     scanTime: new Date().toISOString(),
   };
@@ -253,8 +262,8 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
         if ('scan' in dockerService) {
           const result = await dockerService.scan(scanTarget);
 
-          if (!result.success ?? !result.data) {
-            throw new Error(result.error?.message ?? 'Scan failed');
+          if (!result.success || !result.data) {
+            throw new Error(result.error?.message || 'Scan failed');
           }
 
           scanResult = result.data;
@@ -294,7 +303,9 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
       );
 
       // Calculate fixable count
-      const fixableCount = finalVulnerabilities.filter((v) => v.fixedVersion).length;
+      const fixableCount = finalVulnerabilities.filter(
+        (v) => v.fixedVersion || v.fixed_version,
+      ).length;
 
       // Generate recommendations
       const recommendations = generateRecommendations(finalVulnerabilities, scanResult.summary);

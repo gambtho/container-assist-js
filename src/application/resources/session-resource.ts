@@ -99,9 +99,9 @@ export class SessionResourceProvider {
         name: 'Session Details',
         description: 'Detailed information about a specific session',
         mimeType: 'application/json',
-        handler: (params: { sessionId: string }) => {
+        handler: async (params: { sessionId: string }) => {
           try {
-            const session = this.sessionService.get(params.sessionId);
+            const session = await this.sessionService.get(params.sessionId);
 
             if (!session) {
               return {

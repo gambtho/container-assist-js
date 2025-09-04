@@ -478,7 +478,7 @@ export class CacheKeyUtils {
    * Compare two cache keys for similarity
    */
   static areSimilar(key1: CacheKey, key2: CacheKey): boolean {
-    if (!key1.normalizedKey ?? !key2.normalizedKey) {
+    if (!key1.normalizedKey || !key2.normalizedKey) {
       return false;
     }
 

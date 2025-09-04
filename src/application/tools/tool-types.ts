@@ -65,7 +65,15 @@ export interface ToolHandler<TInput, TOutput> {
 export interface ToolDescriptor<TInput = any, TOutput = any> {
   name: string;
   description: string;
-  category: 'workflow' | 'orchestration' | 'utility';
+  category:
+    | 'workflow'
+    | 'orchestration'
+    | 'utility'
+    | 'analysis'
+    | 'generation'
+    | 'docker'
+    | 'kubernetes'
+    | 'optimization';
   inputSchema: z.ZodType<TInput> | z.ZodEffects<any, TInput, any> | z.ZodObject<any>;
   outputSchema: z.ZodType<TOutput> | z.ZodEffects<any, TOutput, any> | z.ZodObject<any>;
   handler: ToolHandler<TInput, TOutput>;

@@ -77,7 +77,7 @@ async function generateEnhancedDockerfile(
           devDependencies: (analysis.devDependencies ?? []).join(' '),
         },
         dockerContext: {
-          baseImage: input.base_image ?? (analysis.dockerConfig?.baseImage || 'node:18-alpine'),
+          baseImage: input.base_image ?? (analysis.dockerConfig?.baseImage || 'node:20-alpine'),
           multistage: input.multistage,
           securityHardening: input.security_hardening,
           includeHealthcheck: input.include_healthcheck,
@@ -283,15 +283,17 @@ export const enhancedGenerateDockerfileHandler: ToolDescriptor = {
         : null;
 
       // Update session state
-      await sessionService.updateAtomic(validatedInput.session_id, (session: any) => ({
-        ...session,
-        workflow_state: {
-          ...(session.workflow_state || {}),
-          dockerfileContent: dockerfileResult,
-          analysisResult,
-          validationResult: finalValidation,
-        },
-      }));
+      if (sessionService != null && typeof sessionService.updateAtomic === 'function') {
+        await sessionService.updateAtomic(validatedInput.session_id, (session: any) => ({
+          ...session,
+          workflow_state: {
+            ...(session.workflow_state || {}),
+            dockerfileContent: dockerfileResult,
+            analysisResult,
+            validationResult: finalValidation,
+          },
+        }));
+      }
 
       return {
         success: true,

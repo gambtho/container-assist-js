@@ -32,6 +32,7 @@ export class ContainerKitMCPServer {
   private logger: Logger;
   private shutdownHandlers: Array<() => Promise<void>> = [];
   private appConfig: ApplicationConfig;
+  private isShuttingDown: boolean = false;
 
   constructor(config?: ApplicationConfig) {
     // Use the unified configuration if no config provided
@@ -45,8 +46,8 @@ export class ContainerKitMCPServer {
     // Direct service instantiation - no factories or containers
     this.services = this.createServices();
 
-    // Create tool registry with injected services
-    this.toolRegistry = createToolRegistry(this.services, this.logger);
+    // Create tool registry with injected services and config
+    this.toolRegistry = createToolRegistry(this.services, this.logger, this.appConfig);
 
     // Initialize resource manager - needs to be done after services are created
     // Will initialize later in start() method when we have a tool registry
@@ -65,10 +66,13 @@ export class ContainerKitMCPServer {
    * Create a sampling function that uses client sampling capability
    */
   private createMCPSampler(): SampleFunction {
-    return createSampler({
-      type: 'mcp',
-      server: this.server,
-    }, this.logger);
+    return createSampler(
+      {
+        type: 'mcp',
+        server: this.server,
+      },
+      this.logger,
+    );
   }
 
   /**
@@ -88,10 +92,7 @@ export class ContainerKitMCPServer {
     if (this.appConfig.infrastructure?.docker?.port !== undefined) {
       dockerConfig.port = this.appConfig.infrastructure.docker.port;
     }
-    const dockerService = new DockerService(
-      dockerConfig,
-      this.logger.child({ service: 'docker' }),
-    );
+    const dockerService = new DockerService(dockerConfig, this.logger.child({ service: 'docker' }));
 
     const kubernetesConfig: any = {
       kubeconfig: this.appConfig.infrastructure?.kubernetes?.kubeconfig || '',
@@ -105,9 +106,8 @@ export class ContainerKitMCPServer {
       this.logger.child({ service: 'kubernetes' }),
     );
 
-    // AI service will be created after MCP server is ready
-    // This avoids initializing with mock sampler
-    const aiService: any = null; // Will be set in start() method
+    // AI service will be properly initialized after MCP server is ready
+    const aiService: any = null; // Will be created with proper sampler in start()
 
     const sessionService = new SessionService(
       {
@@ -120,7 +120,7 @@ export class ContainerKitMCPServer {
     return {
       docker: dockerService as any,
       kubernetes: kubernetesService as any,
-      ai: aiService as any, // Will be undefined initially, set in start()
+      ai: aiService, // Will be undefined initially, set in start()
       session: sessionService as any,
       events: new EventEmitter(),
     } as Services;
@@ -133,8 +133,6 @@ export class ContainerKitMCPServer {
     // MCP SDK logging is handled through the logging capability
     // The client will set the logging level via logging/setLevel requests
   }
-
-
 
   /**
    * Initialize all services
@@ -149,10 +147,8 @@ export class ContainerKitMCPServer {
       this.services.session.initialize(),
     ];
 
-    // Only initialize AI service if it exists (created after MCP server is ready)
-    if (this.services.ai) {
-      initPromises.push(this.services.ai.initialize());
-    }
+    // Skip AI service initialization here - it will be initialized in start()
+    // after we have the proper MCP sampler
 
     await Promise.all(initPromises);
 
@@ -167,15 +163,49 @@ export class ContainerKitMCPServer {
       // Create real MCP sampler using the server's client sampling capability
       const mcpSampler = this.createMCPSampler();
 
-      // Create AI service with real MCP sampler (no mock fallback)
+      // Get AI configuration from app config
+      const aiConfig = {
+        provider: 'openai',
+        apiKey: this.appConfig.aiServices?.ai?.apiKey || process.env.OPENAI_API_KEY || '',
+        model: this.appConfig.aiServices?.ai?.model || 'gpt-4',
+        temperature: this.appConfig.aiServices?.ai?.temperature || 0.7,
+        maxTokens: this.appConfig.aiServices?.ai?.maxTokens || 2000,
+        timeout: this.appConfig.aiServices?.ai?.timeout || 30000,
+        retryConfig: {
+          maxRetries: 3,
+          retryDelay: 1000,
+          maxRetryDelay: 10000,
+        },
+      };
+
+      // Create AI service with real MCP sampler and config
       this.services.ai = new AIService(
-        {},
+        aiConfig,
         mcpSampler,
         this.logger.child({ service: 'ai' }),
       ) as any;
-      
-      // Initialize the AI service after creation
-      await this.services.ai.initialize();
+
+      // Initialize and validate the AI service
+      try {
+        await this.services.ai.initialize();
+
+        // Test AI service connectivity
+        if (this.appConfig.aiServices?.ai?.apiKey) {
+          // AI service is configured, log success
+          this.logger.info({ provider: aiConfig.provider }, 'AI service initialized successfully');
+        }
+      } catch (error) {
+        this.logger.error({ error }, 'AI service initialization failed');
+
+        // Decide whether to fail hard or continue with degraded functionality
+        if (this.appConfig.features?.aiEnabled) {
+          this.logger.warn(
+            'AI is enabled but failed to initialize, continuing with degraded functionality',
+          );
+        } else {
+          this.logger.info('AI service is optional, continuing without it');
+        }
+      }
 
       // Set server on tool registry
       this.toolRegistry.setServer(this.server);
@@ -201,26 +231,28 @@ export class ContainerKitMCPServer {
       const transport = new StdioServerTransport();
       await this.server.connect(transport);
 
-      this.logger.info({
-        pid: process.pid,
-        version: '2.0.0',
-        services: {
-          docker: 'initialized',
-          kubernetes: 'initialized',
-          ai: 'initialized',
-          session: 'initialized',
+      this.logger.info(
+        {
+          pid: process.pid,
+          version: '2.0.0',
+          services: {
+            docker: 'initialized',
+            kubernetes: 'initialized',
+            ai: 'initialized',
+            session: 'initialized',
+          },
+          resources: {
+            providers: this.resourceManager.getProviderNames(),
+            registered: this.resourceManager.isResourcesRegistered(),
+          },
         },
-        resources: {
-          providers: this.resourceManager.getProviderNames(),
-          registered: this.resourceManager.isResourcesRegistered(),
-        },
-      }, 'MCP server started with constructor injection and resources');
+        'MCP server started with constructor injection and resources',
+      );
     } catch (error) {
       this.logger.error({ error }, 'Failed to start server');
       throw error;
     }
   }
-
 
   /**
    * Get comprehensive health status
@@ -235,7 +267,7 @@ export class ContainerKitMCPServer {
 
     try {
       const dockerHealth = await this.services.docker.health();
-      services.docker = dockerHealth.available ?? false;
+      services.docker = dockerHealth?.available ?? false;
     } catch (error) {
       this.logger.warn({ error }, 'Docker health check failed');
     }
@@ -251,7 +283,7 @@ export class ContainerKitMCPServer {
     services.session = true; // Session service is always available
 
     return {
-      healthy: Object.values(services).every(status => status),
+      healthy: Object.values(services).every((status) => status),
       services,
       version: '2.0.0',
       timestamp: new Date().toISOString(),
@@ -259,35 +291,59 @@ export class ContainerKitMCPServer {
   }
 
   private setupGracefulShutdown(): void {
-    const shutdown = async (signal: string) => {
-      this.logger.info({ signal }, 'Received shutdown signal');
+    const shutdown = async (signal: string): Promise<void> => {
+      this.logger.info({ signal }, 'Received shutdown signal, starting graceful shutdown...');
 
-      for (const handler of this.shutdownHandlers) {
-        try {
-          await handler();
-        } catch (error) {
-          this.logger.error({ error }, 'Shutdown handler failed');
-        }
+      // Prevent multiple shutdown attempts
+      if (this.isShuttingDown) {
+        this.logger.warn('Shutdown already in progress');
+        return;
       }
 
-      // Cleanup services (no complex container cleanup needed)
+      this.isShuttingDown = true;
+
       try {
-        if (this.services.docker && 'cleanup' in this.services.docker) {
-          await (this.services.docker as any).cleanup();
-        }
-        if (this.services.session && 'cleanup' in this.services.session) {
-          await (this.services.session as any).cleanup();
-        }
-      } catch (error) {
-        this.logger.error({ error }, 'Service cleanup failed');
-      }
+        // Give pending requests 30 seconds to complete
+        const shutdownTimeout = setTimeout(() => {
+          this.logger.error('Graceful shutdown timeout, forcing exit');
+          process.exit(1);
+        }, 30000);
 
-      this.logger.info('Server shutdown complete');
-      process.exit(0);
+        // Execute registered shutdown handlers
+        for (const handler of this.shutdownHandlers) {
+          try {
+            await handler();
+          } catch (error) {
+            this.logger.error({ error }, 'Shutdown handler failed');
+          }
+        }
+
+        // Close all service connections
+        await this.closeAllServices();
+
+        clearTimeout(shutdownTimeout);
+        this.logger.info('Graceful shutdown complete');
+        process.exit(0);
+      } catch (error) {
+        this.logger.error({ error }, 'Error during graceful shutdown');
+        process.exit(1);
+      }
     };
 
-    process.on('SIGTERM', () => void shutdown('SIGTERM'));
-    process.on('SIGINT', () => void shutdown('SIGINT'));
+    // Handle signals properly with async error handling
+    process.on('SIGTERM', () => {
+      shutdown('SIGTERM').catch((error) => {
+        this.logger.error({ error }, 'Error during SIGTERM shutdown');
+        process.exit(1);
+      });
+    });
+
+    process.on('SIGINT', () => {
+      shutdown('SIGINT').catch((error) => {
+        this.logger.error({ error }, 'Error during SIGINT shutdown');
+        process.exit(1);
+      });
+    });
   }
 
   /**
@@ -312,6 +368,59 @@ export class ContainerKitMCPServer {
   }
 
   /**
+   * Close all services gracefully
+   */
+  private async closeAllServices(): Promise<void> {
+    const closePromises = [];
+
+    // Close Docker service
+    if (this.services.docker) {
+      if ('close' in this.services.docker) {
+        closePromises.push((this.services.docker as any).close());
+      } else if ('cleanup' in this.services.docker) {
+        closePromises.push((this.services.docker as any).cleanup());
+      }
+    }
+
+    // Close Kubernetes service
+    if (this.services.kubernetes) {
+      if ('close' in this.services.kubernetes) {
+        closePromises.push((this.services.kubernetes as any).close());
+      } else if ('cleanup' in this.services.kubernetes) {
+        closePromises.push((this.services.kubernetes as any).cleanup());
+      }
+    }
+
+    // Close Session service
+    if (this.services.session) {
+      if ('close' in this.services.session) {
+        closePromises.push((this.services.session as any).close());
+      } else if ('cleanup' in this.services.session) {
+        closePromises.push((this.services.session as any).cleanup());
+      }
+    }
+
+    // Close AI service
+    if (this.services.ai) {
+      if ('close' in this.services.ai) {
+        closePromises.push((this.services.ai as any).close());
+      } else if ('cleanup' in this.services.ai) {
+        closePromises.push((this.services.ai as any).cleanup());
+      }
+    }
+
+    // Wait for all services to close
+    const results = await Promise.allSettled(closePromises);
+
+    // Log any errors
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        this.logger.error({ error: result.reason, index }, 'Service close failed');
+      }
+    });
+  }
+
+  /**
    * Get health status for external access
    */
   async getHealth(): Promise<any> {
@@ -327,21 +436,28 @@ export class ContainerKitMCPServer {
       const { AVAILABLE_TOOLS } = await import('../src/application/tools/registry-utils.js');
       const { getToolConfig } = await import('../src/application/tools/tool-config.js');
 
-      const toolList = AVAILABLE_TOOLS.map(toolName => {
-        const config = getToolConfig(toolName);
-        const tool = this.toolRegistry.getTool(toolName);
-        if (!tool) {
-          throw new Error(`Tool ${toolName} not found`);
-        }
+      const toolList = AVAILABLE_TOOLS.map((toolName) => {
+        try {
+          const config = getToolConfig(toolName);
+          const tool = this.toolRegistry.getTool(toolName);
 
-        return {
-          name: config.name,
-          description: config.description,
-          category: config.category || 'utility',
-          inputSchema: tool.inputSchema,
-          chainHint: tool.chainHint,
-        };
-      });
+          if (!tool) {
+            this.logger.warn({ toolName }, 'Tool not found in registry, skipping');
+            return null;
+          }
+
+          return {
+            name: config.name,
+            description: config.description,
+            category: config.category || 'utility',
+            inputSchema: tool.inputSchema,
+            chainHint: tool.chainHint,
+          };
+        } catch (error) {
+          this.logger.warn({ toolName, error }, 'Failed to get tool config, skipping');
+          return null;
+        }
+      }).filter((tool): tool is NonNullable<typeof tool> => tool !== null);
 
       return {
         success: true,

@@ -18,9 +18,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Handle both development (apps/) and production (dist/apps/) paths
-const packageJsonPath = __dirname.includes('dist') 
-  ? join(__dirname, '../../package.json')  // dist/apps/ -> root
-  : join(__dirname, '../package.json');     // apps/ -> root
+const packageJsonPath = __dirname.includes('dist')
+  ? join(__dirname, '../../package.json') // dist/apps/ -> root
+  : join(__dirname, '../package.json'); // apps/ -> root
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
 const logger = createPinoLogger({ service: 'cli' });
@@ -39,9 +39,19 @@ program
   .option('--validate', 'validate configuration and exit')
   .option('--list-tools', 'list all available MCP tools and exit')
   .option('--health-check', 'perform system health check and exit')
-  .option('--docker-socket <path>', 'Docker socket path (default: /var/run/docker.sock)', '/var/run/docker.sock')
-  .option('--k8s-namespace <namespace>', 'default Kubernetes namespace (default: default)', 'default')
-  .addHelpText('after', `
+  .option(
+    '--docker-socket <path>',
+    'Docker socket path (default: /var/run/docker.sock)',
+    '/var/run/docker.sock',
+  )
+  .option(
+    '--k8s-namespace <namespace>',
+    'default Kubernetes namespace (default: default)',
+    'default',
+  )
+  .addHelpText(
+    'after',
+    `
 
 Examples:
   $ container-kit-mcp                           Start server with stdio transport
@@ -75,7 +85,8 @@ Environment Variables:
   K8S_NAMESPACE            Default Kubernetes namespace
   MOCK_MODE                Enable mock mode for testing
   NODE_ENV                 Environment (development, production)
-`);
+`,
+  );
 
 program.parse(argv);
 
@@ -112,7 +123,9 @@ function validateOptions(opts: any): { valid: boolean; errors: string[] } {
     try {
       statSync(opts.dockerSocket);
     } catch (error) {
-      errors.push(`Docker socket not found: ${opts.dockerSocket}. Try --mock for testing without Docker.`);
+      errors.push(
+        `Docker socket not found: ${opts.dockerSocket}. Try --mock for testing without Docker.`,
+      );
     }
   }
 
@@ -134,7 +147,7 @@ async function main(): Promise<void> {
     const validation = validateOptions(options);
     if (!validation.valid) {
       console.error('❌ Configuration errors:');
-      validation.errors.forEach(error => console.error(`  • ${error}`));
+      validation.errors.forEach((error) => console.error(`  • ${error}`));
       console.error('\nUse --help for usage information');
       exit(1);
     }
@@ -221,7 +234,7 @@ async function main(): Promise<void> {
         console.log(`\nTotal: ${toolList.tools.length} tools available`);
       }
 
-      server.shutdown();
+      await server.shutdown();
       process.exit(0);
     }
 
@@ -249,18 +262,21 @@ async function main(): Promise<void> {
         }
       }
 
-      server.shutdown();
+      await server.shutdown();
       process.exit(health.status === 'healthy' ? 0 : 1);
     }
 
-    logger.info({
-      config: {
-        logLevel: config.server.logLevel,
-        workspace: config.workspace.workspaceDir,
-        mockMode: options.mock,
-        devMode: options.dev,
+    logger.info(
+      {
+        config: {
+          logLevel: config.server.logLevel,
+          workspace: config.workspace.workspaceDir,
+          mockMode: options.mock,
+          devMode: options.dev,
+        },
       },
-    }, 'Starting Container Kit MCP Server');
+      'Starting Container Kit MCP Server',
+    );
 
     console.log('🚀 Starting Container Kit MCP Server...');
     console.log(`📦 Version: ${packageJson.version}`);
@@ -280,24 +296,34 @@ async function main(): Promise<void> {
     console.log('✅ Server started successfully');
     console.log('🔌 Listening on stdio transport');
 
-    const shutdown = (signal: string): void => {
+    const shutdown = async (signal: string): Promise<void> => {
       logger.info({ signal }, 'Shutting down');
       console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
 
       try {
-        server.shutdown();
+        await server.shutdown();
         console.log('✅ Shutdown complete');
         process.exit(0);
       } catch (error) {
         logger.error({ error }, 'Shutdown error');
         console.error('❌ Shutdown error:', error);
-        exit(1);
+        process.exit(1);
       }
     };
 
-    process.on('SIGTERM', () => void shutdown('SIGTERM'));
-    process.on('SIGINT', () => void shutdown('SIGINT'));
+    process.on('SIGTERM', () => {
+      shutdown('SIGTERM').catch((error) => {
+        logger.error({ error }, 'Error during SIGTERM shutdown');
+        process.exit(1);
+      });
+    });
 
+    process.on('SIGINT', () => {
+      shutdown('SIGINT').catch((error) => {
+        logger.error({ error }, 'Error during SIGINT shutdown');
+        process.exit(1);
+      });
+    });
   } catch (error) {
     logger.error({ error }, 'Server startup failed');
     console.error('❌ Server startup failed');
@@ -368,4 +394,3 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Run the CLI
 void main();
-

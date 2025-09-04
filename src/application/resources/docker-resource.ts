@@ -102,7 +102,7 @@ export class DockerResourceProvider {
                   text: JSON.stringify(
                     {
                       available: health.available,
-                      client: health.client,
+                      client: health.client ? 'dockerode' : null,
                       version: health.version ?? null,
                       systemInfo: systemInfo
                         ? (() => {
@@ -331,7 +331,7 @@ export class DockerResourceProvider {
 
             const context = {
               dockerAvailable: health.available,
-              client: health.client,
+              client: health.client ? 'dockerode' : null,
               version: health.version,
               buildCapabilities: {
                 dockerfile: true,

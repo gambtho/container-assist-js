@@ -160,7 +160,7 @@ export async function generateFixedDockerfile(
 
       const result = await context.aiService.generate(requestBuilder);
 
-      if (result.data) {
+      if (result?.data != null && typeof result.data === 'string') {
         let fixedContent = result.data;
 
         // If response includes markdown, extract the dockerfile content
