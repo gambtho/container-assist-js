@@ -3,6 +3,7 @@
  * Clean event system without infrastructure dependencies
  */
 
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 export interface DomainEvent {
@@ -187,7 +188,7 @@ export function createDomainEvent(
   metadata?: Record<string, unknown>,
 ): DomainEvent {
   return {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     type,
     aggregateId,
     aggregateType,
