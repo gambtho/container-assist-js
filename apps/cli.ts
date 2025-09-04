@@ -23,7 +23,8 @@ const packageJsonPath = __dirname.includes('dist')
   : join(__dirname, '../package.json'); // apps/ -> root
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
-const logger = createPinoLogger({ service: 'cli' });
+// Always use stderr for logging to avoid MCP protocol interference
+const logger = createPinoLogger({ service: 'cli', useStderr: true });
 
 program
   .name('containerization-assist-mcp')
@@ -37,7 +38,7 @@ program
   .option('--dev', 'enable development mode with debug logging')
   .option('--mock', 'use mock AI sampler for testing')
   .option('--validate', 'validate configuration and exit')
-  .option('--list-tools', 'list all available MCP tools and exit')
+  .option('--list-tools', 'list all registered MCP tools and exit')
   .option('--health-check', 'perform system health check and exit')
   .option(
     '--docker-socket <path>',
@@ -167,54 +168,54 @@ async function main(): Promise<void> {
     logConfigSummaryIfDev(config);
 
     if (options.validate) {
-      console.log('🔍 Validating Containerization Assist MCP configuration...\n');
-      console.log('📋 Configuration Summary:');
-      console.log(`  • Log Level: ${config.server.logLevel}`);
-      console.log(`  • Workspace: ${config.workspace.workspaceDir}`);
-      console.log(`  • Docker Socket: ${process.env.DOCKER_SOCKET || '/var/run/docker.sock'}`);
-      console.log(`  • K8s Namespace: ${process.env.K8S_NAMESPACE || 'default'}`);
-      console.log(`  • Mock Mode: ${process.env.MOCK_MODE === 'true' ? 'enabled' : 'disabled'}`);
-      console.log(`  • Environment: ${process.env.NODE_ENV || 'production'}`);
+      console.error('🔍 Validating Containerization Assist MCP configuration...\n');
+      console.error('📋 Configuration Summary:');
+      console.error(`  • Log Level: ${config.server.logLevel}`);
+      console.error(`  • Workspace: ${config.workspace.workspaceDir}`);
+      console.error(`  • Docker Socket: ${process.env.DOCKER_SOCKET || '/var/run/docker.sock'}`);
+      console.error(`  • K8s Namespace: ${process.env.K8S_NAMESPACE || 'default'}`);
+      console.error(`  • Mock Mode: ${process.env.MOCK_MODE === 'true' ? 'enabled' : 'disabled'}`);
+      console.error(`  • Environment: ${process.env.NODE_ENV || 'production'}`);
 
       // Test Docker connection if not in mock mode
       if (!options.mock) {
-        console.log('\n🐳 Testing Docker connection...');
+        console.error('\n🐳 Testing Docker connection...');
         try {
           execSync('docker version', { stdio: 'pipe' });
-          console.log('  ✅ Docker connection successful');
+          console.error('  ✅ Docker connection successful');
         } catch (error) {
-          console.log('  ⚠️  Docker connection failed - consider using --mock for testing');
+          console.error('  ⚠️  Docker connection failed - consider using --mock for testing');
         }
       }
 
       // Test Kubernetes connection
-      console.log('\n☸️  Testing Kubernetes connection...');
+      console.error('\n☸️  Testing Kubernetes connection...');
       try {
         execSync('kubectl version --client=true', { stdio: 'pipe' });
-        console.log('  ✅ Kubernetes client available');
+        console.error('  ✅ Kubernetes client available');
       } catch (error) {
-        console.log('  ⚠️  Kubernetes client not found - kubectl not in PATH');
+        console.error('  ⚠️  Kubernetes client not found - kubectl not in PATH');
       }
 
       logger.info('Configuration validation completed');
-      console.log('\n✅ Configuration validation complete!');
-      console.log('\nNext steps:');
-      console.log('  • Start server: containerization-assist-mcp');
-      console.log('  • List tools: containerization-assist-mcp --list-tools');
-      console.log('  • Health check: containerization-assist-mcp --health-check');
+      console.error('\n✅ Configuration validation complete!');
+      console.error('\nNext steps:');
+      console.error('  • Start server: containerization-assist-mcp');
+      console.error('  • List tools: containerization-assist-mcp --list-tools');
+      console.error('  • Health check: containerization-assist-mcp --health-check');
       process.exit(0);
     }
 
     // Create server
-    const server = new ContainerizationAssistMCPServer(config);
+    const server = new ContainerizationAssistMCPServer(config, true);
 
     if (options.listTools) {
       logger.info('Listing available tools');
       await server.initialize();
 
       const toolList = await server.listTools();
-      console.log('Available tools:');
-      console.log('═'.repeat(60));
+      console.error('Available tools:');
+      console.error('═'.repeat(60));
 
       if ('tools' in toolList && Array.isArray(toolList.tools)) {
         const toolsByCategory = toolList.tools.reduce((acc: Record<string, any[]>, tool: any) => {
@@ -225,13 +226,15 @@ async function main(): Promise<void> {
         }, {});
 
         for (const [category, tools] of Object.entries(toolsByCategory)) {
-          console.log(`\n📁 ${category.toUpperCase()}`);
+          console.error(`\n📁 ${category.toUpperCase()}`);
           (tools as Array<{ name: string; description: string }>).forEach((tool) => {
-            console.log(`  • ${tool.name.padEnd(25)} ${tool.description}`);
+            console.error(`  • ${tool.name.padEnd(25)} ${tool.description || 'No description'}`);
           });
         }
 
-        console.log(`\nTotal: ${toolList.tools.length} tools available`);
+        console.error(`\nTotal: ${toolList.tools.length} tools registered`);
+      } else {
+        console.error('No tools found in registry');
       }
 
       await server.shutdown();
@@ -244,21 +247,21 @@ async function main(): Promise<void> {
 
       const health = await server.getHealth();
 
-      console.log('🏥 Health Check Results');
-      console.log('═'.repeat(40));
-      console.log(`Status: ${health.status === 'healthy' ? '✅ Healthy' : '❌ Unhealthy'}`);
-      console.log(`Uptime: ${Math.floor(health.uptime)}s`);
-      console.log('\nServices:');
+      console.error('🏥 Health Check Results');
+      console.error('═'.repeat(40));
+      console.error(`Status: ${health.status === 'healthy' ? '✅ Healthy' : '❌ Unhealthy'}`);
+      console.error(`Uptime: ${Math.floor(health.uptime)}s`);
+      console.error('\nServices:');
 
       for (const [service, status] of Object.entries(health.services)) {
         const icon = status ? '✅' : '❌';
-        console.log(`  ${icon} ${service}`);
+        console.error(`  ${icon} ${service}`);
       }
 
       if (health.metrics) {
-        console.log('\nMetrics:');
+        console.error('\nMetrics:');
         for (const [metric, value] of Object.entries(health.metrics)) {
-          console.log(`  📊 ${metric}: ${String(value)}`);
+          console.error(`  📊 ${metric}: ${String(value)}`);
         }
       }
 
@@ -278,31 +281,36 @@ async function main(): Promise<void> {
       'Starting Containerization Assist MCP Server',
     );
 
-    console.log('🚀 Starting Containerization Assist MCP Server...');
-    console.log(`📦 Version: ${packageJson.version}`);
-    console.log(`🏠 Workspace: ${config.workspace.workspaceDir}`);
-    console.log(`📊 Log Level: ${config.server.logLevel}`);
+    console.error('🚀 Starting Containerization Assist MCP Server...');
+    console.error(`📦 Version: ${packageJson.version}`);
+    console.error(`🏠 Workspace: ${config.workspace.workspaceDir}`);
+    console.error(`📊 Log Level: ${config.server.logLevel}`);
 
     if (options.mock) {
-      console.log('🤖 Running with mock AI sampler');
+      console.error('🤖 Running with mock AI sampler');
     }
 
     if (options.dev) {
-      console.log('🔧 Development mode enabled');
+      console.error('🔧 Development mode enabled');
     }
 
     await server.start();
 
-    console.log('✅ Server started successfully');
-    console.log('🔌 Listening on stdio transport');
+    if (options.port) {
+      console.error('✅ Server started successfully');
+      console.error(`🔌 Listening on HTTP port ${options.port}`);
+    } else {
+      console.error('✅ Server started successfully');
+      console.error('🔌 Listening on stdio transport');
+    }
 
     const shutdown = async (signal: string): Promise<void> => {
       logger.info({ signal }, 'Shutting down');
-      console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+      console.error(`\n🛑 Received ${signal}, shutting down gracefully...`);
 
       try {
         await server.shutdown();
-        console.log('✅ Shutdown complete');
+        console.error('✅ Shutdown complete');
         process.exit(0);
       } catch (error) {
         logger.error({ error }, 'Shutdown error');

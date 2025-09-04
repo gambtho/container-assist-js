@@ -34,13 +34,14 @@ export class ContainerizationAssistMCPServer {
   private appConfig: ApplicationConfig;
   private isShuttingDown: boolean = false;
 
-  constructor(config?: ApplicationConfig) {
+  constructor(config?: ApplicationConfig, useStderr = true) {
     // Use the unified configuration if no config provided
     this.appConfig = config || applicationConfig;
 
     this.logger = createPinoLogger({
       level: this.appConfig.server.logLevel,
-      environment: this.appConfig.server.nodeEnv,
+      environment: useStderr ? 'production' : this.appConfig.server.nodeEnv, // Force production mode for MCP
+      useStderr, // Use stderr for MCP stdio transport
     });
 
     // Direct service instantiation - no factories or containers
@@ -365,6 +366,13 @@ export class ContainerizationAssistMCPServer {
   }
 
   /**
+   * Get MCP server instance for external access if needed
+   */
+  getServer(): McpServer {
+    return this.server;
+  }
+
+  /**
    * Get tool registry for external access if needed
    */
   getToolRegistry(): ToolRegistry {
@@ -479,7 +487,31 @@ export class ContainerizationAssistMCPServer {
   /**
    * Shutdown the server gracefully
    */
-  shutdown(): void {
-    this.setupGracefulShutdown();
+  async shutdown(): Promise<void> {
+    if (this.isShuttingDown) {
+      this.logger.warn('Shutdown already in progress');
+      return;
+    }
+
+    this.isShuttingDown = true;
+    this.logger.info('Starting graceful shutdown...');
+
+    try {
+      for (const handler of this.shutdownHandlers) {
+        try {
+          await handler();
+        } catch (error) {
+          this.logger.error({ error }, 'Shutdown handler failed');
+        }
+      }
+
+      // Close all service connections
+      await this.closeAllServices();
+
+      this.logger.info('Graceful shutdown complete');
+    } catch (error) {
+      this.logger.error({ error }, 'Error during graceful shutdown');
+      throw error;
+    }
   }
 }

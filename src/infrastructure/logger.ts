@@ -20,6 +20,7 @@ export interface PinoConfig {
   logFile?: string;
   service?: string;
   version?: string;
+  useStderr?: boolean; // Use stderr instead of stdout (for MCP stdio transport)
 }
 
 /**
@@ -70,28 +71,44 @@ export function createPinoLogger(config?: PinoConfig): Logger {
     },
   };
 
-  // In development, use pretty printing
+  // In development, use pretty printing but disable colors for MCP transport
   if (isDevelopment && config?.pretty !== false) {
-    return pino({
-      ...options,
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'HH:MM:ss Z',
-          ignore: 'pid,hostname',
-          singleLine: false,
-          errorProps: 'stack,cause',
-        },
+    const prettyTransport = {
+      target: 'pino-pretty',
+      options: {
+        colorize: !config?.useStderr, // Disable colors when using stderr for MCP
+        translateTime: 'HH:MM:ss Z',
+        ignore: 'pid,hostname',
+        singleLine: false,
+        errorProps: 'stack,cause',
       },
-    });
+    };
+
+    if (config?.useStderr) {
+      return pino({
+        ...options,
+        transport: prettyTransport,
+      }, pino.destination(2)); // Force to stderr
+    } else {
+      return pino({
+        ...options,
+        transport: prettyTransport,
+      });
+    }
   }
 
   // Production mode with optional file logging
   const destinations = [];
 
-  // Always log to stdout
-  destinations.push(pino.destination(1));
+  // For MCP transport, completely disable stdout/stderr logging to avoid protocol interference
+  if (config?.useStderr) {
+    // Log to a file only for MCP mode to avoid any stdout/stderr interference
+    const logPath = join('./.mcp/logs', 'mcp-server.log');
+    destinations.push(pino.destination(logPath));
+  } else {
+    // Log to stdout for normal operation
+    destinations.push(pino.destination(1));
+  }
 
   // Optionally log to file
   if (config?.logFile) {
@@ -103,8 +120,9 @@ export function createPinoLogger(config?: PinoConfig): Logger {
 }
 
 /**
- * Default logger instance
+ * Default logger instance - always use stderr to avoid MCP protocol interference
  */
 export const defaultPinoLogger = createPinoLogger({
   environment: process.env.NODE_ENV ?? 'development',
+  useStderr: true,
 });

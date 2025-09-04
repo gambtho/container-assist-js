@@ -11,6 +11,7 @@ import { ToolNotImplementedError, suggestAlternativeTools } from '../../errors/t
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { getImplementedTools, isToolImplemented, getToolInfo } from '../tool-manifest.js';
 import type { ApplicationConfig } from '../../../config/types.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 // Re-export types
 export type { ToolDescriptor, ToolContext } from '../tool-types.js';
@@ -18,7 +19,7 @@ export type { ToolDescriptor, ToolContext } from '../tool-types.js';
 export class ToolRegistry {
   private tools = new Map<string, ToolDescriptor>();
   private toolList: Array<{ name: string; description?: string; inputSchema?: unknown }> = [];
-  private server: any = null;
+  private server!: McpServer; 
 
   constructor(
     private readonly services: Services,
@@ -28,19 +29,18 @@ export class ToolRegistry {
     this.logger = logger.child({ component: 'ToolRegistry' });
   }
 
-  setServer(server: unknown): void {
+  setServer(server: McpServer): void {
     this.server = server;
     this.logger.info('MCP server attached to registry');
   }
 
   private logToolExecution(toolName: string, params: unknown): void {
-    if (this.server != null) {
-      this.server.log('info', 'Tool execution started', {
-        tool: toolName,
-        params: this.sanitizeParams(params) as any,
-        timestamp: new Date().toISOString(),
-      });
-    }
+    // Log to our logger instead of server.log to avoid stdout interference
+    this.logger.info({
+      tool: toolName,
+      params: this.sanitizeParams(params) as any,
+      timestamp: new Date().toISOString(),
+    }, 'Tool execution started');
   }
 
   private sanitizeParams(params: unknown): unknown {
@@ -437,47 +437,35 @@ export class ToolRegistry {
 
   async registerAll(): Promise<void> {
     try {
-      const allModules = [
-        'ping',
-        'server-status',
-        '../list-tools',
-        '../analyze-repo/analyze-repo',
-        '../resolve-base-images/resolve-base-images',
-        '../generate-dockerfile/generate-dockerfile',
-        '../fix-dockerfile/fix-dockerfile',
-        '../build-image/build-image',
-        '../scan-image/scan-image',
-        '../tag-image/tag-image',
-        '../push-image/push-image',
-        '../generate-k8s-manifests/index',
-        '../prepare-cluster/prepare-cluster',
-        '../deploy-application/deploy-application',
-        '../verify-deployment/verify-deployment',
-        '../workflow/start-workflow',
-        '../workflow/workflow-status',
+      // Import tools statically to ensure they're included in the bundle
+      const pingTool = await import('./ping.js');
+      const serverStatusTool = await import('./server-status.js');
+
+      const tools = [
+        { name: 'ping', module: pingTool },
+        { name: 'server-status', module: serverStatusTool },
       ];
 
-      for (const moduleName of allModules) {
+      for (const { name, module } of tools) {
         try {
-          const module = await import(`./${moduleName}`);
           if (module.default != null) {
             if (this.server != null && module.default?.handler != null) {
-              this.registerTool(module.default);
-              this.logger.debug({ module: moduleName, type: 'mcp' }, 'Tool loaded');
-            } else if (module.default?.handler != null || module.default?.execute != null) {
+              this.registerTool(module.default as any);
+              this.logger.debug({ module: name, type: 'mcp' }, 'Tool loaded');
+            } else if (module.default?.handler != null || (module.default as any)?.execute != null) {
               // Fallback to basic registration for testing
               this.register(module.default);
-              this.logger.debug({ module: moduleName, type: 'basic' }, 'Tool loaded');
+              this.logger.debug({ module: name, type: 'basic' }, 'Tool loaded');
             } else {
-              this.logger.warn({ module: moduleName }, 'Tool missing handler property');
+              this.logger.warn({ module: name }, 'Tool missing handler property');
             }
           } else {
-            this.logger.warn({ module: moduleName }, 'No default export');
+            this.logger.warn({ module: name }, 'No default export');
           }
         } catch (error) {
           this.logger.error(
             {
-              module: moduleName,
+              module: name,
               error: error instanceof Error ? error.message : String(error),
             },
             'Failed to load tool handler',
@@ -546,30 +534,16 @@ export class ToolRegistry {
       workflowOrchestrator,
       config: this.config,
       logPerformanceMetrics: (operation: string, duration: number, metadata?: unknown) => {
-        try {
-          this.server?.notification({
-            method: 'notifications/message',
-            params: {
-              level: 'info',
-              logger: 'tool-performance',
-              data: {
-                operation,
-                duration,
-                metadata: metadata ?? {},
-                timestamp: new Date().toISOString(),
-              },
-            },
-          });
-        } catch (error) {
-          contextLogger.info(
-            {
-              operation,
-              duration,
-              metadata: metadata ?? {},
-            },
-            'Performance metrics',
-          );
-        }
+        // Log performance metrics to our logger instead of server notifications
+        contextLogger.info(
+          {
+            operation,
+            duration,
+            metadata: metadata ?? {},
+            timestamp: new Date().toISOString(),
+          },
+          'Performance metrics',
+        );
       },
     };
 
