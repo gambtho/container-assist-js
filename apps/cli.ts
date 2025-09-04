@@ -6,7 +6,7 @@
 
 import { program } from 'commander';
 import { ContainerKitMCPServer } from './server.js';
-import { createConfig, logConfigSummaryIfDev } from '../src/config/index';
+import { createConfig, logConfigSummaryIfDev } from '../src/config/index.js';
 import { createPinoLogger } from '../src/infrastructure/logger.js';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
