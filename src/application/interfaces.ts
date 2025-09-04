@@ -16,7 +16,7 @@ import type {
 
   // Service interfaces (essential only)
   SessionStore,
-  EventPublisher
+  EventPublisher,
 } from '../contracts/types/index.js';
 
 // Import Logger from pino
@@ -39,7 +39,7 @@ export type {
   // Session and workflow types commonly used in service coordination
   Session,
   WorkflowState,
-  AnalysisResult
+  AnalysisResult,
 };
 
 // Configuration types - unified in the main config module
@@ -72,7 +72,7 @@ export type {
   ToolHandler,
   ToolDescriptor,
   MCPToolCallRequest,
-  MCPToolCallResponse
+  MCPToolCallResponse,
 } from './tools/tool-types';
 
 // Additional service types needed by factories

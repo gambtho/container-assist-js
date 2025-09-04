@@ -35,57 +35,57 @@ const TEMPLATE_STRATEGIES: Record<string, SamplingParams> = {
   'dockerfile-generation': {
     temperature: 0.2,
     maxTokens: 1500,
-    topP: 0.95
+    topP: 0.95,
   },
 
   // Analysis tasks - high accuracy needed
   'repository-analysis': {
     temperature: 0.1,
     maxTokens: 800,
-    topP: 0.9
+    topP: 0.9,
   },
 
   // Fix tasks - balanced creativity and accuracy
   'dockerfile-fix': {
     temperature: 0.3,
     maxTokens: 1000,
-    topP: 0.9
+    topP: 0.9,
   },
 
   // Error analysis - high precision needed
   'error-analysis': {
     temperature: 0.2,
     maxTokens: 600,
-    topP: 0.85
+    topP: 0.85,
   },
 
   // Optimization suggestions - higher creativity
   'optimization-suggestion': {
     temperature: 0.4,
     maxTokens: 800,
-    topP: 0.9
+    topP: 0.9,
   },
 
   // JSON repair - very low temperature for precision
   'json-repair': {
     temperature: 0.1,
     maxTokens: 500,
-    topP: 1.0
+    topP: 1.0,
   },
 
   // Kubernetes generation
   'k8s-generation': {
     temperature: 0.2,
     maxTokens: 1800,
-    topP: 0.95
+    topP: 0.95,
   },
 
   // Kubernetes fixes
   'k8s-fix': {
     temperature: 0.3,
     maxTokens: 1200,
-    topP: 0.9
-  }
+    topP: 0.9,
+  },
 };
 
 /**
@@ -102,7 +102,7 @@ export class SamplingStrategy {
     const baseParams = TEMPLATE_STRATEGIES[templateId] || {
       temperature: 0.2,
       maxTokens: 1000,
-      topP: 0.9
+      topP: 0.9,
     };
 
     // Apply context-based adjustments
@@ -156,7 +156,7 @@ export class SamplingStrategy {
       ...params,
       temperature: Math.min(params.temperature + tempIncrease, 0.8),
       // Slightly increase tokens for more detailed attempts
-      maxTokens: Math.min(params.maxTokens + 100, params.maxTokens * 1.2)
+      maxTokens: Math.min(params.maxTokens + 100, params.maxTokens * 1.2),
     };
   }
 
@@ -169,7 +169,7 @@ export class SamplingStrategy {
     return {
       ...params,
       temperature: Math.max(params.temperature - tempDecrease, 0.05),
-      topP: Math.max((params.topP ?? 0.9) - 0.05 * errorCount, 0.7)
+      topP: Math.max((params.topP ?? 0.9) - 0.05 * errorCount, 0.7),
     };
   }
 
@@ -178,21 +178,21 @@ export class SamplingStrategy {
    */
   private static adjustForComplexity(
     params: SamplingParams,
-    complexity: 'low' | 'medium' | 'high'
+    complexity: 'low' | 'medium' | 'high',
   ): SamplingParams {
     switch (complexity) {
       case 'low':
         return {
           ...params,
           temperature: Math.max(params.temperature - 0.05, 0.1),
-          maxTokens: Math.max(params.maxTokens * 0.8, 300)
+          maxTokens: Math.max(params.maxTokens * 0.8, 300),
         };
 
       case 'high':
         return {
           ...params,
           temperature: Math.min(params.temperature + 0.1, 0.6),
-          maxTokens: Math.min(params.maxTokens * 1.3, 2500)
+          maxTokens: Math.min(params.maxTokens * 1.3, 2500),
         };
 
       default: // medium
@@ -205,26 +205,26 @@ export class SamplingStrategy {
    */
   private static adjustForTaskType(
     params: SamplingParams,
-    taskType: SamplingContext['taskType']
+    taskType: SamplingContext['taskType'],
   ): SamplingParams {
     switch (taskType) {
       case 'analysis':
         return {
           ...params,
-          temperature: Math.max(params.temperature - 0.05, 0.1) // More precise
+          temperature: Math.max(params.temperature - 0.05, 0.1), // More precise
         };
 
       case 'generation':
         return {
           ...params,
-          temperature: Math.min(params.temperature + 0.05, 0.5) // Slightly more creative
+          temperature: Math.min(params.temperature + 0.05, 0.5), // Slightly more creative
         };
 
       case 'optimization':
         return {
           ...params,
           temperature: Math.min(params.temperature + 0.1, 0.6), // More creative
-          maxTokens: Math.min(params.maxTokens * 1.2, 2000) // More space for suggestions
+          maxTokens: Math.min(params.maxTokens * 1.2, 2000), // More space for suggestions
         };
 
       default:
@@ -237,20 +237,20 @@ export class SamplingStrategy {
    */
   private static adjustForContentLength(
     params: SamplingParams,
-    contentLength: number
+    contentLength: number,
   ): SamplingParams {
     if (contentLength > 5000) {
       // Large content - increase tokens, reduce temperature for focus
       return {
         ...params,
         temperature: Math.max(params.temperature - 0.05, 0.1),
-        maxTokens: Math.min(params.maxTokens * 1.5, 3000)
+        maxTokens: Math.min(params.maxTokens * 1.5, 3000),
       };
     } else if (contentLength < 500) {
       // Small content - reduce tokens
       return {
         ...params,
-        maxTokens: Math.max(params.maxTokens * 0.7, 200)
+        maxTokens: Math.max(params.maxTokens * 0.7, 200),
       };
     }
 
@@ -262,21 +262,21 @@ export class SamplingStrategy {
    */
   private static adjustForTimeConstraint(
     params: SamplingParams,
-    constraint: 'fast' | 'normal' | 'thorough'
+    constraint: 'fast' | 'normal' | 'thorough',
   ): SamplingParams {
     switch (constraint) {
       case 'fast':
         return {
           ...params,
           maxTokens: Math.max(params.maxTokens * 0.7, 200), // Shorter responses
-          temperature: Math.max(params.temperature - 0.1, 0.1) // More focused
+          temperature: Math.max(params.temperature - 0.1, 0.1), // More focused
         };
 
       case 'thorough':
         return {
           ...params,
           maxTokens: Math.min(params.maxTokens * 1.4, 2500), // Longer responses
-          temperature: Math.min(params.temperature + 0.05, 0.4) // Slightly more explorative
+          temperature: Math.min(params.temperature + 0.05, 0.4), // Slightly more explorative
         };
 
       default:
@@ -292,7 +292,7 @@ export class SamplingStrategy {
       temperature: Math.max(0.05, Math.min(0.9, params.temperature)),
       maxTokens: Math.max(100, Math.min(4000, Math.round(params.maxTokens))),
       topP: params.topP ? Math.max(0.1, Math.min(1.0, params.topP)) : params.topP,
-      model: params.model
+      model: params.model,
     };
   }
 
@@ -303,7 +303,7 @@ export class SamplingStrategy {
     return {
       temperature: 0.2,
       maxTokens: 1000,
-      topP: 0.9
+      topP: 0.9,
     };
   }
 
@@ -315,7 +315,7 @@ export class SamplingStrategy {
       complexity: 'medium',
       taskType: 'generation',
       timeConstraint: 'normal',
-      ...options
+      ...options,
     };
   }
 

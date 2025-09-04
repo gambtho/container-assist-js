@@ -16,7 +16,7 @@ export {
   type RequestOptions,
   type DockerfileVariables,
   type AnalysisVariables,
-  type K8sVariables
+  type K8sVariables,
 } from './requests.js';
 
 // Sampling
@@ -27,7 +27,7 @@ export {
   getResultText,
   type SampleFunction,
   type SampleResult,
-  type SamplerConfig
+  type SamplerConfig,
 } from './sampling.js';
 
 // Error handling
@@ -36,7 +36,7 @@ export {
   executeWithRecovery,
   retryWithBackoff,
   type ErrorHandler,
-  type RecoveryResult
+  type RecoveryResult,
 } from './error-handlers.js';
 
 // Caching (existing)

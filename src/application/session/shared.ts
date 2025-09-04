@@ -83,7 +83,7 @@ export class SessionUtils {
       maxSize: 10 * 1024 * 1024, // 10MB
       compression: true,
       encryption: false,
-      backup: true
+      backup: true,
     };
   }
 
@@ -94,7 +94,7 @@ export class SessionUtils {
     const result: SessionMetadata = {
       createdAt: new Date(),
       updatedAt: new Date(),
-      version: '1.0.0'
+      version: '1.0.0',
     };
 
     if (userId != null && userId !== '') {
@@ -123,7 +123,7 @@ export class SessionUtils {
       'push',
       'k8s_manifests',
       'deployment',
-      'verification'
+      'verification',
     ];
 
     // If no session or workflow_state, return initial state
@@ -165,7 +165,7 @@ export class SessionUtils {
 
     return {
       current: Math.min(completedSteps, WORKFLOW_STEPS.length),
-      total: WORKFLOW_STEPS.length
+      total: WORKFLOW_STEPS.length,
     };
   }
 
@@ -191,7 +191,7 @@ export class SessionUtils {
    */
   static updateSessionStatus(
     session: Session | Record<string, unknown>,
-    status?: string
+    status?: string,
   ): Session | Record<string, unknown> {
     if (status != null && status.length > 0) {
       if (typeof session === 'object' && session != null) {
@@ -210,7 +210,7 @@ export const SESSION_CONSTANTS = {
   MAX_SESSION_SIZE: 10 * 1024 * 1024, // 10MB
   CLEANUP_INTERVAL: 60 * 60 * 1000, // 1 hour
   MAX_SESSIONS_PER_USER: 10,
-  ID_PREFIX: 'session_'
+  ID_PREFIX: 'session_',
 } as const;
 
 /**
@@ -220,7 +220,7 @@ export class SessionError extends Error {
   constructor(
     message: string,
     public readonly code: string,
-    public readonly sessionId?: string
+    public readonly sessionId?: string,
   ) {
     super(message);
     this.name = 'SessionError';

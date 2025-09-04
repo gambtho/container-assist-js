@@ -49,7 +49,7 @@ export function getSessionBuildResult(session: Session): DockerBuildResult | nul
     imageId: result.image_id ?? result.imageId ?? '',
     tags: result.tags ?? (result.image_tag ? [result.image_tag] : []),
     logs: result.logs ?? [],
-    success: result.success !== false
+    success: result.success !== false,
   };
 
   // Only add optional properties if they have defined values

@@ -28,15 +28,15 @@ const GenerateKubernetesManifestsInput = z
         requests: z
           .object({
             memory: z.string().default('128Mi'),
-            cpu: z.string().default('100m')
+            cpu: z.string().default('100m'),
           })
           .optional(),
         limits: z
           .object({
             memory: z.string().default('512Mi'),
-            cpu: z.string().default('500m')
+            cpu: z.string().default('500m'),
           })
-          .optional()
+          .optional(),
       })
       .optional(),
     autoscaling: z.boolean().default(false),
@@ -55,16 +55,16 @@ const GenerateKubernetesManifestsInput = z
       .object({
         runAsNonRoot: z.boolean().optional(),
         runAsUser: z.number().optional(),
-        readOnlyRootFilesystem: z.boolean().optional()
+        readOnlyRootFilesystem: z.boolean().optional(),
       })
       .optional(),
     securityContext: z
       .object({
         runAsNonRoot: z.boolean().optional(),
         runAsUser: z.number().optional(),
-        readOnlyRootFilesystem: z.boolean().optional()
+        readOnlyRootFilesystem: z.boolean().optional(),
       })
-      .optional()
+      .optional(),
   })
   .transform((data) => ({
     sessionId: data.session_id ?? data.sessionId ?? '',
@@ -84,7 +84,7 @@ const GenerateKubernetesManifestsInput = z
     targetMemory: data.target_memory ?? data.targetMemory,
     environment: data.environment,
     outputPath: data.output_path ?? data.outputPath ?? './k8s/',
-    securityContext: data.security_context ?? data.securityContext
+    securityContext: data.security_context ?? data.securityContext,
   }));
 
 type KubernetesManifestsInput = z.infer<typeof GenerateKubernetesManifestsInput>;
@@ -97,8 +97,8 @@ const GenerateKubernetesManifestsOutput = z.object({
       kind: z.string(),
       name: z.string(),
       path: z.string(),
-      content: z.string()
-    })
+      content: z.string(),
+    }),
   ),
   outputPath: z.string(),
   metadata: z.object({
@@ -106,8 +106,8 @@ const GenerateKubernetesManifestsOutput = z.object({
     namespace: z.string(),
     image: z.string(),
     estimatedCost: z.number(),
-    warnings: z.array(z.string()).optional()
-  })
+    warnings: z.array(z.string()).optional(),
+  }),
 });
 
 type KubernetesManifestsOutput = z.infer<typeof GenerateKubernetesManifestsOutput>;
@@ -122,7 +122,7 @@ const generateKubernetesManifestsHandler: ToolDescriptor = {
 
   handler: async (
     input: KubernetesManifestsInput,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<KubernetesManifestsOutput> => {
     const { logger, sessionService } = context;
     const { sessionId, outputPath } = input;
@@ -132,9 +132,9 @@ const generateKubernetesManifestsHandler: ToolDescriptor = {
         sessionId,
         appName: input.appName,
         namespace: input.namespace,
-        environment: input.environment
+        environment: input.environment,
       },
-      'Starting K8s manifest generation'
+      'Starting K8s manifest generation',
     );
 
     try {
@@ -172,21 +172,21 @@ const generateKubernetesManifestsHandler: ToolDescriptor = {
           ingressHost: input.ingressHost,
           resources: input.resources
             ? {
-                ...(input.resources.requests && { requests: input.resources.requests }),
-                ...(input.resources.limits && { limits: input.resources.limits })
-              }
+              ...(input.resources.requests && { requests: input.resources.requests }),
+              ...(input.resources.limits && { limits: input.resources.limits }),
+            }
             : undefined,
           autoscaling: {
             enabled: input.autoscaling || false,
             ...(input.minReplicas !== undefined && { minReplicas: input.minReplicas }),
             ...(input.maxReplicas !== undefined && { maxReplicas: input.maxReplicas }),
             ...(input.targetCPU !== undefined && { targetCPU: input.targetCPU }),
-            ...(input.targetMemory !== undefined && { targetMemory: input.targetMemory })
+            ...(input.targetMemory !== undefined && { targetMemory: input.targetMemory }),
           },
           environment: input.environment,
-          outputPath
+          outputPath,
         },
-        context
+        context,
       );
 
       // Estimate monthly cost (simple calculation)
@@ -203,7 +203,7 @@ const generateKubernetesManifestsHandler: ToolDescriptor = {
           kind: m.kind,
           name: m.name,
           path: m.path ?? '',
-          content: ''
+          content: '',
         })),
         outputPath: result.outputPath,
         metadata: {
@@ -211,8 +211,8 @@ const generateKubernetesManifestsHandler: ToolDescriptor = {
           namespace: result.metadata.namespace,
           image: image || `${input.appName}:latest`,
           estimatedCost,
-          warnings: result.warnings
-        }
+          warnings: result.warnings,
+        },
       };
     } catch (error) {
       logger.error({ error }, 'K8s manifest generation failed');
@@ -225,9 +225,9 @@ const generateKubernetesManifestsHandler: ToolDescriptor = {
     reason: 'Deploy generated manifests to Kubernetes cluster',
     paramMapper: (output) => ({
       manifests_path: output.outputPath,
-      namespace: output.metadata.namespace
-    })
-  }
+      namespace: output.metadata.namespace,
+    }),
+  },
 };
 
 // Default export for registry

@@ -10,7 +10,7 @@ import type { ToolContext } from '../tool-types.js';
 export async function checkDeploymentHealth(
   deploymentName: string,
   namespace: string,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<{
   name: string;
   endpoint: string;
@@ -36,7 +36,7 @@ export async function checkDeploymentHealth(
     name: deploymentName,
     endpoint: `http://${deploymentName}.${namespace}`,
     status: 'healthy' as const,
-    response_time_ms: 50
+    response_time_ms: 50,
   };
 }
 
@@ -46,7 +46,7 @@ export async function checkDeploymentHealth(
 export function getPodInfo(
   namespace: string,
   deploymentName: string,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<
   Array<{ name: string; ready: boolean; status: string; restarts?: number; node?: string }>
 > {
@@ -62,15 +62,15 @@ export function getPodInfo(
       ready: true,
       status: 'Running',
       restarts: 0,
-      node: 'node-1'
+      node: 'node-1',
     },
     {
       name: `${deploymentName}-def456`,
       ready: true,
       status: 'Running',
       restarts: 0,
-      node: 'node-2'
-    }
+      node: 'node-2',
+    },
   ]);
 }
 
@@ -80,7 +80,7 @@ export function getPodInfo(
 export async function getServiceEndpoints(
   namespace: string,
   serviceName: string,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<
   Array<{ service: string; type: string; url?: string; port?: number; external: boolean }>
 > {
@@ -97,7 +97,7 @@ export async function getServiceEndpoints(
           type: 'ClusterIP',
           url: e.url,
           port: 80,
-          external: Boolean(e.url) && !String(e.url).includes('cluster.local')
+          external: Boolean(e.url) && !String(e.url).includes('cluster.local'),
         }));
     }
   }
@@ -111,8 +111,8 @@ export async function getServiceEndpoints(
       type: 'LoadBalancer',
       url: 'http://app.example.com',
       port: 80,
-      external: true
-    }
+      external: true,
+    },
   ];
 }
 
@@ -122,7 +122,7 @@ export async function getServiceEndpoints(
 export function analyzeIssues(
   deployments: Array<{ name: string; ready?: boolean; replicas?: any }>,
   pods: Array<{ ready: boolean; status?: string; restarts?: number }>,
-  minReadyPods: number
+  minReadyPods: number,
 ): string[] {
   const issues: string[] = [];
 
@@ -134,7 +134,7 @@ export function analyzeIssues(
 
     if (deployment.replicas && deployment.replicas.ready < deployment.replicas.desired) {
       issues.push(
-        `Deployment ${deployment.name}: Only ${deployment.replicas.ready}/${deployment.replicas.desired} replicas ready`
+        `Deployment ${deployment.name}: Only ${deployment.replicas.ready}/${deployment.replicas.desired} replicas ready`,
       );
     }
 
@@ -164,7 +164,7 @@ export async function getTargetResources(
   deployments: string[],
   services: string[],
   sessionId: string | undefined,
-  sessionService: any
+  sessionService: any,
 ): Promise<{ targetDeployments: string[]; targetServices: string[] }> {
   let targetDeployments = deployments;
   let targetServices = services;
@@ -197,7 +197,7 @@ export async function getTargetResources(
 export async function checkAllDeployments(
   targetDeployments: string[],
   namespace: string,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<
   Array<{
     name: string;
@@ -226,9 +226,9 @@ export async function checkAllDeployments(
         replicas: {
           desired: 3,
           current: 3,
-          ready: 3
+          ready: 3,
         },
-        conditions: []
+        conditions: [],
       });
     } catch (error) {
       logger.error({ error }, `Failed to check deployment ${deploymentName}`);
@@ -239,8 +239,8 @@ export async function checkAllDeployments(
         replicas: {
           desired: 0,
           current: 0,
-          ready: 0
-        }
+          ready: 0,
+        },
       });
     }
   }
@@ -254,7 +254,7 @@ export async function checkAllDeployments(
 export async function checkAllPods(
   targetDeployments: string[],
   namespace: string,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<
   Array<{
     name: string;
@@ -287,7 +287,7 @@ export async function getAllEndpoints(
   targetServices: string[],
   targetDeployments: string[],
   namespace: string,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<
   Array<{
     service: string;
@@ -327,7 +327,7 @@ export async function getAllEndpoints(
 export function determineOverallHealth(
   deploymentResults: Array<{ ready: boolean }>,
   podResults: Array<{ ready: boolean }>,
-  issues: string[]
+  issues: string[],
 ): boolean {
   return (
     deploymentResults.every((d) => d.ready) &&

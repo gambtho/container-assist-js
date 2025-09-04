@@ -9,7 +9,7 @@ import {
   getImplementedTools,
   getPartialTools,
   getStubTools,
-  ToolStatus
+  ToolStatus,
 } from './tool-manifest.js';
 
 /**
@@ -17,7 +17,7 @@ import {
  */
 const ListToolsInput = z.object({
   category: z.string().optional(),
-  status: z.nativeEnum(ToolStatus).optional()
+  status: z.nativeEnum(ToolStatus).optional(),
 });
 
 /**
@@ -31,15 +31,15 @@ const ListToolsOutput = z.object({
       category: z.string(),
       description: z.string(),
       requiredServices: z.array(z.string()).optional(),
-      notes: z.string().optional()
-    })
+      notes: z.string().optional(),
+    }),
   ),
   summary: z.object({
     total: z.number(),
     implemented: z.number(),
     partial: z.number(),
-    stub: z.number()
-  })
+    stub: z.number(),
+  }),
 });
 
 type ListToolsInput = z.infer<typeof ListToolsInput>;
@@ -50,7 +50,7 @@ type ListToolsOutput = z.infer<typeof ListToolsOutput>;
  */
 async function listToolsHandler(
   input: ListToolsInput,
-  _context: ToolContext
+  _context: ToolContext,
 ): Promise<ListToolsOutput> {
   // Async operation to make ESLint happy
   await Promise.resolve();
@@ -73,7 +73,7 @@ async function listToolsHandler(
     category: tool.category,
     description: tool.description,
     requiredServices: tool.requiredServices,
-    notes: tool.notes
+    notes: tool.notes,
   }));
 
   // Calculate summary
@@ -87,8 +87,8 @@ async function listToolsHandler(
       total: implemented + partial + stub,
       implemented,
       partial,
-      stub
-    }
+      stub,
+    },
   };
 }
 
@@ -101,7 +101,7 @@ const listToolsDescriptor: ToolDescriptor<ListToolsInput, ListToolsOutput> = {
   category: 'utility',
   inputSchema: ListToolsInput,
   outputSchema: ListToolsOutput,
-  handler: listToolsHandler
+  handler: listToolsHandler,
 };
 
 export default listToolsDescriptor;

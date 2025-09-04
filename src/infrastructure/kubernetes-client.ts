@@ -10,7 +10,7 @@ import type {
   K8sManifest,
   K8sDeploymentOptions,
   K8sDeploymentResult,
-  K8sServiceStatus
+  K8sServiceStatus,
 } from '../contracts/types/index.js';
 
 // Type guard for Error objects
@@ -93,7 +93,7 @@ export class KubernetesClient {
       // Test cluster connectivity
       await this.k8sApi.listNamespacedPod({
         namespace: 'kube-system',
-        limit: 1
+        limit: 1,
       });
       this.available = true;
       this.logger.info('Kubernetes client initialized');
@@ -107,14 +107,14 @@ export class KubernetesClient {
 
   async deployManifests(
     manifests: K8sManifest[],
-    options?: K8sDeploymentOptions
+    options?: K8sDeploymentOptions,
   ): Promise<K8sDeploymentResult> {
     if (!this.available) {
       throw new KubernetesError(
         'Kubernetes cluster not available',
         ErrorCode.K8S_NOT_AVAILABLE,
         undefined,
-        options?.namespace
+        options?.namespace,
       );
     }
 
@@ -125,9 +125,9 @@ export class KubernetesClient {
     this.logger.info(
       {
         manifestCount: manifests.length,
-        namespace
+        namespace,
       },
-      'Deploying Kubernetes manifests'
+      'Deploying Kubernetes manifests',
     );
 
     for (const manifest of manifests) {
@@ -137,13 +137,13 @@ export class KubernetesClient {
           name: manifest.metadata?.name ?? 'unknown',
           kind: manifest.kind,
           namespace: manifest.metadata?.namespace ?? namespace,
-          status: 'deployed'
+          status: 'deployed',
         });
       } catch (error: unknown) {
         failed.push({
           name: manifest.metadata?.name ?? 'unknown',
           kind: manifest.kind,
-          error: isError(error) ? error.message : 'Unknown error'
+          error: isError(error) ? error.message : 'Unknown error',
         });
       }
     }
@@ -155,7 +155,7 @@ export class KubernetesClient {
         undefined,
         namespace,
         undefined,
-        { failed }
+        { failed },
       );
     }
 
@@ -163,7 +163,7 @@ export class KubernetesClient {
       success: deployed.length > 0,
       resources: [],
       deployed: deployed as string[],
-      failed: failed as { resource: string; error: string }[]
+      failed: failed as { resource: string; error: string }[],
     };
   }
 
@@ -180,12 +180,12 @@ export class KubernetesClient {
           if (this.appsApi) {
             await this.appsApi.createNamespacedDeployment({
               namespace: targetNamespace,
-              body: manifest as k8s.V1Deployment
+              body: manifest as k8s.V1Deployment,
             });
           } else {
             throw new KubernetesError(
               'Apps API not initialized',
-              ErrorCode.K8S_API_NOT_INITIALIZED
+              ErrorCode.K8S_API_NOT_INITIALIZED,
             );
           }
           break;
@@ -193,12 +193,12 @@ export class KubernetesClient {
           if (this.k8sApi) {
             await this.k8sApi.createNamespacedService({
               namespace: targetNamespace,
-              body: manifest as k8s.V1Service
+              body: manifest as k8s.V1Service,
             });
           } else {
             throw new KubernetesError(
               'Core API not initialized',
-              ErrorCode.K8S_API_NOT_INITIALIZED
+              ErrorCode.K8S_API_NOT_INITIALIZED,
             );
           }
           break;
@@ -206,12 +206,12 @@ export class KubernetesClient {
           if (this.k8sApi) {
             await this.k8sApi.createNamespacedConfigMap({
               namespace: targetNamespace,
-              body: manifest as k8s.V1ConfigMap
+              body: manifest as k8s.V1ConfigMap,
             });
           } else {
             throw new KubernetesError(
               'Core API not initialized',
-              ErrorCode.K8S_API_NOT_INITIALIZED
+              ErrorCode.K8S_API_NOT_INITIALIZED,
             );
           }
           break;
@@ -219,12 +219,12 @@ export class KubernetesClient {
           if (this.k8sApi) {
             await this.k8sApi.createNamespacedSecret({
               namespace: targetNamespace,
-              body: manifest as k8s.V1Secret
+              body: manifest as k8s.V1Secret,
             });
           } else {
             throw new KubernetesError(
               'Core API not initialized',
-              ErrorCode.K8S_API_NOT_INITIALIZED
+              ErrorCode.K8S_API_NOT_INITIALIZED,
             );
           }
           break;
@@ -234,7 +234,7 @@ export class KubernetesClient {
           } else {
             throw new KubernetesError(
               'Core API not initialized',
-              ErrorCode.K8S_API_NOT_INITIALIZED
+              ErrorCode.K8S_API_NOT_INITIALIZED,
             );
           }
           break;
@@ -247,9 +247,9 @@ export class KubernetesClient {
         {
           name: manifest.metadata?.name,
           kind: manifest.kind,
-          namespace: targetNamespace
+          namespace: targetNamespace,
         },
-        'Applied manifest'
+        'Applied manifest',
       );
     } catch (error: unknown) {
       // Handle already exists errors gracefully
@@ -257,9 +257,9 @@ export class KubernetesClient {
         this.logger.info(
           {
             name: manifest.metadata?.name,
-            kind: manifest.kind
+            kind: manifest.kind,
           },
-          'Resource already exists, skipping'
+          'Resource already exists, skipping',
         );
         return;
       }
@@ -269,7 +269,7 @@ export class KubernetesClient {
         ErrorCode.K8S_APPLY_FAILED,
         manifest.metadata?.name,
         targetNamespace,
-        isError(error) ? error : new Error('Unknown error')
+        isError(error) ? error : new Error('Unknown error'),
       );
     }
   }
@@ -287,14 +287,14 @@ export class KubernetesClient {
       }
       await this.appsApi.readNamespacedDeployment({
         name,
-        namespace: targetNamespace
+        namespace: targetNamespace,
       });
       return {
         name,
         namespace: targetNamespace,
         type: 'Deployment',
         clusterIP: '',
-        ports: []
+        ports: [],
       };
     } catch (error) {
       throw new KubernetesError(
@@ -302,7 +302,7 @@ export class KubernetesClient {
         ErrorCode.K8S_SERVICE_STATUS_FAILED,
         name,
         targetNamespace,
-        isError(error) ? error : undefined
+        isError(error) ? error : undefined,
       );
     }
   }
@@ -324,7 +324,7 @@ export class KubernetesClient {
       if (isHttpError(error) && error.statusCode === 404) {
         this.logger.info(
           { name, namespace: targetNamespace },
-          'Deployment not found, already deleted'
+          'Deployment not found, already deleted',
         );
         return;
       }
@@ -334,7 +334,7 @@ export class KubernetesClient {
         ErrorCode.K8S_DELETE_FAILED,
         name,
         targetNamespace,
-        isError(error) ? error : new Error('Unknown error')
+        isError(error) ? error : new Error('Unknown error'),
       );
     }
   }
@@ -363,7 +363,7 @@ export class KubernetesClient {
         ErrorCode.K8S_LIST_NAMESPACES_FAILED,
         undefined,
         undefined,
-        isError(error) ? error : new Error('Unknown error')
+        isError(error) ? error : new Error('Unknown error'),
       );
     }
   }
@@ -376,8 +376,8 @@ export class KubernetesClient {
     try {
       const namespace: k8s.V1Namespace = {
         metadata: {
-          name
-        }
+          name,
+        },
       };
 
       if (!this.k8sApi) {
@@ -396,7 +396,7 @@ export class KubernetesClient {
         ErrorCode.K8S_CREATE_NAMESPACE_FAILED,
         undefined,
         name,
-        isError(error) ? error : new Error('Unknown error')
+        isError(error) ? error : new Error('Unknown error'),
       );
     }
   }
@@ -417,7 +417,7 @@ export class KubernetesClient {
 
   async health(): Promise<K8sHealthStatus> {
     const status: K8sHealthStatus = {
-      available: this.available
+      available: this.available,
     };
 
     if (this.available && this.k8sApi) {

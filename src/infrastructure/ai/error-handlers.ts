@@ -28,7 +28,7 @@ export function recoverFromError(error: Error, request: AIRequest): RecoveryResu
     ['json', ['parse', 'invalid json', 'malformed', 'syntax', 'unexpected token']],
     ['timeout', ['timeout', 'took too long', 'request timeout']],
     ['rate-limit', ['rate limit', '429', 'too many requests', 'quota exceeded']],
-    ['token-limit', ['maximum context', 'too many tokens', 'context length', 'token limit']]
+    ['token-limit', ['maximum context', 'too many tokens', 'context length', 'token limit']],
   ] as const;
 
   for (const [handlerName, patterns] of handlers) {
@@ -40,7 +40,7 @@ export function recoverFromError(error: Error, request: AIRequest): RecoveryResu
         return {
           success: true,
           request: recoveredRequest,
-          strategy: handlerName
+          strategy: handlerName,
         };
       }
     }
@@ -48,7 +48,7 @@ export function recoverFromError(error: Error, request: AIRequest): RecoveryResu
 
   return {
     success: false,
-    error: `No recovery strategy available for: ${error.message}`
+    error: `No recovery strategy available for: ${error.message}`,
   };
 }
 
@@ -59,7 +59,7 @@ const ERROR_HANDLERS: Record<string, ErrorHandler> = {
   json: handleJsonParseError,
   timeout: handleTimeoutError,
   'rate-limit': handleRateLimitError,
-  'token-limit': handleTokenLimitError
+  'token-limit': handleTokenLimitError,
 };
 
 /**
@@ -81,9 +81,9 @@ function handleJsonParseError(error: Error, request: AIRequest): AIRequest {
         type: 'json-parse',
         originalError: error.message,
         malformedContent,
-        instruction: 'Fix JSON syntax and return valid JSON only'
-      }
-    }
+        instruction: 'Fix JSON syntax and return valid JSON only',
+      },
+    },
   };
 }
 
@@ -103,9 +103,9 @@ function handleTimeoutError(_error: Error, request: AIRequest): AIRequest {
       recovery: {
         type: 'timeout',
         originalTokens: currentTokens,
-        instruction: 'Reduce response length and complexity'
-      }
-    }
+        instruction: 'Reduce response length and complexity',
+      },
+    },
   };
 }
 
@@ -120,9 +120,9 @@ function handleRateLimitError(_error: Error, request: AIRequest): AIRequest {
       recovery: {
         type: 'rate-limit',
         instruction: 'Retry with exponential backoff',
-        retryAfter: extractRetryAfter(_error.message || 'no message')
-      }
-    }
+        retryAfter: extractRetryAfter(_error.message || 'no message'),
+      },
+    },
   };
 }
 
@@ -148,9 +148,9 @@ function handleTokenLimitError(_error: Error, request: AIRequest): AIRequest {
         type: 'token-limit',
         originalTokens: currentTokens,
         truncatedPrompt: prompt.length < request.prompt.length,
-        instruction: 'Provide essential information only'
-      }
-    }
+        instruction: 'Provide essential information only',
+      },
+    },
   };
 }
 
@@ -168,7 +168,7 @@ function extractRetryAfter(errorMessage: string): number {
 export async function retryWithBackoff<T>(
   operation: () => Promise<T>,
   maxRetries: number = 3,
-  baseDelay: number = 1000
+  baseDelay: number = 1000,
 ): Promise<T> {
   let lastError: Error;
 
@@ -205,7 +205,7 @@ export async function retryWithBackoff<T>(
 export async function executeWithRecovery<T>(
   operation: (request: AIRequest) => Promise<T>,
   initialRequest: AIRequest,
-  maxAttempts: number = 3
+  maxAttempts: number = 3,
 ): Promise<T> {
   let currentRequest = initialRequest;
   let lastError: Error;
@@ -244,13 +244,13 @@ export async function executeWithRecovery<T>(
  * Utility functions for working with recovery results
  */
 export function isSuccessResult(
-  result: RecoveryResult
+  result: RecoveryResult,
 ): result is Extract<RecoveryResult, { success: true }> {
   return result.success;
 }
 
 export function isErrorResult(
-  result: RecoveryResult
+  result: RecoveryResult,
 ): result is Extract<RecoveryResult, { success: false }> {
   return !result.success;
 }
@@ -270,7 +270,7 @@ let globalStats: SimpleRecoveryStats = {
   totalAttempts: 0,
   successfulRecoveries: 0,
   successRate: 0,
-  strategiesUsed: {}
+  strategiesUsed: {},
 };
 
 export function getRecoveryStats(): SimpleRecoveryStats {
@@ -282,6 +282,6 @@ export function resetRecoveryStats(): void {
     totalAttempts: 0,
     successfulRecoveries: 0,
     successRate: 0,
-    strategiesUsed: {}
+    strategiesUsed: {},
   };
 }

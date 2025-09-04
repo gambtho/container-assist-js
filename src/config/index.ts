@@ -26,7 +26,7 @@ export type {
   LogLevel,
   WorkflowMode,
   StoreType,
-  SamplerMode
+  SamplerMode,
 } from './types';
 
 // Export configuration functions
@@ -34,7 +34,7 @@ export {
   createConfiguration,
   createConfigurationForEnv,
   validateConfiguration,
-  getConfigurationSummary
+  getConfigurationSummary,
 } from './config';
 
 // Import configuration
@@ -74,7 +74,7 @@ export const config = new Proxy({} as ApplicationConfig, {
   set(_target, prop, value) {
     getConfig()[prop as keyof ApplicationConfig] = value;
     return true;
-  }
+  },
 });
 
 /**
@@ -144,5 +144,5 @@ export const ConfigHelpers = {
     if (!value) throw new Error(`Invalid TTL format: ${ttl}`);
     const num = parseInt(value, 10);
     return unit === 'h' ? num * 3600000 : unit === 'm' ? num * 60000 : num * 1000;
-  }
+  },
 };

@@ -74,14 +74,14 @@ function createMCPSampler(server: any, logger: Logger): SampleFunction {
             role: 'user',
             content: {
               type: 'text',
-              text: request.prompt
-            }
-          }
+              text: request.prompt,
+            },
+          },
         ],
         maxTokens: request.maxTokens || 4000,
         modelPreferences: {
-          hints: request.model ? [{ name: request.model }] : undefined
-        }
+          hints: request.model ? [{ name: request.model }] : undefined,
+        },
       });
 
       return {
@@ -89,14 +89,14 @@ function createMCPSampler(server: any, logger: Logger): SampleFunction {
         text: response.content[0]?.text || '',
         model: response.model,
         tokenCount: response.usage?.output_tokens,
-        stopReason: response.stopReason
+        stopReason: response.stopReason,
       };
     } catch (error) {
       logger.error({ error }, 'MCP client sampling failed');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
-        code: 'MCP_ERROR'
+        code: 'MCP_ERROR',
       };
     }
   };
@@ -107,13 +107,13 @@ function createMCPSampler(server: any, logger: Logger): SampleFunction {
  * Type guards for discriminated union
  */
 export function isSuccessResult(
-  result: SampleResult
+  result: SampleResult,
 ): result is Extract<SampleResult, { success: true }> {
   return result.success;
 }
 
 export function isErrorResult(
-  result: SampleResult
+  result: SampleResult,
 ): result is Extract<SampleResult, { success: false }> {
   return !result.success;
 }

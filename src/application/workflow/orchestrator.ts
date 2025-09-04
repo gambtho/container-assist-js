@@ -70,7 +70,7 @@ export class WorkflowOrchestrator {
 
   constructor(
     private sessionService: SessionService,
-    logger: Logger
+    logger: Logger,
   ) {
     this.logger = logger.child({ component: 'WorkflowOrchestrator' });
     this.progressTracker = new SimpleProgressTracker(this.logger);
@@ -80,7 +80,7 @@ export class WorkflowOrchestrator {
     config: WorkflowConfig,
     sessionId: string,
     params: Record<string, unknown> = {},
-    options: WorkflowOptions = {}
+    options: WorkflowOptions = {},
   ): Promise<WorkflowExecutionResult> {
     const executionId = `${config.id}-${Date.now()}`;
     const startTime = Date.now();
@@ -89,9 +89,9 @@ export class WorkflowOrchestrator {
       {
         workflowId: config.id,
         sessionId,
-        stepCount: config.steps.length
+        stepCount: config.steps.length,
       },
-      'Starting workflow execution'
+      'Starting workflow execution',
     );
 
     this.currentExecution = {
@@ -99,7 +99,7 @@ export class WorkflowOrchestrator {
       sessionId,
       startTime,
       abortController: new AbortController(),
-      ...(options.onProgress && { onProgress: options.onProgress })
+      ...(options.onProgress && { onProgress: options.onProgress }),
     };
 
     const result: WorkflowExecutionResult = {
@@ -111,7 +111,7 @@ export class WorkflowOrchestrator {
       skippedSteps: [],
       duration: 0,
       errors: [],
-      outputs: {}
+      outputs: {},
     };
 
     try {
@@ -122,8 +122,8 @@ export class WorkflowOrchestrator {
         metadata: {
           workflowId: executionId,
           workflowName: config.name,
-          startedAt: new Date().toISOString()
-        }
+          startedAt: new Date().toISOString(),
+        },
       });
 
       await this.executeSteps(config, sessionId, params, result);
@@ -138,8 +138,8 @@ export class WorkflowOrchestrator {
         stage: 'workflow_completed',
         metadata: {
           completedAt: new Date().toISOString(),
-          workflowResult: result
-        }
+          workflowResult: result,
+        },
       });
 
       // Report final progress
@@ -148,16 +148,16 @@ export class WorkflowOrchestrator {
         status: result.status === 'completed' ? 'completed' : 'failed',
         progress: 1.0,
         message: `Workflow ${result.status}`,
-        metadata: { sessionId, status: result.status, result }
+        metadata: { sessionId, status: result.status, result },
       });
 
       this.logger.info(
         {
           workflowId: executionId,
           status: result.status,
-          duration: result.duration
+          duration: result.duration,
         },
-        'Workflow execution completed'
+        'Workflow execution completed',
       );
 
       return result;
@@ -168,7 +168,7 @@ export class WorkflowOrchestrator {
       result.duration = Date.now() - startTime;
       result.errors.push({
         step: 'workflow',
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
 
       // Execute rollback if configured
@@ -189,7 +189,7 @@ export class WorkflowOrchestrator {
     config: WorkflowConfig,
     sessionId: string,
     params: Record<string, unknown>,
-    result: WorkflowExecutionResult
+    result: WorkflowExecutionResult,
   ): Promise<void> {
     const session = await this.sessionService.getSession(sessionId);
     const state = session.workflow_state ?? {};
@@ -226,7 +226,7 @@ export class WorkflowOrchestrator {
     sessionId: string,
     state: WorkflowState,
     params: Record<string, unknown>,
-    result: WorkflowExecutionResult
+    result: WorkflowExecutionResult,
   ): Promise<void> {
     // Check if step should be executed
     if (step.condition != null && !step.condition(state)) {
@@ -239,9 +239,9 @@ export class WorkflowOrchestrator {
       {
         step: step.name,
         tool: step.tool,
-        description: step.description
+        description: step.description,
       },
-      'Executing workflow step'
+      'Executing workflow step',
     );
 
     // Update session with current step
@@ -253,7 +253,7 @@ export class WorkflowOrchestrator {
       status: 'starting',
       progress: this.calculateProgress(result),
       message: `Starting ${step.description}`,
-      metadata: { sessionId, tool: step.tool }
+      metadata: { sessionId, tool: step.tool },
     });
 
     let retries = 0;
@@ -288,8 +288,8 @@ export class WorkflowOrchestrator {
           metadata: {
             sessionId,
             output: this.sanitizeOutput(toolResult),
-            duration: Date.now() - (this.currentExecution?.startTime ?? Date.now())
-          }
+            duration: Date.now() - (this.currentExecution?.startTime ?? Date.now()),
+          },
         });
 
         return;
@@ -302,9 +302,9 @@ export class WorkflowOrchestrator {
             step: step.name,
             error: lastError.message,
             retry: retries,
-            maxRetries: step.maxRetries
+            maxRetries: step.maxRetries,
           },
-          'Step execution failed'
+          'Step execution failed',
         );
 
         // Add error to session
@@ -321,7 +321,7 @@ export class WorkflowOrchestrator {
             status: 'in_progress',
             progress: this.calculateProgress(result),
             message: `Retrying ${step.description} (attempt ${retries + 1})`,
-            metadata: { sessionId, error: lastError.message, retry: retries }
+            metadata: { sessionId, error: lastError.message, retry: retries },
           });
         }
       }
@@ -331,7 +331,7 @@ export class WorkflowOrchestrator {
     result.failedSteps.push(step.name);
     result.errors.push({
       step: step.name,
-      error: lastError?.message ?? 'Unknown error'
+      error: lastError?.message ?? 'Unknown error',
     });
 
     // Report step failure
@@ -340,7 +340,7 @@ export class WorkflowOrchestrator {
       status: 'failed',
       progress: this.calculateProgress(result),
       message: `Failed ${step.description}`,
-      metadata: { sessionId, error: lastError?.message }
+      metadata: { sessionId, error: lastError?.message },
     });
 
     // Handle error based on configuration
@@ -361,20 +361,20 @@ export class WorkflowOrchestrator {
     sessionId: string,
     state: WorkflowState,
     params: Record<string, unknown>,
-    result: WorkflowExecutionResult
+    result: WorkflowExecutionResult,
   ): Promise<void> {
     this.logger.info(
       {
-        steps: steps.map((s) => s.name)
+        steps: steps.map((s) => s.name),
       },
-      'Executing parallel step group'
+      'Executing parallel step group',
     );
 
     const promises = steps.map((step) =>
       this.executeSingleStep(step, sessionId, state, params, result).catch((error) => {
         this.logger.error({ step: step.name, error: error as Error }); // Fixed logger call
         // Errors are already recorded in result, don't throw
-      })
+      }),
     );
 
     await Promise.all(promises);
@@ -386,7 +386,7 @@ export class WorkflowOrchestrator {
   private async executeToolWithTimeout(
     toolName: string,
     params: Record<string, unknown>,
-    timeout: number
+    timeout: number,
   ): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -400,7 +400,7 @@ export class WorkflowOrchestrator {
           success: true,
           tool: toolName,
           params,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       }, 100); // Quick simulation for testing
     });
@@ -412,12 +412,12 @@ export class WorkflowOrchestrator {
   private async updateWorkflowState(
     sessionId: string,
     stepName: string,
-    output: unknown
+    output: unknown,
   ): Promise<void> {
     const update = {
       [`${stepName}_result`]: output,
       last_completed_step: stepName,
-      last_updated: new Date().toISOString()
+      last_updated: new Date().toISOString(),
     };
     const normalizedUpdate = normalizeWorkflowStateUpdate(update);
     await this.sessionService.updateWorkflowState(sessionId, normalizedUpdate);
@@ -447,7 +447,7 @@ export class WorkflowOrchestrator {
    * Determine final workflow status
    */
   private determineWorkflowStatus(
-    result: WorkflowExecutionResult
+    result: WorkflowExecutionResult,
   ): 'completed' | 'failed' | 'partial' {
     if (result.failedSteps.length === 0) {
       return 'completed';
@@ -471,22 +471,22 @@ export class WorkflowOrchestrator {
   private async executeRollback(
     config: WorkflowConfig,
     sessionId: string,
-    result: WorkflowExecutionResult
+    result: WorkflowExecutionResult,
   ): Promise<void> {
     if (config.rollbackSteps == null || config.rollbackSteps.length === 0) return;
 
     this.logger.info(
       {
-        stepCount: config.rollbackSteps.length
+        stepCount: config.rollbackSteps.length,
       },
-      'Executing rollback steps'
+      'Executing rollback steps',
     );
 
     const session = await this.sessionService.getSession(sessionId);
     const state = session.workflow_state ?? {
       completed_steps: [],
       errors: {},
-      metadata: {}
+      metadata: {},
     };
 
     for (const step of config.rollbackSteps) {
@@ -532,9 +532,9 @@ export class WorkflowOrchestrator {
     if (this.currentExecution) {
       this.logger.info(
         {
-          workflowId: this.currentExecution.workflowId
+          workflowId: this.currentExecution.workflowId,
         },
-        'Aborting workflow execution'
+        'Aborting workflow execution',
       );
 
       this.currentExecution.abortController.abort();
@@ -550,7 +550,7 @@ export class WorkflowOrchestrator {
     return {
       workflowId: this.currentExecution.workflowId,
       sessionId: this.currentExecution.sessionId,
-      duration: Date.now() - this.currentExecution.startTime
+      duration: Date.now() - this.currentExecution.startTime,
     };
   }
 }

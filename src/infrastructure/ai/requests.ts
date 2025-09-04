@@ -94,8 +94,8 @@ export function buildAIRequest(options: RequestOptions): AIRequest {
     model: options.model,
     context: {
       template: options.template,
-      ...variables
-    }
+      ...variables,
+    },
   };
 }
 
@@ -104,34 +104,34 @@ export function buildAIRequest(options: RequestOptions): AIRequest {
  */
 export function buildDockerfileRequest(
   variables: DockerfileVariables,
-  sampling?: { temperature?: number; maxTokens?: number } | undefined
+  sampling?: { temperature?: number; maxTokens?: number } | undefined,
 ): AIRequest {
   return buildAIRequest({
     template: 'dockerfile-generation',
     variables,
-    sampling
+    sampling,
   });
 }
 
 export function buildAnalysisRequest(
   variables: AnalysisVariables,
-  sampling?: { temperature?: number; maxTokens?: number } | undefined
+  sampling?: { temperature?: number; maxTokens?: number } | undefined,
 ): AIRequest {
   return buildAIRequest({
     template: 'repository-analysis',
     variables,
-    sampling
+    sampling,
   });
 }
 
 export function buildK8sRequest(
   variables: K8sVariables,
-  sampling?: { temperature?: number; maxTokens?: number } | undefined
+  sampling?: { temperature?: number; maxTokens?: number } | undefined,
 ): AIRequest {
   return buildAIRequest({
     template: 'k8s-generation',
     variables,
-    sampling
+    sampling,
   });
 }
 
@@ -143,12 +143,12 @@ export function buildKustomizationRequest(
     resources: string[];
     commonLabels?: Record<string, string>;
   },
-  sampling?: { temperature?: number; maxTokens?: number } | undefined
+  sampling?: { temperature?: number; maxTokens?: number } | undefined,
 ): AIRequest {
   return buildAIRequest({
     template: 'kustomization-generation',
     variables,
-    sampling
+    sampling,
   });
 }
 
@@ -163,7 +163,7 @@ export function extractDockerfileVariables(analysis: AnalysisResult): Dockerfile
     buildSystemType: analysis.build_system?.type || 'unknown',
     entryPoint: 'index', // Default entry point since entry_points doesn't exist in schema
     port: analysis.ports?.[0] || analysis.required_ports?.[0] || 8080,
-    optimization: 'balanced'
+    optimization: 'balanced',
   };
 }
 
@@ -188,7 +188,7 @@ Requirements:
 {{#if baseImage}}- Base image: {{baseImage}}{{/if}}
 {{#if customInstructions}}- {{customInstructions}}{{/if}}
 
-Return only the Dockerfile content.`
+Return only the Dockerfile content.`,
   },
 
   'repository-analysis': {
@@ -210,7 +210,7 @@ Return JSON format: {
   "dependencies": ["<key dependencies>"],
   "ports": [<port numbers>],
   "entryPoint": "<main file>"
-}`
+}`,
   },
 
   'dockerfile-fix': {
@@ -229,7 +229,7 @@ Requirements:
 - Maintain security best practices
 - Keep existing functionality
 
-Return only the corrected Dockerfile.`
+Return only the corrected Dockerfile.`,
   },
 
   'k8s-generation': {
@@ -247,7 +247,7 @@ Replicas: {{replicas}}
 {{#if ingressEnabled}}Ingress Host: {{ingressHost}}{{/if}}
 {{#if autoscaling}}Autoscaling: {{minReplicas}}-{{maxReplicas}} replicas at {{targetCPU}}% CPU{{/if}}
 
-Return complete YAML manifests (Deployment, Service{{#if ingressEnabled}}, Ingress{{/if}}{{#if autoscaling}}, HPA{{/if}}).`
+Return complete YAML manifests (Deployment, Service{{#if ingressEnabled}}, Ingress{{/if}}{{#if autoscaling}}, HPA{{/if}}).`,
   },
 
   'kustomization-generation': {
@@ -270,7 +270,7 @@ Generate a production-ready kustomization.yaml that:
 - Follows Kustomize best practices
 - Supports the specified environment
 
-Return only the YAML content for kustomization.yaml.`
+Return only the YAML content for kustomization.yaml.`,
   },
 
   'error-analysis': {
@@ -286,7 +286,7 @@ Return JSON: {
   "rootCause": "<what caused the error>",
   "fixSteps": ["<step 1>", "<step 2>"],
   "prevention": ["<how to prevent>"]
-}`
+}`,
   },
 
   'json-repair': {
@@ -298,8 +298,8 @@ Return JSON: {
 
 Error: {{error_message}}
 
-Return only valid JSON.`
-  }
+Return only valid JSON.`,
+  },
 } as const;
 
 /**

@@ -41,7 +41,7 @@ export function fail(error: string, code?: string, details?: unknown): Fail {
     kind: 'fail',
     error,
     ...(code !== undefined && { code }),
-    ...(details !== undefined && { details })
+    ...(details !== undefined && { details }),
   };
 }
 
@@ -114,7 +114,7 @@ export function tap<T>(result: Result<T>, fn: (value: T) => void): Result<T> {
  */
 export function tapError<T>(
   result: Result<T>,
-  fn: (error: string, code?: string) => void
+  fn: (error: string, code?: string) => void,
 ): Result<T> {
   if (isFail(result)) {
     fn(result.error, result.code);

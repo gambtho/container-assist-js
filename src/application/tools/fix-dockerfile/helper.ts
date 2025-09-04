@@ -31,7 +31,7 @@ export interface DockerfileValidationResult {
 export function analyzeDockerfile(
   dockerfileContent: string,
   knownIssues: DockerfileIssue[] = [],
-  context: ToolContext
+  context: ToolContext,
 ): DockerfileAnalysisResult {
   const { logger } = context;
 
@@ -55,7 +55,7 @@ export function analyzeDockerfile(
         type: 'security',
         message: 'Running as root user - consider using a non-root user',
         line: lineNumber,
-        severity: 'warning'
+        severity: 'warning',
       });
     }
 
@@ -65,7 +65,7 @@ export function analyzeDockerfile(
         type: 'best_practice',
         message: 'Using "latest" tag - consider pinning to specific version',
         line: lineNumber,
-        severity: 'warning'
+        severity: 'warning',
       });
     }
 
@@ -75,7 +75,7 @@ export function analyzeDockerfile(
         type: 'best_practice',
         message: 'Consider using COPY instead of ADD for local files',
         line: lineNumber,
-        severity: 'info'
+        severity: 'info',
       });
     }
 
@@ -88,7 +88,7 @@ export function analyzeDockerfile(
         type: 'optimization',
         message: 'Consider using --no-install-recommends with apt-get to reduce image size',
         line: lineNumber,
-        severity: 'info'
+        severity: 'info',
       });
     }
 
@@ -98,7 +98,7 @@ export function analyzeDockerfile(
         type: 'optimization',
         message: 'Consider adding apt-get clean to reduce image size',
         line: lineNumber,
-        severity: 'info'
+        severity: 'info',
       });
     }
   });
@@ -112,21 +112,21 @@ export function analyzeDockerfile(
     'Create a non-root user for running the application',
     'Use multi-stage builds to reduce final image size',
     'Group RUN commands to reduce layers',
-    'Clean up package manager cache after installation'
+    'Clean up package manager cache after installation',
   ];
 
   const securityImprovements = [
     'Run application as non-root user',
     'Scan for known vulnerabilities',
     'Use minimal base images',
-    'Avoid installing unnecessary packages'
+    'Avoid installing unnecessary packages',
   ];
 
   return {
     issues: allIssues,
     fixedIssues: [],
     recommendations,
-    securityImprovements
+    securityImprovements,
   };
 }
 
@@ -136,7 +136,7 @@ export function analyzeDockerfile(
 export async function generateFixedDockerfile(
   originalContent: string,
   analysisResult: DockerfileAnalysisResult,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<string> {
   const { logger } = context;
 
@@ -150,12 +150,12 @@ export async function generateFixedDockerfile(
         template: 'dockerfile-fix',
         variables: {
           dockerfile: originalContent,
-          error_message: JSON.stringify(analysisResult.issues)
+          error_message: JSON.stringify(analysisResult.issues),
         },
         sampling: {
           temperature: 0.3,
-          maxTokens: 3000
-        }
+          maxTokens: 3000,
+        },
       });
 
       const result = await context.aiService.generate(requestBuilder);
@@ -171,7 +171,7 @@ export async function generateFixedDockerfile(
 
         // Update analysis result with fixed issues
         analysisResult.fixedIssues = analysisResult.issues.filter(
-          (issue) => issue.severity === 'error' || issue.severity === 'warning'
+          (issue) => issue.severity === 'error' || issue.severity === 'warning',
         );
 
         // Log AI generation with metadata
@@ -180,9 +180,9 @@ export async function generateFixedDockerfile(
             model: result.metadata.model,
             tokensUsed: result.metadata.tokensUsed,
             fromCache: result.metadata.fromCache,
-            durationMs: result.metadata.durationMs
+            durationMs: result.metadata.durationMs,
           },
-          'AI-fixed Dockerfile successfully'
+          'AI-fixed Dockerfile successfully',
         );
 
         return fixedContent;
@@ -204,7 +204,7 @@ export async function generateFixedDockerfile(
  */
 function generateBasicDockerfileFix(
   originalContent: string,
-  analysisResult: DockerfileAnalysisResult
+  analysisResult: DockerfileAnalysisResult,
 ): string {
   let fixedContent = originalContent;
 
@@ -239,13 +239,13 @@ RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser`;
         if (issue.message.includes('--no-install-recommends')) {
           fixedContent = fixedContent.replace(
             /apt-get install/g,
-            'apt-get install --no-install-recommends'
+            'apt-get install --no-install-recommends',
           );
         }
         if (issue.message.includes('apt-get clean')) {
           fixedContent = fixedContent.replace(
             /(apt-get install[^\n]*)/g,
-            '$1 && apt-get clean && rm -rf /var/lib/apt/lists/*'
+            '$1 && apt-get clean && rm -rf /var/lib/apt/lists/*',
           );
         }
         break;
@@ -254,7 +254,7 @@ RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser`;
 
   // Mark issues as fixed
   analysisResult.fixedIssues = analysisResult.issues.filter(
-    (issue) => issue.severity === 'error' || issue.severity === 'warning'
+    (issue) => issue.severity === 'error' || issue.severity === 'warning',
   );
 
   return fixedContent;
@@ -265,7 +265,7 @@ RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser`;
  */
 export function validateDockerfileFix(
   fixedContent: string,
-  _analysisResult: DockerfileAnalysisResult
+  _analysisResult: DockerfileAnalysisResult,
 ): DockerfileValidationResult {
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -306,6 +306,6 @@ export function validateDockerfileFix(
   return {
     isValid,
     warnings,
-    errors
+    errors,
   };
 }

@@ -17,7 +17,7 @@ const PrepareClusterInputRaw = z.object({
   dry_run: z.boolean().default(false),
   dryRun: z.boolean().optional(),
   validate_only: z.boolean().default(false),
-  validateOnly: z.boolean().optional()
+  validateOnly: z.boolean().optional(),
 });
 
 const PrepareClusterInput = PrepareClusterInputRaw.transform((data) => {
@@ -31,7 +31,7 @@ const PrepareClusterInput = PrepareClusterInputRaw.transform((data) => {
     clusterContext: data.cluster_context ?? (data.clusterContext || 'default'),
     namespace: data.namespace,
     dryRun: data.dry_run ?? data.dryRun ?? false,
-    validateOnly: data.validate_only ?? data.validateOnly ?? false
+    validateOnly: data.validate_only ?? data.validateOnly ?? false,
   };
 });
 
@@ -43,21 +43,21 @@ const PrepareClusterOutput = z.object({
     context: z.string(),
     version: z.string(),
     nodes: z.number(),
-    ready: z.boolean()
+    ready: z.boolean(),
   }),
   namespace: z.object({
     name: z.string(),
     exists: z.boolean(),
-    created: z.boolean().optional()
+    created: z.boolean().optional(),
   }),
   validation: z.object({
     connectivity: z.boolean(),
     permissions: z.boolean(),
     resources: z.boolean(),
-    ingress: z.boolean().optional()
+    ingress: z.boolean().optional(),
   }),
   recommendations: z.array(z.string()).optional(),
-  metadata: z.record(z.string(), z.unknown()).optional()
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Type aliases
@@ -83,13 +83,13 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterO
 
   handler: async (
     input: PrepareClusterInput,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<PrepareClusterOutput> => {
     const {
       logger,
       sessionService,
       progressEmitter,
-      kubernetesService: _kubernetesService
+      kubernetesService: _kubernetesService,
     } = context;
     const { sessionId, clusterContext, namespace, dryRun, validateOnly } = input;
 
@@ -99,9 +99,9 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterO
         clusterContext,
         namespace,
         dryRun,
-        validateOnly
+        validateOnly,
       },
-      'Starting cluster preparation'
+      'Starting cluster preparation',
     );
 
     try {
@@ -109,7 +109,7 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterO
       if (!sessionService) {
         throw new InfrastructureError(
           ErrorCode.ServiceUnavailable,
-          'Session service not available'
+          'Session service not available',
         );
       }
 
@@ -125,7 +125,7 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterO
           step: 'prepare_cluster',
           status: 'in_progress',
           message: 'Validating cluster connectivity',
-          progress: 0.1
+          progress: 0.1,
         });
       }
 
@@ -135,7 +135,7 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterO
         namespace,
         dryRun,
         validateOnly,
-        logger
+        logger,
       );
 
       // Emit progress
@@ -145,7 +145,7 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterO
           step: 'prepare_cluster',
           status: 'in_progress',
           message: 'Preparing namespace and resources',
-          progress: 0.6
+          progress: 0.6,
         });
       }
 
@@ -154,8 +154,8 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterO
         ...session,
         workflow_state: {
           ...session.workflow_state,
-          clusterResult: clusterInfo
-        }
+          clusterResult: clusterInfo,
+        },
       }));
 
       // Emit completion
@@ -165,7 +165,7 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterO
           step: 'prepare_cluster',
           status: 'completed',
           message: 'Cluster preparation complete',
-          progress: 1.0
+          progress: 1.0,
         });
       }
 
@@ -176,8 +176,8 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterO
         metadata: {
           timestamp: new Date().toISOString(),
           dryRun,
-          validateOnly
-        }
+          validateOnly,
+        },
       };
     } catch (error) {
       logger.error({ error, sessionId }); // Fixed logger call
@@ -189,7 +189,7 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterO
           step: 'prepare_cluster',
           status: 'failed',
           message: `Cluster preparation failed: ${error instanceof Error ? error.message : String(error)}`,
-          progress: 0
+          progress: 0,
         });
       }
 
@@ -203,9 +203,9 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInput, PrepareClusterO
     paramMapper: (output) => ({
       session_id: output.sessionId,
       namespace: output.namespace.name,
-      cluster_context: output.cluster.context
-    })
-  }
+      cluster_context: output.cluster.context,
+    }),
+  },
 };
 
 /**
@@ -217,7 +217,7 @@ function simulateClusterPreparation(
   namespace: string,
   dryRun: boolean,
   validateOnly: boolean,
-  logger: unknown
+  logger: unknown,
 ): {
   cluster: PrepareClusterOutput['cluster'];
   namespace: PrepareClusterOutput['namespace'];
@@ -231,14 +231,14 @@ function simulateClusterPreparation(
     context,
     version: 'v1.28.0',
     nodes: 3,
-    ready: true
+    ready: true,
   };
 
   // Simulate namespace operations
   const namespaceInfo = {
     name: namespace,
     exists: namespace === 'default', // Assume default exists
-    created: !dryRun && namespace !== 'default'
+    created: !dryRun && namespace !== 'default',
   };
 
   // Simulate validation checks
@@ -246,7 +246,7 @@ function simulateClusterPreparation(
     connectivity: true,
     permissions: true,
     resources: true,
-    ingress: true
+    ingress: true,
   };
 
   // Generate recommendations
@@ -264,7 +264,7 @@ function simulateClusterPreparation(
     cluster,
     namespace: namespaceInfo,
     validation,
-    recommendations
+    recommendations,
   };
 }
 

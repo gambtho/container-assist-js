@@ -18,71 +18,71 @@ export function getToolConfig(toolName: string): ToolConfig {
     analyze_repository: {
       name: 'analyze_repository',
       description: 'Analyze repository structure and dependencies',
-      category: 'workflow'
+      category: 'workflow',
     },
 
     // Build tools
     build_image: {
       name: 'build_image',
       description: 'Build Docker image from Dockerfile',
-      category: 'workflow'
+      category: 'workflow',
     },
 
     scan_image: {
       name: 'scan_image',
       description: 'Scan Docker image for vulnerabilities',
-      category: 'workflow'
+      category: 'workflow',
     },
 
     tag_image: {
       name: 'tag_image',
       description: 'Tag Docker image with new tag',
-      category: 'workflow'
+      category: 'workflow',
     },
 
     push_image: {
       name: 'push_image',
       description: 'Push Docker image to registry',
-      category: 'workflow'
+      category: 'workflow',
     },
 
     generate_dockerfile: {
       name: 'generate_dockerfile',
       description: 'Generate Dockerfile from repository analysis',
-      category: 'workflow'
+      category: 'workflow',
     },
 
     // Deploy tools
     generate_k8s_manifests: {
       name: 'generate_k8s_manifests',
       description: 'Generate Kubernetes manifests',
-      category: 'workflow'
+      category: 'workflow',
     },
 
     deploy_application: {
       name: 'deploy_application',
       description: 'Deploy application to Kubernetes cluster',
-      category: 'workflow'
+      category: 'workflow',
     },
 
     // Ops tools
     ping: {
       name: 'ping',
       description: 'Health check for the server',
-      category: 'utility'
+      category: 'utility',
     },
 
     list_tools: {
       name: 'list_tools',
       description: 'List all available tools',
-      category: 'utility'
+      category: 'utility',
     },
 
     server_status: {
       name: 'server_status',
       description: 'Get server status and health',
-      category: 'utility'
-    }
+      category: 'utility',
+    },
   };
 
   const config = configs[toolName];

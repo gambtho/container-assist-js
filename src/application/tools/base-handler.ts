@@ -57,7 +57,7 @@ export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
 
   constructor(
     protected readonly services: CoreServices,
-    config: ToolConfig
+    config: ToolConfig,
   ) {
     this.config = config;
     this.logger = services.logger.child({ tool: config.name });
@@ -97,9 +97,9 @@ export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
     this.logger.info(
       {
         tool: this.config.name,
-        hasSession: (args.session_id ?? args.sessionId) != null
+        hasSession: (args.session_id ?? args.sessionId) != null,
       },
-      'Handling tool request'
+      'Handling tool request',
     );
 
     try {
@@ -118,9 +118,9 @@ export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
       // Format successful response with chain hint if available
       const chainStep = this.chainHint
         ? {
-            tool: this.chainHint.nextTool,
-            reason: this.chainHint.reason
-          }
+          tool: this.chainHint.nextTool,
+          reason: this.chainHint.reason,
+        }
         : undefined;
 
       const toolResult = this.formatSuccess(result, args, chainStep);
@@ -128,9 +128,9 @@ export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
       this.logger.info(
         {
           tool: this.config.name,
-          success: true
+          success: true,
         },
-        'Tool executed successfully'
+        'Tool executed successfully',
       );
 
       return toolResult;
@@ -149,7 +149,7 @@ export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
     } catch (error) {
       throw new ValidationError(
         `Input validation failed: ${error instanceof Error ? error.message : String(error)}`,
-        ['input']
+        ['input'],
       );
     }
   }
@@ -160,7 +160,7 @@ export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
   private formatSuccess(
     result: TOutput,
     args: Record<string, unknown>,
-    nextStep?: { tool: string; reason: string }
+    nextStep?: { tool: string; reason: string },
   ): ToolResult {
     // Extract session ID from various possible locations
     const sessionId = this.extractSessionId(args, result);
@@ -172,7 +172,7 @@ export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
       message: `Tool ${this.config.name} executed successfully`,
       arguments: args,
       ...(sessionId && { sessionId }),
-      ...(nextStep && { nextStep })
+      ...(nextStep && { nextStep }),
     };
   }
 
@@ -187,16 +187,16 @@ export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
       {
         error: errorMessage,
         stack: errorStack,
-        tool: this.config.name
+        tool: this.config.name,
       },
-      'Tool execution failed'
+      'Tool execution failed',
     );
 
     return {
       success: false,
       tool: this.config.name,
       error: errorMessage,
-      arguments: args
+      arguments: args,
     };
   }
 
@@ -249,7 +249,7 @@ export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
 export class ValidationError extends Error {
   constructor(
     message: string,
-    public fields: string[]
+    public fields: string[],
   ) {
     super(message);
     this.name = 'ValidationError';

@@ -11,7 +11,7 @@ import {
   AnalyzeRepositoryInput as AnalyzeRepositoryInputSchema,
   AnalysisResultSchema,
   AnalyzeRepositoryParams,
-  AnalysisResult
+  AnalysisResult,
 } from '../schemas.js';
 import {
   validateRepositoryPath,
@@ -23,7 +23,7 @@ import {
   checkDockerFiles,
   getRecommendedBaseImage,
   getSecurityRecommendations,
-  gatherFileStructure
+  gatherFileStructure,
 } from './helper';
 
 // Use consolidated schemas
@@ -52,9 +52,9 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
       {
         repoPath,
         depth,
-        includeTests
+        includeTests,
       },
-      'Starting repository analysis'
+      'Starting repository analysis',
     );
 
     try {
@@ -65,7 +65,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
           ErrorCode.InvalidInput,
           validation.error != null && validation.error !== ''
             ? validation.error
-            : 'Invalid repository path'
+            : 'Invalid repository path',
         );
       }
 
@@ -77,8 +77,8 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
           metadata: {
             repoPath,
             analysisDepth: depth,
-            includeTests
-          }
+            includeTests,
+          },
         });
         sessionId = session.id;
       }
@@ -90,7 +90,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
           step: 'analyze_repository',
           status: 'in_progress',
           message: 'Analyzing repository structure',
-          progress: 0.1
+          progress: 0.1,
         });
       }
 
@@ -129,14 +129,14 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
             configFiles: JSON.stringify({
               hasDockerfile: dockerInfo.hasDockerfile,
               hasDockerCompose: dockerInfo.hasDockerCompose,
-              hasKubernetes: dockerInfo.hasKubernetes
+              hasKubernetes: dockerInfo.hasKubernetes,
             }),
-            directoryTree: fileList.slice(0, 20).join('\n')
+            directoryTree: fileList.slice(0, 20).join('\n'),
           };
 
           const requestBuilder = buildAnalysisRequest(analysisVariables, {
             temperature: 0.3,
-            maxTokens: 2000
+            maxTokens: 2000,
           });
 
           const result = await context.aiService.generate(requestBuilder);
@@ -150,14 +150,14 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
                 suggestedOptimizations: parsed.optimizations ?? [],
                 securityRecommendations: parsed.security ?? [],
                 recommendedBaseImage: parsed.baseImage,
-                recommendedBuildStrategy: parsed.buildStrategy
+                recommendedBuildStrategy: parsed.buildStrategy,
               };
             } catch {
               // Fallback to raw content
               aiEnhancements = {
                 aiInsights: result.data,
                 fromCache: result.metadata?.fromCache,
-                tokensUsed: result.metadata?.tokensUsed
+                tokensUsed: result.metadata?.tokensUsed,
               };
             }
 
@@ -167,9 +167,9 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
                 model: result.metadata?.model,
                 tokensUsed: result.metadata?.tokensUsed,
                 fromCache: result.metadata?.fromCache,
-                durationMs: result.metadata?.durationMs
+                durationMs: result.metadata?.durationMs,
               },
-              'AI-enhanced repository analysis completed'
+              'AI-enhanced repository analysis completed',
             );
           }
         } else {
@@ -182,11 +182,11 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
       // Transform buildSystem to match schema structure
       const buildSystem = buildSystemRaw
         ? {
-            type: buildSystemRaw.type,
-            build_file: buildSystemRaw.file,
-            build_command: buildSystemRaw.buildCmd,
-            test_command: buildSystemRaw.testCmd
-          }
+          type: buildSystemRaw.type,
+          build_file: buildSystemRaw.file,
+          build_command: buildSystemRaw.buildCmd,
+          test_command: buildSystemRaw.testCmd,
+        }
         : undefined;
 
       // Emit progress
@@ -196,7 +196,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
           step: 'analyze_repository',
           status: 'in_progress',
           message: 'Finalizing analysis',
-          progress: 0.8
+          progress: 0.8,
         });
       }
 
@@ -204,18 +204,18 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
       const baseRecommendations = {
         baseImage: getRecommendedBaseImage(languageInfo.language, frameworkInfo?.framework),
         buildStrategy: buildSystem != null ? 'multi-stage' : 'single-stage',
-        securityNotes: getSecurityRecommendations(dependencies)
+        securityNotes: getSecurityRecommendations(dependencies),
       };
 
       // Merge with AI enhancements
       const recommendations = {
         ...baseRecommendations,
         ...(aiEnhancements.suggestedOptimizations != null && {
-          aiOptimizations: aiEnhancements.suggestedOptimizations
+          aiOptimizations: aiEnhancements.suggestedOptimizations,
         }),
         ...(aiEnhancements.securityRecommendations != null && {
-          aiSecurity: aiEnhancements.securityRecommendations
-        })
+          aiSecurity: aiEnhancements.securityRecommendations,
+        }),
       };
 
       // Store analysis in session
@@ -233,9 +233,9 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
               has_tests: dependencies.some((dep) => dep.type === 'test'),
               docker_compose_exists: dockerInfo.hasDockerCompose ?? false,
               ...dockerInfo,
-              recommendations
-            }
-          }
+              recommendations,
+            },
+          },
         }));
       }
 
@@ -246,7 +246,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
           step: 'analyze_repository',
           status: 'completed',
           message: 'Repository analysis complete',
-          progress: 1.0
+          progress: 1.0,
         });
       }
 
@@ -257,7 +257,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
         language: languageInfo.language,
         dependencies,
         ports,
-        ...dockerInfo
+        ...dockerInfo,
       };
 
       // Only add optional properties if they have defined values
@@ -278,7 +278,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
           type: buildSystem.type,
           buildFile: buildSystem.build_file,
           buildCommand: buildSystem.build_command,
-          testCommand: buildSystem.test_command
+          testCommand: buildSystem.test_command,
         };
       }
 
@@ -293,7 +293,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
         includeTests,
         timestamp: new Date().toISOString(),
         ...(aiEnhancements.aiInsights != null && { aiInsights: aiEnhancements.aiInsights }),
-        ...(aiEnhancements.aiTokenUsage != null && { aiTokenUsage: aiEnhancements.aiTokenUsage })
+        ...(aiEnhancements.aiTokenUsage != null && { aiTokenUsage: aiEnhancements.aiTokenUsage }),
       };
 
       return response;
@@ -310,9 +310,9 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
       session_id: output.sessionId,
       language: output.language,
       framework: output.framework,
-      base_image: output.recommendations?.baseImage
-    })
-  }
+      base_image: output.recommendations?.baseImage,
+    }),
+  },
 };
 
 // Default export for registry
