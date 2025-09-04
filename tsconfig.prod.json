@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "./src",
+    "rootDir": "./",
     "outDir": "./dist",
     "sourceMap": false,
     "declaration": true,
@@ -15,7 +15,7 @@
     "stripInternal": true,
     "importsNotUsedAsValues": "remove"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "apps/**/*"],
   "exclude": [
     "node_modules",
     "dist", 
