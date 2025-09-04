@@ -33,7 +33,7 @@
   },
   "bin": {
     "containerization-assist-mcp": "./dist/apps/cli.js",
-    "ck-mcp": "./dist/apps/cli.js"
+    "ca-mcp": "./dist/apps/cli.js"
   },
   "files": [
     "dist/**/*",

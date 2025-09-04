@@ -109,7 +109,7 @@ export const getConfigSummary = getConfigurationSummary;
  */
 export function logConfigSummaryIfDev(configInstance: ApplicationConfig): void {
   if (configInstance.server.nodeEnv === 'development' && configInstance.features.enableDebugLogs) {
-    console.log('Configuration loaded:', getConfigurationSummary(configInstance));
+    console.error('Configuration loaded:', getConfigurationSummary(configInstance));
   }
 }
 
