@@ -6,7 +6,7 @@
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import type { SampleFunction } from './sampling';
-import type { AIRequest } from './requests.js';
+import type { AIRequest } from './requests';
 
 /**
  * Security issue detected during generation
@@ -44,7 +44,7 @@ export interface StructuredSampleOptions {
 /**
  * Result from structured sampling
  */
-export interface StructuredSampleResult<T = any> {
+export interface StructuredSampleResult<T = unknown> {
   success: boolean;
   data?: T;
   raw?: string;
@@ -72,7 +72,7 @@ export class StructuredSampler {
   /**
    * Generate structured output with validation
    */
-  async generateStructured<T = any>(
+  async generateStructured<T = unknown>(
     prompt: string,
     options: StructuredSampleOptions = {},
   ): Promise<StructuredSampleResult<T>> {
@@ -162,7 +162,7 @@ export class StructuredSampler {
 
     return {
       success: false,
-      error: lastError ?? 'Max retries exceeded',
+      error: `Max retries exceeded (${attempts} attempts)${lastError ? `. Last error: ${lastError}` : ''}`,
       metadata: { attempts },
     };
   }
@@ -207,7 +207,7 @@ export class StructuredSampler {
     text = text.trim();
 
     // Remove markdown code blocks if present
-    const codeBlockRegex = /^``(?:json|yaml|text)?\n?([\s\S]*?)\n?``$/;
+    const codeBlockRegex = /^```(?:json|yaml|text)?\n?([\s\S]*?)\n?```$/;
     const match = text.match(codeBlockRegex);
     if (match?.[1]) {
       text = match[1];
@@ -217,8 +217,7 @@ export class StructuredSampler {
       case 'json':
         return JSON.parse(text);
       case 'yaml':
-        // In a real implementation, use a YAML parser
-        // For now, just return the text
+        // Return the text as-is
         return text;
       case 'text':
         return text;
@@ -232,8 +231,7 @@ export class StructuredSampler {
    */
   private describeSchema(_schema: z.ZodSchema): string | null {
     try {
-      // In a real implementation, this would generate a detailed schema description
-      // For now, return a simplified version
+      // Return a simplified schema description
       return 'Follow the expected schema structure';
     } catch {
       return null;
@@ -256,13 +254,14 @@ export class StructuredSampler {
     ];
 
     for (const pattern of credentialPatterns) {
-      if (pattern.test(content)) {
+      if (content.match(pattern)) {
         issues.push({
           type: 'credential',
           severity: 'high',
           description: 'Potential credential exposure detected',
           recommendation: 'Use environment variables or secrets management',
         });
+        break; // Only report one credential issue per content
       }
     }
 
@@ -299,7 +298,7 @@ export class StructuredSampler {
    */
   async generateDockerfile(
     requirements: string,
-    constraints?: Record<string, any>,
+    constraints?: Record<string, unknown>,
   ): Promise<StructuredSampleResult<string>> {
     const prompt = `Generate a production-ready Dockerfile based on these requirements:
 ${requirements}
@@ -349,7 +348,7 @@ Include:
   /**
    * Sample structured output (alias for generateStructured)
    */
-  async sampleStructured<T = any>(
+  async sampleStructured<T = unknown>(
     prompt: string,
     options: StructuredSampleOptions = {},
   ): Promise<StructuredSampleResult<T>> {
@@ -359,7 +358,7 @@ Include:
   /**
    * Sample JSON output
    */
-  async sampleJSON<T = any>(
+  async sampleJSON<T = unknown>(
     prompt: string,
     options: Omit<StructuredSampleOptions, 'format'> = {},
   ): Promise<StructuredSampleResult<T>> {

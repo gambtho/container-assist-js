@@ -3,7 +3,7 @@
  * Common interfaces and types used across session management
  */
 
-import type { Session } from '../../contracts/types/index.js';
+import type { Session } from '../../domain/types/index';
 
 /**
  * Session metadata

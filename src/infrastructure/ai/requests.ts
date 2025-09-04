@@ -1,4 +1,4 @@
-import type { AnalysisResult } from '../../contracts/types/session.js';
+import type { AnalysisResult } from '../../domain/types/session';
 
 /**
  * Available request templates
@@ -380,14 +380,14 @@ function renderTemplate(
   // Handle conditional blocks: {{#if variable.path}}content{{/if}}
   result = result.replace(
     /\{\{#if\s+([\w.-]+)\}\}(.*?)\{\{\/if\}\}/gs,
-    (_match, varName, content) => {
+    (_match, varName: string, content) => {
       const value = resolveValue(varName);
-      return value && value !== '' ? content : '';
+      return value && value !== '' ? (content as string) : '';
     },
   );
 
   // Handle simple variables: {{variable.path}} or {{build-arg}}
-  result = result.replace(/\{\{([\w.-]+)\}\}/g, (_match, varName) => {
+  result = result.replace(/\{\{([\w.-]+)\}\}/g, (_match, varName: string) => {
     const value = resolveValue(varName);
     if (value == null) return '';
 

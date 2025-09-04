@@ -32,14 +32,14 @@ import {
   DomainError,
   InfrastructureError,
   ServiceError,
-} from '../../contracts/types/errors.js';
-import { ApplicationError } from '../../errors/index.js';
-import { ToolNotImplementedError, ToolValidationError, ToolExecutionError } from './tool-errors.js';
+} from '../../domain/types/errors';
+import { ApplicationError } from '../../errors/index';
+import { ToolNotImplementedError, ToolValidationError, ToolExecutionError } from './tool-errors';
 
 /**
  * Mapping from domain error codes to MCP SDK error codes
  */
-export const ERROR_CODE_MAPPING: Record<DomainErrorCode, MCPErrorCodeType> = {
+const ERROR_CODE_MAPPING: Record<DomainErrorCode, MCPErrorCodeType> = {
   // Domain validation errors
   [DomainErrorCode.ValidationFailed]: MCPErrorCode.InvalidParams,
   [DomainErrorCode.VALIDATION_ERROR]: MCPErrorCode.InvalidParams,
@@ -131,8 +131,8 @@ export const ERROR_CODE_MAPPING: Record<DomainErrorCode, MCPErrorCodeType> = {
 /**
  * Convert domain error to MCP Error
  */
-export function toMcpError(error: DomainError): MCPError {
-  const mcpCode = ERROR_CODE_MAPPING[error.code] || MCPErrorCode.InternalError;
+function toMcpError(error: DomainError): MCPError {
+  const mcpCode = ERROR_CODE_MAPPING[error.code] ?? MCPErrorCode.InternalError;
 
   return createMcpError(mcpCode, error.message, {
     code: error.code,
@@ -150,8 +150,8 @@ export function toMcpError(error: DomainError): MCPError {
 /**
  * Convert infrastructure error to MCP Error
  */
-export function infrastructureErrorToMcp(error: InfrastructureError): MCPError {
-  const mcpCode = ERROR_CODE_MAPPING[error.code] || MCPErrorCode.InternalError;
+function infrastructureErrorToMcp(error: InfrastructureError): MCPError {
+  const mcpCode = ERROR_CODE_MAPPING[error.code] ?? MCPErrorCode.InternalError;
 
   return createMcpError(mcpCode, error.message, {
     code: error.code,
@@ -170,8 +170,8 @@ export function infrastructureErrorToMcp(error: InfrastructureError): MCPError {
 /**
  * Convert service error to MCP Error
  */
-export function serviceErrorToMcp(error: ServiceError): MCPError {
-  const mcpCode = ERROR_CODE_MAPPING[error.code] || MCPErrorCode.InternalError;
+function serviceErrorToMcp(error: ServiceError): MCPError {
+  const mcpCode = ERROR_CODE_MAPPING[error.code] ?? MCPErrorCode.InternalError;
 
   return createMcpError(mcpCode, error.message, {
     code: error.code,
@@ -241,7 +241,7 @@ export function convertToMcpError(error: unknown): MCPError {
 
   if (error instanceof ApplicationError) {
     // Handle application errors using modern error mapping (same pattern as ServiceError)
-    const mcpCode = ERROR_CODE_MAPPING[error.code as DomainErrorCode] || MCPErrorCode.InternalError;
+    const mcpCode = ERROR_CODE_MAPPING[error.code as DomainErrorCode] ?? MCPErrorCode.InternalError;
 
     return createMcpError(mcpCode, error.message, {
       code: error.code,
@@ -315,42 +315,4 @@ export function isRetryableError(error: MCPError): boolean {
   ];
 
   return retryableCodes.includes(code);
-}
-
-/**
- * Get error severity level
- */
-export function getErrorSeverity(error: MCPError): 'low' | 'medium' | 'high' | 'critical' {
-  const details = (error as { data?: { code?: DomainErrorCode } }).data;
-  const code = details?.code;
-
-  if (code == null) return 'high';
-
-  switch (code) {
-    case DomainErrorCode.ValidationFailed:
-    case DomainErrorCode.InvalidInput:
-    case DomainErrorCode.AINotAvailable:
-      return 'low';
-
-    case DomainErrorCode.SessionNotFound:
-    case DomainErrorCode.SessionExpired:
-    case DomainErrorCode.ToolTimeout:
-    case DomainErrorCode.ResourceNotFound:
-      return 'medium';
-
-    case DomainErrorCode.WorkflowFailed:
-    case DomainErrorCode.InvalidState:
-    case DomainErrorCode.DockerError:
-    case DomainErrorCode.KubernetesError:
-    case DomainErrorCode.UnknownError:
-      return 'high';
-
-    case DomainErrorCode.StorageError:
-    case DomainErrorCode.DependencyNotInitialized:
-    case DomainErrorCode.ServiceUnavailable:
-      return 'critical';
-
-    default:
-      return 'medium';
-  }
 }

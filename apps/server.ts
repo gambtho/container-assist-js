@@ -6,8 +6,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 // Remove ServerOptions import as McpServer uses different constructor
-import { createToolRegistry, loadAllTools } from '../src/application/tools/registry-utils.js';
-import type { ToolRegistry } from '../src/application/tools/ops/registry.js';
+import { registerToolsNatively, getRegisteredTools } from '../src/application/tools/native-registry.js';
 import type { Services } from '../src/services/index.js';
 import { createPinoLogger } from '../src/infrastructure/logger.js';
 import { config as applicationConfig, type ApplicationConfig } from '../src/config/index.js';
@@ -20,14 +19,13 @@ import { DockerService } from '../src/services/docker.js';
 import { KubernetesService } from '../src/services/kubernetes.js';
 import { AIService } from '../src/services/ai.js';
 import { SessionService } from '../src/services/session.js';
-import { ResourceManager } from '../src/application/resources/index.js';
+import { SimplifiedResourceManager as ResourceManager } from '../src/application/resources/simplified-resource-manager.js';
 // Import interfaces for proper MCP sampling
-import { createSampler, type SampleFunction } from '../src/infrastructure/ai/sampling.js';
+import { createNativeMCPSampler, type SampleFunction } from '../src/infrastructure/ai/sampling.js';
 
 export class ContainerizationAssistMCPServer {
   private server: McpServer;
   private services: Services;
-  private toolRegistry: ToolRegistry;
   private resourceManager!: ResourceManager; // Initialize later
   private logger: Logger;
   private shutdownHandlers: Array<() => Promise<void>> = [];
@@ -47,9 +45,6 @@ export class ContainerizationAssistMCPServer {
     // Direct service instantiation - no factories or containers
     this.services = this.createServices();
 
-    // Create tool registry with injected services and config
-    this.toolRegistry = createToolRegistry(this.services, this.logger, this.appConfig);
-
     // Initialize resource manager - needs to be done after services are created
     // Will initialize later in start() method when we have a tool registry
 
@@ -64,16 +59,10 @@ export class ContainerizationAssistMCPServer {
   }
 
   /**
-   * Create a sampling function that uses client sampling capability
+   * Create a sampling function using native MCP SDK
    */
   private createMCPSampler(): SampleFunction {
-    return createSampler(
-      {
-        type: 'mcp',
-        server: this.server,
-      },
-      this.logger,
-    );
+    return createNativeMCPSampler(this.server, this.logger);
   }
 
   /**
@@ -212,21 +201,18 @@ export class ContainerizationAssistMCPServer {
         }
       }
 
-      // Set server on tool registry
-      this.toolRegistry.setServer(this.server);
-
-      await loadAllTools(this.toolRegistry);
+      // Register tools natively with MCP SDK (eliminates ToolRegistry complexity)
+      await registerToolsNatively(this.server as any, this.services, this.logger, this.appConfig);
 
       this.resourceManager = new ResourceManager(
         this.appConfig,
         this.services.session as any, // Cast to concrete type for ResourceManager
         this.services.docker as any,
-        this.toolRegistry, // Direct registry instead of factory
         this.logger,
       );
 
       // Register resources with MCP server
-      this.resourceManager.registerWithServer(this.server);
+      this.resourceManager.registerWithServer(this.server as any);
 
       // MCP handlers now handled automatically by McpServer - no manual setup needed
 
@@ -247,7 +233,6 @@ export class ContainerizationAssistMCPServer {
             session: 'initialized',
           },
           resources: {
-            providers: this.resourceManager.getProviderNames(),
             registered: this.resourceManager.isResourcesRegistered(),
           },
         },
@@ -296,55 +281,16 @@ export class ContainerizationAssistMCPServer {
   }
 
   private setupGracefulShutdown(): void {
-    const shutdown = async (signal: string): Promise<void> => {
-      this.logger.info({ signal }, 'Received shutdown signal, starting graceful shutdown...');
-
-      // Prevent multiple shutdown attempts
-      if (this.isShuttingDown) {
-        this.logger.warn('Shutdown already in progress');
-        return;
-      }
-
-      this.isShuttingDown = true;
-
-      try {
-        // Give pending requests 30 seconds to complete
-        const shutdownTimeout = setTimeout(() => {
-          this.logger.error('Graceful shutdown timeout, forcing exit');
-          process.exit(1);
-        }, 30000);
-
-        // Execute registered shutdown handlers
-        for (const handler of this.shutdownHandlers) {
-          try {
-            await handler();
-          } catch (error) {
-            this.logger.error({ error }, 'Shutdown handler failed');
-          }
-        }
-
-        // Close all service connections
-        await this.closeAllServices();
-
-        clearTimeout(shutdownTimeout);
-        this.logger.info('Graceful shutdown complete');
-        process.exit(0);
-      } catch (error) {
-        this.logger.error({ error }, 'Error during graceful shutdown');
-        process.exit(1);
-      }
-    };
-
     // Handle signals properly with async error handling
     process.on('SIGTERM', () => {
-      shutdown('SIGTERM').catch((error) => {
+      this.performShutdown('SIGTERM').catch((error) => {
         this.logger.error({ error }, 'Error during SIGTERM shutdown');
         process.exit(1);
       });
     });
 
     process.on('SIGINT', () => {
-      shutdown('SIGINT').catch((error) => {
+      this.performShutdown('SIGINT').catch((error) => {
         this.logger.error({ error }, 'Error during SIGINT shutdown');
         process.exit(1);
       });
@@ -373,10 +319,47 @@ export class ContainerizationAssistMCPServer {
   }
 
   /**
-   * Get tool registry for external access if needed
+   * Get registered tools for external access if needed
    */
-  getToolRegistry(): ToolRegistry {
-    return this.toolRegistry;
+  getRegisteredTools(): Array<{ name: string; description: string }> {
+    return getRegisteredTools();
+  }
+
+  /**
+   * Perform graceful shutdown
+   */
+  private async performShutdown(signal: string): Promise<void> {
+    this.logger.info({ signal }, 'Received shutdown signal, starting graceful shutdown...');
+
+    if (this.isShuttingDown) {
+      this.logger.warn('Shutdown already in progress');
+      return;
+    }
+
+    this.isShuttingDown = true;
+
+    try {
+      const shutdownTimeout = setTimeout(() => {
+        this.logger.error('Graceful shutdown timeout, forcing exit');
+        process.exit(1);
+      }, 30000);
+
+      for (const handler of this.shutdownHandlers) {
+        try {
+          await handler();
+        } catch (error) {
+          this.logger.error({ error }, 'Shutdown handler failed');
+        }
+      }
+
+      await this.closeAllServices();
+      clearTimeout(shutdownTimeout);
+      this.logger.info('Graceful shutdown complete');
+      process.exit(0);
+    } catch (error) {
+      this.logger.error({ error }, 'Error during graceful shutdown');
+      process.exit(1);
+    }
   }
 
   /**
@@ -444,32 +427,14 @@ export class ContainerizationAssistMCPServer {
    */
   async listTools(): Promise<any> {
     try {
-      // Import the available tools list and config function
-      const { AVAILABLE_TOOLS } = await import('../src/application/tools/registry-utils.js');
-      const { getToolConfig } = await import('../src/application/tools/tool-config.js');
+      // Use native tool registration instead of complex discovery
 
-      const toolList = AVAILABLE_TOOLS.map((toolName) => {
-        try {
-          const config = getToolConfig(toolName);
-          const tool = this.toolRegistry.getTool(toolName);
-
-          if (!tool) {
-            this.logger.warn({ toolName }, 'Tool not found in registry, skipping');
-            return null;
-          }
-
-          return {
-            name: config.name,
-            description: config.description,
-            category: config.category || 'utility',
-            inputSchema: tool.inputSchema,
-            chainHint: tool.chainHint,
-          };
-        } catch (error) {
-          this.logger.warn({ toolName, error }, 'Failed to get tool config, skipping');
-          return null;
-        }
-      }).filter((tool): tool is NonNullable<typeof tool> => tool !== null);
+      const toolList = getRegisteredTools().map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        category: 'utility', // Default category for native tools
+        inputSchema: {}, // Schema not exposed in simple interface
+      }));
 
       return {
         success: true,
@@ -487,31 +452,10 @@ export class ContainerizationAssistMCPServer {
   /**
    * Shutdown the server gracefully
    */
-  async shutdown(): Promise<void> {
-    if (this.isShuttingDown) {
-      this.logger.warn('Shutdown already in progress');
-      return;
-    }
-
-    this.isShuttingDown = true;
-    this.logger.info('Starting graceful shutdown...');
-
-    try {
-      for (const handler of this.shutdownHandlers) {
-        try {
-          await handler();
-        } catch (error) {
-          this.logger.error({ error }, 'Shutdown handler failed');
-        }
-      }
-
-      // Close all service connections
-      await this.closeAllServices();
-
-      this.logger.info('Graceful shutdown complete');
-    } catch (error) {
-      this.logger.error({ error }, 'Error during graceful shutdown');
-      throw error;
-    }
+  shutdown(): void {
+    this.performShutdown('manual').catch((error) => {
+      this.logger.error({ error }, 'Error during manual shutdown');
+      process.exit(1);
+    });
   }
 }

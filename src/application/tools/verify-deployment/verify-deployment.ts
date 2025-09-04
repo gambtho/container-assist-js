@@ -2,15 +2,15 @@
  * Verify Deployment - MCP SDK Compatible Version
  */
 
-import { ErrorCode, DomainError } from '../../../contracts/types/index.js';
+import { ErrorCode, DomainError } from '../../../domain/types/index';
 import {
   VerifyDeploymentInput,
   type VerifyDeploymentParams,
   DeploymentResultSchema,
   type DeploymentResult,
-} from '../schemas.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
-import { checkDeploymentHealth } from './helper.js';
+} from '../schemas';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
+import { checkDeploymentHealth } from './helper';
 
 // Type aliases
 export type VerifyInput = VerifyDeploymentParams;
@@ -27,7 +27,9 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
   outputSchema: DeploymentResultSchema,
 
   handler: async (input: VerifyInput, context: ToolContext): Promise<VerifyOutput> => {
-    const { logger, sessionService, progressEmitter } = context;
+    const logger = context.logger;
+    const sessionService = context.sessionService;
+    const progressEmitter = context.progressEmitter;
     const { sessionId } = input;
 
     logger.info({ sessionId }, 'Starting deployment verification');
@@ -38,20 +40,35 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
         throw new DomainError(ErrorCode.VALIDATION_ERROR, 'Session service not available');
       }
 
-      const session = await sessionService.get(sessionId);
+      interface SessionWithWorkflowState {
+        workflow_state?: {
+          deployment_result?: {
+            deploymentName?: string;
+            deployment_name?: string;
+            namespace?: string;
+            serviceName?: string;
+            service_name?: string;
+            endpoint?: string;
+          };
+        };
+      }
+
+      const sessionServiceTyped = sessionService as { get: (id: string) => Promise<unknown> };
+      const session = (await sessionServiceTyped.get(sessionId)) as SessionWithWorkflowState | null;
       if (!session) {
         throw new DomainError(ErrorCode.SessionNotFound, 'Session not found');
       }
 
       // Get deployment result from session
       const deploymentResult = session.workflow_state?.deployment_result;
-      if (!deploymentResult?.deploymentName) {
+      const deploymentName = deploymentResult?.deploymentName ?? deploymentResult?.deployment_name;
+      if (!deploymentName) {
         throw new DomainError(ErrorCode.VALIDATION_ERROR, 'No deployment found in session');
       }
 
       // Emit progress
       if (progressEmitter) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'verify_deployment',
           status: 'in_progress',
@@ -62,17 +79,17 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
 
       // Check deployment health using existing helper
       const health = await checkDeploymentHealth(
-        deploymentResult.deploymentName,
-        deploymentResult.namespace,
+        deploymentName,
+        deploymentResult?.namespace ?? 'default',
         context,
       );
 
       const ready = health.status === 'healthy';
-      const replicas = 1; // Default to 1 for now
+      const replicas = 1; // Default replica count
 
       // Emit completion
       if (progressEmitter) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'verify_deployment',
           status: ready ? 'completed' : 'failed',
@@ -83,8 +100,8 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
 
       logger.info(
         {
-          deploymentName: deploymentResult.deploymentName,
-          namespace: deploymentResult.namespace,
+          deploymentName,
+          namespace: deploymentResult?.namespace ?? 'default',
           ready,
         },
         'Deployment verification completed',
@@ -93,10 +110,10 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
       return {
         success: true,
         sessionId,
-        namespace: deploymentResult.namespace,
-        deploymentName: deploymentResult.deploymentName,
-        serviceName: deploymentResult.serviceName,
-        endpoint: deploymentResult.endpoint,
+        namespace: deploymentResult?.namespace ?? 'default',
+        deploymentName,
+        serviceName: deploymentResult?.serviceName ?? deploymentResult?.service_name ?? '',
+        endpoint: deploymentResult?.endpoint ?? '',
         ready,
         replicas,
       };
@@ -104,7 +121,7 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
       logger.error({ error }, 'Verification failed'); // Fixed logger call
 
       if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'verify_deployment',
           status: 'failed',

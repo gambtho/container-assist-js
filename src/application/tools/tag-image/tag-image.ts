@@ -3,10 +3,10 @@
  */
 
 import { z } from 'zod';
-import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
-import { TagImageInput, type TagImageParams, BaseSessionResultSchema } from '../schemas.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
-import type { Session } from '../../../contracts/types/session.js';
+import { ErrorCode, DomainError } from '../../../domain/types/errors';
+import { TagImageInput, type TagImageParams, BaseSessionResultSchema } from '../schemas';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
+import type { Session } from '../../../domain/types/session';
 
 // Type aliases
 export type TagInput = TagImageParams;
@@ -23,8 +23,11 @@ async function tagDockerImage(
   const { dockerService, logger } = context;
 
   if (dockerService && 'tag' in dockerService) {
-    const result = await dockerService.tag(source, target);
-    return result.success;
+    interface DockerTagService {
+      tag: (source: string, target: string) => Promise<void>;
+    }
+    await (dockerService as DockerTagService).tag(source, target);
+    return true;
   }
 
   // CLI fallback would go here

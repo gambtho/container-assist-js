@@ -3,8 +3,9 @@
  */
 
 import { z } from 'zod';
-import { executeWithRetry } from '../error-recovery.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
+import { executeWithRetry } from '../error-recovery';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
+import { safeGetWorkflowState } from '../../../domain/types/workflow-state';
 
 // Define Zod schema for repository analysis result
 const RepositoryAnalysisSchema = z.object({
@@ -59,7 +60,7 @@ async function generateEnhancedDockerfile(
     throw new Error('Structured sampler not available - using basic template fallback');
   }
 
-  return executeWithRetry(
+  return executeWithRetry<string>(
     async () => {
       // Use AI request builder for cleaner construction
       // AIRequestBuilder not available - use direct structure
@@ -72,12 +73,12 @@ async function generateEnhancedDockerfile(
           frameworkVersion: analysis.frameworkVersion ?? '',
           buildSystemType: analysis.buildSystem?.type ?? 'npm',
           entryPoint: analysis.entryPoint ?? 'index',
-          port: String(input.port ?? (analysis.suggestedPorts[0] || 8080)),
+          port: String(input.port ?? analysis.suggestedPorts[0] ?? 8080),
           dependencies: analysis.dependencies.join(' '),
           devDependencies: (analysis.devDependencies ?? []).join(' '),
         },
         dockerContext: {
-          baseImage: input.base_image ?? (analysis.dockerConfig?.baseImage || 'node:20-alpine'),
+          baseImage: input.base_image ?? analysis.dockerConfig?.baseImage ?? 'node:20-alpine',
           multistage: input.multistage,
           securityHardening: input.security_hardening,
           includeHealthcheck: input.include_healthcheck,
@@ -94,15 +95,28 @@ async function generateEnhancedDockerfile(
       }
 
       // Validate security of generated Dockerfile if validator is available
-      let validation: any = null;
-      if (contentValidator && dockerfileResult.data) {
+      let validation: {
+        valid?: boolean;
+        errors?: string[];
+        summary?: string;
+        issues?: Array<{ severity?: string; [key: string]: unknown }>;
+        isValid?: boolean;
+      } | null = null;
+
+      if (contentValidator && dockerfileResult.data && typeof dockerfileResult.data === 'string') {
         validation = contentValidator.validateContent(dockerfileResult.data, {
           contentType: 'dockerfile',
           checkSecurity: true,
           checkBestPractices: true,
-        });
+        }) as {
+          valid?: boolean;
+          errors?: string[];
+          summary?: string;
+          issues?: Array<{ severity?: string; [key: string]: unknown }>;
+          isValid?: boolean;
+        };
 
-        if (!validation.valid) {
+        if (!(validation.valid ?? validation.isValid)) {
           logger.warn(
             {
               issues: validation.errors,
@@ -116,9 +130,9 @@ async function generateEnhancedDockerfile(
 
         // Log security warnings if any
         if (validation.issues && validation.issues.length > 0) {
-          const highSeverityIssues = validation.issues.filter((i: any) => i.severity === 'high');
+          const highSeverityIssues = validation.issues.filter((issue) => issue.severity === 'high');
           const mediumSeverityIssues = validation.issues.filter(
-            (i: any) => i.severity === 'medium',
+            (issue) => issue.severity === 'medium',
           );
 
           if (highSeverityIssues.length === 0) {
@@ -138,8 +152,8 @@ async function generateEnhancedDockerfile(
         {
           language: analysis.language,
           framework: analysis.framework,
-          securityIssues: validation.issues?.length ?? 0,
-          validationPassed: validation.isValid,
+          securityIssues: validation?.issues?.length ?? 0,
+          validationPassed: validation?.valid ?? validation?.isValid ?? false,
         },
         'Enhanced Dockerfile generated successfully',
       );
@@ -148,7 +162,7 @@ async function generateEnhancedDockerfile(
         throw new Error('Generated Dockerfile content is empty');
       }
 
-      return dockerfileResult.data;
+      return String(dockerfileResult.data);
     },
     { maxAttempts: 3, delayMs: 1000 },
   );
@@ -167,7 +181,7 @@ async function analyzeRepositoryStructured(
     throw new Error('Structured sampler not available');
   }
 
-  return executeWithRetry(
+  return executeWithRetry<RepositoryAnalysis>(
     async () => {
       // Get repository information (simplified for example)
       const fileList = getFileList(repoPath);
@@ -194,16 +208,17 @@ async function analyzeRepositoryStructured(
         throw new Error(analysisResult.error ?? 'Repository analysis failed');
       }
 
+      const analysisData = analysisResult.data as RepositoryAnalysis;
       logger.info(
         {
-          language: analysisResult.data?.language,
-          framework: analysisResult.data?.framework,
+          language: analysisData.language,
+          framework: analysisData.framework,
           repoPath,
         },
         'Repository analysis completed with structured sampling',
       );
 
-      return analysisResult.data;
+      return analysisData;
     },
     { maxAttempts: 2, delayMs: 500 },
   );
@@ -212,7 +227,7 @@ async function analyzeRepositoryStructured(
 // Helper functions (simplified implementations)
 function getFileList(_repoPath: string): string[] {
   // Implementation would scan files and return paths
-  return ['package.json', 'src/index.js', 'src/app.js'];
+  return ['package.json', 'src/index', 'src/app'];
 }
 
 function readConfigFiles(_repoPath: string): Record<string, string> {
@@ -257,7 +272,8 @@ export const enhancedGenerateDockerfileHandler: ToolDescriptor = {
 
   handler: async (input: unknown, context: unknown) => {
     const ctx = context as ToolContext;
-    const { sessionService, logger } = ctx;
+    const sessionService: unknown = ctx.sessionService;
+    const logger = ctx.logger;
 
     try {
       const validatedInput = EnhancedDockerfileInput.parse(input);
@@ -283,16 +299,27 @@ export const enhancedGenerateDockerfileHandler: ToolDescriptor = {
         : null;
 
       // Update session state
-      if (sessionService != null && typeof sessionService.updateAtomic === 'function') {
-        await sessionService.updateAtomic(validatedInput.session_id, (session: any) => ({
-          ...session,
-          workflow_state: {
-            ...(session.workflow_state || {}),
-            dockerfileContent: dockerfileResult,
-            analysisResult,
-            validationResult: finalValidation,
-          },
-        }));
+      const serviceWithUpdate = sessionService as {
+        updateAtomic?: (
+          sessionId: string,
+          updater: (session: unknown) => unknown,
+        ) => Promise<unknown>;
+      };
+
+      if (serviceWithUpdate && typeof serviceWithUpdate.updateAtomic === 'function') {
+        await serviceWithUpdate.updateAtomic(validatedInput.session_id, (session: unknown) => {
+          const sessionObj = session as Record<string, unknown>;
+          const workflowState = safeGetWorkflowState(sessionObj.workflow_state);
+          return {
+            ...sessionObj,
+            workflow_state: {
+              ...workflowState,
+              dockerfileContent: dockerfileResult,
+              analysisResult,
+              validationResult: finalValidation,
+            },
+          };
+        });
       }
 
       return {

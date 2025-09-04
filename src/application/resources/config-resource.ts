@@ -4,7 +4,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { ApplicationConfig } from '../../config/index.js';
+import type { ApplicationConfig } from '../../config/index';
 
 /**
  * MCP Resource interface

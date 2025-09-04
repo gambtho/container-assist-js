@@ -4,10 +4,10 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
-import type { Session, WorkflowState } from '../contracts/types/index.js';
-import type { SessionFilter } from '../contracts/types/session-store.js';
-import { SessionStore } from '../infrastructure/session-store.js';
-import type { SessionService as ISessionService } from '../application/services/interfaces.js';
+import type { Session, WorkflowState } from '../domain/types/index';
+import type { SessionFilter } from '../domain/types/session-store';
+import { SessionStore } from '../infrastructure/session-store';
+import type { SessionService as ISessionService } from '../application/services/interfaces';
 
 export interface SessionConfig {
   storeType?: 'memory' | 'file';

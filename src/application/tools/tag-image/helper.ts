@@ -2,8 +2,8 @@
  * Tag Image - Helper Functions
  */
 
-import type { ToolContext } from '../tool-types.js';
-import { type Result, ok, fail } from '../../../domain/types/result.js';
+import type { ToolContext } from '../tool-types';
+import { type Result, Success, Failure } from '../../../domain/types/result';
 
 /**
  * Validate Docker tag format
@@ -28,7 +28,7 @@ export function generateSemanticTags(
 
   // Validate version format
   if (!version || version.trim() === '') {
-    return fail('Version cannot be empty');
+    return Failure('Version cannot be empty');
   }
 
   // Clean version string
@@ -60,12 +60,12 @@ export function generateSemanticTags(
   } else {
     // Non-semantic version - validate it's safe for Docker tags
     if (!isValidDockerTag(cleanVersion)) {
-      return fail(`Invalid version format for Docker tag: ${cleanVersion}`);
+      return Failure(`Invalid version format for Docker tag: ${cleanVersion}`);
     }
     tags.push(`${prefix}${imageName}:${cleanVersion}`);
   }
 
-  return ok(tags);
+  return Success(tags);
 }
 
 /**
@@ -83,7 +83,7 @@ export function generateStandardTags(
 
   // Validate project name
   if (!projectName || !isValidDockerTag(projectName)) {
-    return fail(`Invalid project name for Docker image: ${projectName}`);
+    return Failure(`Invalid project name for Docker image: ${projectName}`);
   }
 
   // Project-based tags
@@ -92,7 +92,7 @@ export function generateStandardTags(
   // Version tags if provided
   if (version) {
     const versionTagsResult = generateSemanticTags(version, registry, projectName);
-    if (versionTagsResult.kind === 'ok') {
+    if (versionTagsResult.ok) {
       for (const tag of versionTagsResult.value) {
         tags.push(tag);
       }
@@ -125,7 +125,7 @@ export function generateStandardTags(
     }
   }
 
-  return ok(tags);
+  return Success(tags);
 }
 
 /**
@@ -140,24 +140,27 @@ export async function tagDockerImage(
 
   // Validate inputs
   if (!source || source.trim() === '') {
-    return fail('Source image cannot be empty');
+    return Failure('Source image cannot be empty');
   }
   if (!target || target.trim() === '') {
-    return fail('Target tag cannot be empty');
+    return Failure('Target tag cannot be empty');
   }
 
   try {
     if (dockerService && 'tag' in dockerService) {
-      await dockerService.tag(source, target);
-      return ok({ source, target, success: true });
+      interface DockerTagService {
+        tag: (source: string, target: string) => Promise<void>;
+      }
+      await (dockerService as DockerTagService).tag(source, target);
+      return Success({ source, target, success: true });
     }
 
     // CLI fallback would go here
     logger.warn('Docker service not available - simulating tag operation');
-    return ok({ source, target, success: true });
+    return Success({ source, target, success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return fail(`Failed to tag image: ${message}`, 'TAG_FAILED', { source, target });
+    return Failure(`Failed to tag image: ${message}`);
   }
 }
 
@@ -177,7 +180,7 @@ export async function getSourceImage(
     try {
       const session = await sessionService.get(sessionId);
       if (!session) {
-        return fail('Session not found', 'SESSION_NOT_FOUND');
+        return Failure('Session not found');
       }
 
       const buildResult = session.workflow_state?.build_result;
@@ -188,12 +191,12 @@ export async function getSourceImage(
       projectName = (session.metadata?.projectName as string) || 'app';
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return fail(`Failed to get session: ${message}`, 'SESSION_ERROR');
+      return Failure(`Failed to get session: ${message}`);
     }
   }
 
   if (!source) {
-    return fail('No source image specified', 'NO_SOURCE_IMAGE');
+    return Failure('No source image specified');
   }
 
   // Validate project name for Docker compatibility
@@ -201,7 +204,7 @@ export async function getSourceImage(
     projectName = 'app'; // Fallback to safe default
   }
 
-  return ok({ source, projectName });
+  return Success({ source, projectName });
 }
 
 /**
@@ -224,7 +227,7 @@ export function generateAllTags(
       const tagParts = tag.split(':');
       const tagName = tagParts[tagParts.length - 1];
       if (!tagName || !isValidDockerTag(tagName)) {
-        return fail(`Invalid Docker tag format: ${tag}`);
+        return Failure(`Invalid Docker tag format: ${tag}`);
       }
     }
     allTags.push(...targetTags);
@@ -236,7 +239,7 @@ export function generateAllTags(
       const tagParts = tag.split(':');
       const tagName = tagParts[tagParts.length - 1];
       if (!tagName || !isValidDockerTag(tagName)) {
-        return fail(`Invalid custom Docker tag format: ${tag}`);
+        return Failure(`Invalid custom Docker tag format: ${tag}`);
       }
     }
     allTags.push(...customTags);
@@ -245,7 +248,7 @@ export function generateAllTags(
   // Generate standard tags if no explicit tags provided
   if (allTags.length === 0) {
     const standardTagsResult = generateStandardTags(projectName, version, registry, latest);
-    if (standardTagsResult.kind === 'fail') {
+    if (!standardTagsResult.ok) {
       return standardTagsResult;
     }
     allTags = standardTagsResult.value;
@@ -259,7 +262,7 @@ export function generateAllTags(
   // Remove duplicates
   allTags = Array.from(new Set(allTags));
 
-  return ok(allTags);
+  return Success(allTags);
 }
 
 /**
@@ -276,7 +279,7 @@ export async function applyTags(
   for (const tag of allTags) {
     const result = await tagDockerImage(source, tag, context);
 
-    if (result.kind === 'ok') {
+    if (result.ok) {
       tagResults.push({
         tag: tag.split('/').pop() || tag,
         fullTag: tag,
@@ -298,7 +301,7 @@ export async function applyTags(
     }
   }
 
-  return ok(tagResults);
+  return Success(tagResults);
 }
 
 /**
@@ -309,9 +312,7 @@ export function validateTagResults(
 ): Result<Array<{ tag: string; fullTag: string; created: boolean }>> {
   const successfulTags = tagResults.filter((t) => t.created === true);
   if (successfulTags.length === 0) {
-    return fail('No tags were successfully created', 'NO_TAGS_CREATED', {
-      attemptedTags: tagResults.length,
-    });
+    return Failure('No tags were successfully created');
   }
-  return ok(successfulTags);
+  return Success(successfulTags);
 }

@@ -516,7 +516,7 @@ export class ContentValidator {
       exec: 'Sanitize inputs before command execution',
     };
 
-    return recommendations[key] || 'Review and fix security issue';
+    return recommendations[key] ?? 'Review and fix security issue';
   }
 
   /**

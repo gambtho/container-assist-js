@@ -9,4 +9,4 @@
  * @module src/application/tools/analyze-repo/index
  */
 
-export { default } from './analyze-repo.js';
+export { default } from './analyze-repo';

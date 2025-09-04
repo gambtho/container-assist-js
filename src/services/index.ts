@@ -7,9 +7,9 @@ import type { Logger } from 'pino';
 import { createDockerService, type DockerServiceConfig } from './docker';
 import { createKubernetesService, type KubernetesConfig } from './kubernetes';
 import { type AIConfig, AIService, createAIService } from './ai';
-import { createSessionService, SessionService } from './session.js';
+import { createSessionService, SessionService } from './session';
 import { EventEmitter } from 'events';
-import type { SampleFunction } from '../infrastructure/ai/index.js';
+import type { SampleFunction } from '../infrastructure/ai/index';
 
 export interface ServicesConfig {
   docker?: DockerServiceConfig;

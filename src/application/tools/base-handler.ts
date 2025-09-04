@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { CoreServices } from '../services/interfaces.js';
+import type { CoreServices } from '../services/interfaces';
 import type { ToolConfig } from './tool-config';
 
 /**
@@ -41,17 +41,17 @@ export type ToolResult =
 /**
  * Chain hint for tool workflows
  */
-export interface ChainHint<TOutput = any> {
+export interface ChainHint<TOutput = unknown> {
   nextTool: string;
   reason: string;
-  paramMapper?: (output: TOutput) => Record<string, any>;
+  paramMapper?: (output: TOutput) => Record<string, unknown>;
 }
 
 /**
  * Abstract base class for all tool handlers
  * Uses constructor injection instead of service locator
  */
-export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
+export abstract class BaseToolDescriptor<TInput = unknown, TOutput = unknown> {
   protected readonly logger: Logger;
   protected readonly config: ToolConfig;
 
@@ -71,7 +71,7 @@ export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
   /**
    * Output validation schema - optional
    */
-  get outputSchema(): any {
+  get outputSchema(): unknown {
     return undefined;
   }
 

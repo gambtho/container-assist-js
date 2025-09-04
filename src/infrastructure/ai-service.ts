@@ -1,6 +1,6 @@
 /**
  * Enhanced AI Service
- * Unified service facade integrating all Phase 2 optimizations:
+ * Unified service facade with integrated optimizations:
  * - AI Request Builder pattern
  * - Enhanced error recovery with context
  * - Response caching with TTL and LRU
@@ -9,12 +9,12 @@
 
 import { z } from 'zod';
 import type { Logger } from 'pino';
-import { AIServiceError } from '../errors/index.js';
-import { ErrorCode } from '../contracts/types/errors.js';
-import type { SampleFunction } from '../application/interfaces.js';
-import type { AIRequest } from './ai/requests.js';
+import { AIServiceError } from '../errors/index';
+import { ErrorCode } from '../domain/types/errors';
+import type { SampleFunction } from './ai/sampling';
+import type { AIRequest } from './ai/requests';
 import { AIResponseCache, type CacheOptions, type CacheStats } from './ai/response-cache';
-import { executeWithRecovery } from './ai/error-handlers.js';
+import { executeWithRecovery } from './ai/error-handlers';
 
 /**
  * Enhanced AI service configuration
@@ -79,7 +79,7 @@ export interface GenerationOptions {
   disableRecovery?: boolean;
 
   /** Additional context variables */
-  additionalContext?: Record<string, any>;
+  additionalContext?: Record<string, unknown>;
 }
 
 /**
@@ -96,7 +96,7 @@ export interface StructuredOptions extends GenerationOptions {
 /**
  * Generation result with metadata
  */
-export interface GenerationResult<T = any> {
+export interface GenerationResult<T = unknown> {
   /** The generated content */
   data: T;
 
@@ -169,7 +169,7 @@ export interface PerformanceMetrics {
 }
 
 /**
- * Enhanced AI Service with all Phase 2 optimizations
+ * Enhanced AI Service with integrated optimizations
  */
 export class EnhancedAIService {
   private cache: AIResponseCache;
@@ -413,7 +413,7 @@ export class EnhancedAIService {
         const result = await executeWithRecovery(
           executor,
           requestWithContext,
-          this.config.errorRecovery?.maxAttempts || 3,
+          this.config.errorRecovery?.maxAttempts ?? 3,
         );
 
         const metadata: Partial<GenerationResult<typeof result.data>['metadata']> = {
@@ -653,7 +653,7 @@ export class EnhancedAIService {
       const result = await executeWithRecovery(
         executor,
         requestWithContext,
-        this.config.errorRecovery?.maxAttempts || 3,
+        this.config.errorRecovery?.maxAttempts ?? 3,
       );
 
       const metadata: Partial<GenerationResult<typeof result.data>['metadata']> = {

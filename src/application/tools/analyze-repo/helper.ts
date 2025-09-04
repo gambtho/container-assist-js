@@ -4,7 +4,7 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { AnalyzeRepositoryParams, AnalysisResult } from '../schemas.js';
+import { AnalyzeRepositoryParams, AnalysisResult } from '../schemas';
 
 // Use consolidated schemas
 
@@ -66,9 +66,9 @@ const LANGUAGE_SIGNATURES: Record<string, LanguageSignature> = {
 const FRAMEWORK_SIGNATURES: Record<string, { files: string[]; dependencies?: string[] }> = {
   express: { files: [], dependencies: ['express'] },
   nestjs: { files: ['nest-cli.json'], dependencies: ['@nestjs/core'] },
-  nextjs: { files: ['next.config.js', 'next.config.mjs'], dependencies: ['next'] },
+  nextjs: { files: ['next.config', 'next.config.mjs'], dependencies: ['next'] },
   react: { files: [], dependencies: ['react', 'react-dom'] },
-  vue: { files: ['vue.config.js'], dependencies: ['vue'] },
+  vue: { files: ['vue.config'], dependencies: ['vue'] },
   angular: { files: ['angular.json'], dependencies: ['@angular/core'] },
   django: { files: ['manage.py'], dependencies: ['django'] },
   flask: { files: [], dependencies: ['flask'] },
@@ -321,7 +321,9 @@ export async function detectPorts(repoPath: string, language: string): Promise<n
   if (language === 'javascript' || language === 'typescript') {
     try {
       const packageJsonPath = path.join(repoPath, 'package.json');
-      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'));
+      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8')) as {
+        scripts?: Record<string, string>;
+      };
       const scripts = JSON.stringify(packageJson.scripts ?? {});
       const portMatches = scripts.matchAll(/--port[= ](\d+)/g);
       for (const match of portMatches) {
@@ -372,7 +374,7 @@ export function getRecommendedBaseImage(language: string, framework?: string): s
   if (framework === 'django') return 'python:3.11-slim';
   if (framework === 'spring') return 'openjdk:17-jdk-slim';
 
-  return imageMap[language] || 'alpine:3.19';
+  return imageMap[language] ?? 'alpine:3.19';
 }
 
 /**
@@ -386,7 +388,7 @@ export function getSecurityRecommendations(
   // Check for known vulnerable packages
   const vulnerablePackages = ['request', 'node-uuid', 'minimist<1.2.6'];
   const foundVulnerable = dependencies.filter((dep) =>
-    vulnerablePackages.some((vuln) => dep.name.includes(vuln.split('<')[0] || '')),
+    vulnerablePackages.some((vuln) => dep.name.includes(vuln.split('<')[0] ?? '')),
   );
 
   if (foundVulnerable.length > 0) {
@@ -465,7 +467,7 @@ export async function gatherFileStructure(
  */
 function getFileIcon(extension: string): string {
   const iconMap: Record<string, string> = {
-    '.js': '📜',
+    '': '📜',
     '.ts': '📘',
     '.tsx': '📘',
     '.jsx': '📜',
@@ -483,5 +485,5 @@ function getFileIcon(extension: string): string {
     '.txt': '📝',
   };
 
-  return iconMap[extension.toLowerCase()] || '📄';
+  return iconMap[extension.toLowerCase()] ?? '📄';
 }

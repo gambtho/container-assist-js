@@ -2,9 +2,9 @@
  * Test dependencies factory
  */
 
-import { MockMCPSampler } from './mock-mcp-sampler.js';
-import { createMockLogger } from './test-helpers.js';
-import type { Logger } from '../../src/infrastructure/core/logger-types.js';
+import { MockMCPSampler } from './mock-mcp-sampler';
+import { createMockLogger } from './test-helpers';
+import type { Logger } from '../../src/infrastructure/core/logger-types';
 
 export interface TestDependencies {
   logger: Logger;

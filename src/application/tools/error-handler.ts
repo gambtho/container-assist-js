@@ -4,10 +4,8 @@
  */
 
 import type { Logger } from 'pino';
-// import type { Server } from '@modelcontextprotocol/sdk/types''; // Server not exported'
-import { convertToMcpError } from '../errors/mcp-error-mapper.js';
-import { createValidationHandler } from '../errors/validation.js';
-// import { withRetry as recoveryWithRetry, withTimeout as recoveryWithTimeout } from '../errors/recovery.js''; // Unused imports'
+import { convertToMcpError } from '../errors/mcp-error-mapper';
+import { createValidationHandler } from '../errors/validation';
 import type { ToolDescriptor, ToolContext, ToolHandler } from './tool-types';
 
 /**
@@ -113,9 +111,9 @@ export async function executeToolSafely<TInput, TOutput>(
   // Validate input
   try {
     const validateInput = createValidationHandler(tool.inputSchema);
-    const validatedInput = validateInput(params);
+    const validatedInput: TInput = validateInput(params) as TInput;
 
-    logger.debug({ params: validatedInput }, 'Input validation passed');
+    logger.debug({ params: validatedInput as unknown }, 'Input validation passed');
 
     // Execute with timeout and retry logic
     for (let attempt = 1; attempt <= retries + 1; attempt++) {

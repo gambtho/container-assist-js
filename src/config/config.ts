@@ -192,12 +192,12 @@ function parseValue(value: string, type: string): unknown {
 // Simple nested object path setting
 function setPath(obj: unknown, path: string, value: unknown): void {
   const keys = path.split('.');
-  let current = obj as Record<string, any>;
+  let current = obj as Record<string, unknown>;
 
   for (let i = 0; i < keys.length - 1; i++) {
     const key = keys[i]!;
     if (!(key in current)) current[key] = {};
-    current = current[key] as Record<string, any>;
+    current = current[key] as Record<string, unknown>;
   }
 
   current[keys[keys.length - 1]!] = value;
@@ -274,7 +274,7 @@ export function validateConfiguration(config: ApplicationConfig): {
     errors.push('Invalid LOG_LEVEL');
   }
 
-  if (config.server.port && (config.server.port < 1 ?? config.server.port > 65535)) {
+  if (config.server.port !== undefined && (config.server.port < 1 || config.server.port > 65535)) {
     errors.push('Invalid server port');
   }
 
@@ -284,7 +284,7 @@ export function validateConfiguration(config: ApplicationConfig): {
 /**
  * Get configuration summary for logging
  */
-export function getConfigurationSummary(config: ApplicationConfig): Record<string, any> {
+export function getConfigurationSummary(config: ApplicationConfig): Record<string, unknown> {
   return {
     nodeEnv: config.server.nodeEnv,
     logLevel: config.server.logLevel,

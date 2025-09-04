@@ -8,7 +8,7 @@ import {
   SessionSchema,
   WorkflowStep,
   getWorkflowSteps,
-} from '../../contracts/types/session.js';
+} from '../../domain/types/session';
 import { randomBytes } from 'crypto';
 
 export class SessionUtils {

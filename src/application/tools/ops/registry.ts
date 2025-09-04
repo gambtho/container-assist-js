@@ -1,25 +1,44 @@
 import type { Logger } from 'pino';
-// Tool type no longer needed with new registerTool API
 import { z } from 'zod';
 import { McpError, ErrorCode as MCPErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { ServiceError, ErrorCode } from '../../../contracts/types/errors.js';
-import type { Services } from '../../../services/index.js';
-import type { ToolContext, ToolDescriptor } from '../tool-types.js';
-import { convertToMcpError } from '../../errors/mcp-error-mapper.js';
-import { withValidationAndLogging } from '../../errors/validation.js';
-import { ToolNotImplementedError, suggestAlternativeTools } from '../../errors/tool-errors.js';
+import { ServiceError, ErrorCode } from '../../../domain/types/errors';
+import type { Services } from '../../../services/index';
+
+// MCP Server interface based on usage
+interface McpServer {
+  log?: (level: string, message: string, data: Record<string, unknown>) => void;
+  registerTool: (
+    name: string,
+    definition: {
+      title: string;
+      description?: string;
+      inputSchema: unknown;
+    },
+    handler: (
+      params: unknown,
+      context: unknown,
+    ) => Promise<{
+      content: Array<{ type: 'text'; text: string }>;
+    }>,
+  ) => void;
+  notification?: (params: { method: string; params: Record<string, unknown> }) => void;
+}
+
+import type { ToolContext, ToolDescriptor } from '../tool-types';
+import { convertToMcpError } from '../../errors/mcp-error-mapper';
+import { withValidationAndLogging } from '../../errors/validation';
+import { ToolNotImplementedError, suggestAlternativeTools } from '../../errors/tool-errors';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { getImplementedTools, isToolImplemented, getToolInfo } from '../tool-manifest.js';
-import type { ApplicationConfig } from '../../../config/types.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { getImplementedTools, isToolImplemented, getToolInfo } from '../tool-manifest';
+import type { ApplicationConfig } from '../../../config/types';
 
 // Re-export types
-export type { ToolDescriptor, ToolContext } from '../tool-types.js';
+export type { ToolDescriptor, ToolContext } from '../tool-types';
 
 export class ToolRegistry {
   private tools = new Map<string, ToolDescriptor>();
   private toolList: Array<{ name: string; description?: string; inputSchema?: unknown }> = [];
-  private server!: McpServer;
+  private server: McpServer | null = null;
 
   constructor(
     private readonly services: Services,
@@ -35,15 +54,13 @@ export class ToolRegistry {
   }
 
   private logToolExecution(toolName: string, params: unknown): void {
-    // Log to our logger instead of server.log to avoid stdout interference
-    this.logger.info(
-      {
+    if (this.server != null && 'log' in this.server && typeof this.server.log === 'function') {
+      this.server.log('info', 'Tool execution started', {
         tool: toolName,
-        params: this.sanitizeParams(params) as any,
+        params: this.sanitizeParams(params),
         timestamp: new Date().toISOString(),
-      },
-      'Tool execution started',
-    );
+      });
+    }
   }
 
   private sanitizeParams(params: unknown): unknown {
@@ -71,6 +88,14 @@ export class ToolRegistry {
       );
     }
 
+    // Check for duplicate tool registration
+    if (this.tools.has(descriptor.name)) {
+      throw new ServiceError(
+        ErrorCode.InvalidInput,
+        `Tool '${descriptor.name}' is already registered`,
+      );
+    }
+
     try {
       this.tools.set(descriptor.name, descriptor);
 
@@ -79,7 +104,7 @@ export class ToolRegistry {
         {
           title: descriptor.name,
           description: descriptor.description,
-          inputSchema: descriptor.inputSchema as any,
+          inputSchema: descriptor.inputSchema,
         },
         async (params: unknown, context: unknown) => {
           const toolLogger = this.logger.child({ tool: descriptor.name });
@@ -99,7 +124,7 @@ export class ToolRegistry {
               descriptor.name,
             );
 
-            const result = await validatedHandler(params as TInput);
+            const result = (await validatedHandler(params)) as TOutput;
 
             const responseText = `✅ **${descriptor.name} completed**\n${JSON.stringify(result, null, 2)}`;
 
@@ -149,33 +174,55 @@ export class ToolRegistry {
   }
 
   register(descriptor: unknown): void {
-    const desc = descriptor as any;
-    if (desc?.name == null || desc?.inputSchema == null || desc?.outputSchema == null) {
+    const desc = descriptor as {
+      name?: string;
+      inputSchema?: { parse?: (data: unknown) => unknown };
+      outputSchema?: { parse?: (data: unknown) => unknown };
+      handler?: unknown;
+      execute?: unknown;
+      description?: string;
+      category?: string;
+      chainHint?: unknown;
+    };
+
+    if (!desc?.name || !desc?.inputSchema || !desc?.outputSchema) {
       throw new ServiceError(
         ErrorCode.VALIDATION_ERROR,
         'Tool must have name, inputSchema, and outputSchema',
       );
     }
 
-    if (desc.inputSchema?.parse == null || desc.outputSchema?.parse == null) {
+    if (!desc.inputSchema?.parse || !desc.outputSchema?.parse) {
       throw new ServiceError(
         ErrorCode.VALIDATION_ERROR,
         'Input and output schemas must be valid Zod schemas',
       );
     }
 
-    if (desc.execute != null && desc.handler == null) {
+    if (desc.execute && !desc.handler) {
       desc.handler = desc.execute;
     }
 
-    this.tools.set(desc.name, desc);
+    // Check for duplicate tool registration
+    if (this.tools.has(desc.name)) {
+      throw new ServiceError(ErrorCode.InvalidInput, `Tool '${desc.name}' is already registered`);
+    }
+
+    this.tools.set(desc.name, desc as ToolDescriptor);
 
     // Add to toolList for listTools() method
-    this.toolList.push({
+    const toolInfo: { name: string; description?: string; inputSchema: unknown } = {
       name: desc.name,
-      description: desc.description,
-      inputSchema: zodToJsonSchema(desc.inputSchema),
-    });
+      inputSchema: zodToJsonSchema(desc.inputSchema as z.ZodType),
+    };
+    if (desc.description) {
+      toolInfo.description = desc.description;
+    }
+
+    // Check for duplicate in toolList as well (extra safety)
+    if (!this.toolList.find((tool) => tool.name === desc.name)) {
+      this.toolList.push(toolInfo);
+    }
 
     this.logger.info(
       {
@@ -238,14 +285,18 @@ export class ToolRegistry {
       const baseContext = await this.createToolContext();
 
       try {
-        const validated = tool.inputSchema.parse(args);
+        const validated = tool.inputSchema.parse(args) as Record<string, unknown>;
 
-        const timeout = (tool as any)?.timeout ?? 30000;
+        const toolWithTimeout = tool as ToolDescriptor & { timeout?: number };
+        const timeout = toolWithTimeout.timeout ?? 30000;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
         try {
-          const executeFn = (tool as any).execute ?? tool.handler;
+          const toolWithExecute = tool as ToolDescriptor & {
+            execute?: (...args: unknown[]) => unknown;
+          };
+          const executeFn = toolWithExecute.execute ?? tool.handler;
           const result = await executeFn(validated, {
             ...baseContext,
             signal: controller.signal,
@@ -254,7 +305,7 @@ export class ToolRegistry {
           clearTimeout(timeoutId);
 
           // Tool handlers return results directly, not wrapped in {success, data}
-          const validatedOutput = tool.outputSchema.parse(result);
+          const validatedOutput = tool.outputSchema.parse(result) as unknown;
 
           return {
             success: true,
@@ -345,8 +396,18 @@ export class ToolRegistry {
   }
 
   async handleSamplingRequest(request: unknown): Promise<unknown> {
-    if ((this.services as any)?.mcpSampler != null) {
-      const sampler = (this.services as any).mcpSampler;
+    const servicesWithSampler = this.services as Services & {
+      mcpSampler?: {
+        sample: (request: unknown) => Promise<{
+          success?: boolean;
+          content?: unknown;
+          error?: string;
+        }>;
+      };
+    };
+
+    if (servicesWithSampler.mcpSampler) {
+      const sampler = servicesWithSampler.mcpSampler;
       try {
         const result = await sampler.sample(request);
         if (result?.success) {
@@ -386,13 +447,9 @@ export class ToolRegistry {
       }
     }
 
-    const aiService = this.services.ai as any;
+    const aiService = this.services.ai;
 
-    if (
-      aiService == null ||
-      typeof aiService.isAvailable !== 'function' ||
-      !aiService.isAvailable()
-    ) {
+    if (!aiService || typeof aiService.isAvailable !== 'function' || !aiService.isAvailable()) {
       return {
         success: false,
         content: [
@@ -405,15 +462,26 @@ export class ToolRegistry {
     }
 
     try {
-      const result = await aiService.generate(request);
-      const resultText =
-        typeof result === 'string'
-          ? result
-          : result && typeof result === 'object' && 'content' in result
-            ? result.content
-            : result && typeof result === 'object' && 'data' in result
-              ? result.data
-              : String(result) || 'No result';
+      interface AiServiceWithGenerate {
+        generate: (request: unknown) => Promise<unknown>;
+      }
+      const result = await (aiService as unknown as AiServiceWithGenerate).generate(request);
+      let resultText = 'No result';
+
+      if (typeof result === 'string') {
+        resultText = result;
+      } else if (result && typeof result === 'object') {
+        const objResult = result as Record<string, unknown>;
+        if ('content' in objResult && typeof objResult.content === 'string') {
+          resultText = objResult.content;
+        } else if ('data' in objResult && typeof objResult.data === 'string') {
+          resultText = objResult.data;
+        } else {
+          resultText = JSON.stringify(result);
+        }
+      } else {
+        resultText = String(result);
+      }
 
       return {
         success: true,
@@ -453,11 +521,11 @@ export class ToolRegistry {
         try {
           if (module.default != null) {
             if (this.server != null && module.default?.handler != null) {
-              this.registerTool(module.default as any);
+              this.registerTool(module.default as ToolDescriptor);
               this.logger.debug({ module: name, type: 'mcp' }, 'Tool loaded');
             } else if (
               module.default?.handler != null ||
-              (module.default as any)?.execute != null
+              (module.default as { execute?: unknown })?.execute != null
             ) {
               // Fallback to basic registration for testing
               this.register(module.default);
@@ -525,38 +593,62 @@ export class ToolRegistry {
       this.logger,
     );
 
+    const contextWithToken = contextOrSignal as { progressToken?: unknown } | undefined;
+
+    // Use EventEmitter directly - no need for adapters
+    const progressEmitter = this.services.events;
+    const eventPublisher = this.services.events;
+
     const context: ToolContext = {
       server: this.server,
-      progressToken: logger ? (contextOrSignal as any)?.progressToken : undefined,
+      ...(logger && contextWithToken?.progressToken
+        ? { progressToken: String(contextWithToken.progressToken) }
+        : {}),
 
       logger: contextLogger,
-      sessionService: this.services.session as any,
-      progressEmitter: this.services.events as any,
-      dockerService: this.services.docker as any,
-      kubernetesService: this.services.kubernetes as any,
-      aiService: this.services.ai as any,
-      eventPublisher: this.services.events as any,
+      sessionService: this.services.session,
+      progressEmitter,
+      dockerService: this.services.docker,
+      kubernetesService: this.services.kubernetes,
+      aiService: this.services.ai,
+      eventPublisher,
       workflowManager,
       workflowOrchestrator,
       config: this.config,
+      toolRegistry: this,
       logPerformanceMetrics: (operation: string, duration: number, metadata?: unknown) => {
-        // Log performance metrics to our logger instead of server notifications
-        contextLogger.info(
-          {
-            operation,
-            duration,
-            metadata: metadata ?? {},
-            timestamp: new Date().toISOString(),
-          },
-          'Performance metrics',
-        );
+        try {
+          this.server?.notification?.({
+            method: 'notifications/message',
+            params: {
+              level: 'info',
+              logger: 'tool-performance',
+              data: {
+                operation,
+                duration,
+                metadata: metadata ?? {},
+                timestamp: new Date().toISOString(),
+              },
+            },
+          });
+        } catch (error) {
+          contextLogger.info(
+            {
+              operation,
+              duration,
+              metadata: metadata ?? {},
+            },
+            'Performance metrics',
+          );
+        }
       },
     };
 
     if (
       this.services.ai &&
       'isAvailable' in this.services.ai &&
-      (this.services.ai as any).isAvailable?.() === true
+      typeof this.services.ai.isAvailable === 'function' &&
+      this.services.ai.isAvailable() === true
     ) {
       // Add AI components if available
     }

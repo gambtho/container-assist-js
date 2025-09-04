@@ -3,11 +3,11 @@
  * Ensures proper configuration of all service components including security scanning
  */
 
-import type { ApplicationConfig } from '../config/types.js';
-import type { ServicesConfig } from './index.js';
-import type { DockerServiceConfig } from './docker.js';
-import type { KubernetesConfig } from './kubernetes.js';
-import type { AIConfig } from './ai.js';
+import type { ApplicationConfig } from '../config/types';
+import type { ServicesConfig } from './index';
+import type { DockerServiceConfig } from './docker';
+import type { KubernetesConfig } from './kubernetes';
+import type { AIConfig } from './ai';
 
 /**
  * Build services configuration from application configuration

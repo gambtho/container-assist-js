@@ -3,11 +3,11 @@
  */
 
 import { z } from 'zod';
-import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
-import { PushImageInput, type PushImageParams, BaseSessionResultSchema } from '../schemas.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
-import type { Session } from '../../../contracts/types/session.js';
-import { authenticateRegistry, pushImage } from './helper.js';
+import { ErrorCode, DomainError } from '../../../domain/types/errors';
+import { PushImageInput, type PushImageParams, BaseSessionResultSchema } from '../schemas';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
+import type { Session } from '../../../domain/types/session';
+import { authenticateRegistry, pushImage } from './helper';
 
 // Type aliases
 export type PushInput = PushImageParams;
@@ -53,7 +53,7 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
 
       // Emit progress
       if (progressEmitter) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'push_image',
           status: 'in_progress',
@@ -97,7 +97,7 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
 
       // Emit completion
       if (progressEmitter) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'push_image',
           status: 'completed',
@@ -123,7 +123,7 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
       logger.error({ error }, 'Image push failed');
 
       if (progressEmitter) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'push_image',
           status: 'failed',

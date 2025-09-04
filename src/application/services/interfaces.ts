@@ -4,8 +4,8 @@
  */
 
 import type { Logger } from 'pino';
-import type { DockerBuildOptions, DockerBuildResult } from '../../contracts/types/docker.js';
-import type { Session } from '../../contracts/types/index.js';
+import type { DockerBuildOptions, DockerBuildResult } from '../../domain/types/docker';
+import type { Session } from '../../domain/types/index';
 
 /**
  * Docker service interface for container operations

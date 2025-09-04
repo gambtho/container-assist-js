@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { convertToMcpError, type MCPError } from './mcp-error-mapper.js';
+import { convertToMcpError, type MCPError } from './mcp-error-mapper';
 import type { Logger } from 'pino';
 
 /**

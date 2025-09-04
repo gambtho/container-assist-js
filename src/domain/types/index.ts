@@ -1,51 +1,39 @@
-/**
- * Domain Types
- * Core type definitions and patterns used throughout the application
- */
+export type { Result } from './result';
+export { Success, Failure, isOk, isFail } from './result';
 
-// Result monad pattern for error handling
-export * from './result';
+// Legacy aliases for backwards compatibility
+export { Success as ok, Failure as fail } from './result';
 
-// Session and workflow types - export all except conflicting types
-export {
-  // Session types
-  type Session,
-  SessionSchema,
-  type WorkflowState,
-  WorkflowStateSchema,
-  // Analysis types
-  type AnalysisResult,
-  AnalysisResultSchema,
-  // Dockerfile types (non-conflicting)
-  type DockerfileResult,
-  DockerfileResultSchema,
-  // Manifest types
-  type K8sManifestResult,
-  K8sManifestResultSchema,
-  // Deployment types
-  type DeploymentResult,
-  DeploymentResultSchema,
-  // Workflow enum
-  WorkflowStep,
-} from './session';
+export type { ProgressEmitter, EventPublisher } from './interfaces';
 
-// Explicitly export session-specific build and scan types with aliases
-export {
-  type DockerBuildResult as SessionDockerBuildResult,
-  DockerBuildResultSchema as SessionDockerBuildResultSchema,
-  type ScanResult as SessionScanResult,
-  ScanResultSchema as SessionScanResultSchema,
-} from './session';
+export { ErrorCode, DomainError, InfrastructureError, ServiceError } from './errors';
 
-// Error handling types
-export * from './errors';
+export type { Session, WorkflowState, AnalysisResult, DeploymentResult } from './session';
 
-// Re-export contract types (these take precedence for external interfaces)
-export * from '../../contracts/types/docker.js';
-export * from '../../contracts/types/kubernetes.js';
-export {
-  type ScanOptions,
-  type Vulnerability,
-  type ScanResult as SecurityScanResult,
-} from '../../contracts/types/scanning.js';
-export * from '../../contracts/types/dotnet.js';
+export type { SessionStore } from './session-store';
+
+export type {
+  DockerBuildOptions,
+  DockerBuildResult,
+  DockerScanResult,
+  ScanOptions,
+} from './docker';
+
+export type {
+  KubernetesManifest,
+  KubernetesDeploymentResult,
+  K8sDeploymentOptions,
+  KubernetesService as K8sServiceStatus,
+} from './kubernetes';
+export type {
+  KubernetesManifest as K8sManifest,
+  KubernetesDeploymentResult as K8sDeploymentResult,
+} from './kubernetes';
+
+export type {
+  BaseImageRecommendation,
+  BaseImageResolutionInput,
+  ValidationResult,
+  SuggestedImage,
+} from './base-image';
+export { BaseImageRecommendationSchema, BaseImageResolutionInputSchema } from './base-image';

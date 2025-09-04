@@ -1,4 +1,4 @@
-import type { ToolRegistry } from '../src/application/tools/ops/registry.js';
+// Removed ToolRegistry - using native registration
 import type { Services } from '../src/services/index.js';
 import { type ApplicationConfig } from '../src/config/index.js';
 
@@ -25,7 +25,6 @@ export interface Tool {
 export declare class ContainerizationAssistMCPServer {
   private server;
   private services;
-  private toolRegistry;
   private resourceManager;
   private logger;
   private shutdownHandlers;
@@ -40,7 +39,7 @@ export declare class ContainerizationAssistMCPServer {
   private setupGracefulShutdown;
   addShutdownHandler(handler: () => Promise<void>): void;
   getServices(): Services;
-  getToolRegistry(): ToolRegistry;
+  getRegisteredTools(): Array<{ name: string; description: string }>;
   getHealth(): Promise<HealthStatus>;
   listTools(): Promise<{ success: boolean; tools: Tool[]; count: number }>;
   shutdown(): void;

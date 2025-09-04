@@ -9,8 +9,8 @@ import {
   type ServerStatusParams,
   ServerStatusSchema,
   type ServerStatus,
-} from '../schemas.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
+} from '../schemas';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
 
 // Type aliases
 type ServerStatusInputType = ServerStatusParams;
@@ -30,7 +30,7 @@ const serverStatusTool: ToolDescriptor<ServerStatusInputType, ServerStatusOutput
     input: ServerStatusInputType,
     context: ToolContext,
   ): Promise<ServerStatusOutput> => {
-    const { logger, sessionService } = context;
+    const { logger, sessionService, server, toolRegistry } = context;
     const { details } = input;
 
     logger.info({ details }, 'Server status requested');
@@ -51,6 +51,36 @@ const serverStatusTool: ToolDescriptor<ServerStatusInputType, ServerStatusOutput
         }
       }
 
+      // Get dynamic tool count
+      let toolCount = 0;
+      try {
+        // First try to get tools from server if it exposes listTools()
+        if (
+          server &&
+          typeof server === 'object' &&
+          'listTools' in server &&
+          typeof (server as any).listTools === 'function'
+        ) {
+          const toolsResult = await (server as any).listTools();
+          if (toolsResult && Array.isArray(toolsResult)) {
+            toolCount = toolsResult.length;
+          } else if (
+            toolsResult &&
+            typeof toolsResult === 'object' &&
+            Array.isArray(toolsResult.tools)
+          ) {
+            toolCount = toolsResult.tools.length;
+          }
+        }
+        // Fall back to toolRegistry if server doesn't have listTools()
+        else if (toolRegistry && typeof toolRegistry.getToolCount === 'function') {
+          toolCount = toolRegistry.getToolCount();
+        }
+      } catch (error) {
+        logger.warn({ error }, 'Failed to get dynamic tool count, defaulting to 0');
+        toolCount = 0;
+      }
+
       const status: ServerStatusOutput = {
         success: true,
         version,
@@ -60,7 +90,7 @@ const serverStatusTool: ToolDescriptor<ServerStatusInputType, ServerStatusOutput
           total: totalMem,
         },
         sessions,
-        tools: 15, // Total tools available
+        tools: toolCount,
       };
 
       logger.info({ uptime, sessions, memoryUsed: usedMem }, 'Server status compiled');

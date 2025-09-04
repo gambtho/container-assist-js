@@ -169,3 +169,51 @@ export function createMockBenchmark(overrides?: Partial<BenchmarkResult>): Bench
     ...overrides
   };
 }
+
+/**
+ * ESM Mock Creation and Result Testing Utilities
+ */
+import type { Result } from '../../src/domain/types/result.js';
+
+export function expectSuccess<T>(result: Result<T>): T {
+  if (result.kind !== 'ok') {
+    throw new Error(`Expected success but got failure: ${result.error}`);
+  }
+  return result.value;
+}
+
+export function expectFailure<T>(result: Result<T>): string {
+  if (result.kind !== 'fail') {
+    throw new Error(`Expected failure but got success: ${JSON.stringify(result.value)}`);
+  }
+  return result.error;
+}
+
+export async function waitForMockCall(mockFn: jest.MockedFunction<any>, timeout = 5000): Promise<void> {
+  const start = Date.now();
+  while (mockFn.mock.calls.length === 0) {
+    if (Date.now() - start > timeout) {
+      throw new Error('Mock function was not called within timeout');
+    }
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+}
+
+export function resetAllMocks(...mocks: jest.MockedFunction<any>[]) {
+  mocks.forEach(mock => mock.mockClear());
+}
+
+export function createESMMock<T extends Record<string, any>>(
+  mockImplementation: Partial<T>
+): T {
+  const mock = {} as T;
+  Object.keys(mockImplementation).forEach(key => {
+    const value = mockImplementation[key as keyof T];
+    if (typeof value === 'function') {
+      mock[key as keyof T] = jest.fn().mockImplementation(value) as any;
+    } else {
+      mock[key as keyof T] = value;
+    }
+  });
+  return mock;
+}

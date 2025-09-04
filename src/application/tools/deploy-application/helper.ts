@@ -5,21 +5,22 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
-import { KubernetesManifest, KubernetesDeploymentResult } from '../../../contracts/types/index.js';
+import { KubernetesManifest, KubernetesDeploymentResult } from '../../../domain/types/index';
 
 export type { KubernetesDeploymentResult };
-import type { ToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types';
+import type { KubernetesService } from '../../services/interfaces';
+import {
+  KubernetesServiceResponse,
+  isKubernetesServiceResponse,
+} from '../../../domain/types/workflow-state';
 
 export type DeployInput = {
   sessionId?: string | undefined;
-  manifestsPath?: string | undefined;
-  namespace: string;
-  clusterContext?: string | undefined;
-  dryRun: boolean;
-  wait: boolean;
-  timeout: number;
-  force: boolean;
-  rollbackOnFailure: boolean;
+  namespace?: string | undefined;
+  wait?: boolean | undefined;
+  timeout?: string | number | undefined;
+  dryRun?: boolean | undefined;
 };
 
 /**
@@ -101,34 +102,69 @@ export async function deployToCluster(
   input: DeployInput,
   context: ToolContext,
 ): Promise<KubernetesDeploymentResult> {
-  const { kubernetesService, logger } = context;
+  const kubernetesService = context.kubernetesService as KubernetesService;
+  const { logger } = context;
 
   if (kubernetesService && 'deploy' in kubernetesService) {
-    const deployMethod = kubernetesService.deploy;
-    const result = await deployMethod({
-      manifests,
-      namespace: input.namespace,
-      wait: input.wait,
-      timeout: input.timeout * 1000,
-      dryRun: input.dryRun,
-    });
+    // Type commented out to avoid unused declaration
+    // deploy: (config: {
+    //   manifests: KubernetesManifest[];
+    //   namespace: string;
+    //   wait: boolean;
+    //   timeout: number;
+    //   dryRun: boolean;
+    // }) => Promise<KubernetesServiceResponse>;
 
-    if (result.success && result.data) {
-      return result.data;
+    // Use input parameters with fallback to defaults
+    const namespace = input.namespace ?? 'default';
+    const wait = input.wait ?? true;
+    const dryRun = input.dryRun ?? false;
+
+    // Convert timeout to number if it's a string, with fallback to default
+    let timeout = 300 * 1000; // Default: 300 seconds in milliseconds
+    if (input.timeout !== undefined) {
+      if (typeof input.timeout === 'string') {
+        const parsed = parseInt(input.timeout, 10);
+        if (!isNaN(parsed)) {
+          timeout = parsed * 1000; // Convert seconds to milliseconds
+        }
+      } else if (typeof input.timeout === 'number') {
+        timeout = input.timeout * 1000; // Convert seconds to milliseconds
+      }
     }
 
-    throw new Error(result.error?.message ?? 'Deployment failed');
+    const k8sService = kubernetesService as any;
+    const serviceResponse = await k8sService.deploy({
+      manifests,
+      namespace,
+      wait,
+      timeout,
+      dryRun,
+    });
+
+    if (
+      isKubernetesServiceResponse(serviceResponse) &&
+      serviceResponse.success &&
+      serviceResponse.data
+    ) {
+      return serviceResponse.data as KubernetesDeploymentResult;
+    }
+
+    throw new Error(serviceResponse.error ?? 'Deployment failed');
   }
 
   // Mock deployment for testing
   logger.warn('Kubernetes service not available, simulating deployment');
+
+  // Use same fallback logic for mock deployment
+  const namespace = input.namespace ?? 'default';
 
   return {
     success: true,
     resources: manifests.map((m) => ({
       kind: m.kind,
       name: m.metadata.name,
-      namespace: input.namespace,
+      namespace,
       status: 'created' as const,
     })),
     deployed: manifests.map((m) => `${m.kind}/${m.metadata.name}`),
@@ -151,7 +187,12 @@ export async function rollbackDeployment(
   namespace: string,
   context: ToolContext,
 ): Promise<void> {
-  const { kubernetesService, logger } = context;
+  const kubernetesService = context.kubernetesService as KubernetesService;
+  const { logger } = context;
+
+  type KubernetesServiceWithDelete = {
+    delete: (resource: string, namespace: string) => Promise<void>;
+  };
 
   logger.info({ resources: deployed.length }, 'Starting rollback');
 
@@ -163,7 +204,7 @@ export async function rollbackDeployment(
       // Delete in reverse order
       try {
         if ('delete' in kubernetesService) {
-          await kubernetesService.delete(resource, namespace);
+          await (kubernetesService as KubernetesServiceWithDelete).delete(resource, namespace);
         }
         logger.info(`Rolled back ${resource}`);
       } catch (error) {
@@ -182,19 +223,32 @@ export async function waitForDeployment(
   timeout: number,
   context: ToolContext,
 ): Promise<boolean> {
-  const { kubernetesService, logger } = context;
+  const kubernetesService = context.kubernetesService as KubernetesService;
+  const { logger } = context;
   const startTime = Date.now();
 
   if (!kubernetesService) {
     return true; // Skip in test mode
   }
 
+  type KubernetesServiceWithStatus = {
+    getStatus: (resource: string, namespace: string) => Promise<KubernetesServiceResponse>;
+  };
+
   while (Date.now() - startTime < timeout * 1000) {
     if ('getStatus' in kubernetesService) {
-      const status = await kubernetesService.getStatus(`deployment/${deploymentName}`, namespace);
+      const k8sService = kubernetesService as KubernetesServiceWithStatus;
+      const statusResponse = await k8sService.getStatus(`deployment/${deploymentName}`, namespace);
 
-      if (status.success && status.data?.ready) {
-        return true;
+      if (
+        isKubernetesServiceResponse(statusResponse) &&
+        statusResponse.success &&
+        statusResponse.data
+      ) {
+        const statusData = statusResponse.data as { ready?: boolean };
+        if (statusData.ready) {
+          return true;
+        }
       }
     }
 
@@ -218,16 +272,18 @@ export async function waitForDeployment(
 export async function getTargetPath(
   manifestsPath: string | undefined,
   sessionId: string | undefined,
-  sessionService: any,
+  sessionService: unknown,
 ): Promise<string> {
   let targetPath = manifestsPath;
 
   if (!targetPath && sessionId && sessionService) {
-    const session = await sessionService.get(sessionId);
-    if (!session) {
+    type SessionService = { get: (id: string) => Promise<unknown> };
+    const sessionResult = await (sessionService as SessionService).get(sessionId);
+    if (!sessionResult) {
       throw new Error('Session not found');
     }
 
+    const session = sessionResult as { workflow_state?: { k8s_result?: { output_path?: string } } };
     targetPath = session.workflow_state?.k8s_result?.output_path;
   }
 
@@ -256,10 +312,35 @@ export async function waitForAllDeployments(
   deploymentResult: KubernetesDeploymentResult,
   input: DeployInput,
   context: ToolContext,
-  progressEmitter: any,
+  progressEmitter: unknown,
   sessionId: string | undefined,
 ): Promise<void> {
-  const { wait, dryRun, timeout, namespace } = input;
+  type ProgressEmitter = {
+    emit: (progress: {
+      sessionId: string;
+      step: string;
+      status: string;
+      message: string;
+      progress?: number;
+    }) => Promise<void>;
+  };
+  // Use same fallback logic as deployToCluster
+  const wait = input.wait ?? true;
+  const dryRun = input.dryRun ?? false;
+  const namespace = input.namespace ?? 'default';
+
+  // Convert timeout to number if it's a string, with fallback to default
+  let timeout = 300; // Default: 300 seconds
+  if (input.timeout !== undefined) {
+    if (typeof input.timeout === 'string') {
+      const parsed = parseInt(input.timeout, 10);
+      if (!isNaN(parsed)) {
+        timeout = parsed;
+      }
+    } else if (typeof input.timeout === 'number') {
+      timeout = input.timeout;
+    }
+  }
 
   if (!wait || dryRun || deploymentResult.deployed.length === 0) {
     return;
@@ -272,7 +353,7 @@ export async function waitForAllDeployments(
     if (!deploymentName) continue;
 
     if (progressEmitter && sessionId) {
-      await progressEmitter.emit({
+      await (progressEmitter as ProgressEmitter).emit({
         sessionId,
         step: 'deploy_application',
         status: 'in_progress',
@@ -286,11 +367,6 @@ export async function waitForAllDeployments(
     if (!ready) {
       const { logger } = context;
       logger.warn(`Deployment ${deploymentName} not ready after ${timeout}s`);
-
-      if (input.rollbackOnFailure) {
-        await rollbackDeployment(deploymentResult.deployed, namespace, context);
-        throw new Error(`Deployment timeout and was rolled back`);
-      }
     }
   }
 }
@@ -301,19 +377,61 @@ export async function waitForAllDeployments(
 export async function getEndpoints(
   deploymentResult: KubernetesDeploymentResult,
   namespace: string,
-  kubernetesService: any,
+  kubernetesService: unknown,
   dryRun: boolean,
-): Promise<any[] | undefined> {
+): Promise<
+  | Array<{
+      name?: string;
+      service?: string;
+      url?: string;
+      type: 'service' | 'ingress' | 'route' | 'ClusterIP' | 'NodePort' | 'LoadBalancer';
+      port?: number;
+    }>
+  | undefined
+> {
   let endpoints = deploymentResult.endpoints;
 
-  if (!endpoints && kubernetesService && 'getEndpoints' in kubernetesService && !dryRun) {
-    const endpointResult = await kubernetesService.getEndpoints(namespace);
-    if (endpointResult.success && endpointResult.data) {
-      endpoints = endpointResult.data.map((e: { service: string; url?: string }) => ({
-        service: e.service,
-        type: 'ClusterIP' as const,
-        url: e.url,
-      }));
+  if (
+    !endpoints &&
+    kubernetesService &&
+    typeof kubernetesService === 'object' &&
+    kubernetesService !== null &&
+    'getEndpoints' in kubernetesService &&
+    !dryRun
+  ) {
+    type KubernetesServiceWithEndpoints = {
+      getEndpoints: (namespace: string) => Promise<KubernetesServiceResponse>;
+    };
+
+    const k8sService = kubernetesService as KubernetesServiceWithEndpoints;
+    const endpointResponse = await k8sService.getEndpoints(namespace);
+
+    if (
+      isKubernetesServiceResponse(endpointResponse) &&
+      endpointResponse.success &&
+      endpointResponse.data
+    ) {
+      const endpointData = endpointResponse.data as Array<{ service: string; url?: string }>;
+      endpoints = endpointData.map((e) => {
+        const endpoint: {
+          name?: string;
+          service?: string;
+          url?: string;
+          type: 'service' | 'ingress' | 'route' | 'ClusterIP' | 'NodePort' | 'LoadBalancer';
+          port?: number;
+        } = {
+          type: 'ClusterIP' as const,
+        };
+        if (e.service) {
+          endpoint.service = e.service;
+          endpoint.name = e.service; // Use service name as endpoint name
+        }
+        if (e.url) {
+          endpoint.url = e.url;
+        }
+        endpoint.port = 80; // Default port
+        return endpoint;
+      });
     }
   }
 

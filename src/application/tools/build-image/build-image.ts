@@ -4,19 +4,20 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import type { DockerBuildOptions } from '../../../contracts/types/index.js';
-import { executeWithRetry } from '../error-recovery.js';
-import { ValidationError, NotFoundError } from '../../../errors/index.js';
-import type { Session } from '../../../contracts/types/session.js';
+import type { DockerBuildOptions } from '../../../domain/types/index';
+import { executeWithRetry } from '../error-recovery';
+import { ValidationError, NotFoundError } from '../../../errors/index';
+import type { Session } from '../../../domain/types/session';
+import type { SessionService } from '../../services/interfaces';
 import {
   BuildImageInput as BuildImageInputSchema,
   BuildResultSchema,
   BuildImageParams,
   BuildResult,
-} from '../schemas.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
-import { fileExists } from '../utils.js';
-import { prepareBuildArgs, buildDockerImage, analyzeBuildSecurity } from './helper.js';
+} from '../schemas';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
+import { fileExists } from '../utils';
+import { prepareBuildArgs, buildDockerImage, analyzeBuildSecurity } from './helper';
 
 const BuildImageInput = BuildImageInputSchema;
 const BuildImageOutput = BuildResultSchema;
@@ -38,7 +39,9 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
   outputSchema: BuildImageOutput,
 
   handler: async (input: BuildInput, context: ToolContext): Promise<BuildOutput> => {
-    const { logger, sessionService, progressEmitter } = context;
+    const logger = context.logger;
+    const sessionService = context.sessionService as SessionService;
+    const { progressEmitter } = context;
     const {
       sessionId,
       context: buildContext,
@@ -71,13 +74,15 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
         throw new ValidationError('Session service not available', ['sessionService']);
       }
 
-      const session = await sessionService.get(sessionId);
-      if (!session) {
+      const sessionResult = await sessionService.get(sessionId);
+      if (!sessionResult) {
         throw new NotFoundError('Session not found', 'session', sessionId);
       }
 
+      const session = sessionResult;
+
       // Determine paths
-      const repoPath = (session.metadata?.repoPath as string) || buildContext;
+      const repoPath = session.repo_path ?? buildContext;
       let dockerfilePath = path.isAbsolute(dockerfile)
         ? dockerfile
         : path.join(repoPath, dockerfile);
@@ -125,7 +130,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
       }
 
       // Prepare tags
-      const projectName = session.metadata?.projectName ?? path.basename(repoPath);
+      const projectName = (session.metadata?.projectName as string) ?? path.basename(repoPath);
       const imageTags = tags && tags.length > 0 ? tags : [`${projectName}:latest`];
 
       // Add registry prefix if specified
@@ -135,7 +140,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
 
       // Report progress using callback (fallback to progressEmitter for compatibility)
       if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'build_image',
           status: 'in_progress',
@@ -160,7 +165,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
 
       // Report build start
       if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'build_image',
           status: 'in_progress',
@@ -180,7 +185,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
 
       // Report build progress
       if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'build_image',
           status: 'in_progress',
@@ -204,7 +209,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
           ...session.workflow_state,
           build_result: {
             imageId: buildResult.imageId ?? '',
-            tag: buildResult.tags?.[0] || '',
+            tag: buildResult.tags?.[0] ?? '',
             tags: buildResult.tags ?? [],
             size: buildResult.size ?? 0,
             layers: Array.isArray(buildResult.layers)
@@ -218,13 +223,17 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
       }));
 
       // Push to registry if requested
-      const dockerService = (context as any).dockerService;
+      const dockerService = context.dockerService;
       if (input.push && input.registry && dockerService && fullTags) {
         logger.info({ registry: input.registry }, 'Pushing to registry');
 
         for (const tag of fullTags) {
-          if ('push' in dockerService) {
-            await dockerService.push({
+          if (dockerService && 'push' in dockerService) {
+            await (
+              dockerService as {
+                push: (options: { image: string; registry: string }) => Promise<void>;
+              }
+            ).push({
               image: tag,
               registry: input.registry,
             });
@@ -234,7 +243,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
 
       // Report completion
       if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           step: 'build_image',
           status: 'completed',
           message: 'Docker image built successfully',
@@ -281,7 +290,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
       logger.error({ error: errorMessage }, 'Docker build error');
 
       if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'build_image',
           status: 'failed',

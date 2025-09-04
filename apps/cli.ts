@@ -23,8 +23,14 @@ const packageJsonPath = __dirname.includes('dist')
   : join(__dirname, '../package.json'); // apps/ -> root
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
-// Always use stderr for logging to avoid MCP protocol interference
-const logger = createPinoLogger({ service: 'cli', useStderr: true });
+// Lazy logger creation to avoid cleanup issues on --help
+let _logger: any = null;
+function getLogger() {
+  if (!_logger) {
+    _logger = createPinoLogger({ service: 'cli', useStderr: true });
+  }
+  return _logger;
+}
 
 program
   .name('containerization-assist-mcp')
@@ -197,7 +203,7 @@ async function main(): Promise<void> {
         console.error('  ⚠️  Kubernetes client not found - kubectl not in PATH');
       }
 
-      logger.info('Configuration validation completed');
+      getLogger().info('Configuration validation completed');
       console.error('\n✅ Configuration validation complete!');
       console.error('\nNext steps:');
       console.error('  • Start server: containerization-assist-mcp');
@@ -210,7 +216,7 @@ async function main(): Promise<void> {
     const server = new ContainerizationAssistMCPServer(config, true);
 
     if (options.listTools) {
-      logger.info('Listing available tools');
+      getLogger().info('Listing available tools');
       await server.initialize();
 
       const toolList = await server.listTools();
@@ -242,7 +248,7 @@ async function main(): Promise<void> {
     }
 
     if (options.healthCheck) {
-      logger.info('Performing health check');
+      getLogger().info('Performing health check');
       await server.initialize();
 
       const health = await server.getHealth();
@@ -269,7 +275,7 @@ async function main(): Promise<void> {
       process.exit(health.status === 'healthy' ? 0 : 1);
     }
 
-    logger.info(
+    getLogger().info(
       {
         config: {
           logLevel: config.server.logLevel,
@@ -305,7 +311,7 @@ async function main(): Promise<void> {
     }
 
     const shutdown = async (signal: string): Promise<void> => {
-      logger.info({ signal }, 'Shutting down');
+      getLogger().info({ signal }, 'Shutting down');
       console.error(`\n🛑 Received ${signal}, shutting down gracefully...`);
 
       try {
@@ -313,7 +319,7 @@ async function main(): Promise<void> {
         console.error('✅ Shutdown complete');
         process.exit(0);
       } catch (error) {
-        logger.error({ error }, 'Shutdown error');
+        getLogger().error({ error }, 'Shutdown error');
         console.error('❌ Shutdown error:', error);
         process.exit(1);
       }
@@ -321,19 +327,19 @@ async function main(): Promise<void> {
 
     process.on('SIGTERM', () => {
       shutdown('SIGTERM').catch((error) => {
-        logger.error({ error }, 'Error during SIGTERM shutdown');
+        getLogger().error({ error }, 'Error during SIGTERM shutdown');
         process.exit(1);
       });
     });
 
     process.on('SIGINT', () => {
       shutdown('SIGINT').catch((error) => {
-        logger.error({ error }, 'Error during SIGINT shutdown');
+        getLogger().error({ error }, 'Error during SIGINT shutdown');
         process.exit(1);
       });
     });
   } catch (error) {
-    logger.error({ error }, 'Server startup failed');
+    getLogger().error({ error }, 'Server startup failed');
     console.error('❌ Server startup failed');
 
     if (error instanceof Error) {
@@ -389,13 +395,13 @@ async function main(): Promise<void> {
 }
 
 process.on('uncaughtException', (error) => {
-  logger.fatal({ error }, 'Uncaught exception in CLI');
+  getLogger().fatal({ error }, 'Uncaught exception in CLI');
   console.error('❌ Uncaught exception:', error);
   exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.fatal({ reason, promise }, 'Unhandled rejection in CLI');
+  getLogger().fatal({ reason, promise }, 'Unhandled rejection in CLI');
   console.error('❌ Unhandled rejection:', reason);
   exit(1);
 });

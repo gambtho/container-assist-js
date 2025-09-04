@@ -9,4 +9,4 @@
  * @module src/application/tools/tag-image/index
  */
 
-export { default } from './tag-image.js';
+export { default } from './tag-image';

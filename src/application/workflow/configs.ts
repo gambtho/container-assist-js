@@ -3,7 +3,7 @@
  * Defines the steps and execution flow for different containerization workflows
  */
 
-import type { DockerBuildResult, WorkflowState } from '../../contracts/types/index.js';
+import type { DockerBuildResult, WorkflowState } from '../../domain/types/index';
 import { WorkflowConfig } from './orchestrator';
 import { mapWorkflowStateProperties } from './property-mappers';
 

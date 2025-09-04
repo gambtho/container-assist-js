@@ -9,4 +9,4 @@
  * @module src/application/tools/generate-dockerfile/index
  */
 
-export { default } from './generate-dockerfile.js';
+export { default } from './generate-dockerfile';

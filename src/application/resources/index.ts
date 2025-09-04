@@ -8,7 +8,7 @@ import type { Logger } from 'pino';
 import type { ApplicationConfig } from '../../config/index.js';
 import type { SessionService } from '../../services/session.js';
 import type { DockerService } from '../../services/docker.js';
-import type { ToolRegistry } from '../tools/ops/registry.js';
+// Removed ToolRegistry dependency - using native registration
 
 import { WorkflowResourceProvider } from './workflow-resource';
 import { SessionResourceProvider } from './session-resource';
@@ -25,7 +25,6 @@ export class ResourceManager {
     private config: ApplicationConfig,
     private sessionService: SessionService,
     private dockerService: DockerService,
-    private toolRegistry: ToolRegistry,
     private logger: Logger,
   ) {
     this.logger = logger.child({ component: 'ResourceManager' });
@@ -52,8 +51,8 @@ export class ResourceManager {
     const configProvider = new ConfigResourceProvider(this.config, this.logger);
     this.providers.set('config', configProvider);
 
-    // Tools resources - direct registry access
-    const toolsProvider = new ToolsResourceProvider(this.toolRegistry, this.logger);
+    // Tools resources - uses native registration
+    const toolsProvider = new ToolsResourceProvider(this.logger);
     this.providers.set('tools', toolsProvider);
 
     // Register meta-resources
@@ -130,8 +129,15 @@ export class ResourceManager {
         if (
           !Array.from(this.providers.values()).some((provider) => {
             const providerResources =
-              (provider as { getResources?: () => unknown[] }).getResources?.() || [];
-            return providerResources.some((r: any) => r.uri === uri);
+              (provider as { getResources?: () => unknown[] }).getResources?.() ?? [];
+            return providerResources.some((r: unknown): r is { uri: string } => {
+              return (
+                typeof r === 'object' &&
+                r !== null &&
+                'uri' in r &&
+                (r as { uri: string }).uri === uri
+              );
+            });
           })
         ) {
           const resourceObj = resource as {
@@ -353,9 +359,3 @@ export class ResourceManager {
     return this.resources.size;
   }
 }
-
-export * from './workflow-resource';
-export * from './session-resource';
-export * from './docker-resource';
-export * from './config-resource';
-export * from './tools-resource';
