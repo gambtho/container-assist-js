@@ -255,11 +255,8 @@ export class EnhancedAIService {
     this.metrics.totalRequests++;
 
     try {
-      // Build the final request
       const finalRequest = this.buildFinalRequest(request, options);
       const templateId = this.extractTemplateId(finalRequest);
-
-      // Try cache first (unless bypassed)
       if (!options.bypassCache) {
         const cached = await this.cache.get<T>(finalRequest);
         if (cached !== null) {
@@ -272,10 +269,7 @@ export class EnhancedAIService {
         }
       }
 
-      // Execute generation with optional recovery
       const result = await this.executeGeneration<T>(request, templateId, options);
-
-      // Cache successful results
       if (result.metadata.confidence > 0.7 && !options.bypassCache) {
         await this.cache.set(request, result.data, true, result.metadata.tokensUsed);
       }

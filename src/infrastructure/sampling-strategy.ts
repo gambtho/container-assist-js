@@ -31,56 +31,48 @@ export interface SamplingContext {
  * Template-specific sampling strategies
  */
 const TEMPLATE_STRATEGIES: Record<string, SamplingParams> = {
-  // Generation tasks - moderate creativity needed
   'dockerfile-generation': {
     temperature: 0.2,
     maxTokens: 1500,
     topP: 0.95,
   },
 
-  // Analysis tasks - high accuracy needed
   'repository-analysis': {
     temperature: 0.1,
     maxTokens: 800,
     topP: 0.9,
   },
 
-  // Fix tasks - balanced creativity and accuracy
   'dockerfile-fix': {
     temperature: 0.3,
     maxTokens: 1000,
     topP: 0.9,
   },
 
-  // Error analysis - high precision needed
   'error-analysis': {
     temperature: 0.2,
     maxTokens: 600,
     topP: 0.85,
   },
 
-  // Optimization suggestions - higher creativity
   'optimization-suggestion': {
     temperature: 0.4,
     maxTokens: 800,
     topP: 0.9,
   },
 
-  // JSON repair - very low temperature for precision
   'json-repair': {
     temperature: 0.1,
     maxTokens: 500,
     topP: 1.0,
   },
 
-  // Kubernetes generation
   'k8s-generation': {
     temperature: 0.2,
     maxTokens: 1800,
     topP: 0.95,
   },
 
-  // Kubernetes fixes
   'k8s-fix': {
     temperature: 0.3,
     maxTokens: 1200,
@@ -98,51 +90,41 @@ export class SamplingStrategy {
    * @param context - Optional context for adjustments
    */
   static getParameters(templateId: string, context?: SamplingContext): SamplingParams {
-    // Start with template-specific base parameters
     const baseParams = TEMPLATE_STRATEGIES[templateId] ?? {
       temperature: 0.2,
       maxTokens: 1000,
       topP: 0.9,
     };
 
-    // Apply context-based adjustments
     if (!context) {
       return { ...baseParams };
     }
 
     let adjustedParams = { ...baseParams };
 
-    // Retry adjustments - increase temperature for more variety
     if (context.isRetry ?? (context.attemptNumber && context.attemptNumber > 1)) {
       adjustedParams = this.adjustForRetry(adjustedParams, context.attemptNumber ?? 1);
     }
 
-    // Error-based adjustments - increase precision if errors are frequent
     if (context.errorCount && context.errorCount > 0) {
       adjustedParams = this.adjustForErrors(adjustedParams, context.errorCount);
     }
 
-    // Complexity adjustments
     if (context.complexity) {
       adjustedParams = this.adjustForComplexity(adjustedParams, context.complexity);
     }
 
-    // Task type adjustments
     if (context.taskType) {
       adjustedParams = this.adjustForTaskType(adjustedParams, context.taskType);
     }
 
-    // Content length adjustments
     if (context.contentLength) {
       adjustedParams = this.adjustForContentLength(adjustedParams, context.contentLength);
     }
 
-    // Time constraint adjustments
     if (context.timeConstraint != null) {
       adjustedParams = this.adjustForTimeConstraint(adjustedParams, context.timeConstraint);
     }
-
-    // Ensure parameters stay within reasonable bounds
     return this.enforceConstraints(adjustedParams);
   }
 
@@ -155,7 +137,6 @@ export class SamplingStrategy {
     return {
       ...params,
       temperature: Math.min(params.temperature + tempIncrease, 0.8),
-      // Slightly increase tokens for more detailed attempts
       maxTokens: Math.min(params.maxTokens + 100, params.maxTokens * 1.2),
     };
   }
@@ -211,20 +192,20 @@ export class SamplingStrategy {
       case 'analysis':
         return {
           ...params,
-          temperature: Math.max(params.temperature - 0.05, 0.1), // More precise
+          temperature: Math.max(params.temperature - 0.05, 0.1),
         };
 
       case 'generation':
         return {
           ...params,
-          temperature: Math.min(params.temperature + 0.05, 0.5), // Slightly more creative
+          temperature: Math.min(params.temperature + 0.05, 0.5),
         };
 
       case 'optimization':
         return {
           ...params,
-          temperature: Math.min(params.temperature + 0.1, 0.6), // More creative
-          maxTokens: Math.min(params.maxTokens * 1.2, 2000), // More space for suggestions
+          temperature: Math.min(params.temperature + 0.1, 0.6),
+          maxTokens: Math.min(params.maxTokens * 1.2, 2000),
         };
 
       default:
@@ -240,14 +221,12 @@ export class SamplingStrategy {
     contentLength: number,
   ): SamplingParams {
     if (contentLength > 5000) {
-      // Large content - increase tokens, reduce temperature for focus
       return {
         ...params,
         temperature: Math.max(params.temperature - 0.05, 0.1),
         maxTokens: Math.min(params.maxTokens * 1.5, 3000),
       };
     } else if (contentLength < 500) {
-      // Small content - reduce tokens
       return {
         ...params,
         maxTokens: Math.max(params.maxTokens * 0.7, 200),
@@ -268,15 +247,15 @@ export class SamplingStrategy {
       case 'fast':
         return {
           ...params,
-          maxTokens: Math.max(params.maxTokens * 0.7, 200), // Shorter responses
-          temperature: Math.max(params.temperature - 0.1, 0.1), // More focused
+          maxTokens: Math.max(params.maxTokens * 0.7, 200),
+          temperature: Math.max(params.temperature - 0.1, 0.1),
         };
 
       case 'thorough':
         return {
           ...params,
-          maxTokens: Math.min(params.maxTokens * 1.4, 2500), // Longer responses
-          temperature: Math.min(params.temperature + 0.05, 0.4), // Slightly more explorative
+          maxTokens: Math.min(params.maxTokens * 1.4, 2500),
+          temperature: Math.min(params.temperature + 0.05, 0.4),
         };
 
       default:

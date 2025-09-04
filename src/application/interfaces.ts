@@ -44,7 +44,6 @@ export type {
 
 // Configuration types - unified in the main config module
 export type { ApplicationConfig } from '../config/index.js';
-// DependenciesConfig is deprecated - use ApplicationConfig instead
 export type { ApplicationConfig as DependenciesConfig } from '../config/index.js';
 
 // Workflow step parameters (service-specific)

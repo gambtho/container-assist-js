@@ -121,7 +121,6 @@ export class AIClient {
         tokenCount: result.tokenCount || result.text.length, // Use actual or rough estimate
       };
 
-      // Only add model if it's defined
       if (result.model || options.model) {
         response.model = result.model || options.model!;
       }
