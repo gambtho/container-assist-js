@@ -216,8 +216,12 @@ async function main(): Promise<void> {
     const server = new ContainerizationAssistMCPServer(config, true);
 
     if (options.listTools) {
+<<<<<<< HEAD
       getLogger().info('Listing available tools');
       await server.initialize();
+=======
+      logger.info('Listing available tools');
+>>>>>>> 8f344a2 (cleaning up kubernetes & docker service)
 
       const toolList = await server.listTools();
       console.error('Available tools:');
@@ -248,8 +252,12 @@ async function main(): Promise<void> {
     }
 
     if (options.healthCheck) {
+<<<<<<< HEAD
       getLogger().info('Performing health check');
       await server.initialize();
+=======
+      logger.info('Performing health check');
+>>>>>>> 8f344a2 (cleaning up kubernetes & docker service)
 
       const health = await server.getHealth();
 

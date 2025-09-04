@@ -6,13 +6,18 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 // Remove ServerOptions import as McpServer uses different constructor
+<<<<<<< HEAD
 import { registerToolsNatively, getRegisteredTools } from '../src/application/tools/native-registry.js';
 import type { Services } from '../src/services/index.js';
+=======
+import { createToolRegistry, loadAllTools } from '../src/application/tools/registry-utils.js';
+import type { ToolRegistry } from '../src/application/tools/ops/registry.js';
+>>>>>>> 8f344a2 (cleaning up kubernetes & docker service)
 import { createPinoLogger } from '../src/infrastructure/logger.js';
 import { config as applicationConfig, type ApplicationConfig } from '../src/config/index.js';
 import process from 'node:process';
-import { EventEmitter } from 'events';
 import type { Logger } from 'pino';
+<<<<<<< HEAD
 
 // Import service implementations directly
 import { DockerService } from '../src/services/docker.js';
@@ -22,6 +27,10 @@ import { SessionService } from '../src/services/session.js';
 import { SimplifiedResourceManager as ResourceManager } from '../src/application/resources/simplified-resource-manager.js';
 // Import interfaces for proper MCP sampling
 import { createNativeMCPSampler, type SampleFunction } from '../src/infrastructure/ai/sampling.js';
+=======
+import { initializeServices, cleanupServices, type Services, type ServicesConfig } from '../src/services/index.js';
+import { ResourceManager } from '../src/application/resources/index.js';
+>>>>>>> 8f344a2 (cleaning up kubernetes & docker service)
 
 export class ContainerizationAssistMCPServer {
   private server: McpServer;
@@ -42,9 +51,15 @@ export class ContainerizationAssistMCPServer {
       useStderr, // Use stderr for MCP stdio transport
     });
 
-    // Direct service instantiation - no factories or containers
-    this.services = this.createServices();
+    // Services will be initialized in start() method using factory pattern
+    this.services = {} as Services;
 
+<<<<<<< HEAD
+=======
+    // Tool registry will be created in start() method after services are initialized
+    this.toolRegistry = null as any; // Will be initialized in start()
+
+>>>>>>> 8f344a2 (cleaning up kubernetes & docker service)
     // Initialize resource manager - needs to be done after services are created
     // Will initialize later in start() method when we have a tool registry
 
@@ -59,61 +74,49 @@ export class ContainerizationAssistMCPServer {
   }
 
   /**
+<<<<<<< HEAD
    * Create a sampling function using native MCP SDK
    */
   private createMCPSampler(): SampleFunction {
     return createNativeMCPSampler(this.server, this.logger);
   }
-
-  /**
-   * Create services directly with constructor injection
-   * No service locator, no factories - just direct instantiation
+=======
+   * Create services configuration for factory pattern
    */
-  private createServices(): Services {
-    // Progress notifications handled via MCP SDK progressToken
+  private createServicesConfig(): ServicesConfig {
+    const config: ServicesConfig = {};
+>>>>>>> 8f344a2 (cleaning up kubernetes & docker service)
 
-    // Direct service instantiation with explicit dependencies
-    const dockerConfig: any = {
-      socketPath: this.appConfig.infrastructure?.docker?.socketPath || '/var/run/docker.sock',
+    // Docker configuration
+    if (this.appConfig.infrastructure?.docker) {
+      config.docker = {
+        socketPath: this.appConfig.infrastructure.docker.socketPath || '/var/run/docker.sock',
+      };
+      if (this.appConfig.infrastructure.docker.host !== undefined) {
+        config.docker.host = this.appConfig.infrastructure.docker.host;
+      }
+      if (this.appConfig.infrastructure.docker.port !== undefined) {
+        config.docker.port = this.appConfig.infrastructure.docker.port;
+      }
+    }
+
+    // Kubernetes configuration
+    if (this.appConfig.infrastructure?.kubernetes) {
+      config.kubernetes = {
+        kubeconfig: this.appConfig.infrastructure.kubernetes.kubeconfig || '',
+        namespace: this.appConfig.infrastructure.kubernetes.namespace || 'default',
+      };
+      if (this.appConfig.infrastructure.kubernetes.context !== undefined) {
+        config.kubernetes.context = this.appConfig.infrastructure.kubernetes.context;
+      }
+    }
+
+    // Session configuration
+    config.session = {
+      ttl: this.appConfig.session?.ttl || 3600,
     };
-    if (this.appConfig.infrastructure?.docker?.host !== undefined) {
-      dockerConfig.host = this.appConfig.infrastructure.docker.host;
-    }
-    if (this.appConfig.infrastructure?.docker?.port !== undefined) {
-      dockerConfig.port = this.appConfig.infrastructure.docker.port;
-    }
-    const dockerService = new DockerService(dockerConfig, this.logger.child({ service: 'docker' }));
 
-    const kubernetesConfig: any = {
-      kubeconfig: this.appConfig.infrastructure?.kubernetes?.kubeconfig || '',
-      namespace: this.appConfig.infrastructure?.kubernetes?.namespace || 'default',
-    };
-    if (this.appConfig.infrastructure?.kubernetes?.context !== undefined) {
-      kubernetesConfig.context = this.appConfig.infrastructure.kubernetes.context;
-    }
-    const kubernetesService = new KubernetesService(
-      kubernetesConfig,
-      this.logger.child({ service: 'kubernetes' }),
-    );
-
-    // AI service will be properly initialized after MCP server is ready
-    const aiService: any = null; // Will be created with proper sampler in start()
-
-    const sessionService = new SessionService(
-      {
-        storeType: 'memory',
-        ttl: this.appConfig.session?.ttl || 3600,
-      },
-      this.logger.child({ service: 'session' }),
-    );
-
-    return {
-      docker: dockerService as any,
-      kubernetes: kubernetesService as any,
-      ai: aiService, // Will be undefined initially, set in start()
-      session: sessionService as any,
-      events: new EventEmitter(),
-    } as Services;
+    return config;
   }
 
   /**
@@ -124,82 +127,17 @@ export class ContainerizationAssistMCPServer {
     // The client will set the logging level via logging/setLevel requests
   }
 
-  /**
-   * Initialize all services
-   */
-  async initialize(): Promise<void> {
-    this.logger.info('Initializing services with direct injection...');
-
-    // Initialize all services directly - no complex factory patterns
-    const initPromises = [
-      this.services.docker.initialize(),
-      this.services.kubernetes.initialize(),
-      this.services.session.initialize(),
-    ];
-
-    // Skip AI service initialization here - it will be initialized in start()
-    // after we have the proper MCP sampler
-    // Only initialize AI service if it exists
-    if (this.services.ai) {
-      initPromises.push(this.services.ai.initialize());
-    }
-
-    await Promise.all(initPromises);
-
-    this.logger.info('All services initialized successfully');
-  }
 
   async start(): Promise<void> {
     try {
-      // Initialize services
-      await this.initialize();
+      // Create services configuration
+      const servicesConfig = this.createServicesConfig();
 
-      // Create real MCP sampler using the server's client sampling capability
-      const mcpSampler = this.createMCPSampler();
+      // Initialize all services using factory pattern with MCP server
+      this.services = await initializeServices(servicesConfig, this.logger, this.server);
 
-      // Get AI configuration from app config
-      const aiConfig = {
-        provider: 'openai',
-        apiKey: this.appConfig.aiServices?.ai?.apiKey || process.env.OPENAI_API_KEY || '',
-        model: this.appConfig.aiServices?.ai?.model || 'gpt-4',
-        temperature: this.appConfig.aiServices?.ai?.temperature || 0.7,
-        maxTokens: this.appConfig.aiServices?.ai?.maxTokens || 2000,
-        timeout: this.appConfig.aiServices?.ai?.timeout || 30000,
-        retryConfig: {
-          maxRetries: 3,
-          retryDelay: 1000,
-          maxRetryDelay: 10000,
-        },
-      };
-
-      // Create AI service with real MCP sampler and config
-      this.services.ai = new AIService(
-        aiConfig,
-        mcpSampler,
-        this.logger.child({ service: 'ai' }),
-      ) as any;
-
-      // Initialize and validate the AI service
-      try {
-        await this.services.ai.initialize();
-
-        // Test AI service connectivity
-        if (this.appConfig.aiServices?.ai?.apiKey) {
-          // AI service is configured, log success
-          this.logger.info({ provider: aiConfig.provider }, 'AI service initialized successfully');
-        }
-      } catch (error) {
-        this.logger.error({ error }, 'AI service initialization failed');
-
-        // Decide whether to fail hard or continue with degraded functionality
-        if (this.appConfig.features?.aiEnabled) {
-          this.logger.warn(
-            'AI is enabled but failed to initialize, continuing with degraded functionality',
-          );
-        } else {
-          this.logger.info('AI service is optional, continuing without it');
-        }
-      }
+      // Update tool registry with initialized services
+      this.toolRegistry = createToolRegistry(this.services, this.logger, this.appConfig);
 
       // Register tools natively with MCP SDK (eliminates ToolRegistry complexity)
       await registerToolsNatively(this.server as any, this.services, this.logger, this.appConfig);
@@ -229,14 +167,14 @@ export class ContainerizationAssistMCPServer {
           services: {
             docker: 'initialized',
             kubernetes: 'initialized',
-            ai: 'initialized',
+            ai: this.services.ai ? 'initialized' : 'unavailable',
             session: 'initialized',
           },
           resources: {
             registered: this.resourceManager.isResourcesRegistered(),
           },
         },
-        'MCP server started with constructor injection and resources',
+        'MCP server started with service factory pattern and resources',
       );
     } catch (error) {
       this.logger.error({ error }, 'Failed to start server');
@@ -363,56 +301,14 @@ export class ContainerizationAssistMCPServer {
   }
 
   /**
-   * Close all services gracefully
+   * Close all services gracefully using factory cleanup
    */
   private async closeAllServices(): Promise<void> {
-    const closePromises = [];
-
-    // Close Docker service
-    if (this.services.docker) {
-      if ('close' in this.services.docker) {
-        closePromises.push((this.services.docker as any).close());
-      } else if ('cleanup' in this.services.docker) {
-        closePromises.push((this.services.docker as any).cleanup());
-      }
+    try {
+      await cleanupServices(this.services, this.logger);
+    } catch (error) {
+      this.logger.error({ error }, 'Services cleanup failed');
     }
-
-    // Close Kubernetes service
-    if (this.services.kubernetes) {
-      if ('close' in this.services.kubernetes) {
-        closePromises.push((this.services.kubernetes as any).close());
-      } else if ('cleanup' in this.services.kubernetes) {
-        closePromises.push((this.services.kubernetes as any).cleanup());
-      }
-    }
-
-    // Close Session service
-    if (this.services.session) {
-      if ('close' in this.services.session) {
-        closePromises.push((this.services.session as any).close());
-      } else if ('cleanup' in this.services.session) {
-        closePromises.push((this.services.session as any).cleanup());
-      }
-    }
-
-    // Close AI service
-    if (this.services.ai) {
-      if ('close' in this.services.ai) {
-        closePromises.push((this.services.ai as any).close());
-      } else if ('cleanup' in this.services.ai) {
-        closePromises.push((this.services.ai as any).cleanup());
-      }
-    }
-
-    // Wait for all services to close
-    const results = await Promise.allSettled(closePromises);
-
-    // Log any errors
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        this.logger.error({ error: result.reason, index }, 'Service close failed');
-      }
-    });
   }
 
   /**

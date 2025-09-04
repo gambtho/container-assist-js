@@ -4,17 +4,25 @@
  */
 
 import type { Logger } from 'pino';
+<<<<<<< HEAD
 import { createDockerService, type DockerServiceConfig } from './docker';
 import { createKubernetesService, type KubernetesConfig } from './kubernetes';
 import { type AIConfig, AIService, createAIService } from './ai';
 import { createSessionService, SessionService } from './session';
 import { EventEmitter } from 'events';
 import type { SampleFunction } from '../infrastructure/ai/index';
+=======
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { createDockerService, type DockerServiceConfig } from './docker/';
+import { createKubernetesService, type KubernetesConfig } from './kubernetes/';
+import { AIService, createAIService } from './ai';
+import { createSessionService, SessionService } from './session.js';
+import { EventEmitter } from 'events';
+>>>>>>> 8f344a2 (cleaning up kubernetes & docker service)
 
 export interface ServicesConfig {
   docker?: DockerServiceConfig;
   kubernetes?: KubernetesConfig;
-  ai?: AIConfig;
   session?: { ttl?: number };
 }
 
@@ -33,7 +41,7 @@ export interface Services {
 export async function initializeServices(
   config: ServicesConfig,
   logger: Logger,
-  sampler?: SampleFunction,
+  mcpServer: McpServer,
 ): Promise<Services> {
   logger.info('Initializing services...');
 
@@ -47,8 +55,8 @@ export async function initializeServices(
     createSessionService(config.session ?? {}, logger),
   ]);
 
-  // Create AI service
-  const ai = createAIService(config.ai ?? {}, sampler, logger);
+  // Create AI service with MCP server
+  const ai = createAIService(mcpServer, logger);
 
   logger.info(
     {
@@ -92,10 +100,10 @@ export async function cleanupServices(services: Services, logger: Logger): Promi
 }
 
 // Re-export service types for convenience
-export { DockerService } from './docker';
-export { KubernetesService } from './kubernetes';
+export { DockerService } from './docker/';
+export { KubernetesService } from './kubernetes/';
 export { AIService } from './ai';
 export { SessionService } from './session';
 
 // Re-export config types
-export type { DockerServiceConfig, KubernetesConfig, AIConfig };
+export type { DockerServiceConfig, KubernetesConfig };
