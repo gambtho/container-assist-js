@@ -118,9 +118,9 @@ export abstract class BaseToolDescriptor<TInput = any, TOutput = any> {
       // Format successful response with chain hint if available
       const chainStep = this.chainHint
         ? {
-          tool: this.chainHint.nextTool,
-          reason: this.chainHint.reason,
-        }
+            tool: this.chainHint.nextTool,
+            reason: this.chainHint.reason,
+          }
         : undefined;
 
       const toolResult = this.formatSuccess(result, args, chainStep);

@@ -327,17 +327,17 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
         imageDetails:
           sessionId && sessionService
             ? await (async () => {
-              const session = await sessionService.get(sessionId);
-              const buildResult = session?.workflow_state?.build_result;
-              return buildResult
-                ? {
-                  size: buildResult.size ?? 0,
-                  layers: Array.isArray(buildResult.layers) ? buildResult.layers.length : 0,
-                  os: 'linux',
-                  architecture: 'amd64',
-                }
-                : undefined;
-            })()
+                const session = await sessionService.get(sessionId);
+                const buildResult = session?.workflow_state?.build_result;
+                return buildResult
+                  ? {
+                      size: buildResult.size ?? 0,
+                      layers: Array.isArray(buildResult.layers) ? buildResult.layers.length : 0,
+                      os: 'linux',
+                      architecture: 'amd64',
+                    }
+                  : undefined;
+              })()
             : undefined,
         recommendations,
       };

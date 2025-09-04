@@ -335,7 +335,7 @@ export class ToolRegistry {
 
   listTools(): {
     tools: Array<{ name: string; description?: string; inputSchema?: unknown }>;
-    } {
+  } {
     return { tools: this.toolList };
   }
 

@@ -140,9 +140,9 @@ export function toMcpError(error: DomainError): MCPError {
     timestamp: new Date().toISOString(),
     cause: error.cause
       ? {
-        name: error.cause.name,
-        message: error.cause.message,
-      }
+          name: error.cause.name,
+          message: error.cause.message,
+        }
       : undefined,
   });
 }
@@ -160,9 +160,9 @@ export function infrastructureErrorToMcp(error: InfrastructureError): MCPError {
     timestamp: new Date().toISOString(),
     cause: error.cause
       ? {
-        name: error.cause.name,
-        message: error.cause.message,
-      }
+          name: error.cause.name,
+          message: error.cause.message,
+        }
       : undefined,
   });
 }
@@ -180,9 +180,9 @@ export function serviceErrorToMcp(error: ServiceError): MCPError {
     timestamp: new Date().toISOString(),
     cause: error.cause
       ? {
-        name: error.cause.name,
-        message: error.cause.message,
-      }
+          name: error.cause.name,
+          message: error.cause.message,
+        }
       : undefined,
   });
 }

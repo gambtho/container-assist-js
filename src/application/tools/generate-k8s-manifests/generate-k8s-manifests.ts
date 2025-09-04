@@ -172,9 +172,9 @@ const generateKubernetesManifestsHandler: ToolDescriptor = {
           ingressHost: input.ingressHost,
           resources: input.resources
             ? {
-              ...(input.resources.requests && { requests: input.resources.requests }),
-              ...(input.resources.limits && { limits: input.resources.limits }),
-            }
+                ...(input.resources.requests && { requests: input.resources.requests }),
+                ...(input.resources.limits && { limits: input.resources.limits }),
+              }
             : undefined,
           autoscaling: {
             enabled: input.autoscaling || false,

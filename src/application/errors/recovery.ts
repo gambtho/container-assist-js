@@ -136,7 +136,7 @@ export class CircuitBreaker {
     successes: number;
     lastFailureTime: number;
     lastSuccessTime: number;
-    } {
+  } {
     return {
       state: this.state,
       failures: this.failures,
@@ -340,7 +340,7 @@ export class Bulkhead {
     queued: number;
     maxConcurrent: number;
     maxQueue: number;
-    } {
+  } {
     return {
       active: this.active,
       queued: this.queue.length,

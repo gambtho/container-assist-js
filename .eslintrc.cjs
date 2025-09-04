@@ -72,10 +72,8 @@ module.exports = {
       allowTemplateLiterals: true 
     }],
     'semi': ['error', 'always'],
-    'indent': ['error', 2, { 
-      SwitchCase: 1,
-      ignoredNodes: ['TemplateLiteral']
-    }],
+    // Let Prettier handle indentation
+    'indent': 'off',
     'max-len': ['warn', { 
       code: 120,
       ignoreUrls: true,

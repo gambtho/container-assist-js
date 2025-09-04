@@ -221,11 +221,11 @@ export async function getImageDetails(
   const buildResult = session?.workflow_state?.build_result;
   return buildResult
     ? {
-      size: buildResult.size ?? 0,
-      layers: Array.isArray(buildResult.layers) ? buildResult.layers.length : 0,
-      os: 'linux',
-      architecture: 'amd64',
-    }
+        size: buildResult.size ?? 0,
+        layers: Array.isArray(buildResult.layers) ? buildResult.layers.length : 0,
+        os: 'linux',
+        architecture: 'amd64',
+      }
     : undefined;
 }
 

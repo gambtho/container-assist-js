@@ -32,7 +32,7 @@ export abstract class ApplicationError extends Error {
     timestamp: Date;
     context?: Record<string, unknown>;
     stack?: string;
-    } {
+  } {
     return {
       name: this.name,
       message: this.message,

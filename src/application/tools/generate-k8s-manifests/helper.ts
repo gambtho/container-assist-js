@@ -267,9 +267,9 @@ kind: Kustomization
 namespace: ${input.namespace}
 resources:
 ${outputManifests
-        .filter((m) => m.path)
-        .map((m) => `  - ${path.basename(m.path!)}`)
-        .join('\n')}
+  .filter((m) => m.path)
+  .map((m) => `  - ${path.basename(m.path!)}`)
+  .join('\n')}
 commonLabels:
   app: ${input.appName}
   environment: ${input.environment}`;

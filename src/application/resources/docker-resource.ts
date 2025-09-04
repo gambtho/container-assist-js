@@ -106,18 +106,18 @@ export class DockerResourceProvider {
                       version: health.version ?? null,
                       systemInfo: systemInfo
                         ? (() => {
-                          const dockerSystemInfo = systemInfo as DockerSystemInfo;
-                          return {
-                            containers: dockerSystemInfo.containers ?? 0,
-                            images: dockerSystemInfo.images ?? 0,
-                            serverVersion: dockerSystemInfo.serverVersion,
-                            architecture: dockerSystemInfo.architecture,
-                            os: dockerSystemInfo.os,
-                            kernelVersion: dockerSystemInfo.kernelVersion,
-                            memTotal: dockerSystemInfo.memTotal,
-                            cpus: dockerSystemInfo.ncpu,
-                          };
-                        })()
+                            const dockerSystemInfo = systemInfo as DockerSystemInfo;
+                            return {
+                              containers: dockerSystemInfo.containers ?? 0,
+                              images: dockerSystemInfo.images ?? 0,
+                              serverVersion: dockerSystemInfo.serverVersion,
+                              architecture: dockerSystemInfo.architecture,
+                              os: dockerSystemInfo.os,
+                              kernelVersion: dockerSystemInfo.kernelVersion,
+                              memTotal: dockerSystemInfo.memTotal,
+                              cpus: dockerSystemInfo.ncpu,
+                            };
+                          })()
                         : null,
                       timestamp: new Date().toISOString(),
                     },

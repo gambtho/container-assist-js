@@ -276,10 +276,10 @@ export const enhancedGenerateDockerfileHandler: ToolDescriptor = {
       // Step 3: Final validation check
       const finalValidation = ctx.contentValidator
         ? ctx.contentValidator.validateContent(dockerfileResult, {
-          contentType: 'dockerfile',
-          checkSecurity: true,
-          checkBestPractices: true,
-        })
+            contentType: 'dockerfile',
+            checkSecurity: true,
+            checkBestPractices: true,
+          })
         : null;
 
       // Update session state
@@ -298,9 +298,9 @@ export const enhancedGenerateDockerfileHandler: ToolDescriptor = {
         dockerfile: dockerfileResult,
         securitySummary: ctx.contentValidator
           ? ctx.contentValidator.validateContent(dockerfileResult, {
-            contentType: 'dockerfile',
-            checkSecurity: true,
-          })
+              contentType: 'dockerfile',
+              checkSecurity: true,
+            })
           : null,
         metadata: {
           language: analysisResult.language,

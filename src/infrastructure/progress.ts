@@ -217,7 +217,7 @@ export class StepProgressTracker {
     totalSteps: number;
     currentStepName?: string | undefined;
     overallProgress: number;
-    } {
+  } {
     const currentStepName =
       this.currentStep < this.steps.length ? this.steps[this.currentStep]?.name : undefined;
 

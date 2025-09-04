@@ -182,11 +182,11 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
       // Transform buildSystem to match schema structure
       const buildSystem = buildSystemRaw
         ? {
-          type: buildSystemRaw.type,
-          build_file: buildSystemRaw.file,
-          build_command: buildSystemRaw.buildCmd,
-          test_command: buildSystemRaw.testCmd,
-        }
+            type: buildSystemRaw.type,
+            build_file: buildSystemRaw.file,
+            build_command: buildSystemRaw.buildCmd,
+            test_command: buildSystemRaw.testCmd,
+          }
         : undefined;
 
       // Emit progress

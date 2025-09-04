@@ -98,7 +98,7 @@ function getSystemInfo(): {
     cores: number;
     loadAverage?: number[];
   };
-  } {
+} {
   const memUsage = process.memoryUsage();
 
   return {

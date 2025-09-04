@@ -355,7 +355,7 @@ export class ConfigResourceProvider {
     valid: boolean;
     issues?: string[];
     warnings?: string[];
-    } {
+  } {
     const issues: string[] = [];
     const warnings: string[] = [];
 

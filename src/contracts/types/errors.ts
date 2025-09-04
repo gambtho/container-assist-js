@@ -120,7 +120,7 @@ export class DomainError extends Error {
       message: string;
       stack?: string;
     };
-    } {
+  } {
     return {
       name: this.name,
       code: this.code,
@@ -173,7 +173,7 @@ export class InfrastructureError extends Error {
       message: string;
       stack?: string;
     };
-    } {
+  } {
     return {
       name: this.name,
       code: this.code,
@@ -226,7 +226,7 @@ export class ServiceError extends Error {
       message: string;
       stack?: string;
     };
-    } {
+  } {
     return {
       name: this.name,
       code: this.code,

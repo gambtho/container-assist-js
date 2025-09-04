@@ -196,7 +196,7 @@ export class CacheKeyGenerator {
     totalKeys: number;
     uniqueNormalizedKeys: number;
     averageKeysPerNormalized: number;
-    } {
+  } {
     const totalKeys = Array.from(this.keyRegistry.values()).reduce(
       (sum, keys) => sum + keys.size,
       0,

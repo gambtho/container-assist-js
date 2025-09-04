@@ -64,7 +64,7 @@ export class DockerService {
       Size?: number;
       Created?: number;
     }>
-    > {
+  > {
     return this.client.listImages() as Promise<
       Array<{
         Id: string;

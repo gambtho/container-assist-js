@@ -294,7 +294,7 @@ export class WorkflowManager extends EventEmitter {
     recentCompletions: number;
     recentFailures: number;
     systemLoad: 'low' | 'medium' | 'high';
-    } {
+  } {
     const active = this.getActiveWorkflows().length;
     const now = Date.now();
     const oneHourAgo = now - 60 * 60 * 1000;

@@ -414,7 +414,7 @@ export class ToolsResourceProvider {
   private getPerformanceMetrics(): {
     averageDuration: number;
     slowestTools: Array<{ name: string; averageDuration: number }>;
-    } {
+  } {
     const stats = Array.from(this.toolUsageStats.values());
     return {
       averageDuration:
@@ -429,7 +429,7 @@ export class ToolsResourceProvider {
   private getErrorAnalysis(): {
     toolsWithErrors: number;
     mostProblematic: Array<{ name: string; errors: number; errorRate: number }>;
-    } {
+  } {
     const errorStats = Array.from(this.toolUsageStats.entries())
       .filter(([, stats]) => stats.errors > 0)
       .sort(([, a], [, b]) => b.errors - a.errors);
@@ -484,7 +484,7 @@ export class ToolsResourceProvider {
     containerization: string[];
     deployment: string[];
     fullWorkflow: string[];
-    } {
+  } {
     return {
       containerization: ['analyze_repository', 'generate_dockerfile', 'build_image'],
       deployment: ['build_image', 'tag_image', 'push_image', 'deploy_application'],

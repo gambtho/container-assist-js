@@ -223,7 +223,7 @@ export class SessionStore {
     totalSessions: number;
     activeSessions: number;
     maxSessions: number;
-    } {
+  } {
     return {
       totalSessions: this.sessions.size,
       activeSessions: Array.from(this.sessions.values()).filter((s) => s.status === 'active')
