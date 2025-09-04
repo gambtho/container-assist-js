@@ -81,7 +81,7 @@ export enum ErrorCode {
   AI_TEXT_GENERATION_FAILED = 'AI_TEXT_GENERATION_FAILED',
   ENHANCED_AI_GENERATION_FAILED = 'ENHANCED_AI_GENERATION_FAILED',
   AI_SAMPLER_UNAVAILABLE = 'AI_SAMPLER_UNAVAILABLE',
-  ENHANCED_AI_STRUCTURED_GENERATION_FAILED = 'ENHANCED_AI_STRUCTURED_GENERATION_FAILED'
+  ENHANCED_AI_STRUCTURED_GENERATION_FAILED = 'ENHANCED_AI_STRUCTURED_GENERATION_FAILED',
 }
 
 /**
@@ -120,7 +120,7 @@ export class DomainError extends Error {
       message: string;
       stack?: string;
     };
-  } {
+    } {
     return {
       name: this.name,
       code: this.code,
@@ -131,9 +131,9 @@ export class DomainError extends Error {
         cause: {
           name: this.cause.name,
           message: this.cause.message,
-          ...(this.cause.stack !== undefined && { stack: this.cause.stack })
-        }
-      })
+          ...(this.cause.stack !== undefined && { stack: this.cause.stack }),
+        },
+      }),
     };
   }
 }
@@ -173,7 +173,7 @@ export class InfrastructureError extends Error {
       message: string;
       stack?: string;
     };
-  } {
+    } {
     return {
       name: this.name,
       code: this.code,
@@ -184,9 +184,9 @@ export class InfrastructureError extends Error {
         cause: {
           name: this.cause.name,
           message: this.cause.message,
-          ...(this.cause.stack !== undefined && { stack: this.cause.stack })
-        }
-      })
+          ...(this.cause.stack !== undefined && { stack: this.cause.stack }),
+        },
+      }),
     };
   }
 }
@@ -226,7 +226,7 @@ export class ServiceError extends Error {
       message: string;
       stack?: string;
     };
-  } {
+    } {
     return {
       name: this.name,
       code: this.code,
@@ -237,9 +237,9 @@ export class ServiceError extends Error {
         cause: {
           name: this.cause.name,
           message: this.cause.message,
-          ...(this.cause.stack !== undefined && { stack: this.cause.stack })
-        }
-      })
+          ...(this.cause.stack !== undefined && { stack: this.cause.stack }),
+        },
+      }),
     };
   }
 }
@@ -251,7 +251,7 @@ export class ValidationError extends DomainError {
   constructor(
     message: string,
     public readonly fields?: Record<string, string[]>,
-    cause?: Error
+    cause?: Error,
   ) {
     super(ErrorCode.ValidationFailed, message, cause, { fields });
     this.name = 'ValidationError';
@@ -267,7 +267,7 @@ export class ToolError extends ServiceError {
     message: string,
     code: ErrorCode = ErrorCode.ToolExecutionFailed,
     cause?: Error,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ) {
     super(code, message, cause, { ...metadata, toolName });
     this.name = 'ToolError';
@@ -283,7 +283,7 @@ export class WorkflowError extends DomainError {
     public readonly step: string,
     message: string,
     cause?: Error,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ) {
     super(ErrorCode.WorkflowStepFailed, message, cause, { ...metadata, workflowId, step });
     this.name = 'WorkflowError';
@@ -299,7 +299,7 @@ export function isRetryable(error: Error): boolean {
       ErrorCode.DockerError,
       ErrorCode.KubernetesError,
       ErrorCode.ServiceUnavailable,
-      ErrorCode.ResourceExhausted
+      ErrorCode.ResourceExhausted,
     ].includes(error.code);
   }
 
@@ -401,6 +401,6 @@ export function normalizeError(error: unknown): DomainError | InfrastructureErro
 
   // Handle non-Error objects
   return new ServiceError(ErrorCode.UnknownError, String(error), undefined, {
-    originalError: error
+    originalError: error,
   });
 }

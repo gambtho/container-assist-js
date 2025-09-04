@@ -44,5 +44,5 @@ export const AVAILABLE_TOOLS = [
   'workflow_status',
   'ping',
   'list_tools',
-  'server_status'
+  'server_status',
 ];

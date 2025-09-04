@@ -23,7 +23,7 @@ const MCPErrorCode = {
   InternalError: -32603,
   ParseError: -32700,
   InvalidRequest: -32600,
-  MethodNotFound: -32601
+  MethodNotFound: -32601,
 } as const;
 
 type MCPErrorCodeType = (typeof MCPErrorCode)[keyof typeof MCPErrorCode];
@@ -31,7 +31,7 @@ import {
   ErrorCode as DomainErrorCode,
   DomainError,
   InfrastructureError,
-  ServiceError
+  ServiceError,
 } from '../../contracts/types/errors.js';
 import { ApplicationError } from '../../errors/index.js';
 import { ToolNotImplementedError, ToolValidationError, ToolExecutionError } from './tool-errors.js';
@@ -125,7 +125,7 @@ export const ERROR_CODE_MAPPING: Record<DomainErrorCode, MCPErrorCodeType> = {
   [DomainErrorCode.AI_TEXT_GENERATION_FAILED]: MCPErrorCode.InternalError,
   [DomainErrorCode.ENHANCED_AI_GENERATION_FAILED]: MCPErrorCode.InternalError,
   [DomainErrorCode.AI_SAMPLER_UNAVAILABLE]: MCPErrorCode.InternalError,
-  [DomainErrorCode.ENHANCED_AI_STRUCTURED_GENERATION_FAILED]: MCPErrorCode.InternalError
+  [DomainErrorCode.ENHANCED_AI_STRUCTURED_GENERATION_FAILED]: MCPErrorCode.InternalError,
 };
 
 /**
@@ -140,10 +140,10 @@ export function toMcpError(error: DomainError): MCPError {
     timestamp: new Date().toISOString(),
     cause: error.cause
       ? {
-          name: error.cause.name,
-          message: error.cause.message
-        }
-      : undefined
+        name: error.cause.name,
+        message: error.cause.message,
+      }
+      : undefined,
   });
 }
 
@@ -160,10 +160,10 @@ export function infrastructureErrorToMcp(error: InfrastructureError): MCPError {
     timestamp: new Date().toISOString(),
     cause: error.cause
       ? {
-          name: error.cause.name,
-          message: error.cause.message
-        }
-      : undefined
+        name: error.cause.name,
+        message: error.cause.message,
+      }
+      : undefined,
   });
 }
 
@@ -180,10 +180,10 @@ export function serviceErrorToMcp(error: ServiceError): MCPError {
     timestamp: new Date().toISOString(),
     cause: error.cause
       ? {
-          name: error.cause.name,
-          message: error.cause.message
-        }
-      : undefined
+        name: error.cause.name,
+        message: error.cause.message,
+      }
+      : undefined,
   });
 }
 
@@ -202,7 +202,7 @@ export function convertToMcpError(error: unknown): MCPError {
       toolName: error.toolName,
       availableTools: error.availableTools,
       suggestedAlternatives: error.suggestedAlternatives,
-      timestamp: error.timestamp
+      timestamp: error.timestamp,
     });
   }
 
@@ -210,7 +210,7 @@ export function convertToMcpError(error: unknown): MCPError {
     return createMcpError(MCPErrorCode.InvalidParams, error.message, {
       toolName: error.toolName,
       validationErrors: error.validationErrors,
-      timestamp: error.timestamp
+      timestamp: error.timestamp,
     });
   }
 
@@ -219,7 +219,7 @@ export function convertToMcpError(error: unknown): MCPError {
       toolName: error.toolName,
       operation: error.operation,
       originalError: error.originalError,
-      timestamp: error.timestamp
+      timestamp: error.timestamp,
     });
   }
 
@@ -244,7 +244,7 @@ export function convertToMcpError(error: unknown): MCPError {
       code: error.code,
       layer: 'application',
       context: error.context,
-      timestamp: error.timestamp.toISOString()
+      timestamp: error.timestamp.toISOString(),
     });
   }
 
@@ -276,7 +276,7 @@ export function convertToMcpError(error: unknown): MCPError {
       code: domainCode,
       originalError: error.name,
       stack: error.stack,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
@@ -287,8 +287,8 @@ export function convertToMcpError(error: unknown): MCPError {
     {
       code: DomainErrorCode.UnknownError,
       originalError: error,
-      timestamp: new Date().toISOString()
-    }
+      timestamp: new Date().toISOString(),
+    },
   );
 }
 
@@ -308,7 +308,7 @@ export function isRetryableError(error: MCPError): boolean {
     DomainErrorCode.ServiceUnavailable,
     DomainErrorCode.ResourceExhausted,
     DomainErrorCode.ToolTimeout,
-    DomainErrorCode.StorageError
+    DomainErrorCode.StorageError,
   ];
 
   return retryableCodes.includes(code);

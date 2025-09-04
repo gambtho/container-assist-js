@@ -8,7 +8,7 @@ import type {
   AnalysisResult,
   DockerBuildResult,
   Session,
-  DeploymentResult
+  DeploymentResult,
 } from '../../contracts/types/index.js';
 
 /**
@@ -36,7 +36,7 @@ export function mapWorkflowStateProperties(state: Partial<WorkflowState>): {
     deploymentName: state.deployment_result?.deployment_name,
     deploymentNamespace: state.deployment_result?.namespace ?? 'default',
     projectName: state.analysis_result?.framework ?? 'unknown', // Use framework as project name proxy
-    imageTag: state.tag_result?.tags?.[0] ?? state.build_result?.tags?.[0]
+    imageTag: state.tag_result?.tags?.[0] ?? state.build_result?.tags?.[0],
   };
 }
 
@@ -51,7 +51,7 @@ export function mapSessionProperties(session: Session): {
   return {
     workflowState: session.workflow_state,
     analysisResult: session.workflow_state.analysis_result,
-    buildResult: session.workflow_state.build_result as DockerBuildResult | undefined
+    buildResult: session.workflow_state.build_result as DockerBuildResult | undefined,
   };
 }
 
@@ -59,7 +59,7 @@ export function mapSessionProperties(session: Session): {
  * Normalizes property names in workflow state updates
  */
 export function normalizeWorkflowStateUpdate(
-  update: Partial<WorkflowState> & { last_completed_step?: string }
+  update: Partial<WorkflowState> & { last_completed_step?: string },
 ): Partial<WorkflowState> {
   const normalized: Partial<WorkflowState> & { last_completed_step?: string } = { ...update };
 

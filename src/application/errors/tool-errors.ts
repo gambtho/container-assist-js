@@ -22,7 +22,7 @@ export class ToolNotImplementedError extends Error implements ToolError {
     context?: {
       availableTools?: string[];
       suggestedAlternatives?: string[];
-    }
+    },
   ) {
     super(message);
     this.name = 'ToolNotImplementedError';
@@ -52,13 +52,13 @@ export class ToolNotImplementedError extends Error implements ToolError {
       message: this.message,
       severity: this.severity,
       timestamp: this.timestamp,
-      toolName: this.toolName
+      toolName: this.toolName,
     };
 
     if (this.availableTools !== undefined || this.suggestedAlternatives !== undefined) {
       error.context = {
         availableTools: this.availableTools ?? [],
-        suggestedAlternatives: this.suggestedAlternatives ?? []
+        suggestedAlternatives: this.suggestedAlternatives ?? [],
       };
     }
 
@@ -102,12 +102,12 @@ export class ToolValidationError extends Error implements ToolError {
       message: this.message,
       severity: this.severity,
       timestamp: this.timestamp,
-      toolName: this.toolName
+      toolName: this.toolName,
     };
 
     if (this.validationErrors !== undefined) {
       error.context = {
-        validationErrors: this.validationErrors
+        validationErrors: this.validationErrors,
       };
     }
 
@@ -155,13 +155,13 @@ export class ToolExecutionError extends Error implements ToolError {
       message: this.message,
       severity: this.severity,
       timestamp: this.timestamp,
-      toolName: this.toolName
+      toolName: this.toolName,
     };
 
     if (this.operation !== undefined || this.originalError !== undefined) {
       error.context = {
         operation: this.operation ?? '',
-        originalError: this.originalError ?? null
+        originalError: this.originalError ?? null,
       };
     }
 

@@ -22,7 +22,7 @@ const DEFAULT_TTL = 86400; // 24 hours
  */
 export async function createSessionService(
   config: SessionConfig,
-  logger: Logger
+  logger: Logger,
 ): Promise<SessionService> {
   const service = new SessionService(config, logger);
   await service.initialize();
@@ -40,7 +40,7 @@ export class SessionService implements ISessionService {
 
     this.store = new SessionStore(this.logger, {
       defaultTtlMs: this.ttl * 1000,
-      maxSessions: 1000
+      maxSessions: 1000,
     });
   }
 
@@ -62,11 +62,11 @@ export class SessionService implements ISessionService {
         completed_steps: [],
         errors: {},
         metadata: {},
-        dockerfile_fix_history: []
+        dockerfile_fix_history: [],
       },
       created_at: now,
       updated_at: now,
-      ...data
+      ...data,
     };
 
     this.store.set(id, session);
@@ -88,7 +88,7 @@ export class SessionService implements ISessionService {
     const updated: Session = {
       ...currentSession,
       ...updates,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
 
     this.store.set(id, updated);
@@ -99,9 +99,9 @@ export class SessionService implements ISessionService {
     const updatedSession = this.store.update(id, (session) => ({
       workflow_state: {
         ...session.workflow_state,
-        ...state
+        ...state,
       },
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     }));
 
     if (!updatedSession) {
@@ -137,7 +137,7 @@ export class SessionService implements ISessionService {
         } catch (error) {
           this.logger.warn(
             { sessionId: session.id, error },
-            'Failed to delete session during cleanup'
+            'Failed to delete session during cleanup',
           );
         }
       }
@@ -167,7 +167,7 @@ let _sessionService: SessionService | undefined;
 
 export async function getSessionService(
   config: SessionConfig,
-  logger: Logger
+  logger: Logger,
 ): Promise<SessionService> {
   if (!_sessionService) {
     _sessionService = await createSessionService(config, logger);

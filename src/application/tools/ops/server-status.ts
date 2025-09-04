@@ -15,12 +15,12 @@ const ServerStatusInputSchema = z
     include_sessions: z.boolean().default(true),
     includeSessions: z.boolean().optional(),
     include_dependencies: z.boolean().default(true),
-    includeDependencies: z.boolean().optional()
+    includeDependencies: z.boolean().optional(),
   })
   .transform((data) => ({
     includeSystem: data.include_system ?? data.includeSystem ?? true,
     includeSessions: data.include_sessions ?? data.includeSessions ?? true,
-    includeDependencies: data.include_dependencies ?? data.includeDependencies ?? true
+    includeDependencies: data.include_dependencies ?? data.includeDependencies ?? true,
   }));
 
 // Output schema
@@ -32,7 +32,7 @@ const ServerStatusOutputSchema = z.object({
     startTime: z.string(),
     uptime: z.number(),
     pid: z.number(),
-    nodeVersion: z.string()
+    nodeVersion: z.string(),
   }),
   system: z
     .object({
@@ -41,19 +41,19 @@ const ServerStatusOutputSchema = z.object({
       memory: z.object({
         used: z.number(),
         total: z.number(),
-        free: z.number()
+        free: z.number(),
       }),
       cpu: z.object({
         cores: z.number(),
-        loadAverage: z.array(z.number()).optional()
-      })
+        loadAverage: z.array(z.number()).optional(),
+      }),
     })
     .optional(),
   sessions: z
     .object({
       active: z.number(),
       total: z.number(),
-      expired: z.number().optional()
+      expired: z.number().optional(),
     })
     .optional(),
   dependencies: z
@@ -62,7 +62,7 @@ const ServerStatusOutputSchema = z.object({
       dockerService: z.boolean(),
       kubernetesService: z.boolean(),
       aiService: z.boolean(),
-      progressEmitter: z.boolean()
+      progressEmitter: z.boolean(),
     })
     .optional(),
   tools: z.object({
@@ -70,13 +70,13 @@ const ServerStatusOutputSchema = z.object({
     categories: z.object({
       workflow: z.number(),
       orchestration: z.number(),
-      utility: z.number()
-    })
+      utility: z.number(),
+    }),
   }),
   health: z.object({
     status: z.enum(['healthy', 'degraded', 'unhealthy']),
-    issues: z.array(z.string()).optional()
-  })
+    issues: z.array(z.string()).optional(),
+  }),
 });
 
 // Type aliases
@@ -98,7 +98,7 @@ function getSystemInfo(): {
     cores: number;
     loadAverage?: number[];
   };
-} {
+  } {
   const memUsage = process.memoryUsage();
 
   return {
@@ -107,12 +107,12 @@ function getSystemInfo(): {
     memory: {
       used: memUsage.heapUsed,
       total: memUsage.heapTotal,
-      free: memUsage.heapTotal - memUsage.heapUsed
+      free: memUsage.heapTotal - memUsage.heapUsed,
     },
     cpu: {
       cores: os.cpus().length,
-      ...(process.platform !== 'win32' ? { loadAverage: os.loadavg() } : {})
-    }
+      ...(process.platform !== 'win32' ? { loadAverage: os.loadavg() } : {}),
+    },
   };
 }
 
@@ -131,7 +131,7 @@ function checkDependencyHealth(context: ToolContext): {
     dockerService: !!context.dockerService,
     kubernetesService: !!context.kubernetesService,
     aiService: !!context.aiService,
-    progressEmitter: !!context.progressEmitter
+    progressEmitter: !!context.progressEmitter,
   };
 }
 
@@ -140,7 +140,7 @@ function checkDependencyHealth(context: ToolContext): {
  */
 function assessHealth(
   dependencies: ReturnType<typeof checkDependencyHealth>,
-  system: ReturnType<typeof getSystemInfo>
+  system: ReturnType<typeof getSystemInfo>,
 ): { status: 'healthy' | 'degraded' | 'unhealthy'; issues?: string[] } {
   const issues: string[] = [];
 
@@ -194,9 +194,9 @@ const serverStatusTool: ToolDescriptor<ServerStatusInput, ServerStatusOutput> = 
       {
         includeSystem,
         includeSessions,
-        includeDependencies
+        includeDependencies,
       },
-      'Server status requested'
+      'Server status requested',
     );
 
     try {
@@ -207,7 +207,7 @@ const serverStatusTool: ToolDescriptor<ServerStatusInput, ServerStatusOutput> = 
         startTime: new Date(Date.now() - process.uptime() * 1000).toISOString(),
         uptime: Math.floor(process.uptime()),
         pid: process.pid,
-        nodeVersion: process.version
+        nodeVersion: process.version,
       };
 
       // System info
@@ -224,14 +224,14 @@ const serverStatusTool: ToolDescriptor<ServerStatusInput, ServerStatusOutput> = 
           sessions = {
             active: activeCount,
             total: activeCount, // Would be tracked separately in real implementation
-            expired: 0
+            expired: 0,
           };
         } catch (error) {
           logger.warn({ error }, 'Failed to get session info');
           sessions = {
             active: 0,
             total: 0,
-            expired: 0
+            expired: 0,
           };
         }
       }
@@ -248,8 +248,8 @@ const serverStatusTool: ToolDescriptor<ServerStatusInput, ServerStatusOutput> = 
         categories: {
           workflow: 9,
           orchestration: 2,
-          utility: 3
-        }
+          utility: 3,
+        },
       };
 
       // Health assessment
@@ -265,15 +265,15 @@ const serverStatusTool: ToolDescriptor<ServerStatusInput, ServerStatusOutput> = 
         sessions,
         dependencies,
         tools,
-        health
+        health,
       };
 
       logger.info(
         {
           health: health.status,
-          issues: health.issues?.length ?? 0
+          issues: health.issues?.length ?? 0,
         },
-        'Server status compiled'
+        'Server status compiled',
       );
 
       return status;
@@ -289,23 +289,23 @@ const serverStatusTool: ToolDescriptor<ServerStatusInput, ServerStatusOutput> = 
           startTime: new Date().toISOString(),
           uptime: 0,
           pid: process.pid,
-          nodeVersion: process.version
+          nodeVersion: process.version,
         },
         tools: {
           registered: 15,
           categories: {
             workflow: 9,
             orchestration: 2,
-            utility: 3
-          }
+            utility: 3,
+          },
         },
         health: {
           status: 'unhealthy',
-          issues: ['Failed to collect server status']
-        }
+          issues: ['Failed to collect server status'],
+        },
       };
     }
-  }
+  },
 };
 
 // Default export for registry

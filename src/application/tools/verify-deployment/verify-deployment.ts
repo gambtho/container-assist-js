@@ -21,7 +21,7 @@ const VerifyDeploymentInput = z
     checkPods: z.boolean().optional(),
     timeout: z.number().default(60),
     min_ready_pods: z.number().default(1),
-    minReadyPods: z.number().optional()
+    minReadyPods: z.number().optional(),
   })
   .transform((data) => ({
     sessionId: data.session_id ?? data.sessionId,
@@ -33,7 +33,7 @@ const VerifyDeploymentInput = z
     timeout: data.timeout,
     minReadyPods:
       data.min_ready_pods ??
-      (data.minReadyPods != null && data.minReadyPods > 0 ? data.minReadyPods : 1)
+      (data.minReadyPods != null && data.minReadyPods > 0 ? data.minReadyPods : 1),
   }));
 
 // Output schema
@@ -48,7 +48,7 @@ const VerifyDeploymentOutput = z.object({
         desired: z.number(),
         current: z.number(),
         ready: z.number(),
-        available: z.number().optional()
+        available: z.number().optional(),
       }),
       conditions: z
         .array(
@@ -56,11 +56,11 @@ const VerifyDeploymentOutput = z.object({
             type: z.string(),
             status: z.string(),
             reason: z.string().optional(),
-            message: z.string().optional()
-          })
+            message: z.string().optional(),
+          }),
         )
-        .optional()
-    })
+        .optional(),
+    }),
   ),
   pods: z
     .array(
@@ -69,8 +69,8 @@ const VerifyDeploymentOutput = z.object({
         ready: z.boolean(),
         status: z.string(),
         restarts: z.number().optional(),
-        node: z.string().optional()
-      })
+        node: z.string().optional(),
+      }),
     )
     .optional(),
   endpoints: z
@@ -80,16 +80,16 @@ const VerifyDeploymentOutput = z.object({
         type: z.string(),
         url: z.string().optional(),
         port: z.number().optional(),
-        external: z.boolean()
-      })
+        external: z.boolean(),
+      }),
     )
     .optional(),
   issues: z.array(z.string()).optional(),
   metadata: z.object({
     checkTime: z.number(),
     namespace: z.string(),
-    clusterVersion: z.string().optional()
-  })
+    clusterVersion: z.string().optional(),
+  }),
 });
 
 // Type aliases
@@ -102,7 +102,7 @@ export type VerifyOutput = z.infer<typeof VerifyDeploymentOutput>;
 async function checkDeploymentHealth(
   deploymentName: string,
   namespace: string,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<{
   name: string;
   endpoint: string;
@@ -128,7 +128,7 @@ async function checkDeploymentHealth(
     name: deploymentName,
     endpoint: `http://${deploymentName}.${namespace}`,
     status: 'healthy' as const,
-    response_time_ms: 50
+    response_time_ms: 50,
   };
 }
 
@@ -138,7 +138,7 @@ async function checkDeploymentHealth(
 function getPodInfo(
   namespace: string,
   deploymentName: string,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<
   Array<{ name: string; ready: boolean; status: string; restarts?: number; node?: string }>
 > {
@@ -154,15 +154,15 @@ function getPodInfo(
       ready: true,
       status: 'Running',
       restarts: 0,
-      node: 'node-1'
+      node: 'node-1',
     },
     {
       name: `${deploymentName}-def456`,
       ready: true,
       status: 'Running',
       restarts: 0,
-      node: 'node-2'
-    }
+      node: 'node-2',
+    },
   ]);
 }
 
@@ -172,7 +172,7 @@ function getPodInfo(
 async function getServiceEndpoints(
   namespace: string,
   serviceName: string,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<
   Array<{ service: string; type: string; url?: string; port?: number; external: boolean }>
 > {
@@ -189,7 +189,7 @@ async function getServiceEndpoints(
           type: 'ClusterIP',
           url: e.url,
           port: 80,
-          external: Boolean(e.url) && !String(e.url).includes('cluster.local')
+          external: Boolean(e.url) && !String(e.url).includes('cluster.local'),
         }));
     }
   }
@@ -203,8 +203,8 @@ async function getServiceEndpoints(
       type: 'LoadBalancer',
       url: 'http://app.example.com',
       port: 80,
-      external: true
-    }
+      external: true,
+    },
   ];
 }
 
@@ -214,7 +214,7 @@ async function getServiceEndpoints(
 function analyzeIssues(
   deployments: Array<{ name: string; ready?: boolean; replicas?: any }>,
   pods: Array<{ ready: boolean; status?: string; restarts?: number }>,
-  minReadyPods: number
+  minReadyPods: number,
 ): string[] {
   const issues: string[] = [];
 
@@ -226,7 +226,7 @@ function analyzeIssues(
 
     if (deployment.replicas && deployment.replicas.ready < deployment.replicas.desired) {
       issues.push(
-        `Deployment ${deployment.name}: Only ${deployment.replicas.ready}/${deployment.replicas.desired} replicas ready`
+        `Deployment ${deployment.name}: Only ${deployment.replicas.ready}/${deployment.replicas.desired} replicas ready`,
       );
     }
 
@@ -269,9 +269,9 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
         sessionId,
         namespace,
         deployments: deployments.length,
-        services: services.length
+        services: services.length,
       },
-      'Starting deployment verification'
+      'Starting deployment verification',
     );
 
     const startTime = Date.now();
@@ -311,7 +311,7 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
           step: 'verify_deployment',
           status: 'in_progress',
           message: 'Checking deployment health',
-          progress: 0.2
+          progress: 0.2,
         });
       }
 
@@ -341,9 +341,9 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
               desired: 3,
               current: 3,
               ready: 3,
-              available: 3
+              available: 3,
             },
-            conditions: []
+            conditions: [],
           });
         } catch (error) {
           logger.error({ error }, `Failed to check deployment ${deploymentName}`);
@@ -355,8 +355,8 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
               desired: 0,
               current: 0,
               ready: 0,
-              available: 0
-            }
+              available: 0,
+            },
           });
         }
       }
@@ -377,7 +377,7 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
             step: 'verify_deployment',
             status: 'in_progress',
             message: 'Checking pod status',
-            progress: 0.5
+            progress: 0.5,
           });
         }
 
@@ -403,7 +403,7 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
             step: 'verify_deployment',
             status: 'in_progress',
             message: 'Getting service endpoints',
-            progress: 0.7
+            progress: 0.7,
           });
         }
 
@@ -441,9 +441,9 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
               deployments: deploymentResults,
               endpoints: endpointResults,
               issues,
-              timestamp: new Date().toISOString()
-            }
-          }
+              timestamp: new Date().toISOString(),
+            },
+          },
         }));
       }
 
@@ -456,7 +456,7 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
           message: healthy
             ? 'Deployment verified successfully'
             : `Deployment has ${issues.length} issues`,
-          progress: 1.0
+          progress: 1.0,
         });
       }
 
@@ -469,9 +469,9 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
           pods: podResults.length,
           endpoints: endpointResults.length,
           issues: issues.length,
-          checkTime: `${checkTime}ms`
+          checkTime: `${checkTime}ms`,
         },
-        'Deployment verification completed'
+        'Deployment verification completed',
       );
 
       // Log accessible endpoints
@@ -479,9 +479,9 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
       if (externalEndpoints.length > 0) {
         logger.info(
           {
-            endpoints: externalEndpoints.map((e) => e.url).filter(Boolean)
+            endpoints: externalEndpoints.map((e) => e.url).filter(Boolean),
           },
-          'Application accessible at:'
+          'Application accessible at:',
         );
       }
 
@@ -494,9 +494,9 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
             replicas: {
               ready: d.replicas.ready,
               current: d.replicas.current,
-              desired: d.replicas.desired
+              desired: d.replicas.desired,
             },
-            ready: d.ready
+            ready: d.ready,
           };
           if (d.replicas.available !== undefined) {
             deployment.replicas.available = d.replicas.available;
@@ -512,8 +512,8 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
         metadata: {
           checkTime,
           namespace,
-          clusterVersion: undefined // Would be populated by actual K8s API
-        }
+          clusterVersion: undefined, // Would be populated by actual K8s API
+        },
       };
     } catch (error) {
       logger.error({ error }, 'Verification failed'); // Fixed logger call
@@ -523,13 +523,13 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
           sessionId,
           step: 'verify_deployment',
           status: 'failed',
-          message: 'Verification failed'
+          message: 'Verification failed',
         });
       }
 
       throw error instanceof Error ? error : new Error(String(error));
     }
-  }
+  },
 };
 
 // Default export for registry

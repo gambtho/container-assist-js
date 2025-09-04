@@ -40,7 +40,7 @@ export function generateStandardTags(
   projectName: string,
   version?: string,
   registry?: string,
-  includeLatest: boolean = true
+  includeLatest: boolean = true,
 ): string[] {
   const tags: string[] = [];
   const prefix = registry ? `${registry}/` : '';
@@ -79,7 +79,7 @@ export function generateStandardTags(
 export async function tagDockerImage(
   source: string,
   target: string,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<boolean> {
   const { dockerService, logger } = context;
 
@@ -99,7 +99,7 @@ export async function tagDockerImage(
 export async function getSourceImage(
   sourceImage: string | undefined,
   sessionId: string | undefined,
-  sessionService: any
+  sessionService: any,
 ): Promise<{ source: string; projectName: string }> {
   let source = sourceImage;
   let projectName = 'app';
@@ -135,7 +135,7 @@ export function generateAllTags(
   projectName: string,
   version?: string,
   registry?: string,
-  latest?: boolean
+  latest?: boolean,
 ): string[] {
   let allTags: string[] = [];
 
@@ -171,7 +171,7 @@ export function generateAllTags(
 export async function applyTags(
   source: string,
   allTags: string[],
-  context: ToolContext
+  context: ToolContext,
 ): Promise<Array<{ tag: string; fullTag?: string; created?: boolean }>> {
   const { logger } = context;
   const tagResults: Array<{ tag: string; fullTag?: string; created?: boolean }> = [];
@@ -182,7 +182,7 @@ export async function applyTags(
       tagResults.push({
         tag: tag.split('/').pop() || tag,
         fullTag: tag,
-        created: success
+        created: success,
       });
 
       if (success) {
@@ -195,7 +195,7 @@ export async function applyTags(
       tagResults.push({
         tag: tag.split('/').pop() || tag,
         fullTag: tag,
-        created: false
+        created: false,
       });
     }
   }
@@ -207,7 +207,7 @@ export async function applyTags(
  * Validate tagging results
  */
 export function validateTagResults(
-  tagResults: Array<{ tag: string; fullTag?: string; created?: boolean }>
+  tagResults: Array<{ tag: string; fullTag?: string; created?: boolean }>,
 ): Array<{ tag: string; fullTag?: string; created?: boolean }> {
   const successfulTags = tagResults.filter((t) => t.created);
   if (successfulTags.length === 0) {

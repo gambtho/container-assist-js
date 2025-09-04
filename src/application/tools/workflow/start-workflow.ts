@@ -78,9 +78,9 @@ const StartWorkflowInputSchema = z.object({
       image_tag: z.string().optional(),
       deploy: z.boolean().optional(),
       scan: z.boolean().optional(),
-      parallel_steps: z.boolean().optional()
+      parallel_steps: z.boolean().optional(),
     })
-    .optional()
+    .optional(),
 });
 
 const StartWorkflowOutputSchema = z.object({
@@ -100,14 +100,14 @@ const StartWorkflowOutputSchema = z.object({
       workflow_type: z.string(),
       automated: z.boolean(),
       options: z.record(z.unknown()).optional(),
-      started_at: z.string()
+      started_at: z.string(),
     })
-    .optional()
+    .optional(),
 });
 
 export async function startWorkflowHandler(
   input: StartWorkflowInput,
-  deps: StartWorkflowDeps
+  deps: StartWorkflowDeps,
 ): Promise<StartWorkflowOutput> {
   const { sessionService, workflowOrchestrator, workflowManager, logger, onProgress } = deps;
 
@@ -121,7 +121,7 @@ export async function startWorkflowHandler(
         workflow_id: 'unknown',
         status: 'already_running',
         message: `Workflow already running for session ${validated.session_id}`,
-        error: 'Workflow already in progress'
+        error: 'Workflow already in progress',
       };
     }
 
@@ -133,7 +133,7 @@ export async function startWorkflowHandler(
         workflow_id: 'unknown',
         status: 'failed',
         message: `Unknown workflow type: ${validated.workflow_type}`,
-        error: `Invalid workflow type: ${validated.workflow_type}`
+        error: `Invalid workflow type: ${validated.workflow_type}`,
       };
     }
 
@@ -142,9 +142,9 @@ export async function startWorkflowHandler(
       logger.error(
         {
           workflowId: workflowConfig.id,
-          errors: configValidation.errors
+          errors: configValidation.errors,
         },
-        'Invalid workflow configuration'
+        'Invalid workflow configuration',
       );
 
       return {
@@ -153,7 +153,7 @@ export async function startWorkflowHandler(
         workflow_id: workflowConfig.id,
         status: 'failed',
         message: 'Invalid workflow configuration',
-        error: configValidation.errors.join('; ')
+        error: configValidation.errors.join('; '),
       };
     }
 
@@ -179,8 +179,8 @@ export async function startWorkflowHandler(
         repo_path: validated.repo_path,
         automated: validated.automated,
         options: validated.options,
-        started_at: new Date().toISOString()
-      }
+        started_at: new Date().toISOString(),
+      },
     });
 
     await sessionService.updateWorkflowState(sessionId, {
@@ -192,8 +192,8 @@ export async function startWorkflowHandler(
         skip_tests: validated.options?.skip_tests,
         skip_security: validated.options?.skip_security,
         auto_rollback: validated.options?.auto_rollback,
-        parallel_steps: validated.options?.parallel_steps
-      }
+        parallel_steps: validated.options?.parallel_steps,
+      },
     });
 
     // Report initial progress
@@ -207,8 +207,8 @@ export async function startWorkflowHandler(
           sessionId,
           workflow_type: validated.workflow_type,
           workflow_name: workflowConfig.name,
-          steps_count: workflowConfig.steps.length
-        }
+          steps_count: workflowConfig.steps.length,
+        },
       });
     }
 
@@ -218,9 +218,9 @@ export async function startWorkflowHandler(
         workflowId: workflowConfig.id,
         workflowType: validated.workflow_type,
         repoPath: validated.repo_path,
-        automated: validated.automated
+        automated: validated.automated,
       },
-      'Starting workflow execution'
+      'Starting workflow execution',
     );
 
     // Start workflow execution asynchronously
@@ -232,7 +232,7 @@ export async function startWorkflowHandler(
     if (validated.workflow_type === 'containerization' || validated.workflow_type === 'full') {
       const workflowParams: any = {
         repositoryPath: validated.repo_path,
-        includeSecurityScan: !validated.options?.skip_security
+        includeSecurityScan: !validated.options?.skip_security,
       };
 
       if (validated.options?.image_tag) {
@@ -247,9 +247,9 @@ export async function startWorkflowHandler(
         sessionId,
         {
           repo_path: validated.repo_path,
-          ...validated.options
+          ...validated.options,
         },
-        { ...(onProgress && { onProgress }), signal: abortController.signal }
+        { ...(onProgress && { onProgress }), signal: abortController.signal },
       );
     }
 
@@ -258,7 +258,7 @@ export async function startWorkflowHandler(
       sessionId,
       workflowConfig.id,
       workflowPromise,
-      abortController
+      abortController,
     );
 
     // Estimate duration based on workflow type and options
@@ -276,15 +276,15 @@ export async function startWorkflowHandler(
       next_steps: [
         'Use workflow_status tool to check progress',
         'Monitor progress updates via session events',
-        'Use abort_workflow if cancellation is needed'
+        'Use abort_workflow if cancellation is needed',
       ],
       metadata: {
         repo_path: validated.repo_path,
         workflow_type: validated.workflow_type,
         automated: validated.automated,
         options: validated.options,
-        started_at: new Date().toISOString()
-      }
+        started_at: new Date().toISOString(),
+      },
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -293,9 +293,9 @@ export async function startWorkflowHandler(
       {
         error: errorMessage,
         input,
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       },
-      'Failed to start workflow'
+      'Failed to start workflow',
     );
 
     // Try to update session with error if we have a session ID
@@ -304,7 +304,7 @@ export async function startWorkflowHandler(
       try {
         await sessionService.updateSession(sessionId, {
           status: 'failed',
-          stage: 'workflow_failed'
+          stage: 'workflow_failed',
         });
       } catch (updateError) {
         logger.error({ error: updateError }); // Fixed logger call
@@ -317,7 +317,7 @@ export async function startWorkflowHandler(
       workflow_id: 'unknown',
       status: 'failed',
       message: `Failed to start workflow: ${errorMessage}`,
-      error: errorMessage
+      error: errorMessage,
     };
   }
 }
@@ -327,7 +327,7 @@ export async function startWorkflowHandler(
  */
 async function validateInput(
   input: StartWorkflowInput,
-  logger: Logger
+  logger: Logger,
 ): Promise<{
   repo_path: string;
   workflow_type: string;
@@ -350,7 +350,7 @@ async function validateInput(
     }
   } catch (error) {
     throw new Error(
-      `Invalid repository path: ${repo_path} - ${error instanceof Error ? error.message : String(error)}`
+      `Invalid repository path: ${repo_path} - ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
@@ -362,11 +362,11 @@ async function validateInput(
     'build',
     'deploy-only',
     'deploy',
-    'quick'
+    'quick',
   ];
   if (!validWorkflowTypes.includes(workflow_type)) {
     throw new Error(
-      `Invalid workflow type: ${workflow_type}. Valid types: ${validWorkflowTypes.join(', ')}`
+      `Invalid workflow type: ${workflow_type}. Valid types: ${validWorkflowTypes.join(', ')}`,
     );
   }
 
@@ -394,16 +394,16 @@ async function validateInput(
       repo_path,
       workflow_type,
       automated,
-      options
+      options,
     },
-    'Input validated'
+    'Input validated',
   );
 
   const validated: any = {
     repo_path,
     workflow_type,
     automated,
-    options
+    options,
   };
 
   // Only add session_id if it's defined'
@@ -421,7 +421,7 @@ async function createNewSession(
   sessionService: SessionService,
   sessionId: string,
   validated: any,
-  logger: Logger
+  logger: Logger,
 ): Promise<Session> {
   try {
     const session = await sessionService.createSession(validated.repo_path, {
@@ -430,8 +430,8 @@ async function createNewSession(
       stage: 'initializing',
       metadata: {
         workflow_type: validated.workflow_type,
-        repo_path: validated.repo_path
-      }
+        repo_path: validated.repo_path,
+      },
     });
 
     logger.info({ sessionId }, 'Session created'); // Fixed logger call
@@ -443,14 +443,14 @@ async function createNewSession(
       status:
         session.status === 'pending'
           ? 'active'
-          : (session.status as 'active' | 'completed' | 'failed' | 'paused')
+          : (session.status as 'active' | 'completed' | 'failed' | 'paused'),
     };
 
     return transformedSession;
   } catch (error) {
     logger.error({ sessionId, error }); // Fixed logger call
     throw new Error(
-      `Failed to create session: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to create session: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }
@@ -470,7 +470,7 @@ function estimateWorkflowDuration(workflowConfig: any, validated: any): number {
     generate_k8s: 30000, // 30 seconds
     prepare_cluster: 30000, // 30 seconds
     deploy: 60000, // 1 minute
-    verify: 120000 // 2 minutes
+    verify: 120000, // 2 minutes
   };
 
   let totalEstimate = 0;
@@ -508,7 +508,7 @@ export const startWorkflowEnhancedDescriptor = {
   outputSchema: StartWorkflowOutputSchema,
   handler: startWorkflowHandler,
   timeout: 10000, // 10 seconds to start (not execute)
-  exported: true // Must be in package.json exports
+  exported: true, // Must be in package.json exports
 };
 
 // Default export for registry - export the descriptor, not just the handler

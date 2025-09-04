@@ -81,7 +81,7 @@ export class ContentValidator {
       checkBestPractices = true,
       contentType = 'text',
       strict = false,
-      customRules = []
+      customRules = [],
     } = options;
 
     const errors: string[] = [];
@@ -155,8 +155,8 @@ export class ContentValidator {
       metadata: {
         validationTime: Date.now() - startTime,
         rulesApplied,
-        issuesFound: errors.length + warnings.length + securityIssues.length
-      }
+        issuesFound: errors.length + warnings.length + securityIssues.length,
+      },
     };
 
     if (errors.length > 0) {
@@ -186,28 +186,28 @@ export class ContentValidator {
       name: 'API Key Detection',
       pattern: /(?:api[_-]?key|apikey)\s*[:=]\s*["']?([a-zA-Z0-9_-]{20,})["']?/gi,
       message: 'Potential API key exposed',
-      severity: 'error'
+      severity: 'error',
     });
 
     patterns.set('password', {
       name: 'Password Detection',
       pattern: /(?:password|passwd|pwd)\s*[:=]\s*["']?([^"'\s]{8,})["']?/gi,
       message: 'Potential password exposed',
-      severity: 'error'
+      severity: 'error',
     });
 
     patterns.set('token', {
       name: 'Token Detection',
       pattern: /(?:token|auth|bearer)\s*[:=]\s*["']?([a-zA-Z0-9._-]{20,})["']?/gi,
       message: 'Potential authentication token exposed',
-      severity: 'error'
+      severity: 'error',
     });
 
     patterns.set('private-key', {
       name: 'Private Key Detection',
       pattern: /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/,
       message: 'Private key exposed',
-      severity: 'error'
+      severity: 'error',
     });
 
     // Vulnerability patterns
@@ -215,14 +215,14 @@ export class ContentValidator {
       name: 'Eval Usage',
       pattern: /\beval\s*\(/,
       message: 'eval() usage detected - potential code injection risk',
-      severity: 'warning'
+      severity: 'warning',
     });
 
     patterns.set('exec', {
       name: 'Exec Usage',
       pattern: /\b(?:exec|system|shell_exec)\s*\(/,
       message: 'Command execution detected - potential injection risk',
-      severity: 'warning'
+      severity: 'warning',
     });
 
     return patterns;
@@ -242,7 +242,7 @@ export class ContentValidator {
       } catch (error) {
         return {
           valid: false,
-          errors: [`Invalid JSON: ${error instanceof Error ? error.message : 'Unknown error'}`]
+          errors: [`Invalid JSON: ${error instanceof Error ? error.message : 'Unknown error'}`],
         };
       }
     });
@@ -263,7 +263,7 @@ export class ContentValidator {
       }
 
       const result: ValidationResult = {
-        valid: errors.length === 0
+        valid: errors.length === 0,
       };
 
       if (errors.length > 0) {
@@ -302,7 +302,7 @@ export class ContentValidator {
       }
 
       const result: ValidationResult = {
-        valid: errors.length === 0
+        valid: errors.length === 0,
       };
 
       if (errors.length > 0) {
@@ -334,7 +334,7 @@ export class ContentValidator {
               severity: this.determineSeverity(key),
               description: rule.message,
               line: index + 1,
-              recommendation: this.getRecommendation(key)
+              recommendation: this.getRecommendation(key),
             });
           }
         });
@@ -351,7 +351,7 @@ export class ContentValidator {
     const result: ValidationResult = {
       valid:
         securityIssues.filter((i) => i.severity === 'critical' || i.severity === 'high').length ===
-        0
+        0,
     };
 
     if (errors.length > 0) {
@@ -391,7 +391,7 @@ export class ContentValidator {
     }
 
     const result: ValidationResult = {
-      valid: true
+      valid: true,
     };
 
     if (warnings.length > 0) {
@@ -414,7 +414,7 @@ export class ContentValidator {
         type: 'misconfiguration',
         severity: 'medium',
         description: 'sudo usage in Dockerfile',
-        recommendation: 'Avoid sudo in Dockerfiles, use appropriate base image or USER instruction'
+        recommendation: 'Avoid sudo in Dockerfiles, use appropriate base image or USER instruction',
       });
     }
 
@@ -424,7 +424,7 @@ export class ContentValidator {
         type: 'vulnerability',
         severity: 'high',
         description: 'Piping curl directly to shell',
-        recommendation: 'Download and verify scripts before execution'
+        recommendation: 'Download and verify scripts before execution',
       });
     }
 
@@ -434,7 +434,7 @@ export class ContentValidator {
         type: 'vulnerability',
         severity: 'high',
         description: 'Piping wget directly to shell',
-        recommendation: 'Download and verify scripts before execution'
+        recommendation: 'Download and verify scripts before execution',
       });
     }
 
@@ -444,7 +444,7 @@ export class ContentValidator {
         type: 'misconfiguration',
         severity: 'low',
         description: 'Using :latest tag in FROM instruction',
-        recommendation: 'Pin to specific version for reproducibility'
+        recommendation: 'Pin to specific version for reproducibility',
       });
     }
   }
@@ -459,7 +459,7 @@ export class ContentValidator {
         type: 'vulnerability',
         severity: 'medium',
         description: 'Unquoted variable expansion',
-        recommendation: 'Quote variable expansions to prevent word splitting'
+        recommendation: 'Quote variable expansions to prevent word splitting',
       });
     }
 
@@ -469,7 +469,7 @@ export class ContentValidator {
         type: 'vulnerability',
         severity: 'critical',
         description: 'Dangerous rm command detected',
-        recommendation: 'Review and restrict rm commands'
+        recommendation: 'Review and restrict rm commands',
       });
     }
   }
@@ -513,7 +513,7 @@ export class ContentValidator {
       token: 'Store tokens in environment variables or secure vaults',
       'private-key': 'Private keys should be stored securely, not in code',
       eval: 'Avoid eval(), use safer alternatives',
-      exec: 'Sanitize inputs before command execution'
+      exec: 'Sanitize inputs before command execution',
     };
 
     return recommendations[key] || 'Review and fix security issue';
@@ -546,7 +546,7 @@ export class ContentValidator {
       const critical = result.securityIssues.filter((i) => i.severity === 'critical').length;
       const high = result.securityIssues.filter((i) => i.severity === 'high').length;
       parts.push(
-        `${result.securityIssues.length} security issue(s) (${critical} critical, ${high} high)`
+        `${result.securityIssues.length} security issue(s) (${critical} critical, ${high} high)`,
       );
     }
 

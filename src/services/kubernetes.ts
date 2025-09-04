@@ -8,7 +8,7 @@ import type {
   K8sDeploymentOptions,
   K8sDeploymentResult,
   K8sManifest,
-  K8sServiceStatus
+  K8sServiceStatus,
 } from '../contracts/types/index.js';
 
 export interface KubernetesConfig {
@@ -22,7 +22,7 @@ export interface KubernetesConfig {
  */
 export async function createKubernetesService(
   config: KubernetesConfig,
-  logger: Logger
+  logger: Logger,
 ): Promise<KubernetesService> {
   const service = new KubernetesService(config, logger);
   await service.initialize();
@@ -44,7 +44,7 @@ export class KubernetesService {
 
   async deployManifests(
     manifests: K8sManifest[],
-    options?: K8sDeploymentOptions
+    options?: K8sDeploymentOptions,
   ): Promise<K8sDeploymentResult> {
     return this.client.deployManifests(manifests, options);
   }
@@ -80,7 +80,7 @@ export class KubernetesService {
 
     return {
       ...healthStatus,
-      status: healthStatus.available ? 'healthy' : 'unavailable'
+      status: healthStatus.available ? 'healthy' : 'unavailable',
     };
   }
 
@@ -93,5 +93,5 @@ export class KubernetesService {
 export type {
   K8sManifest,
   K8sDeploymentResult,
-  K8sServiceStatus
+  K8sServiceStatus,
 } from '../contracts/types/index.js';

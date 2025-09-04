@@ -26,7 +26,7 @@ export async function withRetry<T>(fn: () => Promise<T>, options?: RetryOptions)
  */
 export async function executeWithRetry<T>(
   fn: () => Promise<T>,
-  options?: RetryOptions
+  options?: RetryOptions,
 ): Promise<T> {
   return retryAsync(fn, options);
 }
@@ -37,7 +37,7 @@ export async function executeWithRetry<T>(
 export async function executeWithRecovery<T>(
   fn: () => Promise<T>,
   recoveryFn?: (error: unknown) => Promise<T>,
-  options?: RetryOptions
+  options?: RetryOptions,
 ): Promise<T> {
   try {
     return await executeWithRetry(fn, options);
@@ -70,7 +70,8 @@ export function getBuildErrorSuggestions(error: string): ErrorSuggestions {
 
   return {
     suggestions,
-    recovery: suggestions.length > 0 ? 'Try the suggestions above' : 'Check Docker logs for details'
+    recovery:
+      suggestions.length > 0 ? 'Try the suggestions above' : 'Check Docker logs for details',
   };
 }
 
@@ -95,7 +96,7 @@ export function getDeploymentErrorSuggestions(error: string): ErrorSuggestions {
 
   return {
     suggestions,
-    recovery: suggestions.length > 0 ? 'Try the suggestions above' : 'Check deployment logs'
+    recovery: suggestions.length > 0 ? 'Try the suggestions above' : 'Check deployment logs',
   };
 }
 
@@ -120,7 +121,7 @@ export function getScanErrorSuggestions(error: string): ErrorSuggestions {
 
   return {
     suggestions,
-    recovery: suggestions.length > 0 ? 'Try the suggestions above' : 'Check scanner logs'
+    recovery: suggestions.length > 0 ? 'Try the suggestions above' : 'Check scanner logs',
   };
 }
 
@@ -145,6 +146,6 @@ export function getGenericErrorSuggestions(error: string): ErrorSuggestions {
 
   return {
     suggestions: suggestions.length > 0 ? suggestions : ['Check logs for more details'],
-    recovery: 'Review error message and try again'
+    recovery: 'Review error message and try again',
   };
 }

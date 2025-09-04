@@ -65,7 +65,7 @@ export class WorkflowManager extends EventEmitter {
     sessionId: string,
     workflowId: string,
     promise: Promise<WorkflowExecutionResult>,
-    abortController?: AbortController
+    abortController?: AbortController,
   ): void {
     const execution: WorkflowExecution = {
       sessionId,
@@ -73,7 +73,7 @@ export class WorkflowManager extends EventEmitter {
       promise,
       startTime: Date.now(),
       status: 'running',
-      ...(abortController && { abortController })
+      ...(abortController && { abortController }),
     };
 
     this.workflows.set(sessionId, execution);
@@ -82,9 +82,9 @@ export class WorkflowManager extends EventEmitter {
       {
         sessionId,
         workflowId,
-        activeCount: this.workflows.size
+        activeCount: this.workflows.size,
       },
-      'Workflow registered'
+      'Workflow registered',
     );
 
     this.emit('workflow:started', { sessionId, workflowId });
@@ -99,9 +99,9 @@ export class WorkflowManager extends EventEmitter {
             sessionId,
             workflowId,
             duration: Date.now() - execution.startTime,
-            status: result.status
+            status: result.status,
           },
-          'Workflow completed'
+          'Workflow completed',
         );
 
         this.emit('workflow:completed', { sessionId, result });
@@ -116,9 +116,9 @@ export class WorkflowManager extends EventEmitter {
             sessionId,
             workflowId,
             error: error instanceof Error ? error.message : String(error),
-            duration: Date.now() - execution.startTime
+            duration: Date.now() - execution.startTime,
           },
-          'Workflow failed'
+          'Workflow failed',
         );
 
         if (execution.status === 'aborted') {
@@ -153,7 +153,7 @@ export class WorkflowManager extends EventEmitter {
   getAllWorkflows(): { active: WorkflowExecution[]; completed?: WorkflowExecution[] } {
     return {
       active: Array.from(this.workflows.values()),
-      completed: [...this.completedWorkflows]
+      completed: [...this.completedWorkflows],
     };
   }
 
@@ -176,7 +176,7 @@ export class WorkflowManager extends EventEmitter {
   }> {
     let workflows: WorkflowExecution[] = [
       ...Array.from(this.workflows.values()),
-      ...this.completedWorkflows
+      ...this.completedWorkflows,
     ];
 
     // Apply filters
@@ -217,7 +217,7 @@ export class WorkflowManager extends EventEmitter {
         duration: now - w.startTime,
         startTime: new Date(w.startTime),
         ...(w.result?.completedSteps !== undefined && { completedSteps: w.result.completedSteps }),
-        ...(w.result?.errors !== undefined && { errors: w.result.errors })
+        ...(w.result?.errors !== undefined && { errors: w.result.errors }),
       };
 
       return workflowSummary;
@@ -281,7 +281,7 @@ export class WorkflowManager extends EventEmitter {
       failed,
       aborted,
       averageDuration,
-      successRate
+      successRate,
     };
   }
 
@@ -294,7 +294,7 @@ export class WorkflowManager extends EventEmitter {
     recentCompletions: number;
     recentFailures: number;
     systemLoad: 'low' | 'medium' | 'high';
-  } {
+    } {
     const active = this.getActiveWorkflows().length;
     const now = Date.now();
     const oneHourAgo = now - 60 * 60 * 1000;
@@ -316,7 +316,7 @@ export class WorkflowManager extends EventEmitter {
       queuedWorkflows: 0,
       recentCompletions,
       recentFailures,
-      systemLoad
+      systemLoad,
     };
   }
 
@@ -369,9 +369,9 @@ export class WorkflowManager extends EventEmitter {
       {
         sessionId,
         activeCount: this.workflows.size,
-        completedCount: this.completedWorkflows.length
+        completedCount: this.completedWorkflows.length,
       },
-      'Workflow archived'
+      'Workflow archived',
     );
   }
 
@@ -383,7 +383,7 @@ export class WorkflowManager extends EventEmitter {
       () => {
         this.cleanupOldWorkflows();
       },
-      10 * 60 * 1000
+      10 * 60 * 1000,
     );
 
     if (this.cleanupInterval != null && 'unref' in this.cleanupInterval) {
@@ -407,7 +407,7 @@ export class WorkflowManager extends EventEmitter {
     if (cleaned > 0) {
       this.logger.debug(
         { cleaned, remaining: this.completedWorkflows.length },
-        'Old workflows cleaned'
+        'Old workflows cleaned',
       );
     }
   }
