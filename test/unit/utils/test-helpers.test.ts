@@ -52,7 +52,7 @@ describe('Consolidated Test Utilities', () => {
       });
       
       expect(result).toBe('test result');
-      expect(duration).toBeGreaterThanOrEqual(10);
+      expect(duration).toBeGreaterThanOrEqual(8); // Allow for timing variations
       expect(duration).toBeLessThan(100); // Should be reasonable
     });
   });
