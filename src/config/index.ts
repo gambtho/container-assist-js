@@ -35,11 +35,11 @@ export {
   createConfigurationForEnv,
   validateConfiguration,
   getConfigurationSummary,
-} from './config';
+} from './config.js';
 
 // Import configuration
-import { createConfiguration, createConfigurationForEnv, getConfigurationSummary } from './config';
-import type { ApplicationConfig } from './types';
+import { createConfiguration, createConfigurationForEnv, getConfigurationSummary } from './config.js';
+import type { ApplicationConfig } from './types.js';
 
 /**
  * Lazy-loaded configuration instance
