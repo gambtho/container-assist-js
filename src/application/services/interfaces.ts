@@ -119,27 +119,27 @@ export interface SessionService {
   /**
    * Get session by ID
    */
-  get(sessionId: string): Promise<Session | null>;
+  get(sessionId: string): Session | null;
 
   /**
    * Create new session
    */
-  create(data: Partial<Session>): Promise<Session>;
+  create(data: Partial<Session>): Session;
 
   /**
    * Update session atomically
    */
-  updateAtomic(sessionId: string, updater: (session: Session) => Session): Promise<void>;
+  updateAtomic(sessionId: string, updater: (session: Session) => Session): void;
 
   /**
    * Update session data
    */
-  update(sessionId: string, data: Partial<Session>): Promise<void>;
+  update(sessionId: string, data: Partial<Session>): void;
 
   /**
    * Delete session
    */
-  delete(sessionId: string): Promise<void>;
+  delete(sessionId: string): void;
 
   /**
    * Initialize the service (async setup)

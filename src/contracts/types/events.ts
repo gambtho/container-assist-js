@@ -5,7 +5,6 @@
 
 import { z } from 'zod';
 
-// Base event interface
 export interface DomainEvent {
   id: string;
   type: string;
@@ -17,7 +16,6 @@ export interface DomainEvent {
   metadata?: Record<string, unknown>;
 }
 
-// Event types enum
 export const EventType = {
   // Session events
   SESSION_CREATED: 'session.created',
@@ -82,7 +80,7 @@ export const EventType = {
   // System events
   SYSTEM_HEALTH_CHECK: 'system.health_check',
   SYSTEM_MAINTENANCE: 'system.maintenance',
-  CACHE_CLEARED: 'cache.cleared',
+  CACHE_CLEARED: 'cache.cleared'
 } as const;
 
 export type EventTypeName = (typeof EventType)[keyof typeof EventType];
@@ -181,13 +179,12 @@ export interface ErrorOccurredEventData {
   recoverable: boolean;
 }
 
-// Event factory functions
 export function createDomainEvent(
   type: EventTypeName,
   aggregateId: string,
   aggregateType: string,
   data: unknown,
-  metadata?: Record<string, unknown>,
+  metadata?: Record<string, unknown>
 ): DomainEvent {
   return {
     id: crypto.randomUUID(),
@@ -197,7 +194,7 @@ export function createDomainEvent(
     version: 1,
     timestamp: new Date().toISOString(),
     data,
-    metadata: metadata ?? {},
+    metadata: metadata ?? {}
   };
 }
 
@@ -205,7 +202,7 @@ export function createSessionEvent(
   type: EventTypeName,
   sessionId: string,
   data: unknown,
-  metadata?: Record<string, unknown>,
+  metadata?: Record<string, unknown>
 ): DomainEvent {
   return createDomainEvent(type, sessionId, 'session', data, metadata);
 }
@@ -214,7 +211,7 @@ export function createWorkflowEvent(
   type: EventTypeName,
   sessionId: string,
   data: unknown,
-  metadata?: Record<string, unknown>,
+  metadata?: Record<string, unknown>
 ): DomainEvent {
   return createDomainEvent(type, sessionId, 'workflow', data, metadata);
 }
@@ -223,7 +220,7 @@ export function createBuildEvent(
   type: EventTypeName,
   sessionId: string,
   data: unknown,
-  metadata?: Record<string, unknown>,
+  metadata?: Record<string, unknown>
 ): DomainEvent {
   return createDomainEvent(type, sessionId, 'build', data, metadata);
 }
@@ -232,12 +229,11 @@ export function createDeploymentEvent(
   type: EventTypeName,
   sessionId: string,
   data: unknown,
-  metadata?: Record<string, unknown>,
+  metadata?: Record<string, unknown>
 ): DomainEvent {
   return createDomainEvent(type, sessionId, 'deployment', data, metadata);
 }
 
-// Event validation schemas
 export const DomainEventSchema = z.object({
   id: z.string(),
   type: z.string(),
@@ -246,14 +242,14 @@ export const DomainEventSchema = z.object({
   version: z.number(),
   timestamp: z.string().datetime(),
   data: z.any(),
-  metadata: z.record(z.string(), z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional()
 });
 
 export const SessionCreatedEventDataSchema = z.object({
   sessionId: z.string(),
   repoPath: z.string(),
   createdBy: z.string().optional(),
-  config: z.record(z.string(), z.any()).optional(),
+  config: z.record(z.string(), z.any()).optional()
 });
 
 export const WorkflowStepCompletedEventDataSchema = z.object({
@@ -263,7 +259,7 @@ export const WorkflowStepCompletedEventDataSchema = z.object({
   totalSteps: z.number(),
   duration: z.number(),
   output: z.any(),
-  nextStep: z.string().optional(),
+  nextStep: z.string().optional()
 });
 
 export const BuildCompletedEventDataSchema = z.object({
@@ -272,7 +268,7 @@ export const BuildCompletedEventDataSchema = z.object({
   tags: z.array(z.string()),
   size: z.number(),
   duration: z.number(),
-  layers: z.number(),
+  layers: z.number()
 });
 
 export const ScanCompletedEventDataSchema = z.object({
@@ -284,7 +280,7 @@ export const ScanCompletedEventDataSchema = z.object({
   high: z.number(),
   medium: z.number(),
   low: z.number(),
-  duration: z.number(),
+  duration: z.number()
 });
 
 export const ErrorOccurredEventDataSchema = z.object({
@@ -294,10 +290,9 @@ export const ErrorOccurredEventDataSchema = z.object({
   error: z.string(),
   stack: z.string().optional(),
   context: z.record(z.string(), z.any()),
-  recoverable: z.boolean(),
+  recoverable: z.boolean()
 });
 
-// Event handler interface
 export interface EventHandler {
   handle(event: DomainEvent): Promise<void>;
   canHandle(eventType: string): boolean;

@@ -5,9 +5,8 @@
  */
 
 import { program } from 'commander';
-import { ContainerKitMCPServerV2 as ContainerKitMCPServer } from './server.js';
-import { createConfig } from '../src/config/index';
-import { logConfigSummaryIfDev } from '../src/config/index';
+import { ContainerKitMCPServer } from './server.js';
+import { createConfig, logConfigSummaryIfDev } from '../src/config/index';
 import { createPinoLogger } from '../src/infrastructure/logger.js';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
@@ -81,7 +80,6 @@ const options = program.opts();
 function validateOptions(opts: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  // Validate log level
   const validLogLevels = ['debug', 'info', 'warn', 'error'];
   if (opts.logLevel && !validLogLevels.includes(opts.logLevel)) {
     errors.push(`Invalid log level: ${opts.logLevel}. Valid options: ${validLogLevels.join(', ')}`);
@@ -150,11 +148,8 @@ async function main(): Promise<void> {
     // Log configuration summary in development mode
     logConfigSummaryIfDev(config);
 
-    // Validate configuration mode
     if (options.validate) {
       console.log('🔍 Validating Container Kit MCP configuration...\n');
-
-      // Check configuration details
       console.log('📋 Configuration Summary:');
       console.log(`  • Log Level: ${config.server.logLevel}`);
       console.log(`  • Workspace: ${config.workspace.workspaceDir}`);
@@ -195,10 +190,8 @@ async function main(): Promise<void> {
     // Create server
     const server = new ContainerKitMCPServer(config);
 
-    // List tools mode
     if (options.listTools) {
       logger.info('Listing available tools');
-      // We need to initialize to get tools, but don't start the server
       await server.initialize();
 
       const toolList = await server.listTools();
@@ -223,11 +216,10 @@ async function main(): Promise<void> {
         console.log(`\nTotal: ${toolList.tools.length} tools available`);
       }
 
-      await server.shutdown();
+      server.shutdown();
       process.exit(0);
     }
 
-    // Health check mode
     if (options.healthCheck) {
       logger.info('Performing health check');
       await server.initialize();
@@ -248,22 +240,21 @@ async function main(): Promise<void> {
       if (health.metrics) {
         console.log('\nMetrics:');
         for (const [metric, value] of Object.entries(health.metrics)) {
-          console.log(`  📊 ${metric}: ${value}`);
+          console.log(`  📊 ${metric}: ${String(value)}`);
         }
       }
 
-      await server.shutdown();
+      server.shutdown();
       process.exit(health.status === 'healthy' ? 0 : 1);
     }
 
-    // Normal server startup
     logger.info({
       config: {
         logLevel: config.server.logLevel,
         workspace: config.workspace.workspaceDir,
         mockMode: options.mock,
-        devMode: options.dev
-      }
+        devMode: options.dev,
+      },
     }, 'Starting Container Kit MCP Server');
 
     console.log('🚀 Starting Container Kit MCP Server...');
@@ -284,13 +275,12 @@ async function main(): Promise<void> {
     console.log('✅ Server started successfully');
     console.log('🔌 Listening on stdio transport');
 
-    // Setup graceful shutdown
-    const shutdown = async (signal: string): Promise<void> => {
+    const shutdown = (signal: string): void => {
       logger.info({ signal }, 'Shutting down');
       console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
 
       try {
-        await server.shutdown();
+        server.shutdown();
         console.log('✅ Shutdown complete');
         process.exit(0);
       } catch (error) {
@@ -300,8 +290,8 @@ async function main(): Promise<void> {
       }
     };
 
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => void shutdown('SIGTERM'));
+    process.on('SIGINT', () => void shutdown('SIGINT'));
 
   } catch (error) {
     logger.error({ error }, 'Server startup failed');
@@ -359,7 +349,6 @@ async function main(): Promise<void> {
   }
 }
 
-// Handle uncaught errors
 process.on('uncaughtException', (error) => {
   logger.fatal({ error }, 'Uncaught exception in CLI');
   console.error('❌ Uncaught exception:', error);
@@ -373,5 +362,5 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Run the CLI
-main();
+void main();
 

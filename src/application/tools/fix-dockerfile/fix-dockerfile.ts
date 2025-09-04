@@ -18,7 +18,7 @@ const FixDockerfileInput = z
     dockerfile_content: z.string().optional(),
     dockerfileContent: z.string().optional(),
     build_context: z.string().optional().default('standard build context'),
-    buildContext: z.string().optional(),
+    buildContext: z.string().optional()
   })
   .transform((data) => ({
     sessionId:
@@ -31,7 +31,7 @@ const FixDockerfileInput = z
       data.build_context ??
       (data.buildContext != null && data.buildContext !== ''
         ? data.buildContext
-        : 'standard build context'),
+        : 'standard build context')
   }));
 type FixDockerfileInputType = z.infer<typeof FixDockerfileInput>;
 
@@ -44,8 +44,8 @@ const FixDockerfileOutput = z.object({
       line_changed: z.string(),
       old_content: z.string(),
       new_content: z.string(),
-      reasoning: z.string(),
-    }),
+      reasoning: z.string()
+    })
   ),
   security_improvements: z.array(z.string()),
   performance_optimizations: z.array(z.string()),
@@ -54,11 +54,11 @@ const FixDockerfileOutput = z.object({
       approach: z.string(),
       pros: z.array(z.string()),
       cons: z.array(z.string()),
-      when_to_use: z.string(),
-    }),
+      when_to_use: z.string()
+    })
   ),
   testing_recommendations: z.array(z.string()),
-  prevention_tips: z.array(z.string()),
+  prevention_tips: z.array(z.string())
 });
 type FixDockerfileOutputType = z.infer<typeof FixDockerfileOutput>;
 
@@ -75,12 +75,12 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileInputType, FixDoc
     outputSchema: FixDockerfileOutput,
     chainHint: {
       nextTool: 'build-image',
-      reason: 'After fixing the Dockerfile, rebuild the image to verify the fix works',
+      reason: 'After fixing the Dockerfile, rebuild the image to verify the fix works'
     },
 
     handler: async (
       input: FixDockerfileInputType,
-      context: ToolContext,
+      context: ToolContext
     ): Promise<FixDockerfileOutputType> => {
       if (context.sessionService == null) {
         throw new Error('Session service not available');
@@ -112,7 +112,7 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileInputType, FixDoc
 
             if (dockerfileContent == null || dockerfileContent === '') {
               throw new Error(
-                'No Dockerfile found. Generate one first using generate-dockerfile tool.',
+                'No Dockerfile found. Generate one first using generate-dockerfile tool.'
               );
             }
           }
@@ -121,9 +121,9 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileInputType, FixDoc
             {
               sessionId: input.sessionId,
               errorLength: input.errorMessage.length,
-              dockerfileLines: dockerfileContent?.split('\n').length ?? 0,
+              dockerfileLines: dockerfileContent?.split('\n').length ?? 0
             },
-            'Starting AI-powered Dockerfile error analysis',
+            'Starting AI-powered Dockerfile error analysis'
           );
 
           // Use AI for intelligent error analysis and fixing
@@ -142,15 +142,15 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileInputType, FixDoc
                 framework: (repositoryAnalysis as any)?.framework ?? 'unknown',
                 dependencies: JSON.stringify((repositoryAnalysis as any)?.dependencies ?? []),
                 build_system: (repositoryAnalysis as any)?.build_system?.type ?? 'unknown',
-                entry_point: (repositoryAnalysis as any)?.entryPoint ?? 'unknown',
-              },
+                entry_point: (repositoryAnalysis as any)?.entryPoint ?? 'unknown'
+              }
             },
-            DockerfileFixSchema,
+            DockerfileFixSchema
           );
 
           if (!fix?.success) {
             throw new Error(
-              `AI Dockerfile fixing failed: ${fix?.error?.message ?? 'Unknown error'}`,
+              `AI Dockerfile fixing failed: ${fix?.error?.message ?? 'Unknown error'}`
             );
           }
 
@@ -159,28 +159,25 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileInputType, FixDoc
           if (validationResult.isValid !== true) {
             context.logger.warn(
               {
-                issues: validationResult.issues,
+                issues: validationResult.issues
               },
-              'AI fix has issues, but proceeding with warnings',
+              'AI fix has issues, but proceeding with warnings'
             );
           }
 
           // Validate content if validator is available
           if (context.contentValidator?.validateContent != null) {
-            const validation = await context.contentValidator.validateContent(
-              fix.data.fixed_dockerfile,
-              {
-                contentType: 'dockerfile',
-                checkSecurity: true,
-                checkBestPractices: true,
-              },
-            );
+            const validation = context.contentValidator.validateContent(fix.data.fixed_dockerfile, {
+              contentType: 'dockerfile',
+              checkSecurity: true,
+              checkBestPractices: true
+            });
             if (validation.valid !== true) {
               context.logger.warn(
                 {
-                  issues: validation.errors,
+                  issues: validation.errors
                 },
-                'AI fix has security issues, but proceeding with warnings',
+                'AI fix has security issues, but proceeding with warnings'
               );
             }
           }
@@ -194,40 +191,40 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileInputType, FixDoc
                   ...(session.workflowState || {}),
                   dockerfile_result: {
                     ...(session.workflowState?.dockerfile_result || {}),
-                    content: fix.data.fixed_dockerfile,
+                    content: fix.data.fixed_dockerfile
                   },
                   dockerfile_fix_history: [
                     ...(session.workflowState?.dockerfile_fix_history ?? []),
                     {
                       error: input.errorMessage,
                       fix: fix.data,
-                      timestamp: new Date().toISOString(),
-                    },
-                  ],
-                },
+                      timestamp: new Date().toISOString()
+                    }
+                  ]
+                }
               }));
 
               context.logger.info(
                 {
                   sessionId: input.sessionId,
-                  fixesApplied: fix.data.changes_made.length,
+                  fixesApplied: fix.data.changes_made.length
                 },
-                'Dockerfile fix stored in session',
+                'Dockerfile fix stored in session'
               );
             } catch (error) {
               context.logger.warn(
                 {
                   sessionId: input.sessionId,
-                  error,
+                  error
                 },
-                'Failed to store Dockerfile fix in session',
+                'Failed to store Dockerfile fix in session'
               );
             }
           }
 
           // Emit progress if available
           if (context.progressEmitter != null) {
-            context.progressEmitter.emit({
+            await context.progressEmitter.emit({
               sessionId: input.sessionId,
               step: 'fix_dockerfile',
               status: 'completed' as const,
@@ -237,8 +234,8 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileInputType, FixDoc
               metadata: {
                 changesCount: fix.data.changes_made.length,
                 securityImprovements: fix.data.security_improvements.length,
-                performanceOptimizations: fix.data.performance_optimizations.length,
-              },
+                performanceOptimizations: fix.data.performance_optimizations.length
+              }
             });
           }
 
@@ -247,9 +244,9 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileInputType, FixDoc
               sessionId: input.sessionId,
               changesCount: fix.data.changes_made.length,
               hasSecurityImprovements: fix.data.security_improvements.length > 0,
-              hasPerformanceOptimizations: fix.data.performance_optimizations.length > 0,
+              hasPerformanceOptimizations: fix.data.performance_optimizations.length > 0
             },
-            'AI-powered Dockerfile fixing completed successfully',
+            'AI-powered Dockerfile fixing completed successfully'
           );
 
           return {
@@ -260,15 +257,15 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileInputType, FixDoc
             performance_optimizations: fix.data.performance_optimizations,
             alternative_approaches: fix.data.alternative_approaches,
             testing_recommendations: fix.data.testing_recommendations,
-            prevention_tips: fix.data.prevention_tips,
+            prevention_tips: fix.data.prevention_tips
           };
         },
         {
           maxAttempts: 2,
-          delayMs: 1000,
-        },
+          delayMs: 1000
+        }
       );
-    },
+    }
   };
 
 /**
@@ -304,7 +301,7 @@ function validateDockerfileFix(fix: DockerfileFix): ValidationResult {
 
   return {
     isValid: issues.length === 0,
-    issues,
+    issues
   };
 }
 

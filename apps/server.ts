@@ -3,11 +3,11 @@
  * Uses direct service instantiation instead of service locator pattern
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
-import { z } from 'zod';
-import { ToolFactory } from '../src/application/tools/factory.js';
+// Remove ServerOptions import as McpServer uses different constructor
+import { createToolRegistry, loadAllTools } from '../src/application/tools/registry-utils.js';
+import type { ToolRegistry } from '../src/application/tools/ops/registry.js';
 import type { Services } from '../src/services/index.js';
 import { createPinoLogger } from '../src/infrastructure/logger.js';
 import { config as applicationConfig, type ApplicationConfig } from '../src/config/index.js';
@@ -21,11 +21,13 @@ import { KubernetesService } from '../src/services/kubernetes.js';
 import { AIService } from '../src/services/ai.js';
 import { SessionService } from '../src/services/session.js';
 import { ResourceManager } from '../src/application/resources/index.js';
+// Import interfaces for proper MCP sampling
+import { createSampler, type SampleFunction } from '../src/infrastructure/ai/sampling.js';
 
-export class ContainerKitMCPServerV2 {
-  private server: Server;
+export class ContainerKitMCPServer {
+  private server: McpServer;
   private services: Services;
-  private toolFactory: ToolFactory;
+  private toolRegistry: ToolRegistry;
   private resourceManager!: ResourceManager; // Initialize later
   private logger: Logger;
   private shutdownHandlers: Array<() => Promise<void>> = [];
@@ -37,38 +39,36 @@ export class ContainerKitMCPServerV2 {
 
     this.logger = createPinoLogger({
       level: this.appConfig.server.logLevel,
-      environment: this.appConfig.server.nodeEnv
+      environment: this.appConfig.server.nodeEnv,
     });
 
     // Direct service instantiation - no factories or containers
     this.services = this.createServices();
-    
-    // Create tool factory with injected services
-    this.toolFactory = new ToolFactory(this.services, this.logger);
+
+    // Create tool registry with injected services
+    this.toolRegistry = createToolRegistry(this.services, this.logger);
 
     // Initialize resource manager - needs to be done after services are created
     // Will initialize later in start() method when we have a tool registry
 
-    // Properly typed server initialization with experimental progress support
-    const serverInfo = {
+    // Initialize MCP server using the new API
+    this.server = new McpServer({
       name: 'container-kit-mcp',
-      version: '2.0.0'
-    };
-    
-    const serverOptions: ServerOptions = {
-      capabilities: {
-        tools: {},
-        resources: {},
-        logging: {},
-        // Enable experimental progress notifications
-        experimental_progress: true
-      }
-    };
+      version: '2.0.0',
+    });
 
-    this.server = new Server(serverInfo, serverOptions);
-    
     // Initialize SDK logging infrastructure
     this.initializeLogging();
+  }
+
+  /**
+   * Create a sampling function that uses client sampling capability
+   */
+  private createMCPSampler(): SampleFunction {
+    return createSampler({
+      type: 'mcp',
+      server: this.server,
+    }, this.logger);
   }
 
   /**
@@ -80,7 +80,7 @@ export class ContainerKitMCPServerV2 {
 
     // Direct service instantiation with explicit dependencies
     const dockerConfig: any = {
-      socketPath: this.appConfig.infrastructure?.docker?.socketPath || '/var/run/docker.sock'
+      socketPath: this.appConfig.infrastructure?.docker?.socketPath || '/var/run/docker.sock',
     };
     if (this.appConfig.infrastructure?.docker?.host !== undefined) {
       dockerConfig.host = this.appConfig.infrastructure.docker.host;
@@ -90,41 +90,39 @@ export class ContainerKitMCPServerV2 {
     }
     const dockerService = new DockerService(
       dockerConfig,
-      this.logger.child({ service: 'docker' })
+      this.logger.child({ service: 'docker' }),
     );
 
     const kubernetesConfig: any = {
       kubeconfig: this.appConfig.infrastructure?.kubernetes?.kubeconfig || '',
-      namespace: this.appConfig.infrastructure?.kubernetes?.namespace || 'default'
+      namespace: this.appConfig.infrastructure?.kubernetes?.namespace || 'default',
     };
     if (this.appConfig.infrastructure?.kubernetes?.context !== undefined) {
       kubernetesConfig.context = this.appConfig.infrastructure.kubernetes.context;
     }
     const kubernetesService = new KubernetesService(
       kubernetesConfig,
-      this.logger.child({ service: 'kubernetes' })
+      this.logger.child({ service: 'kubernetes' }),
     );
 
-    const aiService = new AIService(
-      {},
-      undefined, // MCP sampler would be injected here if available
-      this.logger.child({ service: 'ai' })
-    );
+    // AI service will be created after MCP server is ready
+    // This avoids initializing with mock sampler
+    const aiService: any = null; // Will be set in start() method
 
     const sessionService = new SessionService(
       {
         storeType: 'memory',
-        ttl: this.appConfig.session?.ttl || 3600
+        ttl: this.appConfig.session?.ttl || 3600,
       },
-      this.logger.child({ service: 'session' })
+      this.logger.child({ service: 'session' }),
     );
 
     return {
       docker: dockerService as any,
       kubernetes: kubernetesService as any,
-      ai: aiService as any,
+      ai: aiService as any, // Will be undefined initially, set in start()
       session: sessionService as any,
-      events: new EventEmitter()
+      events: new EventEmitter(),
     } as Services;
   }
 
@@ -136,48 +134,7 @@ export class ContainerKitMCPServerV2 {
     // The client will set the logging level via logging/setLevel requests
   }
 
-  /**
-   * Log tool execution with sanitized parameters
-   */
-  private async logToolExecution(toolName: string, params: any): Promise<void> {
-    try {
-      await this.server.sendLoggingMessage({
-        level: 'info',
-        logger: 'tool-execution',
-        data: {
-          tool: toolName,
-          params: this.sanitizeParams(params),
-          timestamp: new Date().toISOString()
-        }
-      });
-    } catch (error) {
-      // Fallback to regular logger if MCP logging fails
-      this.logger.info({
-        tool: toolName,
-        params: this.sanitizeParams(params)
-      }, 'Tool execution started');
-    }
-  }
 
-  /**
-   * Sanitize parameters for logging (remove sensitive data)
-   */
-  private sanitizeParams(params: any): any {
-    if (!params || typeof params !== 'object') {
-      return params;
-    }
-
-    const sanitized = { ...params };
-    const sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth', 'credential'];
-    
-    for (const key of Object.keys(sanitized)) {
-      if (sensitiveKeys.some(sensitive => key.toLowerCase().includes(sensitive))) {
-        sanitized[key] = '[REDACTED]';
-      }
-    }
-
-    return sanitized;
-  }
 
   /**
    * Initialize all services
@@ -186,12 +143,18 @@ export class ContainerKitMCPServerV2 {
     this.logger.info('Initializing services with direct injection...');
 
     // Initialize all services directly - no complex factory patterns
-    await Promise.all([
+    const initPromises = [
       this.services.docker.initialize(),
       this.services.kubernetes.initialize(),
-      this.services.ai.initialize(),
-      this.services.session.initialize()
-    ]);
+      this.services.session.initialize(),
+    ];
+
+    // Only initialize AI service if it exists (created after MCP server is ready)
+    if (this.services.ai) {
+      initPromises.push(this.services.ai.initialize());
+    }
+
+    await Promise.all(initPromises);
 
     this.logger.info('All services initialized successfully');
   }
@@ -201,28 +164,37 @@ export class ContainerKitMCPServerV2 {
       // Initialize services
       await this.initialize();
 
-      // Set server on tool factory
-      this.toolFactory.setServer(this.server);
-      
-      // Register all tools
-      await this.toolFactory.registerAll();
+      // Create real MCP sampler using the server's client sampling capability
+      const mcpSampler = this.createMCPSampler();
 
-      // Initialize resource manager with services
+      // Create AI service with real MCP sampler (no mock fallback)
+      this.services.ai = new AIService(
+        {},
+        mcpSampler,
+        this.logger.child({ service: 'ai' }),
+      ) as any;
+      
+      // Initialize the AI service after creation
+      await this.services.ai.initialize();
+
+      // Set server on tool registry
+      this.toolRegistry.setServer(this.server);
+
+      await loadAllTools(this.toolRegistry);
+
       this.resourceManager = new ResourceManager(
         this.appConfig,
         this.services.session as any, // Cast to concrete type for ResourceManager
         this.services.docker as any,
-        this.toolFactory, // Use tool factory as proxy for tool registry
-        this.logger
+        this.toolRegistry, // Direct registry instead of factory
+        this.logger,
       );
 
       // Register resources with MCP server
       this.resourceManager.registerWithServer(this.server);
 
-      // Setup MCP handlers
-      this.setupMCPHandlers();
+      // MCP handlers now handled automatically by McpServer - no manual setup needed
 
-      // Setup graceful shutdown
       this.setupGracefulShutdown();
 
       // Connect transport
@@ -234,14 +206,14 @@ export class ContainerKitMCPServerV2 {
         version: '2.0.0',
         services: {
           docker: 'initialized',
-          kubernetes: 'initialized', 
+          kubernetes: 'initialized',
           ai: 'initialized',
-          session: 'initialized'
+          session: 'initialized',
         },
         resources: {
           providers: this.resourceManager.getProviderNames(),
-          registered: this.resourceManager.isResourcesRegistered()
-        }
+          registered: this.resourceManager.isResourcesRegistered(),
+        },
       }, 'MCP server started with constructor injection and resources');
     } catch (error) {
       this.logger.error({ error }, 'Failed to start server');
@@ -249,84 +221,6 @@ export class ContainerKitMCPServerV2 {
     }
   }
 
-  private setupMCPHandlers(): void {
-    // Set up proper MCP request handlers using SDK
-    
-    // Tools list handler
-    this.server.setRequestHandler(
-      { method: z.literal('tools/list') } as any,
-      async () => {
-        const tools = await this.toolFactory.getAllTools();
-        return {
-          tools: tools.map(tool => ({
-            name: (tool as any).config.name,
-            description: (tool as any).config.description || '',
-            inputSchema: tool.inputSchema || { type: 'object', properties: {} }
-          }))
-        };
-      }
-    );
-    
-    // Tools call handler
-    this.server.setRequestHandler(
-      { method: z.literal('tools/call') } as any,
-      async (request: any) => {
-        const { name, arguments: args } = request.params;
-        
-        await this.logToolExecution(name, args);
-        
-        try {
-          // Create tool with injected services
-          const tool = this.toolFactory.createTool(name);
-          
-          // Execute tool with direct service access
-          const result = await tool.handle({
-            method: name,
-            arguments: args
-          });
-
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify(result, null, 2)
-            }]
-          };
-        } catch (error) {
-          this.logger.error({ error, tool: name }, 'Tool execution failed');
-          return {
-            content: [{
-              type: 'text', 
-              text: JSON.stringify({
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-                tool: name
-              }, null, 2)
-            }],
-            isError: true
-          };
-        }
-      }
-    );
-
-    // Logging level handler
-    this.server.setRequestHandler(
-      { method: z.literal('logging/setLevel') } as any,
-      async (request: any) => {
-        const { level } = request.params;
-        this.logger.level = level;
-        return {};
-      }
-    );
-
-    // Health check handler (custom)
-    this.server.setRequestHandler(
-      { method: z.literal('health/check') } as any,
-      async () => {
-        const health = await this.getHealthStatus();
-        return health;
-      }
-    );
-  }
 
   /**
    * Get comprehensive health status
@@ -336,7 +230,7 @@ export class ContainerKitMCPServerV2 {
       docker: false,
       kubernetes: false,
       ai: false,
-      session: false
+      session: false,
     };
 
     try {
@@ -360,7 +254,7 @@ export class ContainerKitMCPServerV2 {
       healthy: Object.values(services).every(status => status),
       services,
       version: '2.0.0',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -368,7 +262,6 @@ export class ContainerKitMCPServerV2 {
     const shutdown = async (signal: string) => {
       this.logger.info({ signal }, 'Received shutdown signal');
 
-      // Run shutdown handlers
       for (const handler of this.shutdownHandlers) {
         try {
           await handler();
@@ -393,8 +286,8 @@ export class ContainerKitMCPServerV2 {
       process.exit(0);
     };
 
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => void shutdown('SIGTERM'));
+    process.on('SIGINT', () => void shutdown('SIGINT'));
   }
 
   /**
@@ -412,10 +305,10 @@ export class ContainerKitMCPServerV2 {
   }
 
   /**
-   * Get tool factory for external access if needed
+   * Get tool registry for external access if needed
    */
-  getToolFactory(): ToolFactory {
-    return this.toolFactory;
+  getToolRegistry(): ToolRegistry {
+    return this.toolRegistry;
   }
 
   /**
@@ -431,31 +324,34 @@ export class ContainerKitMCPServerV2 {
   async listTools(): Promise<any> {
     try {
       // Import the available tools list and config function
-      const { AVAILABLE_TOOLS } = await import('../src/application/tools/factory.js');
-      const { getSimpleToolConfig } = await import('../src/application/tools/simple-config.js');
-      
+      const { AVAILABLE_TOOLS } = await import('../src/application/tools/registry-utils.js');
+      const { getToolConfig } = await import('../src/application/tools/tool-config.js');
+
       const toolList = AVAILABLE_TOOLS.map(toolName => {
-        const config = getSimpleToolConfig(toolName);
-        const tool = this.toolFactory.createTool(toolName);
-        
+        const config = getToolConfig(toolName);
+        const tool = this.toolRegistry.getTool(toolName);
+        if (!tool) {
+          throw new Error(`Tool ${toolName} not found`);
+        }
+
         return {
           name: config.name,
           description: config.description,
           category: config.category || 'utility',
           inputSchema: tool.inputSchema,
-          chainHint: tool.chainHint
+          chainHint: tool.chainHint,
         };
       });
-      
+
       return {
         success: true,
-        tools: toolList
+        tools: toolList,
       };
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
-        tools: []
+        tools: [],
       };
     }
   }
@@ -463,7 +359,7 @@ export class ContainerKitMCPServerV2 {
   /**
    * Shutdown the server gracefully
    */
-  async shutdown(): Promise<void> {
-    await this.setupGracefulShutdown();
+  shutdown(): void {
+    this.setupGracefulShutdown();
   }
 }

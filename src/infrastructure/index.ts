@@ -6,25 +6,47 @@
 // External system integrations
 export * from './external/index';
 
-// AI/ML services
-export * from './ai/factory';
-export * from './ai/mcp-sampler';
-export * from './ai/mock-sampler';
-// Skip repository-analyzer to avoid duplicate export
+// AI/ML services - unified API with explicit exports to avoid conflicts
+export {
+  // Request building
+  buildAIRequest,
+  buildDockerfileRequest,
+  buildAnalysisRequest,
+  buildK8sRequest,
+  extractDockerfileVariables,
 
-// Explicit exports to resolve naming conflicts
+  // Sampling
+  createSampler,
+  isSuccessResult,
+  isErrorResult,
+  getResultText,
+
+  // Error handling
+  recoverFromError,
+  executeWithRecovery,
+  retryWithBackoff,
+
+  // Structured processing
+  StructuredSampler,
+  ContentValidator,
+
+  // Caching
+  AIResponseCache
+} from './ai/index.js';
+
 export type {
-  SecurityIssue as StructuredSamplerSecurityIssue,
-  ValidationResult as StructuredSamplerValidationResult,
-} from './ai/structured-sampler';
-export type {
-  SecurityIssue as ContentValidatorSecurityIssue,
-  ValidationResult as ContentValidatorValidationResult,
-} from './ai/content-validator';
-
-// Export the main classes from these modules
-export { StructuredSampler } from './ai/structured-sampler';
-export { ContentValidator } from './ai/content-validator';
-
-// Core infrastructure services
-// (Currently no core services - removed obsolete directory)
+  AIRequest,
+  RequestTemplate,
+  RequestOptions,
+  DockerfileVariables,
+  AnalysisVariables,
+  K8sVariables,
+  SampleFunction,
+  SampleResult,
+  SamplerConfig,
+  ErrorHandler,
+  RecoveryResult,
+  CacheOptions,
+  CacheStats,
+  EnhancedAIConfig as AIEnhancedConfig // Rename to avoid conflict
+} from './ai/index.js';

@@ -40,7 +40,7 @@ export class ToolsResourceProvider {
 
   constructor(
     private toolRegistry: ToolRegistry,
-    private logger: Logger,
+    private logger: Logger
   ) {
     this.logger = logger.child({ component: 'ToolsResourceProvider' });
   }
@@ -56,9 +56,9 @@ export class ToolsResourceProvider {
         name: 'Tool Registry',
         description: 'Complete tool registry with metadata and capabilities',
         mimeType: 'application/json',
-        handler: async () => {
+        handler: () => {
           try {
-            const toolList = await this.toolRegistry.listTools();
+            const toolList = this.toolRegistry.listTools();
             const toolCount = this.toolRegistry.getToolCount();
 
             const registry = {
@@ -77,31 +77,31 @@ export class ToolsResourceProvider {
                       category: this.getToolCategory(tool.name),
                       inputSchema: tool.inputSchema ?? {},
                       capabilities: this.getToolCapabilities(tool.name),
-                      usage: this.toolUsageStats.get(tool.name) || {
+                      usage: this.toolUsageStats.get(tool.name) ?? {
                         count: 0,
                         lastUsed: 'never',
                         averageDuration: 0,
                         successRate: 0,
-                        errors: 0,
-                      },
+                        errors: 0
+                      }
                     };
                   })
                   .filter((t): t is NonNullable<typeof t> => t !== null) || [],
-              timestamp: new Date().toISOString(),
+              timestamp: new Date().toISOString()
             };
 
             // Count tools by category
             for (const tool of registry.tools) {
-              registry.categories[tool.category] = (registry.categories[tool.category] || 0) + 1;
+              registry.categories[tool.category] = (registry.categories[tool.category] ?? 0) + 1;
             }
 
             return {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(registry, null, 2),
-                },
-              ],
+                  text: JSON.stringify(registry, null, 2)
+                }
+              ]
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to get tool registry');
@@ -113,16 +113,16 @@ export class ToolsResourceProvider {
                     {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString(),
+                      timestamp: new Date().toISOString()
                     },
                     null,
-                    2,
-                  ),
-                },
-              ],
+                    2
+                  )
+                }
+              ]
             };
           }
-        },
+        }
       },
       // Tool usage analytics resource
       {
@@ -137,26 +137,26 @@ export class ToolsResourceProvider {
                 totalTools: this.toolRegistry.getToolCount(),
                 totalUsage: Array.from(this.toolUsageStats.values()).reduce(
                   (sum, stats) => sum + stats.count,
-                  0,
+                  0
                 ),
                 averageSuccessRate: this.calculateAverageSuccessRate(),
-                lastAnalysisUpdate: new Date().toISOString(),
+                lastAnalysisUpdate: new Date().toISOString()
               },
               topTools: this.getTopTools(5),
               categoryUsage: this.getCategoryUsage(),
               performanceMetrics: this.getPerformanceMetrics(),
               errorAnalysis: this.getErrorAnalysis(),
               recommendations: this.generateRecommendations(),
-              timestamp: new Date().toISOString(),
+              timestamp: new Date().toISOString()
             };
 
             return {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(analytics, null, 2),
-                },
-              ],
+                  text: JSON.stringify(analytics, null, 2)
+                }
+              ]
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to get tool analytics');
@@ -168,16 +168,16 @@ export class ToolsResourceProvider {
                     {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString(),
+                      timestamp: new Date().toISOString()
                     },
                     null,
-                    2,
-                  ),
-                },
-              ],
+                    2
+                  )
+                }
+              ]
             };
           }
-        },
+        }
       },
       // Tool dependencies resource
       {
@@ -185,14 +185,14 @@ export class ToolsResourceProvider {
         name: 'Tool Dependencies',
         description: 'Tool dependency graph and service requirements',
         mimeType: 'application/json',
-        handler: async () => {
+        handler: () => {
           try {
             const dependencies = {
               serviceDependencies: {
-                docker: await this.getToolsByService('docker'),
-                kubernetes: await this.getToolsByService('kubernetes'),
-                ai: await this.getToolsByService('ai'),
-                session: await this.getToolsByService('session'),
+                docker: this.getToolsByService('docker'),
+                kubernetes: this.getToolsByService('kubernetes'),
+                ai: this.getToolsByService('ai'),
+                session: this.getToolsByService('session')
               },
               toolChains: this.getToolChains(),
               criticalPaths: this.getCriticalPaths(),
@@ -200,18 +200,18 @@ export class ToolsResourceProvider {
                 docker: 'unknown', // Would be determined by actual service health
                 kubernetes: 'unknown',
                 ai: 'unknown',
-                session: 'healthy',
+                session: 'healthy'
               },
-              timestamp: new Date().toISOString(),
+              timestamp: new Date().toISOString()
             };
 
             return {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(dependencies, null, 2),
-                },
-              ],
+                  text: JSON.stringify(dependencies, null, 2)
+                }
+              ]
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to get tool dependencies');
@@ -223,16 +223,16 @@ export class ToolsResourceProvider {
                     {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString(),
+                      timestamp: new Date().toISOString()
                     },
                     null,
-                    2,
-                  ),
-                },
-              ],
+                    2
+                  )
+                }
+              ]
             };
           }
-        },
+        }
       },
       // Tool documentation resource
       {
@@ -240,9 +240,9 @@ export class ToolsResourceProvider {
         name: 'Tool Documentation',
         description: 'Comprehensive tool documentation and usage examples',
         mimeType: 'application/json',
-        handler: async () => {
+        handler: () => {
           try {
-            const toolList = await this.toolRegistry.listTools();
+            const toolList = this.toolRegistry.listTools();
 
             const documentation = {
               tools:
@@ -259,10 +259,10 @@ export class ToolsResourceProvider {
                       usage: {
                         parameters: this.getToolParameters(tool),
                         examples: this.getToolExamples(tool.name),
-                        commonPatterns: this.getCommonPatterns(tool.name),
+                        commonPatterns: this.getCommonPatterns(tool.name)
                       },
                       chainWith: this.getToolChainSuggestions(tool.name),
-                      troubleshooting: this.getTroubleshootingTips(tool.name),
+                      troubleshooting: this.getTroubleshootingTips(tool.name)
                     };
                   })
                   .filter((t): t is NonNullable<typeof t> => t !== null) || [],
@@ -272,7 +272,7 @@ export class ToolsResourceProvider {
                   'generate_dockerfile',
                   'build_image',
                   'generate_k8s_manifests',
-                  'deploy_application',
+                  'deploy_application'
                 ],
                 quickStart: ['analyze_repository', 'generate_dockerfile', 'build_image'],
                 production: [
@@ -286,19 +286,19 @@ export class ToolsResourceProvider {
                   'generate_k8s_manifests',
                   'prepare_cluster',
                   'deploy_application',
-                  'verify_deployment',
-                ],
+                  'verify_deployment'
+                ]
               },
-              timestamp: new Date().toISOString(),
+              timestamp: new Date().toISOString()
             };
 
             return {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(documentation, null, 2),
-                },
-              ],
+                  text: JSON.stringify(documentation, null, 2)
+                }
+              ]
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to get tool documentation');
@@ -310,17 +310,17 @@ export class ToolsResourceProvider {
                     {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString(),
+                      timestamp: new Date().toISOString()
                     },
                     null,
-                    2,
-                  ),
-                },
-              ],
+                    2
+                  )
+                }
+              ]
             };
           }
-        },
-      },
+        }
+      }
     ];
   }
 
@@ -328,12 +328,12 @@ export class ToolsResourceProvider {
    * Update tool usage statistics
    */
   updateToolUsage(toolName: string, duration: number, success: boolean): void {
-    const existing = this.toolUsageStats.get(toolName) || {
+    const existing = this.toolUsageStats.get(toolName) ?? {
       count: 0,
       lastUsed: 'never',
       averageDuration: 0,
       successRate: 0,
-      errors: 0,
+      errors: 0
     };
 
     const newCount = existing.count + 1;
@@ -344,7 +344,7 @@ export class ToolsResourceProvider {
       lastUsed: new Date().toISOString(),
       averageDuration: (existing.averageDuration * existing.count + duration) / newCount,
       successRate: ((newCount - newErrors) / newCount) * 100,
-      errors: newErrors,
+      errors: newErrors
     });
   }
 
@@ -382,9 +382,7 @@ export class ToolsResourceProvider {
     return stats.reduce((sum, stat) => sum + stat.successRate, 0) / stats.length;
   }
 
-  private getTopTools(
-    limit: number,
-  ): Array<{
+  private getTopTools(limit: number): Array<{
     name: string;
     count: number;
     lastUsed: string;
@@ -416,7 +414,7 @@ export class ToolsResourceProvider {
   private getPerformanceMetrics(): {
     averageDuration: number;
     slowestTools: Array<{ name: string; averageDuration: number }>;
-    } {
+  } {
     const stats = Array.from(this.toolUsageStats.values());
     return {
       averageDuration:
@@ -424,14 +422,14 @@ export class ToolsResourceProvider {
       slowestTools: Array.from(this.toolUsageStats.entries())
         .sort(([, a], [, b]) => b.averageDuration - a.averageDuration)
         .slice(0, 3)
-        .map(([name, stats]) => ({ name, averageDuration: stats.averageDuration })),
+        .map(([name, stats]) => ({ name, averageDuration: stats.averageDuration }))
     };
   }
 
   private getErrorAnalysis(): {
     toolsWithErrors: number;
     mostProblematic: Array<{ name: string; errors: number; errorRate: number }>;
-    } {
+  } {
     const errorStats = Array.from(this.toolUsageStats.entries())
       .filter(([, stats]) => stats.errors > 0)
       .sort(([, a], [, b]) => b.errors - a.errors);
@@ -441,8 +439,8 @@ export class ToolsResourceProvider {
       mostProblematic: errorStats.slice(0, 5).map(([name, stats]) => ({
         name,
         errors: stats.errors,
-        errorRate: (stats.errors / stats.count) * 100,
-      })),
+        errorRate: (stats.errors / stats.count) * 100
+      }))
     };
   }
 
@@ -452,7 +450,7 @@ export class ToolsResourceProvider {
 
     if (stats.some((stat) => stat.successRate < 80)) {
       recommendations.push(
-        'Some tools have low success rates - consider debugging or improving error handling',
+        'Some tools have low success rates - consider debugging or improving error handling'
       );
     }
 
@@ -468,8 +466,8 @@ export class ToolsResourceProvider {
     return recommendations;
   }
 
-  private async getToolsByService(service: string): Promise<string[]> {
-    const toolList = await this.toolRegistry.listTools();
+  private getToolsByService(service: string): string[] {
+    const toolList = this.toolRegistry.listTools();
     return (toolList.tools ?? [])
       .filter((tool: unknown) => {
         if (!isToolInfo(tool)) return false;
@@ -486,7 +484,7 @@ export class ToolsResourceProvider {
     containerization: string[];
     deployment: string[];
     fullWorkflow: string[];
-    } {
+  } {
     return {
       containerization: ['analyze_repository', 'generate_dockerfile', 'build_image'],
       deployment: ['build_image', 'tag_image', 'push_image', 'deploy_application'],
@@ -496,8 +494,8 @@ export class ToolsResourceProvider {
         'generate_dockerfile',
         'build_image',
         'generate_k8s_manifests',
-        'deploy_application',
-      ],
+        'deploy_application'
+      ]
     };
   }
 
@@ -506,19 +504,19 @@ export class ToolsResourceProvider {
       {
         path: 'Docker Build Pipeline',
         tools: ['generate_dockerfile', 'build_image'],
-        criticality: 'high',
+        criticality: 'high'
       },
       {
         path: 'Kubernetes Deployment',
         tools: ['generate_k8s_manifests', 'deploy_application'],
-        criticality: 'high',
+        criticality: 'high'
       },
-      { path: 'Repository Analysis', tools: ['analyze_repository'], criticality: 'medium' },
+      { path: 'Repository Analysis', tools: ['analyze_repository'], criticality: 'medium' }
     ];
   }
 
   private getToolParameters(
-    tool: ToolInfo,
+    tool: ToolInfo
   ): Record<string, { type: string; required: boolean; description: string }> {
     // Extract parameter information from input schema
     const schema = tool.inputSchema;
@@ -532,50 +530,50 @@ export class ToolsResourceProvider {
           typeof prop === 'object' && prop !== null && 'type' in prop
             ? String(prop.type)
             : 'unknown',
-        required: schema.required?.includes(key) || false,
+        required: schema.required?.includes(key) ?? false,
         description:
           typeof prop === 'object' && prop !== null && 'description' in prop
             ? String(prop.description)
-            : '',
+            : ''
       };
     }
     return params;
   }
 
-  private getToolExamples(toolName: string): Array<Record<string, any>> {
+  private getToolExamples(toolName: string): Array<Record<string, unknown>> {
     // Return common usage examples for each tool
-    const examples: Record<string, any[]> = {
+    const examples: Record<string, unknown[]> = {
       analyze_repository: [
         { repoPath: '/path/to/repo', depth: 'shallow' },
-        { repoPath: '.', depth: 'deep', includeTests: true },
+        { repoPath: '.', depth: 'deep', includeTests: true }
       ],
       generate_dockerfile: [
         { language: 'node', framework: 'express' },
-        { language: 'python', framework: 'fastapi', target: 'production' },
+        { language: 'python', framework: 'fastapi', target: 'production' }
       ],
       build_image: [
         { context: '.', tag: 'my-app:latest' },
-        { context: '.', dockerfile: 'Dockerfile.prod', tags: ['my-app:v1.0', 'my-app:latest'] },
-      ],
+        { context: '.', dockerfile: 'Dockerfile.prod', tags: ['my-app:v1.0', 'my-app:latest'] }
+      ]
     };
 
-    return examples[toolName] || [];
+    return (examples[toolName] ?? []) as Array<Record<string, unknown>>;
   }
 
   private getCommonPatterns(toolName: string): string[] {
     const patterns: Record<string, string[]> = {
       analyze_repository: [
         'Run before Dockerfile generation',
-        'Use shallow analysis for quick insights',
+        'Use shallow analysis for quick insights'
       ],
       generate_dockerfile: [
         'Multi-stage builds for production',
-        'Use Alpine images for smaller size',
+        'Use Alpine images for smaller size'
       ],
-      build_image: ['Tag with version and latest', 'Use build args for configuration'],
+      build_image: ['Tag with version and latest', 'Use build args for configuration']
     };
 
-    return patterns[toolName] || [];
+    return patterns[toolName] ?? [];
   }
 
   private getToolChainSuggestions(toolName: string): string[] {
@@ -583,10 +581,10 @@ export class ToolsResourceProvider {
       analyze_repository: ['generate_dockerfile', 'resolve_base_images'],
       generate_dockerfile: ['build_image', 'scan_image'],
       build_image: ['scan_image', 'tag_image', 'push_image'],
-      generate_k8s_manifests: ['prepare_cluster', 'deploy_application'],
+      generate_k8s_manifests: ['prepare_cluster', 'deploy_application']
     };
 
-    return chains[toolName] || [];
+    return chains[toolName] ?? [];
   }
 
   private getTroubleshootingTips(toolName: string): string[] {
@@ -594,15 +592,15 @@ export class ToolsResourceProvider {
       build_image: [
         'Check Docker daemon is running',
         'Verify Dockerfile syntax',
-        'Ensure build context is correct',
+        'Ensure build context is correct'
       ],
       deploy_application: [
         'Verify Kubernetes cluster connectivity',
         'Check namespace exists',
-        'Validate manifest syntax',
-      ],
+        'Validate manifest syntax'
+      ]
     };
 
-    return tips[toolName] || [];
+    return tips[toolName] ?? [];
   }
 }

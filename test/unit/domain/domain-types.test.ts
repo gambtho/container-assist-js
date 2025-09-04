@@ -41,7 +41,7 @@ import {
   Logger,
   // IDockerService, // Removed - this belongs in application layer
   // SessionStore, // Imported directly from contracts/types/session-store
-} from '../../../src/domain/types/index.js';
+} from '../../../src/contracts/types/index';
 
 describe('Consolidated Docker Types', () => {
   describe('DockerBuildOptions', () => {

@@ -26,7 +26,7 @@ export {
   type DeploymentResult,
   DeploymentResultSchema,
   // Workflow enum
-  WorkflowStep,
+  WorkflowStep
 } from './session';
 
 // Explicitly export session-specific build and scan types with aliases
@@ -34,7 +34,7 @@ export {
   type DockerBuildResult as SessionDockerBuildResult,
   DockerBuildResultSchema as SessionDockerBuildResultSchema,
   type ScanResult as SessionScanResult,
-  ScanResultSchema as SessionScanResultSchema,
+  ScanResultSchema as SessionScanResultSchema
 } from './session';
 
 // Error handling types
@@ -46,6 +46,6 @@ export * from '../../contracts/types/kubernetes.js';
 export {
   type ScanOptions,
   type Vulnerability,
-  type ScanResult as SecurityScanResult,
+  type ScanResult as SecurityScanResult
 } from '../../contracts/types/scanning.js';
 export * from '../../contracts/types/dotnet.js';

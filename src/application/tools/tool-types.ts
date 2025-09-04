@@ -6,9 +6,11 @@ import type { WorkflowOrchestrator } from '../workflow/orchestrator.js';
 import type { WorkflowManager } from '../workflow/manager.js';
 import type { ProgressEmitter, EventPublisher, DependenciesConfig } from '../interfaces.js';
 import type { ProgressCallback } from '../workflow/types.js';
-import type { MCPSampler } from '../../infrastructure/ai/ai-types.js';
-import type { StructuredSampler } from '../../infrastructure/ai/structured-sampler.js';
-import type { ContentValidator } from '../../infrastructure/ai/content-validator.js';
+import type {
+  SampleFunction,
+  StructuredSampler,
+  ContentValidator
+} from '../../infrastructure/ai/index.js';
 
 /**
  * MCP SDK compatible tool context
@@ -31,7 +33,7 @@ export interface ToolContext {
   onProgress?: ProgressCallback;
 
   // AI components
-  mcpSampler?: MCPSampler;
+  sampleFunction?: SampleFunction;
   structuredSampler?: StructuredSampler;
   contentValidator?: ContentValidator;
 
@@ -43,7 +45,7 @@ export interface ToolContext {
   // Performance monitoring
   logPerformanceMetrics?: (operation: string, duration: number, metadata?: unknown) => void;
 
-  // Services - for backwards compatibility
+  // Services - still being used in many tools
   sessionService?: any;
   aiService?: any;
   dockerService?: any;

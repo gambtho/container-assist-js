@@ -2,7 +2,10 @@
  * Generate Dockerfile - Helper Functions
  */
 
-import { AIRequestBuilder } from '../../../infrastructure/ai-request-builder.js';
+import {
+  buildDockerfileRequest,
+  extractDockerfileVariables
+} from '../../../infrastructure/ai/index.js';
 import type { ToolContext } from '../tool-types.js';
 import type { AnalysisResult } from '../../../contracts/types/session.js';
 
@@ -120,7 +123,7 @@ COPY --from=builder --chown=app:app /app/main .
 USER app
 EXPOSE 8080
 CMD ["./main"]
-`,
+`
 };
 
 /**
@@ -129,7 +132,7 @@ CMD ["./main"]
 export async function generateDockerfileContent(
   analysis: AnalysisResult,
   options: DockerfileInput,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<DockerfileGenerationResult> {
   const { logger, aiService } = context;
 
@@ -141,24 +144,25 @@ export async function generateDockerfileContent(
     // Use the AI service from context if available
     if (aiService) {
       // Build the AI request for Dockerfile generation
-      const requestBuilder = new AIRequestBuilder()
-        .template('dockerfile-generation' as any)
-        .withModel('claude-3-haiku-20240307')
-        .withSampling(0.3, 3000)
-        .withContext(analysis)
-        .withDockerContext({
-          ...(options.baseImage && { baseImage: options.baseImage }),
-          optimization: options.optimization,
-          multistage: options.multistage,
-          securityHardening: options.securityHardening,
-          includeHealthcheck: options.includeHealthcheck,
-        })
-        .withVariables({
-          customInstructions: options.customInstructions ?? '',
-          customCommands: options.customCommands?.join('\n') || '',
-        });
+      const dockerfileVars = extractDockerfileVariables(analysis);
 
-      const result = await (aiService as any).generate(requestBuilder);
+      // Merge with user options
+      const mergedVars = {
+        ...dockerfileVars,
+        ...(options.baseImage && { baseImage: options.baseImage }),
+        optimization: options.optimization,
+        multistage: options.multistage,
+        securityHardening: options.securityHardening,
+        includeHealthcheck: options.includeHealthcheck,
+        customInstructions: options.customInstructions ?? undefined
+      };
+
+      const requestBuilder = buildDockerfileRequest(mergedVars, {
+        temperature: 0.3,
+        maxTokens: 3000
+      });
+
+      const result = await aiService.generate(requestBuilder);
 
       if (result.data) {
         baseTemplate = result.data;
@@ -169,9 +173,9 @@ export async function generateDockerfileContent(
             model: result.metadata.model,
             tokensUsed: result.metadata.tokensUsed,
             fromCache: result.metadata.fromCache,
-            durationMs: result.metadata.durationMs,
+            durationMs: result.metadata.durationMs
           },
-          'AI-generated Dockerfile successfully',
+          'AI-generated Dockerfile successfully'
         );
       }
     } else {
@@ -245,7 +249,7 @@ ${options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}`;
       stages.push({
         name: match[1],
         baseImage,
-        purpose: match[1] === 'builder' ? 'Build dependencies and compile' : 'Runtime environment',
+        purpose: match[1] === 'builder' ? 'Build dependencies and compile' : 'Runtime environment'
       });
     }
   }
@@ -257,7 +261,7 @@ ${options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}`;
       stages.push({
         name: 'runtime',
         baseImage: finalFrom[1],
-        purpose: 'Single-stage runtime',
+        purpose: 'Single-stage runtime'
       });
     }
   }
@@ -422,7 +426,7 @@ function getRecommendedBaseImage(language: string): string {
     go: 'golang:1.21-alpine',
     rust: 'rust:1.75-slim',
     ruby: 'ruby:3.2-slim',
-    php: 'php:8.2-fpm-alpine',
+    php: 'php:8.2-fpm-alpine'
   };
 
   return imageMap[language] || 'alpine:latest';
@@ -475,14 +479,14 @@ export function analyzeDockerfileSecurity(content: string): string[] {
 export function estimateImageSize(
   language: string,
   dependencies: string[],
-  multistage: boolean,
+  multistage: boolean
 ): string {
   const baseSizes: Record<string, number> = {
     'node:18-alpine': 50,
     'python:3.11-slim': 120,
     'openjdk:17-jdk-slim': 420,
     'golang:1.21-alpine': 350,
-    'alpine:latest': 5,
+    'alpine:latest': 5
   };
 
   let estimatedSize = baseSizes[language] || 100;

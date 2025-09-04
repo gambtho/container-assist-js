@@ -5,12 +5,13 @@
 
 import Docker from 'dockerode';
 import { DockerError } from '../errors/index.js';
+import { ErrorCode } from '../contracts/types/errors.js';
 import type { Logger } from 'pino';
 import {
   DockerBuildOptions,
   DockerBuildResult,
   DockerScanResult,
-  ScanOptions,
+  ScanOptions
 } from '../contracts/types/index.js';
 import { TrivyScanner } from './scanners/trivy-scanner.js';
 import { isOk } from '../domain/types/result.js';
@@ -106,7 +107,7 @@ export class DockerClient {
         if (trivyResult.kind === 'fail') {
           this.logger.warn(
             { error: trivyResult.error },
-            'Trivy scanner initialization failed, scanning will be disabled',
+            'Trivy scanner initialization failed, scanning will be disabled'
           );
           // Delete the scanner instead of setting to undefined
           delete this.trivyScanner;
@@ -115,9 +116,9 @@ export class DockerClient {
     } catch (error) {
       throw new DockerError(
         'Failed to connect to Docker daemon',
-        'DOCKER_INIT_FAILED',
+        ErrorCode.DOCKER_INIT_FAILED,
         'initialize',
-        error as Error,
+        error as Error
       );
     }
   }
@@ -127,7 +128,6 @@ export class DockerClient {
       this.logger.debug({ contextPath, options }, 'Starting Docker build');
 
       // Create tar stream from context using tar-fs module
-      // @ts-ignore - No types available for tar-fs
       const { pack } = await import('tar-fs');
       const tarStream = pack(contextPath);
 
@@ -143,7 +143,7 @@ export class DockerClient {
         rm: options.rm !== false, // Default to true
         forcerm: options.forcerm,
         squash: options.squash,
-        labels: options.labels,
+        labels: options.labels
       };
 
       // Remove undefined values
@@ -157,7 +157,7 @@ export class DockerClient {
       // Build the image
       const stream = await this.docker.buildImage(
         tarStream,
-        cleanBuildOptions as Docker.ImageBuildOptions,
+        cleanBuildOptions as Docker.ImageBuildOptions
       );
 
       // Process build output
@@ -186,7 +186,7 @@ export class DockerClient {
             if (event.error) {
               logs.push(`ERROR: ${event.error}`);
             }
-          },
+          }
         );
       });
 
@@ -205,7 +205,7 @@ export class DockerClient {
         tags: options.tags ?? (options.tag ? [options.tag] : []),
         success: true,
         logs,
-        buildTime: Date.now(),
+        buildTime: Date.now()
       };
 
       if (imageId) {
@@ -216,10 +216,10 @@ export class DockerClient {
     } catch (error) {
       throw new DockerError(
         `Docker build failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'DOCKER_BUILD_FAILED',
+        ErrorCode.DockerBuildFailed,
         'build',
         error as Error,
-        { contextPath, options },
+        { contextPath, options }
       );
     }
   }
@@ -228,7 +228,7 @@ export class DockerClient {
     // Check if Trivy scanner is available
     if (!this.trivyScanner) {
       this.logger.warn(
-        'Security scanning is not available. Install Trivy to enable vulnerability scanning.',
+        'Security scanning is not available. Install Trivy to enable vulnerability scanning.'
       );
 
       // Return empty scan result with metadata indicating scanning is disabled
@@ -240,14 +240,14 @@ export class DockerClient {
           medium: 0,
           low: 0,
           unknown: 0,
-          total: 0,
+          total: 0
         },
         scanTime: new Date().toISOString(),
         metadata: {
           image,
           // Note: scanner not available - metadata only includes standard fields
-          lastScanned: new Date().toISOString(),
-        },
+          lastScanned: new Date().toISOString()
+        }
       };
     }
 
@@ -264,27 +264,34 @@ export class DockerClient {
 
       throw new DockerError(
         `Security scan failed: ${scanResult.error}`,
-        scanResult.code || 'SCAN_FAILED',
+        (scanResult.code as ErrorCode) || ErrorCode.SCANNER_NOT_AVAILABLE,
         'scan',
         undefined,
-        { image, options },
+        { image, options }
       );
     }
   }
 
   async tag(imageId: string, tag: string): Promise<void> {
     try {
-      const [repo, tagName] = tag.includes(':') ? tag.split(':') : [tag, 'latest'];
+      const parts = tag.includes(':') ? tag.split(':') : [tag, 'latest'];
+      const repo = parts[0] ?? tag;
+      const tagName = parts[1] ?? 'latest';
       const image = this.docker.getImage(imageId);
-      await image.tag({ repo, tag: tagName } as any);
+      await new Promise<void>((resolve, reject) => {
+        image.tag({ repo, tag: tagName ?? 'latest' }, (error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
       this.logger.debug({ imageId, tag }, 'Image tagged successfully');
     } catch (error) {
       throw new DockerError(
         `Failed to tag image: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'DOCKER_TAG_FAILED',
+        ErrorCode.DOCKER_TAG_FAILED,
         'tag',
         error as Error,
-        { imageId, tag },
+        { imageId, tag }
       );
     }
   }
@@ -322,10 +329,10 @@ export class DockerClient {
     } catch (error) {
       throw new DockerError(
         `Failed to push image: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'DOCKER_PUSH_FAILED',
+        ErrorCode.DockerPushFailed,
         'push',
         error as Error,
-        { tag, registry },
+        { tag, registry }
       );
     }
   }
@@ -337,14 +344,14 @@ export class DockerClient {
         Id: img.Id,
         RepoTags: img.RepoTags ?? undefined,
         Size: img.Size ?? undefined,
-        Created: img.Created ?? undefined,
+        Created: img.Created ?? undefined
       }));
     } catch (error) {
       throw new DockerError(
         `Failed to list images: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'DOCKER_LIST_FAILED',
+        ErrorCode.DOCKER_LIST_FAILED,
         'listImages',
-        error as Error,
+        error as Error
       );
     }
   }
@@ -357,10 +364,10 @@ export class DockerClient {
     } catch (error) {
       throw new DockerError(
         `Failed to remove image: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'DOCKER_REMOVE_FAILED',
+        ErrorCode.DOCKER_REMOVE_FAILED,
         'removeImage',
         error as Error,
-        { imageId },
+        { imageId }
       );
     }
   }
@@ -379,10 +386,10 @@ export class DockerClient {
       // For other errors, throw
       throw new DockerError(
         `Failed to check image existence: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'DOCKER_INSPECT_FAILED',
+        ErrorCode.DOCKER_INSPECT_FAILED,
         'imageExists',
         error as Error,
-        { imageId },
+        { imageId }
       );
     }
   }
@@ -402,14 +409,14 @@ export class DockerClient {
           arch: info.Architecture,
           containers: info.Containers,
           images: info.Images,
-          serverVersion: info.ServerVersion,
+          serverVersion: info.ServerVersion
         },
-        client: this,
+        client: this
       };
     } catch (error) {
       this.logger.error({ error }, 'Docker health check failed');
       return {
-        available: false,
+        available: false
       };
     }
   }
@@ -425,9 +432,9 @@ export class DockerClient {
       this.logger.error({ error }, 'Failed to list containers');
       throw new DockerError(
         'Failed to list containers',
-        'DOCKER_LIST_CONTAINERS_FAILED',
+        ErrorCode.DOCKER_LIST_CONTAINERS_FAILED,
         'listContainers',
-        error instanceof Error ? error : undefined,
+        error instanceof Error ? error : undefined
       );
     }
   }

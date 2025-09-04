@@ -53,7 +53,35 @@ export enum ErrorCode {
   // Additional error codes used by handlers
   AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
   OPERATION_FAILED = 'OPERATION_FAILED',
-  TIMEOUT = 'TIMEOUT'
+  TIMEOUT = 'TIMEOUT',
+
+  // Specific Docker error codes
+  DOCKER_UNKNOWN = 'DOCKER_UNKNOWN',
+  DOCKER_INIT_FAILED = 'DOCKER_INIT_FAILED',
+  DOCKER_TAG_FAILED = 'DOCKER_TAG_FAILED',
+  DOCKER_LIST_FAILED = 'DOCKER_LIST_FAILED',
+  DOCKER_REMOVE_FAILED = 'DOCKER_REMOVE_FAILED',
+  DOCKER_INSPECT_FAILED = 'DOCKER_INSPECT_FAILED',
+  DOCKER_LIST_CONTAINERS_FAILED = 'DOCKER_LIST_CONTAINERS_FAILED',
+  DOCKER_HEALTH_CHECK_FAILED = 'DOCKER_HEALTH_CHECK_FAILED',
+
+  // Specific Kubernetes error codes
+  K8S_UNKNOWN = 'K8S_UNKNOWN',
+  K8S_NOT_AVAILABLE = 'K8S_NOT_AVAILABLE',
+  K8S_DEPLOY_FAILED = 'K8S_DEPLOY_FAILED',
+  K8S_API_NOT_INITIALIZED = 'K8S_API_NOT_INITIALIZED',
+  K8S_APPLY_FAILED = 'K8S_APPLY_FAILED',
+  K8S_SERVICE_STATUS_FAILED = 'K8S_SERVICE_STATUS_FAILED',
+  K8S_DELETE_FAILED = 'K8S_DELETE_FAILED',
+  K8S_LIST_NAMESPACES_FAILED = 'K8S_LIST_NAMESPACES_FAILED',
+  K8S_CREATE_NAMESPACE_FAILED = 'K8S_CREATE_NAMESPACE_FAILED',
+
+  // Specific AI error codes
+  AI_GENERATION_FAILED = 'AI_GENERATION_FAILED',
+  AI_TEXT_GENERATION_FAILED = 'AI_TEXT_GENERATION_FAILED',
+  ENHANCED_AI_GENERATION_FAILED = 'ENHANCED_AI_GENERATION_FAILED',
+  AI_SAMPLER_UNAVAILABLE = 'AI_SAMPLER_UNAVAILABLE',
+  ENHANCED_AI_STRUCTURED_GENERATION_FAILED = 'ENHANCED_AI_STRUCTURED_GENERATION_FAILED'
 }
 
 /**
@@ -92,20 +120,20 @@ export class DomainError extends Error {
       message: string;
       stack?: string;
     };
-    } {
+  } {
     return {
       name: this.name,
       code: this.code,
       message: this.message,
       ...(this.metadata !== undefined && { metadata: this.metadata }),
       ...(this.stack !== undefined && { stack: this.stack }),
-      ...(this.cause !== undefined && { 
+      ...(this.cause !== undefined && {
         cause: {
           name: this.cause.name,
           message: this.cause.message,
-          ...(this.cause.stack !== undefined && { stack: this.cause.stack }),
+          ...(this.cause.stack !== undefined && { stack: this.cause.stack })
         }
-      }),
+      })
     };
   }
 }
@@ -145,20 +173,20 @@ export class InfrastructureError extends Error {
       message: string;
       stack?: string;
     };
-    } {
+  } {
     return {
       name: this.name,
       code: this.code,
       message: this.message,
       ...(this.metadata !== undefined && { metadata: this.metadata }),
       ...(this.stack !== undefined && { stack: this.stack }),
-      ...(this.cause !== undefined && { 
+      ...(this.cause !== undefined && {
         cause: {
           name: this.cause.name,
           message: this.cause.message,
-          ...(this.cause.stack !== undefined && { stack: this.cause.stack }),
+          ...(this.cause.stack !== undefined && { stack: this.cause.stack })
         }
-      }),
+      })
     };
   }
 }
@@ -198,20 +226,20 @@ export class ServiceError extends Error {
       message: string;
       stack?: string;
     };
-    } {
+  } {
     return {
       name: this.name,
       code: this.code,
       message: this.message,
       ...(this.metadata !== undefined && { metadata: this.metadata }),
       ...(this.stack !== undefined && { stack: this.stack }),
-      ...(this.cause !== undefined && { 
+      ...(this.cause !== undefined && {
         cause: {
           name: this.cause.name,
           message: this.cause.message,
-          ...(this.cause.stack !== undefined && { stack: this.cause.stack }),
+          ...(this.cause.stack !== undefined && { stack: this.cause.stack })
         }
-      }),
+      })
     };
   }
 }
@@ -223,7 +251,7 @@ export class ValidationError extends DomainError {
   constructor(
     message: string,
     public readonly fields?: Record<string, string[]>,
-    cause?: Error,
+    cause?: Error
   ) {
     super(ErrorCode.ValidationFailed, message, cause, { fields });
     this.name = 'ValidationError';
@@ -239,7 +267,7 @@ export class ToolError extends ServiceError {
     message: string,
     code: ErrorCode = ErrorCode.ToolExecutionFailed,
     cause?: Error,
-    metadata?: Record<string, unknown>,
+    metadata?: Record<string, unknown>
   ) {
     super(code, message, cause, { ...metadata, toolName });
     this.name = 'ToolError';
@@ -255,7 +283,7 @@ export class WorkflowError extends DomainError {
     public readonly step: string,
     message: string,
     cause?: Error,
-    metadata?: Record<string, unknown>,
+    metadata?: Record<string, unknown>
   ) {
     super(ErrorCode.WorkflowStepFailed, message, cause, { ...metadata, workflowId, step });
     this.name = 'WorkflowError';
@@ -271,7 +299,7 @@ export function isRetryable(error: Error): boolean {
       ErrorCode.DockerError,
       ErrorCode.KubernetesError,
       ErrorCode.ServiceUnavailable,
-      ErrorCode.ResourceExhausted,
+      ErrorCode.ResourceExhausted
     ].includes(error.code);
   }
 
@@ -373,6 +401,6 @@ export function normalizeError(error: unknown): DomainError | InfrastructureErro
 
   // Handle non-Error objects
   return new ServiceError(ErrorCode.UnknownError, String(error), undefined, {
-    originalError: error,
+    originalError: error
   });
 }

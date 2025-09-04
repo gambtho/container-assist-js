@@ -2,10 +2,9 @@
  * Pino logger configuration and factory functions
  */
 
-import pino from 'pino';
+import pino, { type Logger, type LoggerOptions } from 'pino';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Logger, LoggerOptions } from 'pino';
 
 // Ensure log directory exists
 try {
@@ -30,7 +29,7 @@ export function createPinoLogger(config?: PinoConfig): Logger {
   const isDevelopment =
     config?.environment === 'development' || process.env.NODE_ENV === 'development';
 
-  const level = config?.level ?? (process.env.LOG_LEVEL || 'info');
+  const level = config?.level ?? process.env.LOG_LEVEL ?? 'info';
 
   const options: LoggerOptions = {
     level,
@@ -47,28 +46,28 @@ export function createPinoLogger(config?: PinoConfig): Logger {
         'credentials',
         '*.password',
         '*.token',
-        '*.secret',
+        '*.secret'
       ],
-      censor: '[REDACTED]',
+      censor: '[REDACTED]'
     },
     base: {
       pid: process.pid,
       hostname: process.env.HOSTNAME ?? 'localhost',
       service: config?.service ?? 'container-kit-mcp',
-      version: config?.version ?? '2.0.0',
+      version: config?.version ?? '2.0.0'
     },
     formatters: {
       level: (label) => {
         return { level: label };
-      },
+      }
     },
     timestamp: pino.stdTimeFunctions.isoTime,
     serializers: {
       err: pino.stdSerializers.err,
       error: pino.stdSerializers.err,
       req: pino.stdSerializers.req,
-      res: pino.stdSerializers.res,
-    },
+      res: pino.stdSerializers.res
+    }
   };
 
   // In development, use pretty printing
@@ -82,9 +81,9 @@ export function createPinoLogger(config?: PinoConfig): Logger {
           translateTime: 'HH:MM:ss Z',
           ignore: 'pid,hostname',
           singleLine: false,
-          errorProps: 'stack,cause',
-        },
-      },
+          errorProps: 'stack,cause'
+        }
+      }
     });
   }
 
@@ -107,12 +106,5 @@ export function createPinoLogger(config?: PinoConfig): Logger {
  * Default logger instance
  */
 export const defaultPinoLogger = createPinoLogger({
-  environment: process.env.NODE_ENV ?? 'development',
+  environment: process.env.NODE_ENV ?? 'development'
 });
-
-/**
- * Backward compatibility exports
- */
-export const createLogger = createPinoLogger;
-export const logger = defaultPinoLogger;
-export const defaultLogger = defaultPinoLogger;

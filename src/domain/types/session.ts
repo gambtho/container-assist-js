@@ -15,7 +15,7 @@ export const SessionSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   expires_at: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.unknown()).optional()
 });
 
 /**
@@ -26,7 +26,7 @@ export const WorkflowStateSchema = z.object({
   steps: z.array(z.string()),
   stepResults: z.record(z.unknown()).optional(),
   progress: z.number().min(0).max(1),
-  error: z.string().optional(),
+  error: z.string().optional()
 });
 
 /**
@@ -39,7 +39,7 @@ export const AnalysisResultSchema = z.object({
   dependencies: z.array(z.string()).optional(),
   hasDockerfile: z.boolean(),
   recommendations: z.array(z.string()),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1)
 });
 
 /**
@@ -51,7 +51,7 @@ export const DockerBuildResultSchema = z.object({
   success: z.boolean(),
   buildTime: z.number(),
   buildLogs: z.string().optional(),
-  warnings: z.array(z.string()).optional(),
+  warnings: z.array(z.string()).optional()
 });
 
 /**
@@ -62,7 +62,7 @@ export const DockerfileResultSchema = z.object({
   baseImage: z.string(),
   instructions: z.array(z.string()),
   optimizations: z.array(z.string()).optional(),
-  securityIssues: z.array(z.string()).optional(),
+  securityIssues: z.array(z.string()).optional()
 });
 
 /**
@@ -74,12 +74,12 @@ export const ScanResultSchema = z.object({
       id: z.string(),
       severity: z.enum(['low', 'medium', 'high', 'critical']),
       description: z.string(),
-      fix: z.string().optional(),
-    }),
+      fix: z.string().optional()
+    })
   ),
   totalCount: z.number(),
   criticalCount: z.number(),
-  success: z.boolean(),
+  success: z.boolean()
 });
 
 /**
@@ -92,12 +92,12 @@ export const K8sManifestResultSchema = z.object({
       kind: z.string(),
       metadata: z.object({
         name: z.string(),
-        namespace: z.string().optional(),
+        namespace: z.string().optional()
       }),
-      spec: z.unknown(),
-    }),
+      spec: z.unknown()
+    })
   ),
-  success: z.boolean(),
+  success: z.boolean()
 });
 
 /**
@@ -108,7 +108,7 @@ export const DeploymentResultSchema = z.object({
   namespace: z.string(),
   status: z.enum(['pending', 'running', 'succeeded', 'failed']),
   podCount: z.number(),
-  success: z.boolean(),
+  success: z.boolean()
 });
 
 /**
@@ -133,7 +133,7 @@ export function getWorkflowSteps(): WorkflowStep[] {
     WorkflowStep.BUILD,
     WorkflowStep.SCAN,
     WorkflowStep.KUBERNETES,
-    WorkflowStep.DEPLOY,
+    WorkflowStep.DEPLOY
   ];
 }
 
@@ -160,7 +160,7 @@ export function createMockSession(overrides?: Partial<Session>): Session {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 3600000).toISOString(),
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -169,7 +169,7 @@ export function createMockWorkflowState(overrides?: Partial<WorkflowState>): Wor
     currentStep: WorkflowStep.ANALYSIS,
     steps: getWorkflowSteps(),
     progress: 0,
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -182,6 +182,6 @@ export function createMockAnalysisResult(overrides?: Partial<AnalysisResult>): A
     hasDockerfile: false,
     recommendations: ['Add Dockerfile', 'Add .dockerignore'],
     confidence: 0.95,
-    ...overrides,
+    ...overrides
   };
 }

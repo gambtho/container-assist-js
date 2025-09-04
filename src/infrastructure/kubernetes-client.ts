@@ -5,11 +5,12 @@
 import * as k8s from '@kubernetes/client-node';
 import type { Logger } from 'pino';
 import { KubernetesError } from '../errors/index.js';
+import { ErrorCode } from '../contracts/types/errors.js';
 import type {
   K8sManifest,
   K8sDeploymentOptions,
   K8sDeploymentResult,
-  K8sServiceStatus,
+  K8sServiceStatus
 } from '../contracts/types/index.js';
 
 // Type guard for Error objects
@@ -63,7 +64,7 @@ export class KubernetesClient {
     this.kc = new k8s.KubeConfig();
 
     try {
-      if (config.kubeconfig != null) {
+      if (config.kubeconfig != null && config.kubeconfig.trim() !== '') {
         this.kc.loadFromFile(config.kubeconfig);
       } else {
         this.kc.loadFromDefault();
@@ -92,7 +93,7 @@ export class KubernetesClient {
       // Test cluster connectivity
       await this.k8sApi.listNamespacedPod({
         namespace: 'kube-system',
-        limit: 1,
+        limit: 1
       });
       this.available = true;
       this.logger.info('Kubernetes client initialized');
@@ -106,14 +107,14 @@ export class KubernetesClient {
 
   async deployManifests(
     manifests: K8sManifest[],
-    options?: K8sDeploymentOptions,
+    options?: K8sDeploymentOptions
   ): Promise<K8sDeploymentResult> {
     if (!this.available) {
       throw new KubernetesError(
         'Kubernetes cluster not available',
-        'K8S_NOT_AVAILABLE',
+        ErrorCode.K8S_NOT_AVAILABLE,
         undefined,
-        options?.namespace,
+        options?.namespace
       );
     }
 
@@ -124,9 +125,9 @@ export class KubernetesClient {
     this.logger.info(
       {
         manifestCount: manifests.length,
-        namespace,
+        namespace
       },
-      'Deploying Kubernetes manifests',
+      'Deploying Kubernetes manifests'
     );
 
     for (const manifest of manifests) {
@@ -136,13 +137,13 @@ export class KubernetesClient {
           name: manifest.metadata?.name ?? 'unknown',
           kind: manifest.kind,
           namespace: manifest.metadata?.namespace ?? namespace,
-          status: 'deployed',
+          status: 'deployed'
         });
       } catch (error: unknown) {
         failed.push({
           name: manifest.metadata?.name ?? 'unknown',
           kind: manifest.kind,
-          error: isError(error) ? error.message : 'Unknown error',
+          error: isError(error) ? error.message : 'Unknown error'
         });
       }
     }
@@ -150,11 +151,11 @@ export class KubernetesClient {
     if (failed.length > 0 && deployed.length === 0) {
       throw new KubernetesError(
         'All deployments failed',
-        'K8S_DEPLOY_FAILED',
+        ErrorCode.K8S_DEPLOY_FAILED,
         undefined,
         namespace,
         undefined,
-        { failed },
+        { failed }
       );
     }
 
@@ -162,13 +163,13 @@ export class KubernetesClient {
       success: deployed.length > 0,
       resources: [],
       deployed: deployed as string[],
-      failed: failed as { resource: string; error: string }[],
+      failed: failed as { resource: string; error: string }[]
     };
   }
 
   async applyManifest(manifest: K8sManifest, namespace?: string): Promise<void> {
     if (!this.available) {
-      throw new KubernetesError('Kubernetes cluster not available', 'K8S_NOT_AVAILABLE');
+      throw new KubernetesError('Kubernetes cluster not available', ErrorCode.K8S_NOT_AVAILABLE);
     }
 
     const targetNamespace = namespace ?? (manifest.metadata?.namespace || 'default');
@@ -179,47 +180,62 @@ export class KubernetesClient {
           if (this.appsApi) {
             await this.appsApi.createNamespacedDeployment({
               namespace: targetNamespace,
-              body: manifest as k8s.V1Deployment,
+              body: manifest as k8s.V1Deployment
             });
           } else {
-            throw new KubernetesError('Apps API not initialized', 'K8S_API_NOT_INITIALIZED');
+            throw new KubernetesError(
+              'Apps API not initialized',
+              ErrorCode.K8S_API_NOT_INITIALIZED
+            );
           }
           break;
         case 'service':
           if (this.k8sApi) {
             await this.k8sApi.createNamespacedService({
               namespace: targetNamespace,
-              body: manifest as k8s.V1Service,
+              body: manifest as k8s.V1Service
             });
           } else {
-            throw new KubernetesError('Core API not initialized', 'K8S_API_NOT_INITIALIZED');
+            throw new KubernetesError(
+              'Core API not initialized',
+              ErrorCode.K8S_API_NOT_INITIALIZED
+            );
           }
           break;
         case 'configmap':
           if (this.k8sApi) {
             await this.k8sApi.createNamespacedConfigMap({
               namespace: targetNamespace,
-              body: manifest as k8s.V1ConfigMap,
+              body: manifest as k8s.V1ConfigMap
             });
           } else {
-            throw new KubernetesError('Core API not initialized', 'K8S_API_NOT_INITIALIZED');
+            throw new KubernetesError(
+              'Core API not initialized',
+              ErrorCode.K8S_API_NOT_INITIALIZED
+            );
           }
           break;
         case 'secret':
           if (this.k8sApi) {
             await this.k8sApi.createNamespacedSecret({
               namespace: targetNamespace,
-              body: manifest as k8s.V1Secret,
+              body: manifest as k8s.V1Secret
             });
           } else {
-            throw new KubernetesError('Core API not initialized', 'K8S_API_NOT_INITIALIZED');
+            throw new KubernetesError(
+              'Core API not initialized',
+              ErrorCode.K8S_API_NOT_INITIALIZED
+            );
           }
           break;
         case 'namespace':
           if (this.k8sApi) {
             await this.k8sApi.createNamespace({ body: manifest as k8s.V1Namespace });
           } else {
-            throw new KubernetesError('Core API not initialized', 'K8S_API_NOT_INITIALIZED');
+            throw new KubernetesError(
+              'Core API not initialized',
+              ErrorCode.K8S_API_NOT_INITIALIZED
+            );
           }
           break;
         default:
@@ -231,9 +247,9 @@ export class KubernetesClient {
         {
           name: manifest.metadata?.name,
           kind: manifest.kind,
-          namespace: targetNamespace,
+          namespace: targetNamespace
         },
-        'Applied manifest',
+        'Applied manifest'
       );
     } catch (error: unknown) {
       // Handle already exists errors gracefully
@@ -241,66 +257,66 @@ export class KubernetesClient {
         this.logger.info(
           {
             name: manifest.metadata?.name,
-            kind: manifest.kind,
+            kind: manifest.kind
           },
-          'Resource already exists, skipping',
+          'Resource already exists, skipping'
         );
         return;
       }
 
       throw new KubernetesError(
         `Failed to apply ${manifest.kind}: ${isError(error) ? error.message : 'Unknown error'}`,
-        'K8S_APPLY_FAILED',
+        ErrorCode.K8S_APPLY_FAILED,
         manifest.metadata?.name,
         targetNamespace,
-        isError(error) ? error : new Error('Unknown error'),
+        isError(error) ? error : new Error('Unknown error')
       );
     }
   }
 
   async getServiceStatus(name: string, namespace?: string): Promise<K8sServiceStatus> {
     if (!this.available) {
-      throw new KubernetesError('Kubernetes cluster not available', 'K8S_NOT_AVAILABLE');
+      throw new KubernetesError('Kubernetes cluster not available', ErrorCode.K8S_NOT_AVAILABLE);
     }
 
     const targetNamespace = namespace ?? 'default';
 
     try {
       if (!this.appsApi) {
-        throw new KubernetesError('Apps API not initialized', 'K8S_API_NOT_INITIALIZED');
+        throw new KubernetesError('Apps API not initialized', ErrorCode.K8S_API_NOT_INITIALIZED);
       }
       await this.appsApi.readNamespacedDeployment({
         name,
-        namespace: targetNamespace,
+        namespace: targetNamespace
       });
       return {
         name,
         namespace: targetNamespace,
         type: 'Deployment',
         clusterIP: '',
-        ports: [],
+        ports: []
       };
     } catch (error) {
       throw new KubernetesError(
         `Failed to get service status: ${isError(error) ? error.message : 'Unknown error'}`,
-        'K8S_SERVICE_STATUS_FAILED',
+        ErrorCode.K8S_SERVICE_STATUS_FAILED,
         name,
         targetNamespace,
-        isError(error) ? error : undefined,
+        isError(error) ? error : undefined
       );
     }
   }
 
   async deleteDeployment(name: string, namespace?: string): Promise<void> {
     if (!this.available) {
-      throw new KubernetesError('Kubernetes cluster not available', 'K8S_NOT_AVAILABLE');
+      throw new KubernetesError('Kubernetes cluster not available', ErrorCode.K8S_NOT_AVAILABLE);
     }
 
     const targetNamespace = namespace ?? 'default';
 
     try {
       if (!this.appsApi) {
-        throw new KubernetesError('Apps API not initialized', 'K8S_API_NOT_INITIALIZED');
+        throw new KubernetesError('Apps API not initialized', ErrorCode.K8S_API_NOT_INITIALIZED);
       }
       await this.appsApi.deleteNamespacedDeployment({ name, namespace: targetNamespace });
       this.logger.info({ name, namespace: targetNamespace }, 'Deployment deleted');
@@ -308,29 +324,29 @@ export class KubernetesClient {
       if (isHttpError(error) && error.statusCode === 404) {
         this.logger.info(
           { name, namespace: targetNamespace },
-          'Deployment not found, already deleted',
+          'Deployment not found, already deleted'
         );
         return;
       }
 
       throw new KubernetesError(
         `Failed to delete deployment: ${isError(error) ? error.message : 'Unknown error'}`,
-        'K8S_DELETE_FAILED',
+        ErrorCode.K8S_DELETE_FAILED,
         name,
         targetNamespace,
-        isError(error) ? error : new Error('Unknown error'),
+        isError(error) ? error : new Error('Unknown error')
       );
     }
   }
 
   async getNamespaces(): Promise<string[]> {
     if (!this.available) {
-      throw new KubernetesError('Kubernetes cluster not available', 'K8S_NOT_AVAILABLE');
+      throw new KubernetesError('Kubernetes cluster not available', ErrorCode.K8S_NOT_AVAILABLE);
     }
 
     try {
       if (!this.k8sApi) {
-        throw new KubernetesError('Core API not initialized', 'K8S_API_NOT_INITIALIZED');
+        throw new KubernetesError('Core API not initialized', ErrorCode.K8S_API_NOT_INITIALIZED);
       }
       const namespaces = await this.k8sApi.listNamespace();
       return namespaces.items
@@ -344,28 +360,28 @@ export class KubernetesClient {
     } catch (error: unknown) {
       throw new KubernetesError(
         `Failed to list namespaces: ${isError(error) ? error.message : 'Unknown error'}`,
-        'K8S_LIST_NAMESPACES_FAILED',
+        ErrorCode.K8S_LIST_NAMESPACES_FAILED,
         undefined,
         undefined,
-        isError(error) ? error : new Error('Unknown error'),
+        isError(error) ? error : new Error('Unknown error')
       );
     }
   }
 
   async createNamespace(name: string): Promise<void> {
     if (!this.available) {
-      throw new KubernetesError('Kubernetes cluster not available', 'K8S_NOT_AVAILABLE');
+      throw new KubernetesError('Kubernetes cluster not available', ErrorCode.K8S_NOT_AVAILABLE);
     }
 
     try {
       const namespace: k8s.V1Namespace = {
         metadata: {
-          name,
-        },
+          name
+        }
       };
 
       if (!this.k8sApi) {
-        throw new KubernetesError('Core API not initialized', 'K8S_API_NOT_INITIALIZED');
+        throw new KubernetesError('Core API not initialized', ErrorCode.K8S_API_NOT_INITIALIZED);
       }
       await this.k8sApi.createNamespace({ body: namespace });
       this.logger.info({ name }, 'Namespace created');
@@ -377,10 +393,10 @@ export class KubernetesClient {
 
       throw new KubernetesError(
         `Failed to create namespace: ${isError(error) ? error.message : 'Unknown error'}`,
-        'K8S_CREATE_NAMESPACE_FAILED',
+        ErrorCode.K8S_CREATE_NAMESPACE_FAILED,
         undefined,
         name,
-        isError(error) ? error : new Error('Unknown error'),
+        isError(error) ? error : new Error('Unknown error')
       );
     }
   }
@@ -401,7 +417,7 @@ export class KubernetesClient {
 
   async health(): Promise<K8sHealthStatus> {
     const status: K8sHealthStatus = {
-      available: this.available,
+      available: this.available
     };
 
     if (this.available && this.k8sApi) {

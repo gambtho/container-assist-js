@@ -62,7 +62,7 @@ export class TrivyScanner {
 
   constructor(
     private readonly logger: Logger,
-    config?: TrivyConfig,
+    config?: TrivyConfig
   ) {
     this.executor = new CommandExecutor(logger);
     this.config = {
@@ -71,7 +71,7 @@ export class TrivyScanner {
       timeout: config?.timeout ?? 300000, // 5 minutes
       severity: config?.severity ?? ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'],
       ignoreUnfixed: config?.ignoreUnfixed ?? false,
-      skipUpdate: config?.skipUpdate ?? false,
+      skipUpdate: config?.skipUpdate ?? false
     };
   }
 
@@ -85,7 +85,7 @@ export class TrivyScanner {
       if (!isAvailable) {
         return fail(
           'Trivy is not installed. Please install Trivy to enable vulnerability scanning.',
-          'TRIVY_NOT_FOUND',
+          'TRIVY_NOT_FOUND'
         );
       }
 
@@ -99,13 +99,13 @@ export class TrivyScanner {
         const updateResult = await this.executor.execute(
           this.config.scannerPath,
           ['image', '--download-db-only'],
-          { timeout: 120000 }, // 2 minutes for DB update
+          { timeout: 120000 } // 2 minutes for DB update
         );
 
         if (updateResult.exitCode !== 0) {
           this.logger.warn(
             { stderr: updateResult.stderr },
-            'Failed to update Trivy database, continuing with existing database',
+            'Failed to update Trivy database, continuing with existing database'
           );
         }
       }
@@ -148,7 +148,7 @@ export class TrivyScanner {
       const args = ['image', '--format', 'json', '--quiet', '--cache-dir', this.config.cacheDir];
 
       // Add severity filter
-      if (options?.severity || this.config.severity.length > 0) {
+      if (options?.severity ?? this.config.severity.length > 0) {
         const severities = options?.severity
           ? options.severity.map((s) => s.toUpperCase())
           : this.config.severity.map((s) => s.toUpperCase());
@@ -165,7 +165,7 @@ export class TrivyScanner {
 
       // Execute Trivy scan
       const result = await this.executor.execute(this.config.scannerPath, args, {
-        timeout: this.config.timeout,
+        timeout: this.config.timeout
       });
 
       if (result.timedOut) {
@@ -198,7 +198,7 @@ export class TrivyScanner {
         medium: 0,
         low: 0,
         unknown: 0,
-        total: 0,
+        total: 0
       };
 
       // Process all results
@@ -212,29 +212,18 @@ export class TrivyScanner {
                 | 'medium'
                 | 'low';
 
-              const vulnEntry: any = {
+              const score = vuln.CVSS?.nvd?.V3Score ?? vuln.CVSS?.redhat?.V3Score;
+              const vulnEntry: DockerScanResult['vulnerabilities'][0] = {
+                id: vuln.VulnerabilityID,
                 severity,
                 cve: vuln.VulnerabilityID,
                 package: vuln.PkgName,
                 version: vuln.InstalledVersion,
+                ...(vuln.FixedVersion && { fixedVersion: vuln.FixedVersion }),
+                ...(vuln.Description && { description: vuln.Description }),
+                ...(vuln.PrimaryURL && { references: [vuln.PrimaryURL] }),
+                ...(score !== undefined && { score })
               };
-
-              if (vuln.FixedVersion) {
-                vulnEntry.fixedVersion = vuln.FixedVersion;
-              }
-
-              if (vuln.Description) {
-                vulnEntry.description = vuln.Description;
-              }
-
-              if (vuln.PrimaryURL) {
-                vulnEntry.references = [vuln.PrimaryURL];
-              }
-
-              const score = vuln.CVSS?.nvd?.V3Score ?? vuln.CVSS?.redhat?.V3Score;
-              if (score !== undefined) {
-                vulnEntry.score = score;
-              }
 
               vulnerabilities.push(vulnEntry);
 
@@ -254,7 +243,7 @@ export class TrivyScanner {
       const metadata: Record<string, unknown> = {
         image: trivyResult.ArtifactName,
         scanner: 'trivy',
-        scannerVersion: this.trivyVersion,
+        scannerVersion: this.trivyVersion
       };
 
       if (trivyResult.Metadata) {
@@ -273,13 +262,13 @@ export class TrivyScanner {
         scanTime: new Date().toISOString(),
         metadata: {
           ...metadata,
-          image: metadata.image as string,
-        },
+          image: metadata.image as string
+        }
       };
     } catch (error) {
       this.logger.error(
         { error: error instanceof Error ? error.message : error },
-        'Failed to parse Trivy output',
+        'Failed to parse Trivy output'
       );
 
       // Return empty result on parse error
@@ -291,12 +280,12 @@ export class TrivyScanner {
           medium: 0,
           low: 0,
           unknown: 0,
-          total: 0,
+          total: 0
         },
         scanTime: new Date().toISOString(),
         metadata: {
-          image: imageRef,
-        },
+          image: imageRef
+        }
       };
     }
   }
@@ -307,7 +296,7 @@ export class TrivyScanner {
   getInfo(): { available: boolean; version: string | null } {
     return {
       available: this.isInitialized,
-      version: this.trivyVersion,
+      version: this.trivyVersion
     };
   }
 }

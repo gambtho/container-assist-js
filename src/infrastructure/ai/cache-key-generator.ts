@@ -4,7 +4,7 @@
  */
 
 import { createHash } from 'crypto';
-import type { AIRequest } from '../ai-request-builder.js';
+import type { AIRequest } from './requests.js';
 
 /**
  * Options for cache key generation
@@ -89,14 +89,14 @@ export class CacheKeyGenerator {
       normalizeWhitespace: true,
       excludeVariables: [],
       includeOnlyVariables: [],
-      ...options,
+      ...options
     };
 
     this.similarityOptions = {
       enableSimilarity: false,
       similarityThreshold: 0.8,
       maxSimilarKeys: 3,
-      ...similarityOptions,
+      ...similarityOptions
     };
   }
 
@@ -131,7 +131,7 @@ export class CacheKeyGenerator {
     } = {
       variableCount: Object.keys(normalized.context ?? {}).length,
       promptLength: normalized.prompt.length,
-      hasContext: normalized.context != null && Object.keys(normalized.context).length > 0,
+      hasContext: normalized.context != null && Object.keys(normalized.context).length > 0
     };
 
     const templateId = this.extractTemplateId(request);
@@ -145,9 +145,9 @@ export class CacheKeyGenerator {
       components: {
         promptHash,
         contextHash,
-        parametersHash,
+        parametersHash
       },
-      metadata,
+      metadata
     };
 
     // Register key for similarity tracking
@@ -196,10 +196,10 @@ export class CacheKeyGenerator {
     totalKeys: number;
     uniqueNormalizedKeys: number;
     averageKeysPerNormalized: number;
-    } {
+  } {
     const totalKeys = Array.from(this.keyRegistry.values()).reduce(
       (sum, keys) => sum + keys.size,
-      0,
+      0
     );
 
     const uniqueNormalizedKeys = this.keyRegistry.size;
@@ -209,7 +209,7 @@ export class CacheKeyGenerator {
     return {
       totalKeys,
       uniqueNormalizedKeys,
-      averageKeysPerNormalized,
+      averageKeysPerNormalized
     };
   }
 
@@ -235,7 +235,7 @@ export class CacheKeyGenerator {
     if (normalized.temperature !== undefined) {
       normalized.temperature = this.roundToPrecision(
         normalized.temperature,
-        this.options.temperaturePrecision,
+        this.options.temperaturePrecision
       );
     }
 
@@ -305,7 +305,7 @@ export class CacheKeyGenerator {
       context: this.extractEssentialContext(request.context ?? {}),
       // Round parameters to broader ranges
       temperature: request.temperature ? Math.round(request.temperature * 10) / 10 : undefined,
-      model: request.model,
+      model: request.model
     };
 
     return createHash('md5').update(JSON.stringify(essentials)).digest('hex').substring(0, 12);
@@ -491,7 +491,7 @@ export class CacheKeyUtils {
  */
 export function createCacheKeyGenerator(
   options?: KeyGenerationOptions,
-  similarityOptions?: SimilarityOptions,
+  similarityOptions?: SimilarityOptions
 ): CacheKeyGenerator {
   return new CacheKeyGenerator(options, similarityOptions);
 }

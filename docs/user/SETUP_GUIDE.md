@@ -14,17 +14,20 @@ This guide will help you set up the Container Kit MCP Server to work with Claude
    - Download from [docker.com](https://docker.com/products/docker-desktop)
    - Start Docker Desktop and ensure it's running
 
-3. **Claude Desktop** (or another MCP client)
-   - Download from [claude.ai](https://claude.ai/desktop)
+3. **Claude Desktop or VS Code** (MCP clients)
+   - **Claude Desktop**: Download from [claude.ai](https://claude.ai/desktop)
+   - **VS Code**: Install latest version with MCP support
 
 ### Optional Software
 - **Kubernetes** (for deployment features)
   - Docker Desktop includes Kubernetes
   - Enable in Docker Desktop settings
 
-## Installation Steps
+## Installation Options
 
-### Step 1: Install the MCP Server
+Choose one of these installation methods:
+
+### Option A: Install from NPM (Recommended for End Users)
 
 Open terminal/command prompt and run:
 ```bash
@@ -36,7 +39,29 @@ Verify installation:
 container-kit-mcp --version
 ```
 
-### Step 2: Configure Claude Desktop
+### Option B: Build and Run Locally (For Development)
+
+1. **Clone and build the project:**
+   ```bash
+   git clone https://github.com/gambtho/container-assist-js.git
+   cd container-assist-js
+   npm install
+   npm run build
+   ```
+
+2. **Run the built CLI:**
+   ```bash
+   node dist/bin/cli.js start
+   ```
+
+3. **Or run in development mode:**
+   ```bash
+   npm run start:dev
+   ```
+
+## Configuration Steps
+
+### Configure Claude Desktop
 
 1. **Find your configuration file:**
    - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
@@ -47,6 +72,7 @@ container-kit-mcp --version
 
 Open the file in a text editor and add:
 
+**For NPM Installation:**
 ```json
 {
   "mcpServers": {
@@ -62,6 +88,24 @@ Open the file in a text editor and add:
 }
 ```
 
+**For Local Development Build:**
+```json
+{
+  "mcpServers": {
+    "container-kit": {
+      "command": "node",
+      "args": ["/path/to/container-assist-js/dist/bin/cli.js", "start"],
+      "env": {
+        "DOCKER_SOCKET": "/var/run/docker.sock",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+Replace `/path/to/container-assist-js` with the actual path to your local repository.
+
 For Windows users, adjust the Docker socket:
 ```json
 "env": {
@@ -71,12 +115,90 @@ For Windows users, adjust the Docker socket:
 
 3. **Restart Claude Desktop**
 
-### Step 3: Verify Setup
+### Configure VS Code
 
+VS Code supports MCP servers through workspace or global configuration:
+
+#### Option 1: Workspace Configuration (Recommended)
+
+1. **Create `.vscode/mcp.json` in your workspace:**
+
+**For NPM Installation:**
+```json
+{
+  "servers": {
+    "container-kit": {
+      "command": "container-kit-mcp",
+      "args": ["start"],
+      "env": {
+        "DOCKER_SOCKET": "/var/run/docker.sock",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+**For Local Development Build:**
+```json
+{
+  "servers": {
+    "container-kit": {
+      "command": "node",
+      "args": ["/path/to/container-assist-js/dist/bin/cli.js", "start"],
+      "env": {
+        "DOCKER_SOCKET": "/var/run/docker.sock",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+#### Option 2: Global Configuration via settings.json
+
+Add to your VS Code `settings.json`:
+
+```json
+{
+  "chat.mcp.discovery.enabled": true,
+  "chat.mcp.autostart": true,
+  "mcp": {
+    "servers": {
+      "container-kit": {
+        "command": "container-kit-mcp",
+        "args": ["start"],
+        "env": {
+          "DOCKER_SOCKET": "/var/run/docker.sock",
+          "LOG_LEVEL": "info"
+        }
+      }
+    }
+  }
+}
+```
+
+For local builds, replace `"command": "container-kit-mcp"` with `"command": "node"` and adjust args accordingly.
+
+#### VS Code Setup Commands
+
+- Use `MCP: Open Workspace Folder Configuration` to create/edit `.vscode/mcp.json`
+- Use `MCP: Add Server` for guided setup
+- Use `MCP: Restart Server` after configuration changes
+
+### Verify Setup
+
+**For Claude Desktop:**
 1. Open Claude Desktop
 2. Start a new conversation
 3. Type: "Can you list the available MCP tools?"
 4. Claude should show Container Kit tools
+
+**For VS Code:**
+1. Open VS Code with MCP-enabled workspace
+2. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+3. Run `MCP: List Servers` to verify container-kit is loaded
+4. Use VS Code's chat feature to interact with Container Kit tools
 
 ## Configuration Options
 

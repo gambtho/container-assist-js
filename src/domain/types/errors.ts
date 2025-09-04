@@ -121,7 +121,7 @@ export function isRetryable(error: DomainError): boolean {
     [
       ErrorCode.DOCKER_CONNECTION,
       ErrorCode.KUBERNETES_CONNECTION,
-      ErrorCode.AI_SERVICE_ERROR,
+      ErrorCode.AI_SERVICE_ERROR
     ].includes(error.code)
   ) {
     return true;
@@ -171,7 +171,7 @@ export function normalizeError(error: unknown): DomainError {
       code: ErrorCode.UNKNOWN,
       message: error.message,
       severity: ErrorSeverity.MEDIUM,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
     if (error.stack !== undefined) {
       result.stack = error.stack;
@@ -184,7 +184,7 @@ export function normalizeError(error: unknown): DomainError {
       code: ErrorCode.UNKNOWN,
       message: error,
       severity: ErrorSeverity.MEDIUM,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 
@@ -193,7 +193,7 @@ export function normalizeError(error: unknown): DomainError {
     message: 'An unknown error occurred',
     severity: ErrorSeverity.MEDIUM,
     timestamp: new Date().toISOString(),
-    context: { originalError: error },
+    context: { originalError: error }
   };
 }
 
@@ -203,13 +203,13 @@ export function normalizeError(error: unknown): DomainError {
 export function createDomainError(
   code: ErrorCode,
   message: string,
-  context?: Record<string, unknown>,
+  context?: Record<string, unknown>
 ): DomainError {
   const result: DomainError = {
     code,
     message,
     severity: getErrorSeverity(code),
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toISOString()
   };
   if (context !== undefined) {
     result.context = context;
@@ -225,7 +225,7 @@ export function createInfrastructureError(
   message: string,
   service: string,
   retryable: boolean = true,
-  endpoint?: string,
+  endpoint?: string
 ): InfrastructureError {
   const result: InfrastructureError = {
     code,
@@ -233,7 +233,7 @@ export function createInfrastructureError(
     severity: getErrorSeverity(code),
     timestamp: new Date().toISOString(),
     service,
-    retryable,
+    retryable
   };
   if (endpoint !== undefined) {
     result.endpoint = endpoint;
@@ -248,13 +248,13 @@ export function createValidationError(
   message: string,
   field?: string,
   value?: unknown,
-  expectedType?: string,
+  expectedType?: string
 ): ValidationError {
   const result: ValidationError = {
     code: ErrorCode.VALIDATION,
     message,
     severity: ErrorSeverity.MEDIUM,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toISOString()
   };
   if (field !== undefined) {
     result.field = field;

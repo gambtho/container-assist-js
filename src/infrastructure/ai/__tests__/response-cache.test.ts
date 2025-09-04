@@ -97,7 +97,7 @@ describe('AIResponseCache', () => {
     it('should handle different response types', async () => {
       const stringResponse = 'text response';
       const objectResponse = { key: 'value', array: [1, 2, 3] };
-      const numberResponse = 42;
+      const _numberResponse = 42;
 
       await cache.set(sampleRequest, stringResponse, true);
       expect(await cache.get(sampleRequest)).toBe(stringResponse);
@@ -185,7 +185,7 @@ describe('AIResponseCache', () => {
     it('should track access counts and last accessed time', async () => {
       await cache.set(sampleRequest, sampleResponse, true);
 
-      const initialTime = mockClock.now;
+      const _initialTime = mockClock.now;
 
       // Access multiple times
       await cache.get(sampleRequest);

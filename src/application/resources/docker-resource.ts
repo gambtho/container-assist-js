@@ -65,7 +65,7 @@ interface DockerContainerInfo {
 export class DockerResourceProvider {
   constructor(
     private dockerService: DockerService,
-    private logger: Logger,
+    private logger: Logger
   ) {
     this.logger = logger.child({ component: 'DockerResourceProvider' });
   }
@@ -106,26 +106,26 @@ export class DockerResourceProvider {
                       version: health.version ?? null,
                       systemInfo: systemInfo
                         ? (() => {
-                          const dockerSystemInfo = systemInfo as DockerSystemInfo;
-                          return {
-                            containers: dockerSystemInfo.containers ?? 0,
-                            images: dockerSystemInfo.images ?? 0,
-                            serverVersion: dockerSystemInfo.serverVersion,
-                            architecture: dockerSystemInfo.architecture,
-                            os: dockerSystemInfo.os,
-                            kernelVersion: dockerSystemInfo.kernelVersion,
-                            memTotal: dockerSystemInfo.memTotal,
-                            cpus: dockerSystemInfo.ncpu,
-                          };
-                        })()
+                            const dockerSystemInfo = systemInfo as DockerSystemInfo;
+                            return {
+                              containers: dockerSystemInfo.containers ?? 0,
+                              images: dockerSystemInfo.images ?? 0,
+                              serverVersion: dockerSystemInfo.serverVersion,
+                              architecture: dockerSystemInfo.architecture,
+                              os: dockerSystemInfo.os,
+                              kernelVersion: dockerSystemInfo.kernelVersion,
+                              memTotal: dockerSystemInfo.memTotal,
+                              cpus: dockerSystemInfo.ncpu
+                            };
+                          })()
                         : null,
-                      timestamp: new Date().toISOString(),
+                      timestamp: new Date().toISOString()
                     },
                     null,
-                    2,
-                  ),
-                },
-              ],
+                    2
+                  )
+                }
+              ]
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to get Docker system info');
@@ -138,16 +138,16 @@ export class DockerResourceProvider {
                       status: 'error',
                       available: false,
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString(),
+                      timestamp: new Date().toISOString()
                     },
                     null,
-                    2,
-                  ),
-                },
-              ],
+                    2
+                  )
+                }
+              ]
             };
           }
-        },
+        }
       },
       // Docker images resource
       {
@@ -168,13 +168,13 @@ export class DockerResourceProvider {
                       {
                         status: 'unavailable',
                         message: 'Docker is not available',
-                        timestamp: new Date().toISOString(),
+                        timestamp: new Date().toISOString()
                       },
                       null,
-                      2,
-                    ),
-                  },
-                ],
+                      2
+                    )
+                  }
+                ]
               };
             }
 
@@ -187,7 +187,7 @@ export class DockerResourceProvider {
                 tags: dockerImage.RepoTags ?? dockerImage.tags ?? [],
                 size: dockerImage.Size ?? dockerImage.size ?? 0,
                 created: dockerImage.Created ?? dockerImage.created,
-                parentId: dockerImage.ParentId ?? dockerImage.parentId ?? null,
+                parentId: dockerImage.ParentId ?? dockerImage.parentId ?? null
               };
             });
 
@@ -199,13 +199,13 @@ export class DockerResourceProvider {
                     {
                       count: imageList.length,
                       images: imageList,
-                      timestamp: new Date().toISOString(),
+                      timestamp: new Date().toISOString()
                     },
                     null,
-                    2,
-                  ),
-                },
-              ],
+                    2
+                  )
+                }
+              ]
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to list Docker images');
@@ -217,16 +217,16 @@ export class DockerResourceProvider {
                     {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString(),
+                      timestamp: new Date().toISOString()
                     },
                     null,
-                    2,
-                  ),
-                },
-              ],
+                    2
+                  )
+                }
+              ]
             };
           }
-        },
+        }
       },
       // Docker containers resource
       {
@@ -247,13 +247,13 @@ export class DockerResourceProvider {
                       {
                         status: 'unavailable',
                         message: 'Docker is not available',
-                        timestamp: new Date().toISOString(),
+                        timestamp: new Date().toISOString()
                       },
                       null,
-                      2,
-                    ),
-                  },
-                ],
+                      2
+                    )
+                  }
+                ]
               };
             }
 
@@ -268,7 +268,7 @@ export class DockerResourceProvider {
                 state: dockerContainer.State ?? dockerContainer.state,
                 status: dockerContainer.Status ?? dockerContainer.status,
                 created: dockerContainer.Created ?? dockerContainer.created,
-                ports: dockerContainer.Ports ?? dockerContainer.ports ?? [],
+                ports: dockerContainer.Ports ?? dockerContainer.ports ?? []
               };
             });
 
@@ -279,7 +279,7 @@ export class DockerResourceProvider {
               other: containerList.filter((c) => {
                 const state = c.state ?? '';
                 return !['running', 'exited'].includes(state);
-              }).length,
+              }).length
             };
 
             return {
@@ -290,13 +290,13 @@ export class DockerResourceProvider {
                     {
                       stats,
                       containers: containerList,
-                      timestamp: new Date().toISOString(),
+                      timestamp: new Date().toISOString()
                     },
                     null,
-                    2,
-                  ),
-                },
-              ],
+                    2
+                  )
+                }
+              ]
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to list Docker containers');
@@ -308,16 +308,16 @@ export class DockerResourceProvider {
                     {
                       status: 'error',
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString(),
+                      timestamp: new Date().toISOString()
                     },
                     null,
-                    2,
-                  ),
-                },
-              ],
+                    2
+                  )
+                }
+              ]
             };
           }
-        },
+        }
       },
       // Docker build context resource
       {
@@ -338,7 +338,7 @@ export class DockerResourceProvider {
                 buildx: false, // Would need to check if buildx is available
                 multiPlatform: false,
                 secrets: false,
-                ssh: false,
+                ssh: false
               },
               recommendedBuildArgs: ['NODE_ENV', 'BUILD_DATE', 'VCS_REF', 'VERSION'],
               commonBaseImages: [
@@ -349,9 +349,9 @@ export class DockerResourceProvider {
                 'openjdk:17-alpine',
                 'nginx:alpine',
                 'ubuntu:22.04',
-                'debian:bullseye-slim',
+                'debian:bullseye-slim'
               ],
-              timestamp: new Date().toISOString(),
+              timestamp: new Date().toISOString()
             };
 
             if (health.available) {
@@ -372,9 +372,9 @@ export class DockerResourceProvider {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(context, null, 2),
-                },
-              ],
+                  text: JSON.stringify(context, null, 2)
+                }
+              ]
             };
           } catch (error) {
             this.logger.error({ error }, 'Failed to get Docker build context');
@@ -387,17 +387,17 @@ export class DockerResourceProvider {
                       status: 'error',
                       dockerAvailable: false,
                       message: error instanceof Error ? error.message : 'Unknown error',
-                      timestamp: new Date().toISOString(),
+                      timestamp: new Date().toISOString()
                     },
                     null,
-                    2,
-                  ),
-                },
-              ],
+                    2
+                  )
+                }
+              ]
             };
           }
-        },
-      },
+        }
+      }
     ];
   }
 }

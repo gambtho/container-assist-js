@@ -3,7 +3,7 @@
  * Common interfaces and types used across session management
  */
 
-import type { WorkflowState, Session } from '../../contracts/types/index.js';
+import type { Session } from '../../contracts/types/index.js';
 
 /**
  * Session metadata
@@ -25,26 +25,6 @@ export interface SessionConfig {
   compression?: boolean;
   encryption?: boolean;
   backup?: boolean;
-}
-
-/**
- * Session data structure
- */
-export interface SessionData {
-  id: string;
-  metadata: SessionMetadata;
-  config: SessionConfig;
-  state: WorkflowState;
-  data: Record<string, unknown>;
-}
-
-/**
- * Session update operation
- */
-export interface SessionUpdate {
-  id: string;
-  updates: Partial<SessionData>;
-  merge?: boolean; // Whether to merge or replace
 }
 
 /**
@@ -74,20 +54,6 @@ export interface SessionResult<T = unknown> {
 }
 
 /**
- * Session event types
- */
-export type SessionEvent =
-  | { type: 'created'; sessionId: string; data: SessionData }
-  | { type: 'updated'; sessionId: string; changes: Partial<SessionData> }
-  | { type: 'deleted'; sessionId: string }
-  | { type: 'expired'; sessionId: string };
-
-/**
- * Session listener callback
- */
-export type SessionEventListener = (event: SessionEvent) => void;
-
-/**
  * Common session utilities
  */
 export class SessionUtils {
@@ -99,75 +65,13 @@ export class SessionUtils {
   }
 
   /**
-   * Validate session data
-   */
-  static isValidSessionData(data: unknown): data is SessionData {
-    if (typeof data !== 'object' || data === null) {
-      return false;
-    }
-    const obj = data as Record<string, unknown>;
-    return (
-      typeof obj.id === 'string' &&
-      obj.metadata != null &&
-      typeof obj.metadata === 'object' &&
-      'createdAt' in obj.metadata &&
-      obj.state != null
-    );
-  }
-
-  /**
-   * Calculate session age
-   */
-  static getSessionAge(session: SessionData): number {
-    return Date.now() - session.metadata.createdAt.getTime();
-  }
-
-  /**
    * Check if session has expired
    */
-  static isExpired(session: Session | SessionData): boolean {
-    // Handle Session type (from contracts/types/session.ts)
-    if ('expires_at' in session) {
-      if (session.expires_at == null || session.expires_at === '') {
-        return false;
-      }
-      return new Date(session.expires_at).getTime() < Date.now();
-    }
-
-    // Handle SessionData type (legacy)
-    const sessionData = session as SessionData;
-    if (sessionData.config?.ttl == null || sessionData.config.ttl === 0) {
+  static isExpired(session: Session): boolean {
+    if (session.expires_at == null || session.expires_at === '') {
       return false;
     }
-
-    return SessionUtils.getSessionAge(sessionData) > sessionData.config.ttl;
-  }
-
-  /**
-   * Merge session data
-   */
-  static mergeSessionData(existing: SessionData, updates: Partial<SessionData>): SessionData {
-    return {
-      ...existing,
-      ...updates,
-      metadata: {
-        ...existing.metadata,
-        ...updates.metadata,
-        updatedAt: new Date(),
-      },
-      config: {
-        ...existing.config,
-        ...updates.config,
-      },
-      state: {
-        ...existing.state,
-        ...updates.state,
-      },
-      data: {
-        ...existing.data,
-        ...updates.data,
-      },
-    };
+    return new Date(session.expires_at).getTime() < Date.now();
   }
 
   /**
@@ -179,7 +83,7 @@ export class SessionUtils {
       maxSize: 10 * 1024 * 1024, // 10MB
       compression: true,
       encryption: false,
-      backup: true,
+      backup: true
     };
   }
 
@@ -190,7 +94,7 @@ export class SessionUtils {
     const result: SessionMetadata = {
       createdAt: new Date(),
       updatedAt: new Date(),
-      version: '1.0.0',
+      version: '1.0.0'
     };
 
     if (userId != null && userId !== '') {
@@ -219,7 +123,7 @@ export class SessionUtils {
       'push',
       'k8s_manifests',
       'deployment',
-      'verification',
+      'verification'
     ];
 
     // If no session or workflow_state, return initial state
@@ -261,7 +165,7 @@ export class SessionUtils {
 
     return {
       current: Math.min(completedSteps, WORKFLOW_STEPS.length),
-      total: WORKFLOW_STEPS.length,
+      total: WORKFLOW_STEPS.length
     };
   }
 
@@ -287,7 +191,7 @@ export class SessionUtils {
    */
   static updateSessionStatus(
     session: Session | Record<string, unknown>,
-    status?: string,
+    status?: string
   ): Session | Record<string, unknown> {
     if (status != null && status.length > 0) {
       if (typeof session === 'object' && session != null) {
@@ -306,7 +210,7 @@ export const SESSION_CONSTANTS = {
   MAX_SESSION_SIZE: 10 * 1024 * 1024, // 10MB
   CLEANUP_INTERVAL: 60 * 60 * 1000, // 1 hour
   MAX_SESSIONS_PER_USER: 10,
-  ID_PREFIX: 'session_',
+  ID_PREFIX: 'session_'
 } as const;
 
 /**
@@ -316,7 +220,7 @@ export class SessionError extends Error {
   constructor(
     message: string,
     public readonly code: string,
-    public readonly sessionId?: string,
+    public readonly sessionId?: string
   ) {
     super(message);
     this.name = 'SessionError';

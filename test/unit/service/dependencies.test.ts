@@ -4,7 +4,7 @@
  */
 
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { createMockLogger } from '../../utils/test-helpers.js';
+import { createMockLogger } from '../../utils/test-helpers';
 import type { Logger } from 'pino';
 
 describe('Service Dependencies', () => {

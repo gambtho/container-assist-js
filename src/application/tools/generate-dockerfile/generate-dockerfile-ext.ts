@@ -17,7 +17,7 @@ const RepositoryAnalysisSchema = z.object({
       type: z.string(),
       buildFile: z.string(),
       buildCommand: z.string().optional(),
-      testCommand: z.string().optional(),
+      testCommand: z.string().optional()
     })
     .optional(),
   dependencies: z.array(z.string()),
@@ -28,9 +28,9 @@ const RepositoryAnalysisSchema = z.object({
     .object({
       baseImage: z.string(),
       multistage: z.boolean(),
-      nonRootUser: z.boolean(),
+      nonRootUser: z.boolean()
     })
-    .optional(),
+    .optional()
 });
 
 type RepositoryAnalysis = z.infer<typeof RepositoryAnalysisSchema>;
@@ -42,7 +42,7 @@ const EnhancedDockerfileInput = z.object({
   port: z.number().optional(),
   security_hardening: z.boolean().default(true),
   include_healthcheck: z.boolean().default(true),
-  multistage: z.boolean().default(true),
+  multistage: z.boolean().default(true)
 });
 
 /**
@@ -51,7 +51,7 @@ const EnhancedDockerfileInput = z.object({
 async function generateEnhancedDockerfile(
   analysis: RepositoryAnalysis,
   input: z.infer<typeof EnhancedDockerfileInput>,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<string> {
   const { structuredSampler, contentValidator, logger } = context;
 
@@ -74,19 +74,19 @@ async function generateEnhancedDockerfile(
           entryPoint: analysis.entryPoint ?? 'index',
           port: String(input.port ?? (analysis.suggestedPorts[0] || 8080)),
           dependencies: analysis.dependencies.join(' '),
-          devDependencies: (analysis.devDependencies ?? []).join(' '),
+          devDependencies: (analysis.devDependencies ?? []).join(' ')
         },
         dockerContext: {
           baseImage: input.base_image ?? (analysis.dockerConfig?.baseImage || 'node:18-alpine'),
           multistage: input.multistage,
           securityHardening: input.security_hardening,
-          includeHealthcheck: input.include_healthcheck,
+          includeHealthcheck: input.include_healthcheck
         },
-        sessionId: input.session_id,
+        sessionId: input.session_id
       };
 
       const dockerfileResult = await structuredSampler.sampleStructured(JSON.stringify(aiRequest), {
-        format: 'text',
+        format: 'text'
       });
 
       if (!dockerfileResult.success) {
@@ -96,19 +96,19 @@ async function generateEnhancedDockerfile(
       // Validate security of generated Dockerfile if validator is available
       let validation: any = null;
       if (contentValidator && dockerfileResult.data) {
-        validation = await contentValidator.validateContent(dockerfileResult.data, {
+        validation = contentValidator.validateContent(dockerfileResult.data, {
           contentType: 'dockerfile',
           checkSecurity: true,
-          checkBestPractices: true,
+          checkBestPractices: true
         });
 
         if (!validation.valid) {
           logger.warn(
             {
               issues: validation.errors,
-              summary: validation.summary,
+              summary: validation.summary
             },
-            'Security validation failed for generated Dockerfile',
+            'Security validation failed for generated Dockerfile'
           );
 
           throw new Error(`Security validation failed: ${validation.summary}`);
@@ -118,7 +118,7 @@ async function generateEnhancedDockerfile(
         if (validation.issues && validation.issues.length > 0) {
           const highSeverityIssues = validation.issues.filter((i: any) => i.severity === 'high');
           const mediumSeverityIssues = validation.issues.filter(
-            (i: any) => i.severity === 'medium',
+            (i: any) => i.severity === 'medium'
           );
 
           if (highSeverityIssues.length === 0) {
@@ -126,9 +126,9 @@ async function generateEnhancedDockerfile(
             logger.warn(
               {
                 issues: mediumSeverityIssues,
-                summary: validation.summary,
+                summary: validation.summary
               },
-              'Security warnings in generated Dockerfile',
+              'Security warnings in generated Dockerfile'
             );
           }
         }
@@ -139,9 +139,9 @@ async function generateEnhancedDockerfile(
           language: analysis.language,
           framework: analysis.framework,
           securityIssues: validation.issues?.length ?? 0,
-          validationPassed: validation.isValid,
+          validationPassed: validation.isValid
         },
-        'Enhanced Dockerfile generated successfully',
+        'Enhanced Dockerfile generated successfully'
       );
 
       if (!dockerfileResult.data) {
@@ -150,7 +150,7 @@ async function generateEnhancedDockerfile(
 
       return dockerfileResult.data;
     },
-    { maxAttempts: 3, delayMs: 1000 },
+    { maxAttempts: 3, delayMs: 1000 }
   );
 }
 
@@ -159,7 +159,7 @@ async function generateEnhancedDockerfile(
  */
 async function analyzeRepositoryStructured(
   repoPath: string,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<RepositoryAnalysis> {
   const { structuredSampler, logger } = context;
 
@@ -170,9 +170,9 @@ async function analyzeRepositoryStructured(
   return executeWithRetry(
     async () => {
       // Get repository information (simplified for example)
-      const fileList = await getFileList(repoPath);
-      const configFiles = await readConfigFiles(repoPath);
-      const directoryTree = await getDirectoryStructure(repoPath);
+      const fileList = getFileList(repoPath);
+      const configFiles = readConfigFiles(repoPath);
+      const directoryTree = getDirectoryStructure(repoPath);
 
       // Use AI request builder for repository analysis
       // AIRequestBuilder not available - use direct structure
@@ -182,12 +182,12 @@ async function analyzeRepositoryStructured(
         variables: {
           fileList: fileList.slice(0, 500).join('\n'),
           configFiles: JSON.stringify(configFiles),
-          directoryTree,
-        },
+          directoryTree
+        }
       };
 
       const analysisResult = await structuredSampler.sampleJSON(JSON.stringify(aiRequest), {
-        schema: RepositoryAnalysisSchema,
+        schema: RepositoryAnalysisSchema
       });
 
       if (!analysisResult.success) {
@@ -198,31 +198,31 @@ async function analyzeRepositoryStructured(
         {
           language: analysisResult.data?.language,
           framework: analysisResult.data?.framework,
-          repoPath,
+          repoPath
         },
-        'Repository analysis completed with structured sampling',
+        'Repository analysis completed with structured sampling'
       );
 
       return analysisResult.data;
     },
-    { maxAttempts: 2, delayMs: 500 },
+    { maxAttempts: 2, delayMs: 500 }
   );
 }
 
 // Helper functions (simplified implementations)
-async function getFileList(_repoPath: string): Promise<string[]> {
+function getFileList(_repoPath: string): string[] {
   // Implementation would scan files and return paths
   return ['package.json', 'src/index.js', 'src/app.js'];
 }
 
-async function readConfigFiles(_repoPath: string): Promise<Record<string, string>> {
+function readConfigFiles(_repoPath: string): Record<string, string> {
   // Implementation would read common config files
   return {
-    'package.json': '{"name": "example", "dependencies": {"express": "^4.18.0"}}',
+    'package.json': '{"name": "example", "dependencies": {"express": "^4.18.0"}}'
   };
 }
 
-async function getDirectoryStructure(_repoPath: string): Promise<string> {
+function getDirectoryStructure(_repoPath: string): string {
   // Implementation would return tree structure
   return `
 package.json
@@ -251,8 +251,8 @@ export const enhancedGenerateDockerfileHandler: ToolDescriptor = {
       language: z.string(),
       framework: z.string().optional(),
       validationPassed: z.boolean(),
-      securityIssues: z.number(),
-    }),
+      securityIssues: z.number()
+    })
   }),
 
   handler: async (input: unknown, context: unknown) => {
@@ -270,16 +270,16 @@ export const enhancedGenerateDockerfileHandler: ToolDescriptor = {
       const dockerfileResult = await generateEnhancedDockerfile(
         analysisResult,
         validatedInput,
-        ctx,
+        ctx
       );
 
       // Step 3: Final validation check
       const finalValidation = ctx.contentValidator
-        ? await ctx.contentValidator.validateContent(dockerfileResult, {
-          contentType: 'dockerfile',
-          checkSecurity: true,
-          checkBestPractices: true,
-        })
+        ? ctx.contentValidator.validateContent(dockerfileResult, {
+            contentType: 'dockerfile',
+            checkSecurity: true,
+            checkBestPractices: true
+          })
         : null;
 
       // Update session state
@@ -289,31 +289,31 @@ export const enhancedGenerateDockerfileHandler: ToolDescriptor = {
           ...(session.workflow_state || {}),
           dockerfileContent: dockerfileResult,
           analysisResult,
-          validationResult: finalValidation,
-        },
+          validationResult: finalValidation
+        }
       }));
 
       return {
         success: true,
         dockerfile: dockerfileResult,
         securitySummary: ctx.contentValidator
-          ? await ctx.contentValidator.validateContent(dockerfileResult, {
-            contentType: 'dockerfile',
-            checkSecurity: true,
-          })
+          ? ctx.contentValidator.validateContent(dockerfileResult, {
+              contentType: 'dockerfile',
+              checkSecurity: true
+            })
           : null,
         metadata: {
           language: analysisResult.language,
           framework: analysisResult.framework,
           validationPassed: finalValidation?.valid ?? false,
-          securityIssues: finalValidation?.errors?.length ?? 0,
-        },
+          securityIssues: finalValidation?.errors?.length ?? 0
+        }
       };
     } catch (error) {
       logger.error({ error }, 'Error occurred'); // Fixed logger call
       throw new Error(`Enhanced Dockerfile generation failed: ${(error as Error).message}`);
     }
-  },
+  }
 };
 
 // Default export for registry

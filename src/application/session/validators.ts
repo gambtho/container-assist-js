@@ -32,7 +32,7 @@ export function getSessionBuildResult(session: Session): DockerBuildResult | nul
     logs?: string[];
     size_bytes?: number;
     size?: number;
-    layers?: number | any[]; // Can be number or array from different sources
+    layers?: number | unknown[]; // Can be number or array from different sources
     build_duration_ms?: number;
     buildTime?: number;
     success?: boolean;
@@ -46,10 +46,10 @@ export function getSessionBuildResult(session: Session): DockerBuildResult | nul
   const layersCount = Array.isArray(layersValue) ? layersValue.length : layersValue;
 
   const dockerResult: DockerBuildResult = {
-    imageId: result.image_id ?? (result.imageId || ''),
+    imageId: result.image_id ?? result.imageId ?? '',
     tags: result.tags ?? (result.image_tag ? [result.image_tag] : []),
     logs: result.logs ?? [],
-    success: result.success !== false,
+    success: result.success !== false
   };
 
   // Only add optional properties if they have defined values

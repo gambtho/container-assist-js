@@ -1,5 +1,5 @@
 import type { Logger } from 'pino';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+// Tool type no longer needed with new registerTool API
 import { z } from 'zod';
 import { McpError, ErrorCode as MCPErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ServiceError, ErrorCode } from '../../../contracts/types/errors.js';
@@ -8,19 +8,11 @@ import type { ToolContext, ToolDescriptor } from '../tool-types.js';
 import { convertToMcpError } from '../../errors/mcp-error-mapper.js';
 import { withValidationAndLogging } from '../../errors/validation.js';
 import { ToolNotImplementedError, suggestAlternativeTools } from '../../errors/tool-errors.js';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { getImplementedTools, isToolImplemented, getToolInfo } from '../tool-manifest.js';
 
 // Re-export types
 export type { ToolDescriptor, ToolContext } from '../tool-types.js';
-
-// Helper function to convert Zod schema to JSON Schema (simplified)
-function zodToJsonSchema(_schema: any): any {
-  return {
-    type: 'object',
-    properties: {},
-    additionalProperties: true,
-  };
-}
 
 export class ToolRegistry {
   private tools = new Map<string, ToolDescriptor>();
@@ -29,7 +21,7 @@ export class ToolRegistry {
 
   constructor(
     private readonly services: Services,
-    private readonly logger: Logger,
+    private readonly logger: Logger
   ) {
     this.logger = logger.child({ component: 'ToolRegistry' });
   }
@@ -44,7 +36,7 @@ export class ToolRegistry {
       this.server.log('info', 'Tool execution started', {
         tool: toolName,
         params: this.sanitizeParams(params) as any,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       });
     }
   }
@@ -70,71 +62,70 @@ export class ToolRegistry {
     if (this.server == null) {
       throw new ServiceError(
         ErrorCode.DependencyNotInitialized,
-        'MCP server not attached to registry. Call setServer() first.',
+        'MCP server not attached to registry. Call setServer() first.'
       );
     }
 
     try {
       this.tools.set(descriptor.name, descriptor);
 
-      const tool: Tool = {
-        name: descriptor.name,
-        description: descriptor.description,
-        inputSchema: zodToJsonSchema(descriptor.inputSchema) as {
-          type: 'object';
-          properties?: any;
-        } & { [k: string]: unknown },
-      };
+      this.server.registerTool(
+        descriptor.name,
+        {
+          title: descriptor.name,
+          description: descriptor.description,
+          inputSchema: descriptor.inputSchema as any
+        },
+        async (params: unknown, context: unknown) => {
+          const toolLogger = this.logger.child({ tool: descriptor.name });
 
-      this.server.addTool(tool, async (params: unknown, context: unknown) => {
-        const toolLogger = this.logger.child({ tool: descriptor.name });
+          this.logToolExecution(descriptor.name, params);
 
-        this.logToolExecution(descriptor.name, params);
+          try {
+            const toolContext = await this.createToolContext(context, toolLogger);
 
-        try {
-          const toolContext = await this.createToolContext(context, toolLogger);
-
-          const validatedHandler = withValidationAndLogging(
-            descriptor.inputSchema as z.ZodType<TInput>,
-            descriptor.outputSchema,
-            async (validatedInput: TInput, _logger) => {
-              return await descriptor.handler(validatedInput, toolContext);
-            },
-            toolLogger,
-            descriptor.name,
-          );
-
-          const result = await validatedHandler(params as TInput);
-
-          const responseText = `✅ **${descriptor.name} completed**\n${JSON.stringify(result, null, 2)}`;
-
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: responseText,
+            const validatedHandler = withValidationAndLogging(
+              descriptor.inputSchema as z.ZodType<TInput>,
+              descriptor.outputSchema,
+              async (validatedInput: TInput, _logger) => {
+                return await descriptor.handler(validatedInput, toolContext);
               },
-            ],
-          };
-        } catch (error) {
-          toolLogger.error({ error }, 'Tool execution failed');
+              toolLogger,
+              descriptor.name
+            );
 
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: `❌ **${descriptor.name} failed**: ${errorMessage}`,
-              },
-            ],
-          };
+            const result = await validatedHandler(params as TInput);
+
+            const responseText = `✅ **${descriptor.name} completed**\n${JSON.stringify(result, null, 2)}`;
+
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: responseText
+                }
+              ]
+            };
+          } catch (error) {
+            toolLogger.error({ error }, 'Tool execution failed');
+
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: `❌ **${descriptor.name} failed**: ${errorMessage}`
+                }
+              ]
+            };
+          }
         }
-      });
+      );
 
       this.toolList.push({
         name: descriptor.name,
         description: descriptor.description,
-        inputSchema: zodToJsonSchema(descriptor.inputSchema),
+        inputSchema: zodToJsonSchema(descriptor.inputSchema)
       });
 
       this.logger.info(
@@ -142,9 +133,9 @@ export class ToolRegistry {
           tool: descriptor.name,
           category: descriptor.category,
           hasChainHint: !!descriptor.chainHint,
-          registrationMethod: 'mcp-sdk',
+          registrationMethod: 'mcp-sdk'
         },
-        'MCP tool registered',
+        'MCP tool registered'
       );
     } catch (error) {
       this.logger.error({ error, tool: descriptor.name }, 'Failed to register MCP tool');
@@ -157,14 +148,14 @@ export class ToolRegistry {
     if (desc?.name == null || desc?.inputSchema == null || desc?.outputSchema == null) {
       throw new ServiceError(
         ErrorCode.VALIDATION_ERROR,
-        'Tool must have name, inputSchema, and outputSchema',
+        'Tool must have name, inputSchema, and outputSchema'
       );
     }
 
     if (desc.inputSchema?.parse == null || desc.outputSchema?.parse == null) {
       throw new ServiceError(
         ErrorCode.VALIDATION_ERROR,
-        'Input and output schemas must be valid Zod schemas',
+        'Input and output schemas must be valid Zod schemas'
       );
     }
 
@@ -174,114 +165,177 @@ export class ToolRegistry {
 
     this.tools.set(desc.name, desc);
 
+    // Add to toolList for listTools() method
+    this.toolList.push({
+      name: desc.name,
+      description: desc.description,
+      inputSchema: zodToJsonSchema(desc.inputSchema)
+    });
+
     this.logger.info(
       {
         tool: desc.name,
         category: desc.category,
-        hasChainHint: Boolean(desc.chainHint),
+        hasChainHint: Boolean(desc.chainHint)
       },
-      'Tool registered',
+      'Tool registered'
     );
   }
 
   async handleToolCall(request: unknown): Promise<unknown> {
-    const { name, arguments: args } = request as { name: string; arguments: unknown };
+    try {
+      const { name, arguments: args } = request as { name: string; arguments: unknown };
 
-    if (!isToolImplemented(name)) {
-      const availableTools = getImplementedTools();
-      const suggestions = suggestAlternativeTools(name, availableTools);
+      // First check if tool is directly registered (e.g., test tools)
+      if (!this.tools.has(name)) {
+        // Then check if it should be implemented according to manifest
+        if (!isToolImplemented(name)) {
+          const availableTools = getImplementedTools();
+          const suggestions = suggestAlternativeTools(name, availableTools);
 
-      const toolInfo = getToolInfo(name);
-      let errorMessage = `Tool '${name}' is not implemented`;
+          const toolInfo = getToolInfo(name);
+          let errorMessage = `Tool '${name}' is not implemented`;
 
-      if (toolInfo != null) {
-        errorMessage += `. Status: ${toolInfo.status}`;
-        if (toolInfo.notes != null && toolInfo.notes !== '') {
-          errorMessage += `. Note: ${toolInfo.notes}`;
+          if (toolInfo != null) {
+            errorMessage += `. Status: ${toolInfo.status}`;
+            if (toolInfo.notes != null && toolInfo.notes !== '') {
+              errorMessage += `. Note: ${toolInfo.notes}`;
+            }
+          }
+
+          this.logger.warn(
+            {
+              tool: name,
+              availableTools: availableTools.length,
+              suggestions
+            },
+            'Unimplemented tool requested'
+          );
+
+          throw new ToolNotImplementedError(errorMessage, name, {
+            availableTools,
+            suggestedAlternatives: suggestions
+          });
+        } else {
+          // Tool is in manifest but not registered - configuration issue
+          this.logger.warn({ tool: name }, 'Tool not found in registry');
+          throw new McpError(MCPErrorCode.MethodNotFound, `Tool ${name} not registered`, {
+            requestedTool: name,
+            hint: 'Tool is implemented but not registered. This is a server configuration issue.'
+          });
         }
       }
 
-      this.logger.warn(
-        {
-          tool: name,
-          availableTools: availableTools.length,
-          suggestions,
-        },
-        'Unimplemented tool requested',
-      );
+      this.logToolExecution(name, args);
 
-      throw new ToolNotImplementedError(errorMessage, name, {
-        availableTools,
-        suggestedAlternatives: suggestions,
-      });
-    }
+      const tool = this.tools.get(name)!; // We already checked existence above
 
-    this.logToolExecution(name, args);
-
-    const tool = this.tools.get(name);
-    if (tool == null) {
-      this.logger.warn({ tool: name }, 'Tool not found in registry');
-      throw new McpError(MCPErrorCode.MethodNotFound, `Tool ${name} not registered`, {
-        requestedTool: name,
-        hint: 'Tool is implemented but not registered. This is a server configuration issue.',
-      });
-    }
-
-    const baseContext = await this.createToolContext();
-
-    try {
-      const validated = tool.inputSchema.parse(args);
-
-      const timeout = (tool as any)?.timeout ?? 30000;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      const baseContext = await this.createToolContext();
 
       try {
-        const executeFn = (tool as any).execute ?? tool.handler;
-        const result = await executeFn(validated, {
-          ...baseContext,
-          signal: controller.signal,
-        });
+        const validated = tool.inputSchema.parse(args);
 
-        clearTimeout(timeoutId);
+        const timeout = (tool as any)?.timeout ?? 30000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        if (result?.success && result?.data) {
-          const validatedOutput = tool.outputSchema.parse(result.data);
+        try {
+          const executeFn = (tool as any).execute ?? tool.handler;
+          const result = await executeFn(validated, {
+            ...baseContext,
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          // Tool handlers return results directly, not wrapped in {success, data}
+          const validatedOutput = tool.outputSchema.parse(result);
 
           return {
+            success: true,
             content: [
               {
                 type: 'text',
-                text: JSON.stringify(validatedOutput, null, 2),
-              },
-            ],
+                text: JSON.stringify(validatedOutput, null, 2)
+              }
+            ]
           };
-        } else {
-          throw convertToMcpError(result?.error ?? new Error('Unknown error'));
+        } finally {
+          clearTimeout(timeoutId);
         }
-      } finally {
-        clearTimeout(timeoutId);
+      } catch (error) {
+        this.logger.error({ error, tool: name }, 'Tool execution error');
+
+        if (error instanceof z.ZodError) {
+          throw new McpError(MCPErrorCode.InvalidParams, 'Input validation failed', {
+            issues: error.issues.map((e) => ({
+              path: e.path.join('.'),
+              message: e.message,
+              code: e.code
+            }))
+          });
+        }
+
+        throw convertToMcpError(error);
       }
     } catch (error) {
-      this.logger.error({ error, tool: name }, 'Tool execution error');
+      // Handle all errors by converting them to structured MCP responses
+      this.logger.error({ error }, 'handleToolCall failed');
 
-      if (error instanceof z.ZodError) {
-        throw new McpError(MCPErrorCode.InvalidParams, 'Input validation failed', {
-          issues: error.issues.map((e) => ({
-            path: e.path.join('.'),
-            message: e.message,
-            code: e.code,
-          })),
-        });
+      if (error instanceof ToolNotImplementedError) {
+        return {
+          success: false,
+          content: [
+            {
+              type: 'text',
+              text: `Tool ${error.toolName} not found`
+            }
+          ]
+        };
       }
 
-      throw convertToMcpError(error);
+      if (error instanceof McpError) {
+        return {
+          success: false,
+          content: [
+            {
+              type: 'text',
+              text: `Validation error: ${error.message}`
+            }
+          ]
+        };
+      }
+
+      // Check for MCP error-like objects (which may not be instanceof McpError)
+      if (error && typeof error === 'object' && 'message' in error && 'code' in error) {
+        return {
+          success: false,
+          content: [
+            {
+              type: 'text',
+              text: `Error: ${String(error.message)}`
+            }
+          ]
+        };
+      }
+
+      // Generic error handling
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        content: [
+          {
+            type: 'text',
+            text: `Error: ${errorMessage}`
+          }
+        ]
+      };
     }
   }
 
-  async listTools(): Promise<{
+  listTools(): {
     tools: Array<{ name: string; description?: string; inputSchema?: unknown }>;
-  }> {
+  } {
     return { tools: this.toolList };
   }
 
@@ -299,9 +353,9 @@ export class ToolRegistry {
                 text:
                   typeof result?.content === 'string'
                     ? result.content
-                    : JSON.stringify(result?.content),
-              },
-            ],
+                    : JSON.stringify(result?.content)
+              }
+            ]
           };
         } else {
           return {
@@ -309,9 +363,9 @@ export class ToolRegistry {
             content: [
               {
                 type: 'text',
-                text: `Sampling error: ${result?.error ?? 'Unknown error'}`,
-              },
-            ],
+                text: `Sampling error: ${result?.error ?? 'Unknown error'}`
+              }
+            ]
           };
         }
       } catch (error) {
@@ -320,9 +374,9 @@ export class ToolRegistry {
           content: [
             {
               type: 'text',
-              text: `Sampling error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
+              text: `Sampling error: ${error instanceof Error ? error.message : String(error)}`
+            }
+          ]
         };
       }
     }
@@ -339,9 +393,9 @@ export class ToolRegistry {
         content: [
           {
             type: 'text',
-            text: 'AI sampling not available',
-          },
-        ],
+            text: 'AI sampling not available'
+          }
+        ]
       };
     }
 
@@ -361,9 +415,9 @@ export class ToolRegistry {
         content: [
           {
             type: 'text',
-            text: resultText,
-          },
-        ],
+            text: resultText
+          }
+        ]
       };
     } catch (error) {
       this.logger.error({ error }, 'Sampling error');
@@ -372,9 +426,9 @@ export class ToolRegistry {
         content: [
           {
             type: 'text',
-            text: `Sampling error: ${error instanceof Error ? error.message : String(error)}`,
-          },
-        ],
+            text: `Sampling error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ]
       };
     }
   }
@@ -384,6 +438,7 @@ export class ToolRegistry {
       const allModules = [
         'ping',
         'server-status',
+        '../list-tools',
         '../analyze-repo/analyze-repo',
         '../resolve-base-images/resolve-base-images',
         '../generate-dockerfile/generate-dockerfile',
@@ -392,10 +447,12 @@ export class ToolRegistry {
         '../scan-image/scan-image',
         '../tag-image/tag-image',
         '../push-image/push-image',
-        '../generate-k8s-manifests/generate-k8s-manifests',
+        '../generate-k8s-manifests/index',
         '../prepare-cluster/prepare-cluster',
         '../deploy-application/deploy-application',
         '../verify-deployment/verify-deployment',
+        '../workflow/start-workflow',
+        '../workflow/workflow-status'
       ];
 
       for (const moduleName of allModules) {
@@ -405,6 +462,10 @@ export class ToolRegistry {
             if (this.server != null && module.default?.handler != null) {
               this.registerTool(module.default);
               this.logger.debug({ module: moduleName, type: 'mcp' }, 'Tool loaded');
+            } else if (module.default?.handler != null || module.default?.execute != null) {
+              // Fallback to basic registration for testing
+              this.register(module.default);
+              this.logger.debug({ module: moduleName, type: 'basic' }, 'Tool loaded');
             } else {
               this.logger.warn({ module: moduleName }, 'Tool missing handler property');
             }
@@ -415,25 +476,25 @@ export class ToolRegistry {
           this.logger.error(
             {
               module: moduleName,
-              error: error instanceof Error ? error.message : String(error),
+              error: error instanceof Error ? error.message : String(error)
             },
-            'Failed to load tool handler',
+            'Failed to load tool handler'
           );
         }
       }
 
       this.logger.info(
         {
-          toolCount: this.tools.size,
+          toolCount: this.tools.size
         },
-        'All tools registered',
+        'All tools registered'
       );
     } catch (error) {
       this.logger.error({ error }, 'Failed to register tools');
       throw new ServiceError(
         ErrorCode.ServiceUnavailable,
         'Failed to register tool handlers',
-        error instanceof Error ? error : undefined,
+        error instanceof Error ? error : undefined
       );
     }
   }
@@ -452,7 +513,7 @@ export class ToolRegistry {
 
   private async createToolContext(
     contextOrSignal?: unknown,
-    logger?: Logger,
+    logger?: Logger
   ): Promise<ToolContext> {
     const signal = logger ? (contextOrSignal as AbortSignal) : (contextOrSignal as AbortSignal);
     const contextLogger = logger ?? this.logger;
@@ -463,7 +524,7 @@ export class ToolRegistry {
     const workflowManager = new WorkflowManager(this.logger);
     const workflowOrchestrator = new WorkflowOrchestrator(
       this.services.session as any,
-      this.logger,
+      this.logger
     );
 
     const context: ToolContext = {
@@ -487,7 +548,7 @@ export class ToolRegistry {
           sessionTTL: '24h',
           maxSessions: 100,
           enableMetrics: false,
-          enableEvents: true,
+          enableEvents: true
         },
         workspace: { workspaceDir: process.cwd(), tempDir: './tmp', cleanupOnExit: true },
         infrastructure: {
@@ -497,14 +558,14 @@ export class ToolRegistry {
             host: 'localhost',
             port: 2376,
             timeout: 300000,
-            apiVersion: '1.41',
+            apiVersion: '1.41'
           },
           kubernetes: {
             kubeconfig: '',
             namespace: 'default',
             context: '',
             timeout: 300000,
-            dryRun: false,
+            dryRun: false
           },
           scanning: {
             enabled: true,
@@ -512,7 +573,7 @@ export class ToolRegistry {
             severityThreshold: 'high' as const,
             failOnVulnerabilities: false,
             skipUpdate: false,
-            timeout: 300000,
+            timeout: 300000
           },
           build: {
             enableCache: true,
@@ -521,15 +582,15 @@ export class ToolRegistry {
             buildArgs: {},
             labels: {},
             target: '',
-            squash: false,
+            squash: false
           },
           java: {
             defaultVersion: '17',
             defaultJvmHeapPercentage: 75,
             enableNativeImage: false,
             enableJmx: false,
-            enableProfiling: false,
-          },
+            enableProfiling: false
+          }
         },
         aiServices: {
           ai: {
@@ -540,14 +601,14 @@ export class ToolRegistry {
             retryAttempts: 3,
             retryDelayMs: 1000,
             temperature: 0.1,
-            maxTokens: 4096,
+            maxTokens: 4096
           },
           sampler: {
             mode: 'auto' as const,
             templateDir: './templates',
             cacheEnabled: true,
             retryAttempts: 3,
-            retryDelayMs: 1000,
+            retryDelayMs: 1000
           },
           mock: {
             enabled: false,
@@ -555,8 +616,8 @@ export class ToolRegistry {
             deterministicMode: false,
             simulateLatency: false,
             errorRate: 0,
-            latencyRange: { min: 100, max: 500 },
-          },
+            latencyRange: { min: 100, max: 500 }
+          }
         },
         logging: {
           level: 'info' as const,
@@ -565,7 +626,7 @@ export class ToolRegistry {
           filePath: './logs/app.log',
           maxFileSize: '10MB',
           maxFiles: 5,
-          enableColors: true,
+          enableColors: true
         },
         workflow: {
           mode: 'interactive' as const,
@@ -573,7 +634,7 @@ export class ToolRegistry {
           maxRetries: 3,
           retryDelayMs: 5000,
           parallelSteps: false,
-          skipOptionalSteps: false,
+          skipOptionalSteps: false
         },
         features: {
           aiEnabled: true,
@@ -583,8 +644,8 @@ export class ToolRegistry {
           enablePerformanceMonitoring: false,
           enableDebugLogs: false,
           enableTracing: false,
-          nonInteractive: false,
-        },
+          nonInteractive: false
+        }
       } as any,
       logPerformanceMetrics: (operation: string, duration: number, metadata?: unknown) => {
         try {
@@ -597,24 +658,28 @@ export class ToolRegistry {
                 operation,
                 duration,
                 metadata: metadata ?? {},
-                timestamp: new Date().toISOString(),
-              },
-            },
+                timestamp: new Date().toISOString()
+              }
+            }
           });
         } catch (error) {
           contextLogger.info(
             {
               operation,
               duration,
-              metadata: metadata ?? {},
+              metadata: metadata ?? {}
             },
-            'Performance metrics',
+            'Performance metrics'
           );
         }
-      },
+      }
     };
 
-    if (this.services.ai && 'isAvailable' in this.services.ai && (this.services.ai as any).isAvailable?.() === true) {
+    if (
+      this.services.ai &&
+      'isAvailable' in this.services.ai &&
+      (this.services.ai as any).isAvailable?.() === true
+    ) {
       // Add AI components if available
     }
 

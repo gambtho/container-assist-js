@@ -65,7 +65,7 @@ export class SessionAlreadyExistsError extends Error {
 export class OptimisticLockError extends Error {
   constructor(id: string, expectedVersion: number, actualVersion: number) {
     super(
-      `Optimistic lock failed for session ${id}: expected version ${expectedVersion}, got ${actualVersion}`,
+      `Optimistic lock failed for session ${id}: expected version ${expectedVersion}, got ${actualVersion}`
     );
     this.name = 'OptimisticLockError';
   }

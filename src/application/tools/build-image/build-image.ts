@@ -12,7 +12,7 @@ import {
   BuildImageInput as BuildImageInputSchema,
   BuildResultSchema,
   BuildImageParams,
-  BuildResult,
+  BuildResult
 } from '../schemas.js';
 import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 import { fileExists } from '../utils.js';
@@ -29,12 +29,12 @@ export type BuildOutput = BuildResult;
  */
 function prepareBuildArgs(
   buildArgs: Record<string, string>,
-  session: unknown,
+  session: unknown
 ): Record<string, string> {
   const defaults: Record<string, string> = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',
     BUILD_DATE: new Date().toISOString(),
-    VCS_REF: process.env.GIT_COMMIT ?? 'unknown',
+    VCS_REF: process.env.GIT_COMMIT ?? 'unknown'
   };
 
   // Add session-specific args if available
@@ -62,7 +62,7 @@ function prepareBuildArgs(
  */
 async function buildDockerImage(
   options: DockerBuildOptions,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<DockerBuildResult> {
   const { logger } = context;
   const dockerService = (context as any).dockerService;
@@ -72,7 +72,7 @@ async function buildDockerImage(
     const result = await dockerService.build(options);
     if (result.success) {
       // Check if result has data property with build result
-      const buildResult = (result).data;
+      const buildResult = result.data;
       if (buildResult) {
         return buildResult;
       }
@@ -81,7 +81,7 @@ async function buildDockerImage(
     }
     const errorMessage =
       typeof result === 'object' && result !== null && 'error' in result
-        ? String((result).error?.message || (result).error || 'Docker build failed')
+        ? String(result.error?.message || result.error || 'Docker build failed')
         : 'Docker build failed';
     throw new Error(errorMessage);
   }
@@ -97,7 +97,7 @@ async function buildDockerImage(
     layers: 10,
     buildTime: Date.now(),
     logs: ['Build completed successfully', 'Using CLI fallback'],
-    success: true,
+    success: true
   };
 }
 
@@ -148,7 +148,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
       buildArgs,
       target,
       noCache,
-      platform,
+      platform
     } = input;
 
     // Progress tracking handled via progressEmitter
@@ -159,9 +159,9 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
         context: buildContext,
         dockerfile,
         tags,
-        noCache,
+        noCache
       },
-      'Starting Docker image build',
+      'Starting Docker image build'
     );
 
     const startTime = Date.now();
@@ -194,7 +194,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
           throw new NotFoundError(
             `Dockerfile not found: ${dockerfilePath}`,
             'dockerfile',
-            dockerfilePath,
+            dockerfilePath
           );
         }
       }
@@ -225,15 +225,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
           status: 'in_progress',
           message: 'Preparing Docker build',
           progress: 0.1,
-          metadata: { sessionId, dockerfile: dockerfilePath },
-        });
-      } else if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
-          sessionId,
-          step: 'build_image',
-          status: 'in_progress',
-          message: 'Preparing Docker build',
-          progress: 0.1,
+          metadata: { sessionId, dockerfile: dockerfilePath }
         });
       }
 
@@ -245,7 +237,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
         buildArgs: prepareBuildArgs(buildArgs ?? {}, session),
         ...(target && { target }),
         noCache,
-        ...(platform && { platform }),
+        ...(platform && { platform })
       };
 
       logger.info(buildOptions as unknown, 'Executing Docker build');
@@ -258,15 +250,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
           status: 'in_progress',
           message: 'Building Docker image',
           progress: 0.3,
-          metadata: { sessionId, tags: fullTags, context: buildOptions.context },
-        });
-      } else if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
-          sessionId,
-          step: 'build_image',
-          status: 'in_progress',
-          message: 'Building Docker image',
-          progress: 0.3,
+          metadata: { sessionId, tags: fullTags, context: buildOptions.context }
         });
       }
 
@@ -275,7 +259,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
         async () => {
           return await buildDockerImage(buildOptions, context);
         },
-        { maxAttempts: 2 },
+        { maxAttempts: 2 }
       );
 
       // Report build progress
@@ -286,15 +270,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
           status: 'in_progress',
           message: 'Finalizing image',
           progress: 0.9,
-          metadata: { sessionId, imageId: buildResult.imageId },
-        });
-      } else if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
-          sessionId,
-          step: 'build_image',
-          status: 'in_progress',
-          message: 'Finalizing image',
-          progress: 0.9,
+          metadata: { sessionId, imageId: buildResult.imageId }
         });
       }
 
@@ -320,9 +296,9 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
               : (buildResult.layers ?? 0),
             buildTime,
             logs: buildResult.logs ?? [],
-            success: buildResult.success ?? true,
-          },
-        },
+            success: buildResult.success ?? true
+          }
+        }
       }));
 
       // Push to registry if requested
@@ -332,9 +308,9 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
 
         for (const tag of fullTags) {
           if ('push' in dockerService) {
-            await (dockerService).push({
+            await dockerService.push({
               image: tag,
-              registry: input.registry,
+              registry: input.registry
             });
           }
         }
@@ -352,16 +328,8 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
             imageId: buildResult.imageId,
             tags: buildResult.tags,
             buildTime,
-            size: buildResult.size,
-          },
-        });
-      } else if (progressEmitter && sessionId) {
-        await progressEmitter.emit({
-          sessionId,
-          step: 'build_image',
-          status: 'completed',
-          message: 'Docker image built successfully',
-          progress: 1.0,
+            size: buildResult.size
+          }
         });
       }
 
@@ -369,9 +337,9 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
         {
           imageId: buildResult.imageId,
           tags: buildResult.tags,
-          buildTime: `${buildTime}ms`,
+          buildTime: `${buildTime}ms`
         },
-        'Docker image built successfully',
+        'Docker image built successfully'
       );
 
       return {
@@ -389,8 +357,8 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
           platform: platform ?? 'linux/amd64',
           dockerfile: dockerfilePath,
           context: buildContext,
-          cached: !noCache,
-        },
+          cached: !noCache
+        }
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -402,7 +370,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
           step: 'build_image',
           status: 'failed',
           message: 'Docker build failed',
-          progress: 0,
+          progress: 0
         });
       }
 
@@ -416,9 +384,9 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
     reason: 'Scan built image for vulnerabilities',
     paramMapper: (output) => ({
       image_id: output.imageId,
-      image_tag: output.tags[0],
-    }),
-  },
+      image_tag: output.tags[0]
+    })
+  }
 };
 
 // Default export for registry

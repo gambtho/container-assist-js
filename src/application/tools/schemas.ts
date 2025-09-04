@@ -8,19 +8,19 @@ import { z } from 'zod';
 // ============= Base Input Schemas =============
 
 export const SessionIdInput = z.object({
-  sessionId: z.string().min(1, 'Session ID is required'),
+  sessionId: z.string().min(1, 'Session ID is required')
 });
 
 // ============= Tool Input Schemas =============
 
 export const RepoPathInput = z.object({
-  repoPath: z.string().min(1, 'Repository path is required'),
+  repoPath: z.string().min(1, 'Repository path is required')
 });
 
 export const AnalyzeRepositoryInput = RepoPathInput.extend({
   sessionId: z.string().optional(),
   depth: z.enum(['shallow', 'deep']).default('shallow'),
-  includeTests: z.boolean().default(false),
+  includeTests: z.boolean().default(false)
 });
 
 export const ResolveBaseImagesInput = SessionIdInput;
@@ -39,17 +39,17 @@ export const BuildImageInput = SessionIdInput.extend({
   push: z.boolean().default(false),
   registry: z.string().optional(),
   squash: z.boolean().default(false),
-  pull: z.boolean().default(true),
+  pull: z.boolean().default(true)
 });
 
 export const ScanImageInput = SessionIdInput;
 
 export const TagImageInput = SessionIdInput.extend({
-  tag: z.string().min(1, 'Tag is required'),
+  tag: z.string().min(1, 'Tag is required')
 });
 
 export const PushImageInput = SessionIdInput.extend({
-  registry: z.string().optional(),
+  registry: z.string().optional()
 });
 
 export const GenerateK8sManifestsInput = SessionIdInput;
@@ -63,26 +63,26 @@ export const VerifyDeploymentInput = SessionIdInput;
 export const StartWorkflowInput = RepoPathInput.extend({
   automated: z.boolean().default(true),
   deploy: z.boolean().default(true),
-  scan: z.boolean().default(true),
+  scan: z.boolean().default(true)
 });
 
 export const WorkflowStatusInput = SessionIdInput;
 
 export const FixDockerfileInput = SessionIdInput.extend({
-  errorMessage: z.string().min(1, 'Error message is required'),
+  errorMessage: z.string().min(1, 'Error message is required')
 });
 
 export const OptimizeJvmInput = SessionIdInput.extend({
   memoryLimit: z.string().optional(),
-  cpuLimit: z.number().optional(),
+  cpuLimit: z.number().optional()
 });
 
 export const PingInput = z.object({
-  message: z.string().optional(),
+  message: z.string().optional()
 });
 
 export const ServerStatusInput = z.object({
-  details: z.boolean().optional(),
+  details: z.boolean().optional()
 });
 
 export const ListToolsInput = z.object({});
@@ -90,11 +90,11 @@ export const ListToolsInput = z.object({});
 // ============= Base Output Schemas =============
 
 export const BaseSuccessSchema = z.object({
-  success: z.boolean(),
+  success: z.boolean()
 });
 
 export const BaseSessionResultSchema = BaseSuccessSchema.extend({
-  sessionId: z.string(),
+  sessionId: z.string()
 });
 
 // ============= Tool Output Schemas =============
@@ -109,15 +109,15 @@ export const AnalysisResultSchema = BaseSessionResultSchema.extend({
       type: z.string(),
       buildFile: z.string(),
       buildCommand: z.string().optional(),
-      testCommand: z.string().optional(),
+      testCommand: z.string().optional()
     })
     .optional(),
   dependencies: z.array(
     z.object({
       name: z.string(),
       version: z.string().optional(),
-      type: z.enum(['runtime', 'dev', 'test']).optional(),
-    }),
+      type: z.enum(['runtime', 'dev', 'test']).optional()
+    })
   ),
   ports: z.array(z.number()),
   hasDockerfile: z.boolean(),
@@ -128,14 +128,14 @@ export const AnalysisResultSchema = BaseSessionResultSchema.extend({
     .object({
       baseImage: z.string().optional(),
       buildStrategy: z.string().optional(),
-      securityNotes: z.array(z.string()).optional(),
+      securityNotes: z.array(z.string()).optional()
     })
-    .optional(),
+    .optional()
 });
 export const DockerfileResultSchema = BaseSessionResultSchema.extend({
   dockerfile: z.string(),
   path: z.string(),
-  validation: z.array(z.string()).optional(),
+  validation: z.array(z.string()).optional()
 });
 
 export const BuildResultSchema = BaseSessionResultSchema.extend({
@@ -151,8 +151,8 @@ export const BuildResultSchema = BaseSessionResultSchema.extend({
     platform: z.string().optional(),
     dockerfile: z.string(),
     context: z.string(),
-    cached: z.boolean().optional(),
-  }),
+    cached: z.boolean().optional()
+  })
 });
 
 export const ScanResultSchema = BaseSessionResultSchema.extend({
@@ -161,7 +161,7 @@ export const ScanResultSchema = BaseSessionResultSchema.extend({
   high: z.number(),
   medium: z.number(),
   low: z.number(),
-  details: z.array(z.any()).optional(),
+  details: z.array(z.any()).optional()
 });
 
 export const K8sManifestsResultSchema = BaseSessionResultSchema.extend({
@@ -170,9 +170,9 @@ export const K8sManifestsResultSchema = BaseSessionResultSchema.extend({
   resources: z.array(
     z.object({
       kind: z.string(),
-      name: z.string(),
-    }),
-  ),
+      name: z.string()
+    })
+  )
 });
 
 export const DeploymentResultSchema = BaseSessionResultSchema.extend({
@@ -181,7 +181,7 @@ export const DeploymentResultSchema = BaseSessionResultSchema.extend({
   serviceName: z.string(),
   endpoint: z.string().optional(),
   ready: z.boolean(),
-  replicas: z.number(),
+  replicas: z.number()
 });
 
 export const WorkflowResultSchema = BaseSuccessSchema.extend({
@@ -189,7 +189,7 @@ export const WorkflowResultSchema = BaseSuccessSchema.extend({
   status: z.enum(['pending', 'running', 'completed', 'failed']),
   currentStep: z.string().optional(),
   completedSteps: z.array(z.string()),
-  errors: z.record(z.string(), z.string()).optional(),
+  errors: z.record(z.string(), z.string()).optional()
 });
 
 export const ToolListSchema = BaseSuccessSchema.extend({
@@ -197,14 +197,14 @@ export const ToolListSchema = BaseSuccessSchema.extend({
     z.object({
       name: z.string(),
       description: z.string(),
-      category: z.enum(['workflow', 'orchestration', 'utility', 'optimization']),
-    }),
-  ),
+      category: z.enum(['workflow', 'orchestration', 'utility', 'optimization'])
+    })
+  )
 });
 
 export const PingResultSchema = BaseSuccessSchema.extend({
   message: z.string(),
-  timestamp: z.string(),
+  timestamp: z.string()
 });
 
 export const ServerStatusSchema = BaseSuccessSchema.extend({
@@ -212,10 +212,10 @@ export const ServerStatusSchema = BaseSuccessSchema.extend({
   uptime: z.number(),
   memory: z.object({
     used: z.number(),
-    total: z.number(),
+    total: z.number()
   }),
   sessions: z.number().optional(),
-  tools: z.number(),
+  tools: z.number()
 });
 
 // ============= Session Schemas =============
@@ -226,7 +226,7 @@ export const SessionStatusEnum = z.enum([
   'building',
   'deploying',
   'completed',
-  'failed',
+  'failed'
 ]);
 
 export const WorkflowStateSchema = z.object({
@@ -239,7 +239,7 @@ export const WorkflowStateSchema = z.object({
   k8sManifests: z.any().optional(),
   deploymentResult: z.any().optional(),
   errors: z.record(z.string(), z.string()),
-  metadata: z.record(z.string(), z.unknown()),
+  metadata: z.record(z.string(), z.unknown())
 });
 
 export const SessionSchema = z.object({
@@ -251,7 +251,7 @@ export const SessionSchema = z.object({
   updatedAt: z.string().datetime(),
   config: z.record(z.string(), z.unknown()).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  version: z.number().default(0),
+  version: z.number().default(0)
 });
 
 // ============= Type Exports =============
@@ -300,7 +300,7 @@ export type Session = z.infer<typeof SessionSchema>;
  */
 export function validateInput<T>(
   schema: z.ZodSchema<T>,
-  data: unknown,
+  data: unknown
 ): { success: true; data: T } | { success: false; error: string } {
   try {
     const validated = schema.parse(data);

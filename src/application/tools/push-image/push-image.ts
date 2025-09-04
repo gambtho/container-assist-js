@@ -23,7 +23,7 @@ const PushImageInput = z
     authToken: z.string().optional(),
     retry_on_failure: z.boolean().default(true),
     retryOnFailure: z.boolean().optional(),
-    parallel: z.boolean().default(false),
+    parallel: z.boolean().default(false)
   })
   .transform((data) => ({
     sessionId: data.session_id ?? data.sessionId,
@@ -33,7 +33,7 @@ const PushImageInput = z
     password: data.password,
     authToken: data.auth_token ?? data.authToken,
     retryOnFailure: data.retry_on_failure ?? data.retryOnFailure ?? true,
-    parallel: data.parallel,
+    parallel: data.parallel
   }));
 
 // Output schema
@@ -44,21 +44,21 @@ const PushImageOutput = z.object({
       tag: z.string(),
       digest: z.string(),
       size: z.number().optional(),
-      pushTime: z.number(),
-    }),
+      pushTime: z.number()
+    })
   ),
   failed: z.array(
     z.object({
       tag: z.string(),
-      error: z.string(),
-    }),
+      error: z.string()
+    })
   ),
   registry: z.string(),
   metadata: z.object({
     totalSize: z.number().optional(),
     totalPushTime: z.number(),
-    timestamp: z.string(),
-  }),
+    timestamp: z.string()
+  })
 });
 
 // Type aliases
@@ -68,11 +68,11 @@ export type PushOutput = z.infer<typeof PushImageOutput>;
 /**
  * Authenticate with registry
  */
-async function authenticateRegistry(
+function authenticateRegistry(
   registry: string,
   credentials: { username?: string; password?: string; authToken?: string },
-  context: ToolContext,
-): Promise<boolean> {
+  context: ToolContext
+): boolean {
   const { logger } = context;
 
   if (!credentials.username && !credentials.authToken) {
@@ -80,7 +80,7 @@ async function authenticateRegistry(
     const envAuth = {
       username: process.env.DOCKER_USERNAME,
       password: process.env.DOCKER_PASSWORD,
-      authToken: process.env.DOCKER_AUTH_TOKEN,
+      authToken: process.env.DOCKER_AUTH_TOKEN
     };
 
     if (envAuth.username ?? envAuth.authToken) {
@@ -106,22 +106,22 @@ async function pushImage(
   tag: string,
   registry: string,
   auth: { username?: string; password?: string },
-  context: ToolContext,
+  context: ToolContext
 ): Promise<{ digest: string; size?: number; pushTime?: number }> {
   const { dockerService, logger } = context;
   const startTime = Date.now();
 
   if (dockerService && 'push' in dockerService) {
-    const result = await (dockerService).push({
+    const result = await dockerService.push({
       image: tag,
       registry,
-      auth: auth.username && auth.password ? auth : undefined,
+      auth: auth.username && auth.password ? auth : undefined
     });
 
     if (result.success && result.data) {
       const pushResult: { digest: string; size?: number; pushTime?: number } = {
         digest: result.data.digest,
-        pushTime: Date.now() - startTime,
+        pushTime: Date.now() - startTime
       };
 
       // Only add size if it's defined'
@@ -140,7 +140,7 @@ async function pushImage(
   return {
     digest: `sha256:${Math.random().toString(36).substring(7)}`,
     size: 100 * 1024 * 1024,
-    pushTime: Date.now() - startTime,
+    pushTime: Date.now() - startTime
   };
 }
 
@@ -152,7 +152,7 @@ async function pushWithRetry(
   registry: string,
   auth: { username?: string; password?: string },
   context: ToolContext,
-  maxRetries: number = 3,
+  maxRetries: number = 3
 ): Promise<{ digest: string; size?: number; pushTime?: number }> {
   const { logger } = context;
   let lastError: Error | undefined;
@@ -196,9 +196,9 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
         sessionId,
         tags: tags.length,
         registry,
-        parallel,
+        parallel
       },
-      'Starting image push',
+      'Starting image push'
     );
 
     try {
@@ -242,12 +242,12 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
       if (password !== undefined) credentials.password = password;
       if (authToken !== undefined) credentials.authToken = authToken;
 
-      const authenticated = await authenticateRegistry(targetRegistry, credentials, context);
+      const authenticated = authenticateRegistry(targetRegistry, credentials, context);
 
       if (!authenticated) {
         throw new DomainError(
           ErrorCode.AUTHENTICATION_ERROR,
-          'Failed to authenticate with registry',
+          'Failed to authenticate with registry'
         );
       }
 
@@ -258,7 +258,7 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
           step: 'push_image',
           status: 'in_progress',
           message: `Pushing ${imagesToPush.length} images to ${targetRegistry}`,
-          progress: 0.1,
+          progress: 0.1
         });
       }
 
@@ -303,7 +303,7 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
               step: 'push_image',
               status: 'in_progress',
               message: `Pushing ${tag} (${i + 1}/${imagesToPush.length})`,
-              progress: 0.1 + 0.8 * (i / imagesToPush.length),
+              progress: 0.1 + 0.8 * (i / imagesToPush.length)
             });
           }
 
@@ -336,9 +336,9 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
               pushed: pushed.map((p) => ({ tag: p.tag, digest: p.digest })),
               failed,
               registry: targetRegistry,
-              timestamp: new Date().toISOString(),
-            },
-          },
+              timestamp: new Date().toISOString()
+            }
+          }
         }));
       }
 
@@ -349,7 +349,7 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
           step: 'push_image',
           status: pushed.length > 0 ? 'completed' : 'failed',
           message: `Pushed ${pushed.length}/${imagesToPush.length} images`,
-          progress: 1.0,
+          progress: 1.0
         });
       }
 
@@ -357,7 +357,7 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
       if (pushed.length === 0) {
         throw new DomainError(
           ErrorCode.OPERATION_FAILED,
-          `All ${failed.length} image pushes failed`,
+          `All ${failed.length} image pushes failed`
         );
       }
 
@@ -365,9 +365,9 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
         {
           pushed: pushed.length,
           failed: failed.length,
-          registry: targetRegistry,
+          registry: targetRegistry
         },
-        'Image push completed',
+        'Image push completed'
       );
 
       return {
@@ -376,30 +376,30 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
           tag: p.tag,
           digest: p.digest,
           size: p.size,
-          pushTime: p.pushTime ?? 0,
+          pushTime: p.pushTime ?? 0
         })),
         failed: failed.map((f) => ({
           tag: f.tag,
-          error: f.error ?? 'Unknown error',
+          error: f.error ?? 'Unknown error'
         })),
         registry: targetRegistry,
         metadata: {
           totalSize: totalSize > 0 ? totalSize : undefined,
           totalPushTime,
-          timestamp: new Date().toISOString(),
-        },
+          timestamp: new Date().toISOString()
+        }
       };
     } catch (error) {
       logger.error({ error }, 'Error occurred'); // Fixed logger call
 
       if (progressEmitter && sessionId) {
-        progressEmitter.emit({
+        await progressEmitter.emit({
           step: 'push_image',
           message: 'Image push failed',
           metadata: {
             sessionId,
-            error: error instanceof Error ? error.message : String(error),
-          },
+            error: error instanceof Error ? error.message : String(error)
+          }
         });
       }
 
@@ -412,9 +412,9 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
     reason: 'Generate Kubernetes manifests for deployment',
     paramMapper: (output) => ({
       image: output.pushed[0]?.tag,
-      registry: output.registry,
-    }),
-  },
+      registry: output.registry
+    })
+  }
 };
 
 // Default export for registry

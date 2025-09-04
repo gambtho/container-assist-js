@@ -3,6 +3,7 @@
  * Provides workflow status with progress tracking and metrics
  */
 
+import { z } from 'zod';
 import { SessionService } from '../../session/manager.js';
 import { WorkflowManager } from '../../workflow/manager.js';
 import { Session } from '../../../contracts/types/index.js';
@@ -85,12 +86,63 @@ export interface WorkflowStatusDeps {
   logger: Logger;
 }
 
+// Zod schemas for validation
+const WorkflowStatusInputSchema = z.object({
+  session_id: z.string(),
+  include_history: z.boolean().optional(),
+  include_outputs: z.boolean().optional(),
+  include_errors: z.boolean().optional(),
+  step_filter: z.string().optional()
+});
+
+const WorkflowStatusOutputSchema = z.object({
+  success: z.boolean(),
+  session_id: z.string(),
+  workflow_id: z.string().optional(),
+  workflow_name: z.string().optional(),
+  status: z.enum(['active', 'completed', 'failed', 'unknown', 'aborted']),
+  stage: z.string().optional(),
+  progress: z.object({
+    percentage: z.number(),
+    current_step: z.string().optional(),
+    total_steps: z.number().optional(),
+    completed_steps: z.number().optional(),
+    estimated_remaining_minutes: z.number().optional()
+  }),
+  timing: z
+    .object({
+      started_at: z.string().optional(),
+      updated_at: z.string(),
+      duration_seconds: z.number().optional(),
+      estimated_completion: z.string().optional()
+    })
+    .optional(),
+  workflow: z
+    .object({
+      type: z.string().optional(),
+      steps: z.array(z.string()).optional(),
+      current_step_index: z.number().optional(),
+      outputs: z.record(z.unknown()).optional(),
+      errors: z.array(z.string()).optional(),
+      next_steps: z.array(z.string()).optional()
+    })
+    .optional(),
+  system: z
+    .object({
+      memory_usage: z.number().optional(),
+      active_workflows: z.number().optional(),
+      system_load: z.enum(['low', 'medium', 'high']).optional()
+    })
+    .optional(),
+  error: z.string().optional()
+});
+
 /**
  * Workflow status handler
  */
 export async function workflowStatusHandler(
   input: WorkflowStatusInput,
-  deps: WorkflowStatusDeps,
+  deps: WorkflowStatusDeps
 ): Promise<WorkflowStatusOutput> {
   const { sessionService, workflowManager, progressEmitter, logger } = deps;
 
@@ -132,7 +184,7 @@ export async function workflowStatusHandler(
       (step) =>
         !(completedSteps as string[])?.includes?.(step) &&
         !(failedSteps as string[])?.includes?.(step) &&
-        !skippedSteps.includes(step),
+        !skippedSteps.includes(step)
     );
 
     const progress = {
@@ -142,7 +194,7 @@ export async function workflowStatusHandler(
       failed_steps: failedSteps as string[],
       skipped_steps: skippedSteps,
       remaining_steps: remainingSteps,
-      total_steps: allSteps.length,
+      total_steps: allSteps.length
     };
 
     // Build timing information
@@ -154,7 +206,7 @@ export async function workflowStatusHandler(
     const duration = currentTime.getTime() - startTime.getTime();
 
     const timing: WorkflowStatusOutput['timing'] = {
-      duration,
+      duration
     };
 
     // Only add optional properties if they have defined values
@@ -183,7 +235,7 @@ export async function workflowStatusHandler(
       workflow_name: workflowName,
       status,
       progress,
-      timing,
+      timing
     };
 
     // Only add stage if it's defined'
@@ -193,11 +245,11 @@ export async function workflowStatusHandler(
 
     // Add optional information based on input flags
     if (input.include_errors === true) {
-      response.errors = await getWorkflowErrors(
+      response.errors = getWorkflowErrors(
         session,
         progressEmitter,
         input.session_id,
-        input.step_filter,
+        input.step_filter
       );
     }
 
@@ -215,13 +267,13 @@ export async function workflowStatusHandler(
       repo_path: session.metadata?.repo_path as string,
       automated: session.metadata?.automated as boolean,
       options: session.metadata?.options as Record<string, unknown>,
-      next_steps: generateNextSteps(status, progress, workflowType),
+      next_steps: generateNextSteps(status, progress, workflowType)
     };
 
     // Add system information
     response.system = {
       active_workflows: workflowManager.getActiveWorkflows().length,
-      system_load: workflowManager.getStatusSummary().systemLoad,
+      system_load: workflowManager.getStatusSummary().systemLoad
     };
 
     logger.debug('Workflow status retrieved');
@@ -234,7 +286,7 @@ export async function workflowStatusHandler(
 
     return createErrorResponse(
       input.session_id ?? 'unknown',
-      `Failed to get workflow status: ${errorMessage}`,
+      `Failed to get workflow status: ${errorMessage}`
     );
   }
 }
@@ -253,12 +305,12 @@ function createErrorResponse(sessionId: string, error: string): WorkflowStatusOu
       failed_steps: [],
       skipped_steps: [],
       remaining_steps: [],
-      total_steps: 0,
+      total_steps: 0
     },
     timing: {
-      duration: 0,
+      duration: 0
     },
-    error,
+    error
   };
 }
 
@@ -268,7 +320,7 @@ function createErrorResponse(sessionId: string, error: string): WorkflowStatusOu
 function determineWorkflowStatus(
   session: Session,
   workflowExecution: unknown,
-  _progressInfo: unknown,
+  _progressInfo: unknown
 ): WorkflowStatusOutput['status'] {
   // Check workflow execution status first
   if (
@@ -321,7 +373,7 @@ function getSkippedSteps(session: Session, _progressInfo: unknown): string[] {
 function calculateEstimatedRemaining(
   progress: any,
   duration: number,
-  _totalSteps: number,
+  _totalSteps: number
 ): number | undefined {
   if (progress.percentage === 0 || progress.percentage >= 100) {
     return undefined;
@@ -337,19 +389,17 @@ function calculateEstimatedRemaining(
 /**
  * Get workflow errors with details
  */
-async function getWorkflowErrors(
+function getWorkflowErrors(
   session: Session,
   progressEmitter: any,
   sessionId: string,
-  stepFilter?: string,
-): Promise<
-  Array<{
-    step: string;
-    message: string;
-    timestamp: string;
-    retry_count?: number;
-  }>
-> {
+  stepFilter?: string
+): Array<{
+  step: string;
+  message: string;
+  timestamp: string;
+  retry_count?: number;
+}> {
   const errors: Array<{
     step: string;
     message: string;
@@ -360,17 +410,17 @@ async function getWorkflowErrors(
   // Get errors from progress history
   const progressHistory =
     progressEmitter.getHistory(sessionId, {
-      status: 'failed',
+      status: 'failed'
     }) || [];
 
   for (const update of progressHistory) {
     if (stepFilter && update.step !== stepFilter) continue;
 
-    await errors.push({
+    errors.push({
       step: update.step,
       message: update.message ?? 'Step failed',
       timestamp: update.timestamp,
-      retry_count: update.metadata?.retry as number,
+      retry_count: update.metadata?.retry as number
     });
   }
 
@@ -381,11 +431,11 @@ async function getWorkflowErrors(
       for (const error of state.errors) {
         if (stepFilter && error.step !== stepFilter) continue;
 
-        await errors.push({
+        errors.push({
           step: error.step,
           message: error.message ?? error.error,
           timestamp: error.timestamp ?? session.updated_at,
-          retry_count: error.retry_count,
+          retry_count: error.retry_count
         });
       }
     }
@@ -424,7 +474,7 @@ function getWorkflowOutputs(session: Session, stepFilter?: string): Record<strin
 function getProgressHistory(
   progressEmitter: any,
   sessionId: string,
-  stepFilter?: string,
+  stepFilter?: string
 ): Array<{
   step: string;
   status: string;
@@ -435,7 +485,7 @@ function getProgressHistory(
 }> {
   const history =
     progressEmitter.getHistory(sessionId, {
-      step: stepFilter,
+      step: stepFilter
     }) || [];
 
   return history.map((update: any) => ({
@@ -444,7 +494,7 @@ function getProgressHistory(
     progress: Math.round(update.progress * 100),
     message: update.message,
     timestamp: update.timestamp,
-    duration: update.metadata?.duration as number,
+    duration: update.metadata?.duration as number
   }));
 }
 
@@ -454,7 +504,7 @@ function getProgressHistory(
 function generateNextSteps(
   status: WorkflowStatusOutput['status'],
   progress: any,
-  workflowType?: string,
+  workflowType?: string
 ): string[] {
   const nextSteps: string[] = [];
 
@@ -499,10 +549,12 @@ export const workflowStatusEnhancedDescriptor = {
   name: 'workflow_status',
   description: 'Get comprehensive workflow status with progress tracking and detailed metrics',
   category: 'orchestration' as const,
+  inputSchema: WorkflowStatusInputSchema,
+  outputSchema: WorkflowStatusOutputSchema,
   handler: workflowStatusHandler,
   timeout: 5000,
-  exported: true,
+  exported: true
 };
 
-// Default export for registry
-export default workflowStatusHandler;
+// Default export for registry - export the descriptor, not just the handler
+export default workflowStatusEnhancedDescriptor;

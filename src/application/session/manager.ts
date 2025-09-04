@@ -28,7 +28,7 @@ function validateSessionConfig(config?: SessionServiceConfig): Required<SessionS
     defaultTTL: config?.defaultTTL ?? DEFAULT_SESSION_TTL,
     maxActiveSessions: config?.maxActiveSessions ?? DEFAULT_MAX_SESSIONS,
     persistencePath: config?.persistencePath ?? '',
-    persistenceInterval: config?.persistenceInterval ?? DEFAULT_PERSISTENCE_INTERVAL,
+    persistenceInterval: config?.persistenceInterval ?? DEFAULT_PERSISTENCE_INTERVAL
   };
 
   // Validate ranges
@@ -97,7 +97,7 @@ export class SessionService extends EventEmitter {
     if (this.config.persistencePath != null) {
       this.startPersistence();
       void this.loadPersistedSessions().catch((err: unknown) =>
-        this.logger.warn({ error: err }, 'Failed to load persisted sessions'),
+        this.logger.warn({ error: err }, 'Failed to load persisted sessions')
       );
     }
 
@@ -105,9 +105,9 @@ export class SessionService extends EventEmitter {
       {
         maxActiveSessions: this.config.maxActiveSessions,
         defaultTTL: this.config.defaultTTL,
-        persistence: !!this.config.persistencePath,
+        persistence: !!this.config.persistencePath
       },
-      'Session service initialized',
+      'Session service initialized'
     );
   }
 
@@ -144,7 +144,7 @@ export class SessionService extends EventEmitter {
       version: '1.0.0',
       persisted_at: new Date().toISOString(),
       session_count: sessions.length,
-      sessions,
+      sessions
     };
 
     const dir = path.dirname(this.config.persistencePath);
@@ -157,7 +157,7 @@ export class SessionService extends EventEmitter {
 
     this.logger.debug(
       { count: sessions.length, path: this.config.persistencePath },
-      'Sessions persisted',
+      'Sessions persisted'
     );
   }
 
@@ -187,9 +187,9 @@ export class SessionService extends EventEmitter {
           {
             loaded: validSessions.length,
             total: parsed.sessions.length,
-            expired: parsed.sessions.length - validSessions.length,
+            expired: parsed.sessions.length - validSessions.length
           },
-          'Loaded persisted sessions',
+          'Loaded persisted sessions'
         );
       }
     } catch (error: unknown) {
@@ -197,7 +197,7 @@ export class SessionService extends EventEmitter {
       if (err.code !== 'ENOENT') {
         this.logger.error(
           { error: err.message ?? String(err) },
-          'Failed to load persisted sessions',
+          'Failed to load persisted sessions'
         );
         throw error;
       }
@@ -212,7 +212,7 @@ export class SessionService extends EventEmitter {
   async create(data: { projectName?: string; metadata?: unknown }): Promise<Session> {
     return this.createSession('', {
       ...data,
-      metadata: data.metadata as Record<string, unknown> | undefined,
+      metadata: data.metadata as Record<string, unknown> | undefined
     });
   }
 
@@ -263,7 +263,7 @@ export class SessionService extends EventEmitter {
     if (activeCount >= this.config.maxActiveSessions) {
       throw new ServiceError(
         ErrorCode.ResourceLimitExceeded,
-        `Maximum active sessions (${this.config.maxActiveSessions}) reached`,
+        `Maximum active sessions (${this.config.maxActiveSessions}) reached`
       );
     }
 
@@ -271,7 +271,7 @@ export class SessionService extends EventEmitter {
       ...data,
       expires_at:
         data?.expires_at ??
-        new Date(Date.now() + this.config.defaultTTL * MILLISECONDS_PER_SECOND).toISOString(),
+        new Date(Date.now() + this.config.defaultTTL * MILLISECONDS_PER_SECOND).toISOString()
     });
 
     await this.store.create(session);
@@ -304,7 +304,7 @@ export class SessionService extends EventEmitter {
       ...updates,
       id: current.id, // Prevent ID changes
       created_at: current.created_at, // Preserve creation time
-      version: current.version, // Will be incremented by store
+      version: current.version // Will be incremented by store
     }));
 
     const updated = await this.store.get(id);
@@ -324,7 +324,7 @@ export class SessionService extends EventEmitter {
   async updateWorkflowState(id: string, stateUpdate: Partial<WorkflowState>): Promise<Session> {
     await this.store.updateAtomic(id, (current) => ({
       ...current,
-      workflow_state: SessionUtils.mergeWorkflowState(current.workflow_state ?? {}, stateUpdate),
+      workflow_state: SessionUtils.mergeWorkflowState(current.workflow_state ?? {}, stateUpdate)
     }));
 
     const updated = await this.store.get(id);
@@ -336,9 +336,9 @@ export class SessionService extends EventEmitter {
       {
         sessionId: id,
         stage: updated.stage,
-        progress: updated.progress?.percentage,
+        progress: updated.progress?.percentage
       },
-      'Workflow state updated',
+      'Workflow state updated'
     );
 
     this.emit('workflow:updated', { session: updated, update: stateUpdate });
@@ -359,7 +359,7 @@ export class SessionService extends EventEmitter {
 
     this.logger.info(
       { sessionId: id, step, progress: updated.progress?.percentage },
-      'Step completed',
+      'Step completed'
     );
 
     return updated;
@@ -405,8 +405,8 @@ export class SessionService extends EventEmitter {
     return this.updateSession(id, {
       status: success ? 'completed' : 'failed',
       expires_at: new Date(
-        Date.now() + COMPLETED_SESSION_RETENTION * MILLISECONDS_PER_SECOND,
-      ).toISOString(),
+        Date.now() + COMPLETED_SESSION_RETENTION * MILLISECONDS_PER_SECOND
+      ).toISOString()
     });
   }
 
@@ -421,8 +421,8 @@ export class SessionService extends EventEmitter {
       return {
         ...current,
         expires_at: new Date(
-          currentExpiry + additionalSeconds * MILLISECONDS_PER_SECOND,
-        ).toISOString(),
+          currentExpiry + additionalSeconds * MILLISECONDS_PER_SECOND
+        ).toISOString()
       };
     });
 
@@ -482,7 +482,7 @@ export class SessionService extends EventEmitter {
         this.store.getByStatus('pending'),
         this.store.getByStatus('analyzing'),
         this.store.getByStatus('building'),
-        this.store.getByStatus('deploying'),
+        this.store.getByStatus('deploying')
       ]);
 
     return {
@@ -502,7 +502,7 @@ export class SessionService extends EventEmitter {
       pending: pending.length,
       analyzing: analyzing.length,
       building: building.length,
-      deploying: deploying.length,
+      deploying: deploying.length
     };
   }
 

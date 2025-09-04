@@ -23,43 +23,43 @@ const LANGUAGE_SIGNATURES: Record<string, LanguageSignature> = {
   javascript: {
     extensions: ['.js', '.mjs', '.cjs'],
     files: ['package.json', 'node_modules'],
-    patterns: [/^import .* from/, /^const .* = require/],
+    patterns: [/^import .* from/, /^const .* = require/]
   },
   typescript: {
     extensions: ['.ts', '.tsx'],
     files: ['tsconfig.json', 'package.json'],
-    patterns: [/^import .* from/, /^export (class|interface|type)/],
+    patterns: [/^import .* from/, /^export (class|interface|type)/]
   },
   python: {
     extensions: ['.py'],
     files: ['requirements.txt', 'setup.py', 'pyproject.toml', 'Pipfile'],
-    patterns: [/^import /, /^from .* import/],
+    patterns: [/^import /, /^from .* import/]
   },
   java: {
     extensions: ['.java'],
     files: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
-    patterns: [/^package /, /^import /],
+    patterns: [/^package /, /^import /]
   },
   go: {
     extensions: ['.go'],
     files: ['go.mod', 'go.sum'],
-    patterns: [/^package /, /^import \(/],
+    patterns: [/^package /, /^import \(/]
   },
   rust: {
     extensions: ['.rs'],
     files: ['Cargo.toml', 'Cargo.lock'],
-    patterns: [/^use /, /^mod /],
+    patterns: [/^use /, /^mod /]
   },
   ruby: {
     extensions: ['.rb'],
     files: ['Gemfile', 'Gemfile.lock', 'Rakefile'],
-    patterns: [/^require /, /^class .* </, /^module /],
+    patterns: [/^require /, /^class .* </, /^module /]
   },
   php: {
     extensions: ['.php'],
     files: ['composer.json', 'composer.lock'],
-    patterns: [/^<\?php/, /^namespace /, /^use /],
-  },
+    patterns: [/^<\?php/, /^namespace /, /^use /]
+  }
 };
 
 // Framework detection configuration
@@ -75,7 +75,7 @@ const FRAMEWORK_SIGNATURES: Record<string, { files: string[]; dependencies?: str
   fastapi: { files: [], dependencies: ['fastapi'] },
   spring: { files: ['pom.xml', 'build.gradle'], dependencies: [] },
   rails: { files: ['Gemfile'], dependencies: ['rails'] },
-  laravel: { files: ['artisan'], dependencies: [] },
+  laravel: { files: ['artisan'], dependencies: [] }
 };
 
 // Build system detection
@@ -90,14 +90,14 @@ const BUILD_SYSTEMS = {
   pip: { file: 'requirements.txt', buildCmd: 'python setup.py build', testCmd: 'pytest' },
   poetry: { file: 'pyproject.toml', buildCmd: 'poetry build', testCmd: 'poetry run pytest' },
   composer: { file: 'composer.json', buildCmd: 'composer install', testCmd: 'phpunit' },
-  bundler: { file: 'Gemfile', buildCmd: 'bundle install', testCmd: 'bundle exec rspec' },
+  bundler: { file: 'Gemfile', buildCmd: 'bundle install', testCmd: 'bundle exec rspec' }
 };
 
 /**
  * Validate repository path exists and is accessible
  */
 export async function validateRepositoryPath(
-  repoPath: string,
+  repoPath: string
 ): Promise<{ valid: boolean; error?: string }> {
   try {
     const stats = await fs.stat(repoPath);
@@ -115,7 +115,7 @@ export async function validateRepositoryPath(
  * Detect primary programming language
  */
 export async function detectLanguage(
-  repoPath: string,
+  repoPath: string
 ): Promise<{ language: string; version?: string }> {
   const files = await fs.readdir(repoPath);
   const fileStats = await Promise.all(
@@ -123,7 +123,7 @@ export async function detectLanguage(
       const filePath = path.join(repoPath, file);
       const stats = await fs.stat(filePath);
       return { name: file, path: filePath, isFile: stats.isFile() };
-    }),
+    })
   );
 
   // Count file extensions
@@ -170,7 +170,7 @@ export async function detectLanguage(
  */
 export async function detectFramework(
   repoPath: string,
-  language: string,
+  language: string
 ): Promise<{ framework?: string; version?: string } | null> {
   const files = await fs.readdir(repoPath);
 
@@ -192,7 +192,7 @@ export async function detectFramework(
       };
       const allDeps = {
         ...(packageJson.dependencies ?? {}),
-        ...(packageJson.devDependencies ?? {}),
+        ...(packageJson.devDependencies ?? {})
       };
 
       for (const [framework, signature] of Object.entries(FRAMEWORK_SIGNATURES)) {
@@ -224,7 +224,7 @@ export async function detectFramework(
  * Detect build system
  */
 export async function detectBuildSystem(
-  repoPath: string,
+  repoPath: string
 ): Promise<((typeof BUILD_SYSTEMS)[keyof typeof BUILD_SYSTEMS] & { type: string }) | undefined> {
   const files = await fs.readdir(repoPath);
 
@@ -242,7 +242,7 @@ export async function detectBuildSystem(
  */
 export async function analyzeDependencies(
   repoPath: string,
-  language: string,
+  language: string
 ): Promise<Array<{ name: string; version?: string; type?: 'runtime' | 'dev' | 'test' }>> {
   const dependencies: Array<{ name: string; version?: string; type?: 'runtime' | 'dev' | 'test' }> =
     [];
@@ -277,7 +277,7 @@ export async function analyzeDependencies(
             if (match?.[1] != null) {
               const entry: { name: string; type?: 'runtime'; version?: string } = {
                 name: match[1].trim(),
-                type: 'runtime',
+                type: 'runtime'
               };
               if (match[3]?.trim()) {
                 entry.version = match[3].trim();
@@ -285,12 +285,16 @@ export async function analyzeDependencies(
               dependencies.push(entry);
             }
           });
-      } catch {}
+      } catch {
+        // Ignore parsing errors for package.json
+      }
     } else if (language === 'java') {
       // Parse pom.xml or build.gradle for dependencies
       // This would require XML/Gradle parsing
     }
-  } catch {}
+  } catch {
+    // Ignore errors when parsing dependencies
+  }
 
   return dependencies;
 }
@@ -309,7 +313,9 @@ export async function detectPorts(repoPath: string, language: string): Promise<n
     if (portMatch?.[1]) {
       ports.add(parseInt(portMatch[1]));
     }
-  } catch {}
+  } catch {
+    // Ignore errors when reading .env file
+  }
 
   // Check package.json scripts
   if (language === 'javascript' || language === 'typescript') {
@@ -323,7 +329,9 @@ export async function detectPorts(repoPath: string, language: string): Promise<n
           ports.add(parseInt(match[1]));
         }
       }
-    } catch {}
+    } catch {
+      // Ignore errors when parsing package.json scripts
+    }
   }
 
   return Array.from(ports);
@@ -333,14 +341,14 @@ export async function detectPorts(repoPath: string, language: string): Promise<n
  * Check for Docker files
  */
 export async function checkDockerFiles(
-  repoPath: string,
+  repoPath: string
 ): Promise<{ hasDockerfile: boolean; hasDockerCompose: boolean; hasKubernetes: boolean }> {
   const files = await fs.readdir(repoPath);
 
   return {
     hasDockerfile: files.includes('Dockerfile') || files.includes('dockerfile'),
     hasDockerCompose: files.includes('docker-compose.yml') || files.includes('docker-compose.yaml'),
-    hasKubernetes: files.includes('k8s') || files.includes('kubernetes') || files.includes('.k8s'),
+    hasKubernetes: files.includes('k8s') || files.includes('kubernetes') || files.includes('.k8s')
   };
 }
 
@@ -356,7 +364,7 @@ export function getRecommendedBaseImage(language: string, framework?: string): s
     go: 'golang:1.21-alpine',
     rust: 'rust:1.75-slim',
     ruby: 'ruby:3.2-slim',
-    php: 'php:8.2-fpm-alpine',
+    php: 'php:8.2-fpm-alpine'
   };
 
   // Framework-specific overrides
@@ -371,19 +379,19 @@ export function getRecommendedBaseImage(language: string, framework?: string): s
  * Get security recommendations based on dependencies
  */
 export function getSecurityRecommendations(
-  dependencies: Array<{ name: string; version?: string; type?: 'runtime' | 'dev' | 'test' }>,
+  dependencies: Array<{ name: string; version?: string; type?: 'runtime' | 'dev' | 'test' }>
 ): string[] {
   const recommendations: string[] = [];
 
   // Check for known vulnerable packages
   const vulnerablePackages = ['request', 'node-uuid', 'minimist<1.2.6'];
   const foundVulnerable = dependencies.filter((dep) =>
-    vulnerablePackages.some((vuln) => dep.name.includes(vuln.split('<')[0] || '')),
+    vulnerablePackages.some((vuln) => dep.name.includes(vuln.split('<')[0] || ''))
   );
 
   if (foundVulnerable.length > 0) {
     recommendations.push(
-      `Update vulnerable packages: ${foundVulnerable.map((d) => d.name).join(', ')}`,
+      `Update vulnerable packages: ${foundVulnerable.map((d) => d.name).join(', ')}`
     );
   }
 
@@ -403,7 +411,7 @@ export function getSecurityRecommendations(
  */
 export async function gatherFileStructure(
   repoPath: string,
-  maxDepth: number = 2,
+  maxDepth: number = 2
 ): Promise<string[]> {
   const files: string[] = [];
 
@@ -424,7 +432,7 @@ export async function gatherFileStructure(
             'build',
             '.vscode',
             '.idea',
-            '__pycache__',
+            '__pycache__'
           ].includes(entry)
         ) {
           continue;
@@ -472,7 +480,7 @@ function getFileIcon(extension: string): string {
     '.yaml': '📄',
     '.yml': '📄',
     '.md': '📖',
-    '.txt': '📝',
+    '.txt': '📝'
   };
 
   return iconMap[extension.toLowerCase()] || '📄';

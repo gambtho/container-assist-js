@@ -5,11 +5,12 @@
 import { DockerClient } from '../infrastructure/docker-client.js';
 import type { Logger } from 'pino';
 import { DockerError } from '../errors/index.js';
+import { ErrorCode } from '../contracts/types/errors.js';
 import {
   DockerBuildOptions,
   DockerBuildResult,
   DockerScanResult,
-  ScanOptions,
+  ScanOptions
 } from '../contracts/types/index.js';
 
 export interface DockerServiceConfig {
@@ -63,7 +64,7 @@ export class DockerService {
       Size?: number;
       Created?: number;
     }>
-    > {
+  > {
     return this.client.listImages() as Promise<
       Array<{
         Id: string;
@@ -94,7 +95,7 @@ export class DockerService {
     const healthStatus = await this.client.health();
 
     if (!healthStatus.available) {
-      throw new DockerError('Docker not available', 'DOCKER_HEALTH_CHECK_FAILED', 'health');
+      throw new DockerError('Docker not available', ErrorCode.DOCKER_HEALTH_CHECK_FAILED, 'health');
     }
 
     const result: {
@@ -106,7 +107,7 @@ export class DockerService {
       client?: DockerClient;
     } = {
       available: healthStatus.available,
-      status: 'healthy',
+      status: 'healthy'
     };
 
     if (healthStatus.version !== undefined) {
@@ -179,7 +180,7 @@ export class DockerService {
  */
 export async function createDockerService(
   config: DockerServiceConfig,
-  logger: Logger,
+  logger: Logger
 ): Promise<DockerService> {
   const service = new DockerService(config, logger);
   await service.initialize();

@@ -62,7 +62,7 @@ export class SessionStore {
   /**
    * Create or update a session
    */
-  async set(id: string, session: Partial<Session>): Promise<void> {
+  set(id: string, session: Partial<Session>): void {
     // Validate and complete session data
     const now = new Date().toISOString();
     const fullSession: Session = {
@@ -76,10 +76,10 @@ export class SessionStore {
         completed_steps: [],
         errors: {},
         metadata: {},
-        dockerfile_fix_history: [],
+        dockerfile_fix_history: []
       },
       version: (session.version ?? 0) + 1,
-      ...session,
+      ...session
     };
 
     // Validate schema
@@ -97,31 +97,28 @@ export class SessionStore {
   /**
    * Update an existing session
    */
-  async update(
-    id: string,
-    updater: (session: Session) => Partial<Session>,
-  ): Promise<Session | null> {
-    const existing = await this.get(id);
+  update(id: string, updater: (session: Session) => Partial<Session>): Session | null {
+    const existing = this.get(id);
     if (!existing) {
       return null;
     }
 
     const updated = updater(existing);
-    await this.set(id, { ...existing, ...updated });
-    return await this.get(id);
+    this.set(id, { ...existing, ...updated });
+    return this.get(id);
   }
 
   /**
    * Atomic update operation
    */
-  async updateAtomic(id: string, updater: (session: Session) => Session): Promise<void> {
-    const existing = await this.get(id);
+  updateAtomic(id: string, updater: (session: Session) => Session): void {
+    const existing = this.get(id);
     if (!existing) {
       throw new Error(`Session ${id} not found`);
     }
 
     const updated = updater(existing);
-    await this.set(id, updated);
+    this.set(id, updated);
   }
 
   /**
@@ -226,12 +223,12 @@ export class SessionStore {
     totalSessions: number;
     activeSessions: number;
     maxSessions: number;
-    } {
+  } {
     return {
       totalSessions: this.sessions.size,
       activeSessions: Array.from(this.sessions.values()).filter((s) => s.status === 'active')
         .length,
-      maxSessions: this.maxSessions,
+      maxSessions: this.maxSessions
     };
   }
 

@@ -22,8 +22,8 @@ npm install -g @thgamble/containerization-assist-mcp
 
 #### For Development
 ```bash
-git clone https://github.com/gambtho/container-assist-js
-cd containerization-assist-js
+git clone https://github.com/gambtho/container-assist-js.git
+cd container-assist-js
 npm install
 npm run build
 ```
@@ -85,7 +85,6 @@ await server.start();
 | Tool | Category | Description |
 |------|----------|-------------|
 | `analyze_repository` | Analysis | Analyze repository structure and detect language/framework |
-| `analyze_repository_v2` | Analysis | Enhanced repository analysis with AI |
 | `resolve_base_images` | Build | Find optimal base images for applications |
 | `generate_dockerfile` | Build | Create optimized Dockerfiles |
 | `generate_dockerfile_ext` | Build | Extended Dockerfile generation with AI |
@@ -192,6 +191,7 @@ src/
 ├── infrastructure/  # External adapters (docker, k8s, ai, core)
 ├── application/     # Business logic (tools, workflow, factories)
 └── platform/        # Entry points (bin, server)
+apps/                # CLI entry points
 ```
 
 ## Example Usage
@@ -286,9 +286,6 @@ sudo usermod -aG docker $USER
 ## Documentation
 
 - [User Setup Guide](docs/user/SETUP_GUIDE.md)
-- [Developer Guide](docs/developer/ARCHITECTURE.md)
-- [Tool Development](docs/developer/TOOL_DEVELOPMENT.md)
-- [API Reference](docs/api/TOOLS_REFERENCE.md)
 
 ## Development
 
@@ -322,11 +319,6 @@ npm run test:coverage  # Coverage report
 - **Error Handling**: Result monad pattern throughout
 - **Testing**: Comprehensive unit and integration tests
 
-See [CLAUDE.md](CLAUDE.md) for detailed development guidelines.
-
-## Contributing
-
-Please read [CONTRIBUTING.md](docs/developer/CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 

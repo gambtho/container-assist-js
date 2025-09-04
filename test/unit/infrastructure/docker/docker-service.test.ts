@@ -4,9 +4,9 @@
  */
 
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { createMockLogger } from '../../../utils/test-helpers.js';
+import { createMockLogger } from '../../../utils/test-helpers';
 import type { Logger } from 'pino';
-import type { DockerBuildOptions, DockerScanResult } from '../../../../src/domain/types/docker.js';
+import type { DockerBuildOptions, DockerScanResult } from '../../../../src/domain/types/docker';
 
 // Mock Docker service interface for infrastructure consolidation testing
 interface MockDockerService {

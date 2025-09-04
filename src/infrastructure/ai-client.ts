@@ -4,7 +4,13 @@
 
 import type { Logger } from 'pino';
 import { AIServiceError } from '../errors/index.js';
-import type { MCPSampler } from '../application/interfaces.js';
+import { ErrorCode } from '../contracts/types/errors.js';
+import {
+  createSampler,
+  isSuccessResult,
+  type SampleFunction,
+  type AIRequest
+} from './ai/sampling.js';
 
 export interface AIClientConfig {
   modelPreferences?: {
@@ -49,60 +55,75 @@ export interface RepositoryAnalysis {
 
 export class AIClient {
   private logger: Logger;
-  private sampler: MCPSampler | undefined;
+  private sampler: SampleFunction;
   private available = false;
 
   constructor(
     private config: AIClientConfig = {},
-    sampler: MCPSampler | undefined,
     logger: Logger,
+    sampler?: SampleFunction
   ) {
     this.logger = logger.child({ component: 'AIClient' });
-    this.sampler = sampler;
-    this.available = sampler != null;
 
-    if (this.available) {
-      this.logger.info('AI client initialized with MCP sampler');
-    } else {
-      this.logger.warn('AI client initialized without sampler - limited functionality');
+    if (!sampler) {
+      throw new Error('AI client requires a sampler function - no mock sampler available');
     }
+
+    this.sampler = sampler;
+    this.available = true;
+
+    this.logger.info('AI client initialized with sampler function');
+  }
+
+  /**
+   * Update the sampler function (used after server initialization)
+   */
+  setSampler(sampler: SampleFunction): void {
+    this.sampler = sampler;
+    this.available = true;
+
+    this.logger.info('AI client updated with new sampler function');
+  }
+
+  /**
+   * Create and set MCP sampler from server
+   */
+  setMCPServer(server: any): void {
+    this.sampler = createSampler({ type: 'mcp', server }, this.logger);
+    this.available = true;
+
+    this.logger.info('AI client updated with MCP server sampler');
   }
 
   async generateText(options: AIGenerationOptions): Promise<AIGenerationResult> {
-    if (!this.available || this.sampler == null) {
-      throw new AIServiceError(
-        'AI sampler not available',
-        'AI_SAMPLER_UNAVAILABLE',
-        undefined,
-        undefined,
-        { operation: 'generateText' },
-      );
-    }
-
     try {
-      const result = await this.sampler.sample({
+      const request: AIRequest = {
         prompt: options.prompt,
         maxTokens: options.maxTokens ?? (this.config.maxTokens || 2000),
         temperature: options.temperature ?? (this.config.temperature || 0.7),
-      });
+        model: options.model
+      };
 
-      if ('error' in result) {
+      const result = await this.sampler(request);
+
+      if (!isSuccessResult(result)) {
         throw new AIServiceError(
           `AI generation failed: ${result.error}`,
-          'AI_GENERATION_FAILED',
+          ErrorCode.AI_GENERATION_FAILED,
           undefined,
           undefined,
-          { prompt: `${options.prompt.substring(0, 100)}...` },
+          { prompt: `${options.prompt.substring(0, 100)}...` }
         );
       }
 
       const response: AIGenerationResult = {
         text: result.text,
-        tokenCount: result.text.length, // Rough estimate
+        tokenCount: result.tokenCount || result.text.length // Use actual or rough estimate
       };
 
-      if (options.model) {
-        response.model = options.model;
+      // Only add model if it's defined
+      if (result.model || options.model) {
+        response.model = result.model || options.model!;
       }
 
       return response;
@@ -113,10 +134,10 @@ export class AIClient {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new AIServiceError(
         `Text generation failed: ${errorMessage}`,
-        'AI_TEXT_GENERATION_FAILED',
+        ErrorCode.AI_TEXT_GENERATION_FAILED,
         undefined,
         error instanceof Error ? error : undefined,
-        { operation: 'generateText' },
+        { operation: 'generateText' }
       );
     }
   }
@@ -127,7 +148,7 @@ export class AIClient {
       prompt,
       maxTokens: 2000,
       temperature: 0.7,
-      model: this.getModelPreference('dockerfile'),
+      model: this.getModelPreference('dockerfile')
     });
 
     return result.text;
@@ -138,7 +159,7 @@ export class AIClient {
     const result = await this.generateText({
       prompt,
       maxTokens: 1500,
-      temperature: 0.5,
+      temperature: 0.5
     });
 
     // Try to parse as JSON, fallback to raw text
@@ -153,7 +174,7 @@ export class AIClient {
         hasTests: false,
         hasDatabase: false,
         recommendations: [],
-        rawAnalysis: result.text,
+        rawAnalysis: result.text
       };
     }
   }
@@ -163,7 +184,7 @@ export class AIClient {
     const result = await this.generateText({
       prompt,
       maxTokens: 1000,
-      temperature: 0.6,
+      temperature: 0.6
     });
 
     // Parse suggestions from response
@@ -179,7 +200,7 @@ export class AIClient {
     const result = await this.generateText({
       prompt,
       maxTokens: 2000,
-      temperature: 0.5,
+      temperature: 0.5
     });
 
     return result.text;

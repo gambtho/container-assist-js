@@ -3,7 +3,6 @@
  * Central export point for all domain types
  */
 
-// Result type from interfaces for legacy compatibility
 export type { Result } from './interfaces';
 
 // Error types
@@ -17,7 +16,7 @@ export type {
   DockerfileResult,
   K8sManifestResult,
   DeploymentResult,
-  WorkflowStepType,
+  WorkflowStepType
 } from './session';
 export { SessionSchema, WorkflowStep, getWorkflowSteps } from './session';
 
@@ -26,7 +25,7 @@ export type {
   SessionStore,
   SessionFilter,
   SessionNotFoundError,
-  SessionAlreadyExistsError,
+  SessionAlreadyExistsError
 } from './session-store';
 
 // Docker types (consolidated single source of truth)
@@ -41,7 +40,7 @@ export type {
   DockerfileFix,
   DockerfileChange,
   AlternativeApproach,
-  DockerfileFixHistory,
+  DockerfileFixHistory
 } from './docker';
 export {
   DockerBuildOptionsSchema,
@@ -51,7 +50,7 @@ export {
   DockerTagResultSchema,
   DockerfileFixSchema,
   DockerfileChangeSchema,
-  AlternativeApproachSchema,
+  AlternativeApproachSchema
 } from './docker';
 
 // Build types (consolidated single source of truth)
@@ -70,14 +69,14 @@ export type {
   BuildOptionsType,
   BuildResultType,
   BuildProgressType,
-  BuildErrorType,
+  BuildErrorType
 } from './build';
 export {
   BuildConfigurationSchema,
   BuildOptionsSchema,
   BuildResultSchema,
   BuildProgressSchema,
-  BuildErrorSchema,
+  BuildErrorSchema
 } from './build';
 
 // Scanning types (consolidated single source of truth)
@@ -97,19 +96,17 @@ export type {
   VulnerabilityType,
   VulnerabilitySummaryType,
   ScanResultType,
-  SecurityPolicyType,
+  SecurityPolicyType
 } from './scanning';
 export {
   ScannerConfigSchema,
   VulnerabilitySchema,
   VulnerabilitySummarySchema,
   ScanResultSchema,
-  SecurityPolicySchema,
+  SecurityPolicySchema
 } from './scanning';
 
-// Domain service interfaces (essential only - reduced from 20+ to 5)
-// Note: Logger removed - use 'import type { Logger } from 'pino'' directly
-// Note: Single-implementation interfaces removed - use concrete classes directly
+// Domain service interfaces
 export type {
   ProgressEmitter,
   ProgressData,
@@ -121,7 +118,7 @@ export type {
   FileSystem,
   CommandExecutor,
   EventPublisher,
-  Configuration,
+  Configuration
 } from './interfaces';
 
 // Domain events and event system
@@ -145,7 +142,7 @@ export type {
   WorkflowStepCompletedEventDataType,
   BuildCompletedEventDataType,
   ScanCompletedEventDataType,
-  ErrorOccurredEventDataType,
+  ErrorOccurredEventDataType
 } from './events';
 export {
   EventType,
@@ -159,7 +156,7 @@ export {
   WorkflowStepCompletedEventDataSchema,
   BuildCompletedEventDataSchema,
   ScanCompletedEventDataSchema,
-  ErrorOccurredEventDataSchema,
+  ErrorOccurredEventDataSchema
 } from './events';
 
 // Kubernetes types
@@ -170,7 +167,7 @@ export type {
   KubernetesDeploymentResult,
   KubernetesCluster,
   KubernetesPod,
-  KubernetesService as K8sService,
+  KubernetesService as K8sService
 } from './kubernetes';
 
 // Backwards compatibility aliases for K8s types
@@ -178,7 +175,7 @@ export type {
   KubernetesManifest as K8sManifest,
   KubernetesDeploymentResult as K8sDeploymentResult,
   KubernetesService as K8sServiceStatus,
-  K8sDeploymentOptions,
+  K8sDeploymentOptions
 } from './kubernetes';
 
 // Base Image types
@@ -186,7 +183,7 @@ export type {
   BaseImageRecommendation,
   BaseImageResolutionInput,
   ValidationResult,
-  SuggestedImage,
+  SuggestedImage
 } from './base-image';
 export { BaseImageRecommendationSchema, BaseImageResolutionInputSchema } from './base-image';
 
@@ -202,7 +199,7 @@ export type {
   SecurityConsiderations,
   PerformanceOptimizations,
   CloudNativeFeatures,
-  MigrationRecommendations,
+  MigrationRecommendations
 } from './dotnet';
 export {
   DotNetAnalysisSchema,
@@ -215,5 +212,5 @@ export {
   SecurityConsiderationsSchema,
   PerformanceOptimizationsSchema,
   CloudNativeFeaturesSchema,
-  MigrationRecommendationsSchema,
+  MigrationRecommendationsSchema
 } from './dotnet';
