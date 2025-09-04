@@ -10,7 +10,7 @@ import {
   ErrorCode,
   DomainError,
   KubernetesManifest,
-  KubernetesDeploymentResult,
+  KubernetesDeploymentResult
 } from '../../../contracts/types/index.js';
 import type { Session } from '../../../contracts/types/session.js';
 import type { ToolDescriptor, ToolContext } from '../tool-types.js';
@@ -31,7 +31,7 @@ const DeployApplicationInput = z
     timeout: z.number().default(300),
     force: z.boolean().default(false),
     rollback_on_failure: z.boolean().default(true),
-    rollbackOnFailure: z.boolean().optional(),
+    rollbackOnFailure: z.boolean().optional()
   })
   .transform((data) => ({
     sessionId: data.session_id ?? data.sessionId ?? undefined,
@@ -42,7 +42,7 @@ const DeployApplicationInput = z
     wait: data.wait,
     timeout: data.timeout,
     force: data.force,
-    rollbackOnFailure: data.rollback_on_failure ?? data.rollbackOnFailure ?? true,
+    rollbackOnFailure: data.rollback_on_failure ?? data.rollbackOnFailure ?? true
   }));
 
 // Output schema
@@ -53,14 +53,14 @@ const DeployApplicationOutput = z.object({
       kind: z.string(),
       name: z.string(),
       namespace: z.string(),
-      status: z.string(),
-    }),
+      status: z.string()
+    })
   ),
   failed: z.array(
     z.object({
       resource: z.string(),
-      error: z.string(),
-    }),
+      error: z.string()
+    })
   ),
   endpoints: z
     .array(
@@ -68,16 +68,16 @@ const DeployApplicationOutput = z.object({
         service: z.string(),
         type: z.string(),
         url: z.string().optional(),
-        port: z.number().optional(),
-      }),
+        port: z.number().optional()
+      })
     )
     .optional(),
   rollbackPerformed: z.boolean().optional(),
   metadata: z.object({
     deploymentTime: z.number(),
     clusterInfo: z.string().optional(),
-    warnings: z.array(z.string()).optional(),
-  }),
+    warnings: z.array(z.string()).optional()
+  })
 });
 
 // Type aliases
@@ -102,7 +102,7 @@ async function loadManifests(manifestsPath: string): Promise<KubernetesManifest[
     try {
       const docs = yaml.loadAll(content) as KubernetesManifest[];
       manifests.push(
-        ...docs.filter((d: KubernetesManifest | null): d is KubernetesManifest => d?.kind != null),
+        ...docs.filter((d: KubernetesManifest | null): d is KubernetesManifest => d?.kind != null)
       ); // Filter out null docs
     } catch (error) {
       throw new Error(`Failed to parse ${file}: ${String(error)}`);
@@ -133,7 +133,7 @@ function orderManifests(manifests: KubernetesManifest[]): KubernetesManifest[] {
     'HorizontalPodAutoscaler',
     'PodDisruptionBudget',
     'Ingress',
-    'NetworkPolicy',
+    'NetworkPolicy'
   ];
 
   return manifests.sort((a, b) => {
@@ -149,7 +149,7 @@ function orderManifests(manifests: KubernetesManifest[]): KubernetesManifest[] {
 async function deployToCluster(
   manifests: KubernetesManifest[],
   input: DeployInput,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<KubernetesDeploymentResult> {
   const { kubernetesService, logger } = context;
 
@@ -160,7 +160,7 @@ async function deployToCluster(
       namespace: input.namespace,
       wait: input.wait,
       timeout: input.timeout * 1000,
-      dryRun: input.dryRun,
+      dryRun: input.dryRun
     });
 
     if (result != null && typeof result === 'object') {
@@ -193,7 +193,7 @@ async function deployToCluster(
       kind: m.kind,
       name: m.metadata.name,
       namespace: input.namespace,
-      status: 'created' as const,
+      status: 'created' as const
     })),
     deployed: manifests.map((m) => `${m.kind}/${m.metadata.name}`),
     failed: [],
@@ -201,9 +201,9 @@ async function deployToCluster(
       {
         service: manifests.find((m) => m.kind === 'Service')?.metadata.name ?? 'app',
         type: 'ClusterIP',
-        port: 80,
-      },
-    ],
+        port: 80
+      }
+    ]
   };
 }
 
@@ -213,7 +213,7 @@ async function deployToCluster(
 async function rollbackDeployment(
   deployed: string[],
   namespace: string,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<void> {
   const { kubernetesService, logger } = context;
 
@@ -242,7 +242,7 @@ async function waitForDeployment(
   deploymentName: string,
   namespace: string,
   timeout: number,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<boolean> {
   const { kubernetesService, logger } = context;
   const startTime = Date.now();
@@ -264,9 +264,9 @@ async function waitForDeployment(
     logger.info(
       {
         deployment: deploymentName,
-        elapsed: Math.round((Date.now() - startTime) / 1000),
+        elapsed: Math.round((Date.now() - startTime) / 1000)
       },
-      'Waiting for deployment to be ready',
+      'Waiting for deployment to be ready'
     );
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -294,9 +294,9 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
         sessionId,
         manifestsPath,
         namespace,
-        dryRun,
+        dryRun
       },
-      'Starting application deployment',
+      'Starting application deployment'
     );
 
     const startTime = Date.now();
@@ -324,7 +324,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
       } catch {
         throw new DomainError(
           ErrorCode.VALIDATION_ERROR,
-          `Manifests path not found: ${targetPath}`,
+          `Manifests path not found: ${targetPath}`
         );
       }
 
@@ -335,7 +335,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
           step: 'deploy_application',
           status: 'in_progress',
           message: 'Loading Kubernetes manifests',
-          progress: 0.1,
+          progress: 0.1
         });
       }
 
@@ -349,9 +349,9 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
       logger.info(
         {
           manifestsCount: manifests.length,
-          kinds: manifests.map((m) => m.kind),
+          kinds: manifests.map((m) => m.kind)
         },
-        `Loaded ${manifests.length} manifests`,
+        `Loaded ${manifests.length} manifests`
       );
 
       // Order manifests for deployment
@@ -364,7 +364,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
           step: 'deploy_application',
           status: 'in_progress',
           message: dryRun ? 'Validating manifests' : 'Deploying to cluster',
-          progress: 0.3,
+          progress: 0.3
         });
       }
 
@@ -384,7 +384,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
           const partialResult = await deployToCluster(
             orderedManifests.slice(0, 1), // Try to get what was deployed
             { ...input, dryRun: true },
-            context,
+            context
           );
 
           if (partialResult.deployed.length > 0) {
@@ -393,7 +393,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
             throw new DomainError(
               ErrorCode.OPERATION_FAILED,
               'Deployment failed and was rolled back',
-              error instanceof Error ? error : undefined,
+              error instanceof Error ? error : undefined
             );
           }
         }
@@ -415,7 +415,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
               step: 'deploy_application',
               status: 'in_progress',
               message: `Waiting for ${deploymentName} to be ready`,
-              progress: 0.6,
+              progress: 0.6
             });
           }
 
@@ -443,7 +443,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
           endpoints = endpointResult.data.map((e: { service: string; url?: string }) => ({
             service: e.service,
             type: 'ClusterIP' as const,
-            url: e.url,
+            url: e.url
           }));
         }
       }
@@ -455,7 +455,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
           kind: kind ?? 'Unknown',
           name: name ?? 'Unknown',
           namespace,
-          status: 'deployed',
+          status: 'deployed'
         };
       });
 
@@ -469,9 +469,9 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
               deployed,
               endpoints,
               namespace,
-              timestamp: new Date().toISOString(),
-            },
-          },
+              timestamp: new Date().toISOString()
+            }
+          }
         }));
       }
 
@@ -482,7 +482,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
           step: 'deploy_application',
           status: 'completed',
           message: `Deployed ${deployed.length} resources`,
-          progress: 1.0,
+          progress: 1.0
         });
       }
 
@@ -493,9 +493,9 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
           deployed: deployed.length,
           failed: deploymentResult.failed.length,
           deploymentTime: `${deploymentTime}ms`,
-          dryRun,
+          dryRun
         },
-        'Deployment completed',
+        'Deployment completed'
       );
 
       // Generate warnings
@@ -513,7 +513,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
           service: endpoint.service ?? (endpoint.name || 'unknown'),
           type: endpoint.type,
           url: endpoint.url,
-          port: endpoint.port,
+          port: endpoint.port
         }))
         .filter((e) => e.service !== 'unknown');
 
@@ -524,8 +524,8 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
         failed: deploymentResult.failed,
         metadata: {
           deploymentTime,
-          warnings: warnings.length > 0 ? warnings : undefined,
-        },
+          warnings: warnings.length > 0 ? warnings : undefined
+        }
       };
 
       // Only add optional properties if they have defined values
@@ -547,7 +547,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
           step: 'deploy_application',
           status: 'failed',
           message: 'Deployment failed',
-          progress: 0,
+          progress: 0
         });
       }
 
@@ -560,9 +560,9 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
     reason: 'Verify deployment health and get endpoints',
     paramMapper: (output) => ({
       namespace: output.deployed[0]?.namespace,
-      deployments: output.deployed.filter((d) => d.kind === 'Deployment').map((d) => d.name),
-    }),
-  },
+      deployments: output.deployed.filter((d) => d.kind === 'Deployment').map((d) => d.name)
+    })
+  }
 };
 
 // Default export for registry

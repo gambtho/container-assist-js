@@ -43,7 +43,7 @@ export async function loadManifests(manifestsPath: string): Promise<KubernetesMa
       // For now, just try to parse as JSON (temporary workaround)
       const docs = [JSON.parse(content)] as KubernetesManifest[];
       manifests.push(
-        ...docs.filter((d: KubernetesManifest | null): d is KubernetesManifest => d?.kind != null),
+        ...docs.filter((d: KubernetesManifest | null): d is KubernetesManifest => d?.kind != null)
       ); // Filter out null docs
     } catch (error) {
       throw new Error(`Failed to parse ${file}: ${String(error)}`);
@@ -74,7 +74,7 @@ export function orderManifests(manifests: KubernetesManifest[]): KubernetesManif
     'HorizontalPodAutoscaler',
     'PodDisruptionBudget',
     'Ingress',
-    'NetworkPolicy',
+    'NetworkPolicy'
   ];
 
   return manifests.sort((a, b) => {
@@ -90,7 +90,7 @@ export function orderManifests(manifests: KubernetesManifest[]): KubernetesManif
 export async function deployToCluster(
   manifests: KubernetesManifest[],
   input: DeployInput,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<KubernetesDeploymentResult> {
   const { kubernetesService, logger } = context;
 
@@ -101,7 +101,7 @@ export async function deployToCluster(
       namespace: input.namespace,
       wait: input.wait,
       timeout: input.timeout * 1000,
-      dryRun: input.dryRun,
+      dryRun: input.dryRun
     });
 
     if (result.success && result.data) {
@@ -120,7 +120,7 @@ export async function deployToCluster(
       kind: m.kind,
       name: m.metadata.name,
       namespace: input.namespace,
-      status: 'created' as const,
+      status: 'created' as const
     })),
     deployed: manifests.map((m) => `${m.kind}/${m.metadata.name}`),
     failed: [],
@@ -128,9 +128,9 @@ export async function deployToCluster(
       {
         service: manifests.find((m) => m.kind === 'Service')?.metadata.name ?? 'app',
         type: 'ClusterIP',
-        port: 80,
-      },
-    ],
+        port: 80
+      }
+    ]
   };
 }
 
@@ -140,7 +140,7 @@ export async function deployToCluster(
 export async function rollbackDeployment(
   deployed: string[],
   namespace: string,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<void> {
   const { kubernetesService, logger } = context;
 
@@ -168,7 +168,7 @@ export async function waitForDeployment(
   deploymentName: string,
   namespace: string,
   timeout: number,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<boolean> {
   const { kubernetesService, logger } = context;
   const startTime = Date.now();
@@ -189,9 +189,9 @@ export async function waitForDeployment(
     logger.info(
       {
         deployment: deploymentName,
-        elapsed: Math.round((Date.now() - startTime) / 1000),
+        elapsed: Math.round((Date.now() - startTime) / 1000)
       },
-      'Waiting for deployment to be ready',
+      'Waiting for deployment to be ready'
     );
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -206,7 +206,7 @@ export async function waitForDeployment(
 export async function getTargetPath(
   manifestsPath: string | undefined,
   sessionId: string | undefined,
-  sessionService: any,
+  sessionService: any
 ): Promise<string> {
   let targetPath = manifestsPath;
 
@@ -245,7 +245,7 @@ export async function waitForAllDeployments(
   input: DeployInput,
   context: ToolContext,
   progressEmitter: any,
-  sessionId: string | undefined,
+  sessionId: string | undefined
 ): Promise<void> {
   const { wait, dryRun, timeout, namespace } = input;
 
@@ -265,7 +265,7 @@ export async function waitForAllDeployments(
         step: 'deploy_application',
         status: 'in_progress',
         message: `Waiting for ${deploymentName} to be ready`,
-        progress: 0.6,
+        progress: 0.6
       });
     }
 
@@ -290,7 +290,7 @@ export async function getEndpoints(
   deploymentResult: KubernetesDeploymentResult,
   namespace: string,
   kubernetesService: any,
-  dryRun: boolean,
+  dryRun: boolean
 ): Promise<any[] | undefined> {
   let endpoints = deploymentResult.endpoints;
 
@@ -300,7 +300,7 @@ export async function getEndpoints(
       endpoints = endpointResult.data.map((e: { service: string; url?: string }) => ({
         service: e.service,
         type: 'ClusterIP' as const,
-        url: e.url,
+        url: e.url
       }));
     }
   }

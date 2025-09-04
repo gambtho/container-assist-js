@@ -8,7 +8,7 @@ import type { ToolDescriptor, ToolContext } from '../tool-types.js';
 
 // Input schema
 const PingInputSchema = z.object({
-  message: z.string().default('ping'),
+  message: z.string().default('ping')
 });
 
 // Output schema
@@ -20,13 +20,13 @@ const PingOutputSchema = z.object({
     name: z.string(),
     version: z.string(),
     uptime: z.number(),
-    pid: z.number(),
+    pid: z.number()
   }),
   capabilities: z.object({
     tools: z.boolean(),
     sampling: z.boolean(),
-    progress: z.boolean(),
-  }),
+    progress: z.boolean()
+  })
 });
 
 // Input/Output types
@@ -60,17 +60,17 @@ const pingTool: ToolDescriptor<PingInput, PingOutput> = {
         name: 'container-kit-mcp',
         version: '2.0.0',
         uptime: process.uptime(),
-        pid: process.pid,
+        pid: process.pid
       },
       capabilities: {
         tools: true,
         sampling: true,
-        progress: true,
-      },
+        progress: true
+      }
     };
 
     return response;
-  },
+  }
 };
 
 // Export for use in registry

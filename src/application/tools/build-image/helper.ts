@@ -10,12 +10,12 @@ import type { ToolContext } from '../tool-types.js';
  */
 export function prepareBuildArgs(
   buildArgs: Record<string, string>,
-  session: any,
+  session: any
 ): Record<string, string> {
   const defaults: Record<string, string> = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',
     BUILD_DATE: new Date().toISOString(),
-    VCS_REF: process.env.GIT_COMMIT ?? 'unknown',
+    VCS_REF: process.env.GIT_COMMIT ?? 'unknown'
   };
 
   // Add session-specific args if available
@@ -37,7 +37,7 @@ export function prepareBuildArgs(
  */
 export async function buildDockerImage(
   options: DockerBuildOptions,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<DockerBuildResult> {
   const { dockerService, logger } = context;
 
@@ -58,7 +58,7 @@ export async function buildDockerImage(
     layers: 10,
     buildTime: Date.now(),
     logs: ['Build completed successfully', 'Using CLI fallback'],
-    success: true,
+    success: true
   };
 }
 
@@ -67,7 +67,7 @@ export async function buildDockerImage(
  */
 export function analyzeBuildSecurity(
   dockerfile: string,
-  buildArgs: Record<string, string>,
+  buildArgs: Record<string, string>
 ): string[] {
   const warnings: string[] = [];
 

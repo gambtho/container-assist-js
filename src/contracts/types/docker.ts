@@ -305,7 +305,7 @@ export const DockerBuildOptionsSchema = z.object({
   quiet: z.boolean().optional(),
   forcerm: z.boolean().optional(),
   rm: z.boolean().optional(),
-  labels: z.record(z.string(), z.string()).optional(),
+  labels: z.record(z.string(), z.string()).optional()
 });
 
 export const DockerBuildResultSchema = z.object({
@@ -323,7 +323,7 @@ export const DockerBuildResultSchema = z.object({
   error: z.string().optional(),
   stream: z.string().optional(),
   aux: z.any().optional(),
-  method: z.string().optional(),
+  method: z.string().optional()
 });
 
 export const DockerScanResultSchema = z.object({
@@ -339,8 +339,8 @@ export const DockerScanResultSchema = z.object({
       description: z.string().optional(),
       score: z.number().optional(),
       vector: z.string().optional(),
-      references: z.array(z.string()).optional(),
-    }),
+      references: z.array(z.string()).optional()
+    })
   ),
   summary: z.object({
     critical: z.number(),
@@ -348,7 +348,7 @@ export const DockerScanResultSchema = z.object({
     medium: z.number(),
     low: z.number(),
     unknown: z.number().optional(),
-    total: z.number(),
+    total: z.number()
   }),
   scanTime: z.string().optional(),
   scan_duration_ms: z.number().optional(),
@@ -359,9 +359,9 @@ export const DockerScanResultSchema = z.object({
       size: z.number().optional(),
       os: z.string().optional(),
       distro: z.string().optional(),
-      lastScanned: z.string().optional(),
+      lastScanned: z.string().optional()
     })
-    .optional(),
+    .optional()
 });
 
 export const DockerPushResultSchema = z.object({
@@ -383,9 +383,9 @@ export const DockerPushResultSchema = z.object({
     .object({
       Tag: z.string().optional(),
       Digest: z.string().optional(),
-      Size: z.number().optional(),
+      Size: z.number().optional()
     })
-    .optional(),
+    .optional()
 });
 
 export const DockerTagResultSchema = z.object({
@@ -393,21 +393,21 @@ export const DockerTagResultSchema = z.object({
   registry: z.string().optional(),
   repository: z.string().optional(),
   success: z.boolean(),
-  error: z.string().optional(),
+  error: z.string().optional()
 });
 
 export const DockerfileChangeSchema = z.object({
   line_changed: z.string(),
   old_content: z.string(),
   new_content: z.string(),
-  reasoning: z.string(),
+  reasoning: z.string()
 });
 
 export const AlternativeApproachSchema = z.object({
   approach: z.string(),
   pros: z.array(z.string()),
   cons: z.array(z.string()),
-  when_to_use: z.string(),
+  when_to_use: z.string()
 });
 
 export const DockerfileFixSchema = z.object({
@@ -418,5 +418,5 @@ export const DockerfileFixSchema = z.object({
   performance_optimizations: z.array(z.string()),
   alternative_approaches: z.array(AlternativeApproachSchema),
   testing_recommendations: z.array(z.string()),
-  prevention_tips: z.array(z.string()),
+  prevention_tips: z.array(z.string())
 });

@@ -9,7 +9,7 @@ import type { ProgressCallback } from '../workflow/types.js';
 import type {
   SampleFunction,
   StructuredSampler,
-  ContentValidator,
+  ContentValidator
 } from '../../infrastructure/ai/index.js';
 
 /**

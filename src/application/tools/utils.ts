@@ -38,8 +38,8 @@ export async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): 
   return Promise.race([
     operation,
     new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs),
-    ),
+      setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs)
+    )
   ]);
 }
 
@@ -53,7 +53,7 @@ export function handleError(error: unknown, context?: string): never {
   throw new DomainError(
     ErrorCode.OPERATION_FAILED,
     message,
-    error instanceof Error ? error : undefined,
+    error instanceof Error ? error : undefined
   );
 }
 
@@ -75,14 +75,14 @@ export async function emitProgress(
     progress: number;
     message: string;
     metadata?: unknown;
-  },
+  }
 ): Promise<void> {
   if (context.progressEmitter) {
     const update: any = {
       ...data,
       status: data.status as 'starting' | 'in_progress' | 'completed' | 'failed',
       sessionId: context.sessionId ?? 'system',
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
     if (data.metadata !== undefined) {
       update.metadata = data.metadata as Record<string, unknown>;
@@ -134,7 +134,7 @@ export function createToolDescriptor<TInput, TOutput>(config: {
         logger.error({ error }, `${config.name} failed`);
         handleError(error, `Tool ${config.name} execution failed`);
       }
-    },
+    }
   };
 }
 
@@ -148,7 +148,7 @@ export async function retryOperation<T>(
     delayMs?: number;
     backoffMultiplier?: number;
     logger?: Logger;
-  } = {},
+  } = {}
 ): Promise<T> {
   const { maxAttempts = 3, delayMs = 1000, backoffMultiplier = 2, logger } = options;
 
@@ -170,9 +170,9 @@ export async function retryOperation<T>(
               attempt,
               maxAttempts,
               delay,
-              error: lastError,
+              error: lastError
             },
-            'Operation failed, retrying...',
+            'Operation failed, retrying...'
           );
         }
 
@@ -184,7 +184,7 @@ export async function retryOperation<T>(
   throw new DomainError(
     ErrorCode.OPERATION_FAILED,
     `Operation failed after ${maxAttempts} attempts`,
-    lastError instanceof Error ? lastError : undefined,
+    lastError instanceof Error ? lastError : undefined
   );
 }
 

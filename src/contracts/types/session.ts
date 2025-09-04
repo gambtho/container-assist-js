@@ -9,7 +9,7 @@ import {
   DockerBuildResultSchema,
   DockerScanResultSchema,
   DockerTagResultSchema,
-  DockerPushResultSchema,
+  DockerPushResultSchema
 } from './docker';
 
 export const AnalysisResultSchema = z.object({
@@ -21,7 +21,7 @@ export const AnalysisResultSchema = z.object({
     .object({
       type: z.string(),
       build_file: z.string(),
-      build_command: z.string().optional(),
+      build_command: z.string().optional()
     })
     .optional(),
   dependencies: z
@@ -29,8 +29,8 @@ export const AnalysisResultSchema = z.object({
       z.object({
         name: z.string(),
         version: z.string().optional(),
-        type: z.enum(['runtime', 'dev', 'test']).optional(),
-      }),
+        type: z.enum(['runtime', 'dev', 'test']).optional()
+      })
     )
     .optional(),
   has_tests: z.boolean().default(false),
@@ -48,9 +48,9 @@ export const AnalysisResultSchema = z.object({
     .object({
       baseImage: z.string().optional(),
       buildStrategy: z.string().optional(),
-      securityNotes: z.array(z.string()).optional(),
+      securityNotes: z.array(z.string()).optional()
     })
-    .optional(),
+    .optional()
 });
 
 export const DockerfileResultSchema = z.object({
@@ -59,7 +59,7 @@ export const DockerfileResultSchema = z.object({
   base_image: z.string().optional(),
   stages: z.array(z.string()).optional(),
   optimizations: z.array(z.string()).optional(),
-  multistage: z.boolean().default(false),
+  multistage: z.boolean().default(false)
 });
 
 export const ScanResultSchema = DockerScanResultSchema;
@@ -71,8 +71,8 @@ export const K8sManifestResultSchema = z.object({
       name: z.string(),
       namespace: z.string().optional(),
       content: z.string(),
-      file_path: z.string(),
-    }),
+      file_path: z.string()
+    })
   ),
   deployment_strategy: z.enum(['rolling', 'recreate', 'blue-green', 'canary']).optional(),
   replicas: z.number().default(1),
@@ -81,18 +81,18 @@ export const K8sManifestResultSchema = z.object({
       requests: z
         .object({
           cpu: z.string().optional(),
-          memory: z.string().optional(),
+          memory: z.string().optional()
         })
         .optional(),
       limits: z
         .object({
           cpu: z.string().optional(),
-          memory: z.string().optional(),
+          memory: z.string().optional()
         })
-        .optional(),
+        .optional()
     })
     .optional(),
-  output_path: z.string().optional(),
+  output_path: z.string().optional()
 });
 
 export const DeploymentResultSchema = z.object({
@@ -104,8 +104,8 @@ export const DeploymentResultSchema = z.object({
       z.object({
         type: z.enum(['internal', 'external', 'nodeport', 'loadbalancer']),
         url: z.string(),
-        port: z.number(),
-      }),
+        port: z.number()
+      })
     )
     .optional(),
   status: z.object({
@@ -117,13 +117,13 @@ export const DeploymentResultSchema = z.object({
           type: z.string(),
           status: z.string(),
           reason: z.string().optional(),
-          message: z.string().optional(),
-        }),
+          message: z.string().optional()
+        })
       )
-      .optional(),
+      .optional()
   }),
   deployment_duration_ms: z.number().optional(),
-  ready: z.boolean().default(false),
+  ready: z.boolean().default(false)
 });
 
 export const WorkflowStateSchema = z.object({
@@ -150,7 +150,7 @@ export const WorkflowStateSchema = z.object({
       context: z.string(),
       kubernetes_version: z.string(),
       namespaces_created: z.array(z.string()).optional(),
-      secrets_created: z.array(z.string()).optional(),
+      secrets_created: z.array(z.string()).optional()
     })
     .optional(),
 
@@ -163,8 +163,8 @@ export const WorkflowStateSchema = z.object({
           name: z.string(),
           endpoint: z.string(),
           status: z.enum(['healthy', 'unhealthy', 'degraded']),
-          response_time_ms: z.number(),
-        }),
+          response_time_ms: z.number()
+        })
       ),
       readiness_passed: z.boolean(),
       liveness_passed: z.boolean(),
@@ -173,10 +173,10 @@ export const WorkflowStateSchema = z.object({
           z.object({
             name: z.string(),
             passed: z.boolean(),
-            error: z.string().optional(),
-          }),
+            error: z.string().optional()
+          })
         )
-        .optional(),
+        .optional()
     })
     .optional(),
 
@@ -188,7 +188,7 @@ export const WorkflowStateSchema = z.object({
   registry_config: z
     .object({
       url: z.string(),
-      credentials: z.string().optional(),
+      credentials: z.string().optional()
     })
     .optional(),
 
@@ -197,11 +197,11 @@ export const WorkflowStateSchema = z.object({
       z.object({
         error: z.string(),
         fix: DockerfileFixSchema,
-        timestamp: z.string(),
-      }),
+        timestamp: z.string()
+      })
     )
     .optional()
-    .default([]),
+    .default([])
 });
 
 export const SessionSchema = z.object({
@@ -219,7 +219,7 @@ export const SessionSchema = z.object({
       'deploying',
       'completed',
       'failed',
-      'expired',
+      'expired'
     ])
     .default('active'),
 
@@ -232,7 +232,7 @@ export const SessionSchema = z.object({
   workflow_state: WorkflowStateSchema.default(() => ({
     completed_steps: [],
     errors: {},
-    metadata: {},
+    metadata: {}
   })),
 
   version: z.number().default(0),
@@ -242,7 +242,7 @@ export const SessionSchema = z.object({
       auto_push: z.boolean().default(false),
       registry: z.string().optional(),
       namespace: z.string().default('default'),
-      skip_scan: z.boolean().default(false),
+      skip_scan: z.boolean().default(false)
     })
     .optional(),
 
@@ -251,9 +251,9 @@ export const SessionSchema = z.object({
       current_step: z.number(),
       total_steps: z.number(),
       percentage: z.number().min(0).max(100),
-      estimated_completion: z.string().datetime().optional(),
+      estimated_completion: z.string().datetime().optional()
     })
-    .optional(),
+    .optional()
 });
 
 export type Session = z.infer<typeof SessionSchema>;
@@ -274,7 +274,7 @@ export const WorkflowStep = {
   GENERATE_K8S: 'generate_k8s_manifests',
   PREPARE_CLUSTER: 'prepare_cluster',
   DEPLOY: 'deploy_application',
-  VERIFY: 'verify_deployment',
+  VERIFY: 'verify_deployment'
 } as const;
 
 export type WorkflowStepType = (typeof WorkflowStep)[keyof typeof WorkflowStep];
@@ -290,6 +290,6 @@ export function getWorkflowSteps(): WorkflowStepType[] {
     WorkflowStep.GENERATE_K8S,
     WorkflowStep.PREPARE_CLUSTER,
     WorkflowStep.DEPLOY,
-    WorkflowStep.VERIFY,
+    WorkflowStep.VERIFY
   ];
 }

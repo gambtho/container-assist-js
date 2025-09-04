@@ -181,7 +181,7 @@ export const BuildConfigurationSchema = z.object({
   buildTool: z.enum(['docker', 'buildah', 'kaniko', 'podman']),
   strategy: z.enum(['single-stage', 'multi-stage', 'buildkit']),
   outputFormat: z.enum(['oci', 'docker']),
-  cacheStrategy: z.enum(['inline', 'registry', 'local']).optional(),
+  cacheStrategy: z.enum(['inline', 'registry', 'local']).optional()
 });
 
 export const BuildOptionsSchema = z.object({
@@ -203,8 +203,8 @@ export const BuildOptionsSchema = z.object({
     .array(
       z.object({
         id: z.string(),
-        src: z.string(),
-      }),
+        src: z.string()
+      })
     )
     .optional(),
   ssh: z.array(z.string()).optional(),
@@ -221,10 +221,10 @@ export const BuildOptionsSchema = z.object({
       z.object({
         name: z.string(),
         soft: z.number(),
-        hard: z.number(),
-      }),
+        hard: z.number()
+      })
     )
-    .optional(),
+    .optional()
 });
 
 export const BuildResultSchema = z.object({
@@ -252,9 +252,9 @@ export const BuildResultSchema = z.object({
       entrypoint: z.array(z.string()).optional(),
       workingDir: z.string().optional(),
       user: z.string().optional(),
-      exposedPorts: z.record(z.string(), z.any()).optional(),
+      exposedPorts: z.record(z.string(), z.any()).optional()
     })
-    .optional(),
+    .optional()
 });
 
 export const BuildProgressSchema = z.object({
@@ -268,9 +268,9 @@ export const BuildProgressSchema = z.object({
   progressDetail: z
     .object({
       current: z.number().optional(),
-      total: z.number().optional(),
+      total: z.number().optional()
     })
-    .optional(),
+    .optional()
 });
 
 export const BuildErrorSchema = z.object({
@@ -280,7 +280,7 @@ export const BuildErrorSchema = z.object({
   stage: z.string().optional(),
   line: z.number().optional(),
   context: z.string().optional(),
-  suggestions: z.array(z.string()).optional(),
+  suggestions: z.array(z.string()).optional()
 });
 
 // Type exports

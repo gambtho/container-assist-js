@@ -33,10 +33,10 @@ export const RepositoryAnalysisSchema = z.object({
       exposePorts: z.array(z.number()),
       environmentVars: z.array(z.string()).optional(),
       volumes: z.array(z.string()).optional(),
-      securityConsiderations: z.array(z.string()).optional(),
+      securityConsiderations: z.array(z.string()).optional()
     })
     .optional(),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1)
 });
 
 export type RepositoryAnalysis = z.infer<typeof RepositoryAnalysisSchema>;
@@ -69,14 +69,14 @@ export class RepositoryAnalyzer {
    */
   async analyzeRepository(
     repositoryData: string,
-    options: AnalysisOptions = {},
+    options: AnalysisOptions = {}
   ): Promise<RepositoryAnalysis | null> {
     const {
       includeContainerization = true,
       includeSecurityAnalysis = false,
       includeBestPractices = true,
       maxTokens = 3000,
-      temperature = 0.2,
+      temperature = 0.2
     } = options;
 
     try {
@@ -84,16 +84,16 @@ export class RepositoryAnalyzer {
         repositoryData,
         includeContainerization,
         includeSecurityAnalysis,
-        includeBestPractices,
+        includeBestPractices
       );
 
       this.logger.debug(
         {
           dataSize: repositoryData.length,
           includeContainerization,
-          includeSecurityAnalysis,
+          includeSecurityAnalysis
         },
-        'Starting repository analysis',
+        'Starting repository analysis'
       );
 
       const result = await this.structuredSampler.generateStructured<RepositoryAnalysis>(prompt, {
@@ -101,16 +101,16 @@ export class RepositoryAnalyzer {
         format: 'json',
         temperature,
         maxTokens,
-        validateSecurity: includeSecurityAnalysis,
+        validateSecurity: includeSecurityAnalysis
       });
 
       if (!result.success ?? !result.data) {
         this.logger.error(
           {
             error: result.error,
-            attempts: result.metadata?.attempts,
+            attempts: result.metadata?.attempts
           },
-          'Analysis failed',
+          'Analysis failed'
         );
         return null;
       }
@@ -120,9 +120,9 @@ export class RepositoryAnalyzer {
           language: result.data.language,
           framework: result.data.framework,
           confidence: result.data.confidence,
-          tokensUsed: result.metadata?.tokensUsed,
+          tokensUsed: result.metadata?.tokensUsed
         },
-        'Repository analysis completed',
+        'Repository analysis completed'
       );
 
       return result.data;
@@ -136,7 +136,7 @@ export class RepositoryAnalyzer {
    * Analyze package.json for Node.js projects
    */
   async analyzePackageJson(
-    packageJsonContent: string,
+    packageJsonContent: string
   ): Promise<Partial<RepositoryAnalysis> | null> {
     try {
       const packageData = JSON.parse(packageJsonContent);
@@ -158,8 +158,8 @@ Please provide:
         {
           format: 'json',
           temperature: 0.1,
-          maxTokens: 2000,
-        },
+          maxTokens: 2000
+        }
       );
 
       return result.success && result.data ? result.data : null;
@@ -197,7 +197,7 @@ Format as JSON with arrays for each category.`;
         format: 'json',
         temperature: 0.2,
         maxTokens: 2000,
-        validateSecurity: true,
+        validateSecurity: true
       });
 
       return result.success && result.data ? result.data : null;
@@ -217,7 +217,7 @@ Format as JSON with arrays for each category.`;
       multiStage?: boolean;
       healthCheck?: boolean;
       nonRootUser?: boolean;
-    },
+    }
   ): Promise<{
     dockerfile: string;
     dockerIgnore: string;
@@ -229,7 +229,7 @@ Format as JSON with arrays for each category.`;
       multiStage: true,
       healthCheck: true,
       nonRootUser: true,
-      ...requirements,
+      ...requirements
     };
 
     const prompt = `Based on this repository analysis, generate complete containerization files:
@@ -260,7 +260,7 @@ Format as JSON with each file as a string property.`;
         format: 'json',
         temperature: 0.1,
         maxTokens: 4000,
-        validateSecurity: true,
+        validateSecurity: true
       });
 
       return result.success && result.data ? result.data : null;
@@ -277,7 +277,7 @@ Format as JSON with each file as a string property.`;
     repositoryData: string,
     includeContainerization: boolean,
     includeSecurityAnalysis: boolean,
-    includeBestPractices: boolean,
+    includeBestPractices: boolean
   ): string {
     let prompt = `Analyze this repository structure and provide detailed insights:
 

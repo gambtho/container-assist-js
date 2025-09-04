@@ -11,7 +11,7 @@ export class SimpleProgressTracker {
 
   async reportProgress(
     callback: ProgressCallback | undefined,
-    update: ProgressUpdate,
+    update: ProgressUpdate
   ): Promise<void> {
     if (callback) {
       try {
@@ -20,9 +20,9 @@ export class SimpleProgressTracker {
         this.logger.warn(
           {
             error: error instanceof Error ? error.message : String(error),
-            step: update.step,
+            step: update.step
           },
-          'Progress callback error',
+          'Progress callback error'
         );
       }
     }
@@ -31,15 +31,15 @@ export class SimpleProgressTracker {
       {
         step: update.step,
         status: update.status,
-        progress: Math.round(update.progress * 100),
+        progress: Math.round(update.progress * 100)
       },
-      'Progress update',
+      'Progress update'
     );
   }
 
   createStepReporter(
     callback: ProgressCallback | undefined,
-    stepName: string,
+    stepName: string
   ): StepProgressReporter {
     return new StepProgressReporter(this, callback, stepName);
   }
@@ -52,7 +52,7 @@ export class StepProgressReporter {
   constructor(
     private tracker: SimpleProgressTracker,
     private callback: ProgressCallback | undefined,
-    private stepName: string,
+    private stepName: string
   ) {}
 
   async start(message?: string, metadata?: Record<string, unknown>): Promise<void> {
@@ -61,21 +61,21 @@ export class StepProgressReporter {
       status: 'starting',
       progress: 0,
       ...(message && { message }),
-      ...(metadata && { metadata }),
+      ...(metadata && { metadata })
     });
   }
 
   async progress(
     progress: number,
     message?: string,
-    metadata?: Record<string, unknown>,
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     await this.tracker.reportProgress(this.callback, {
       step: this.stepName,
       status: 'in_progress',
       progress: Math.max(0, Math.min(1, progress)),
       ...(message && { message }),
-      ...(metadata && { metadata }),
+      ...(metadata && { metadata })
     });
   }
 
@@ -85,7 +85,7 @@ export class StepProgressReporter {
       status: 'completed',
       progress: 1.0,
       ...(message && { message }),
-      ...(metadata && { metadata }),
+      ...(metadata && { metadata })
     });
   }
 
@@ -95,7 +95,7 @@ export class StepProgressReporter {
       status: 'failed',
       progress: 0,
       ...(message && { message }),
-      ...(metadata && { metadata }),
+      ...(metadata && { metadata })
     });
   }
 }

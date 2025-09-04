@@ -232,7 +232,7 @@ export const ScannerConfigSchema = z.object({
   template: z.string().optional(),
   ignoreUnfixed: z.boolean().optional(),
   skipUpdate: z.boolean().optional(),
-  clearCache: z.boolean().optional(),
+  clearCache: z.boolean().optional()
 });
 
 export const VulnerabilitySchema = z.object({
@@ -250,13 +250,13 @@ export const VulnerabilitySchema = z.object({
   cvssV2: z
     .object({
       score: z.number(),
-      vector: z.string(),
+      vector: z.string()
     })
     .optional(),
   cvssV3: z
     .object({
       score: z.number(),
-      vector: z.string(),
+      vector: z.string()
     })
     .optional(),
   references: z.array(z.string()).optional(),
@@ -271,13 +271,13 @@ export const VulnerabilitySchema = z.object({
     .object({
       digest: z.string(),
       diffId: z.string().optional(),
-      createdBy: z.string().optional(),
+      createdBy: z.string().optional()
     })
     .optional(),
   primaryUrl: z.string().optional(),
   fixState: z.enum(['fixed', 'not-fixed', 'will-not-fix', 'fix-deferred']).optional(),
   installedVersion: z.string().optional(),
-  fixedIn: z.array(z.string()).optional(),
+  fixedIn: z.array(z.string()).optional()
 });
 
 export const VulnerabilitySummarySchema = z.object({
@@ -290,7 +290,7 @@ export const VulnerabilitySummarySchema = z.object({
   total: z.number(),
   fixed: z.number().optional(),
   unfixed: z.number().optional(),
-  ignored: z.number().optional(),
+  ignored: z.number().optional()
 });
 
 export const ScanResultSchema = z.object({
@@ -314,7 +314,7 @@ export const ScanResultSchema = z.object({
       lastScanned: z.string().optional(),
       layers: z.number().optional(),
       digest: z.string().optional(),
-      tags: z.array(z.string()).optional(),
+      tags: z.array(z.string()).optional()
     })
     .optional(),
   config: z.any().optional(),
@@ -324,8 +324,8 @@ export const ScanResultSchema = z.object({
       z.object({
         code: z.string().optional(),
         message: z.string(),
-        details: z.any().optional(),
-      }),
+        details: z.any().optional()
+      })
     )
     .optional(),
   compliance: z
@@ -337,12 +337,12 @@ export const ScanResultSchema = z.object({
             name: z.string(),
             passed: z.boolean(),
             violations: z.number(),
-            severity: z.enum(['critical', 'high', 'medium', 'low', 'unknown', 'negligible']),
-          }),
+            severity: z.enum(['critical', 'high', 'medium', 'low', 'unknown', 'negligible'])
+          })
         )
-        .optional(),
+        .optional()
     })
-    .optional(),
+    .optional()
 });
 
 export const SecurityPolicySchema = z.object({
@@ -353,18 +353,18 @@ export const SecurityPolicySchema = z.object({
       name: z.string(),
       severity: z.enum(['critical', 'high', 'medium', 'low', 'unknown', 'negligible']),
       condition: z.string(),
-      action: z.enum(['fail', 'warn', 'ignore']),
-    }),
+      action: z.enum(['fail', 'warn', 'ignore'])
+    })
   ),
   exceptions: z
     .array(
       z.object({
         cve: z.string(),
         reason: z.string(),
-        expiry: z.string().optional(),
-      }),
+        expiry: z.string().optional()
+      })
     )
-    .optional(),
+    .optional()
 });
 
 export type ScannerConfigType = z.infer<typeof ScannerConfigSchema>;

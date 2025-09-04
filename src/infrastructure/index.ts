@@ -31,7 +31,7 @@ export {
   ContentValidator,
 
   // Caching
-  AIResponseCache,
+  AIResponseCache
 } from './ai/index.js';
 
 export type {
@@ -48,5 +48,5 @@ export type {
   RecoveryResult,
   CacheOptions,
   CacheStats,
-  EnhancedAIConfig as AIEnhancedConfig, // Rename to avoid conflict
+  EnhancedAIConfig as AIEnhancedConfig // Rename to avoid conflict
 } from './ai/index.js';

@@ -33,13 +33,13 @@ export function buildServicesConfig(appConfig: ApplicationConfig): ServicesConfi
     dockerConfig.trivy = {
       scannerPath: 'trivy', // Could be made configurable
       cacheDir: '/tmp/trivy-cache',
-      timeout: appConfig.infrastructure.scanning.timeout ?? 300000,
+      timeout: appConfig.infrastructure.scanning.timeout ?? 300000
     };
   }
 
   const kubernetesConfig: KubernetesConfig = {
     kubeconfig: appConfig.infrastructure.kubernetes.kubeconfig,
-    namespace: appConfig.infrastructure.kubernetes.namespace,
+    namespace: appConfig.infrastructure.kubernetes.namespace
   };
 
   if (appConfig.infrastructure.kubernetes.context !== undefined) {
@@ -48,8 +48,8 @@ export function buildServicesConfig(appConfig: ApplicationConfig): ServicesConfi
 
   const aiConfig: AIConfig = {
     modelPreferences: {
-      default: appConfig.aiServices.ai.model,
-    },
+      default: appConfig.aiServices.ai.model
+    }
   };
 
   if (appConfig.aiServices.ai.temperature !== undefined) {
@@ -68,8 +68,8 @@ export function buildServicesConfig(appConfig: ApplicationConfig): ServicesConfi
       ttl:
         appConfig.mcp.sessionTTL != null && appConfig.mcp.sessionTTL !== ''
           ? parseTTL(appConfig.mcp.sessionTTL)
-          : 3600000,
-    },
+          : 3600000
+    }
   };
 }
 

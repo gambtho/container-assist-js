@@ -24,7 +24,7 @@ const TagImageInput = z
     version: z.string().optional(),
     latest: z.boolean().default(true),
     custom_tags: z.array(z.string()).optional(),
-    customTags: z.array(z.string()).optional(),
+    customTags: z.array(z.string()).optional()
   })
   .transform((data) => ({
     sessionId: data.session_id ?? data.sessionId,
@@ -36,7 +36,7 @@ const TagImageInput = z
     registry: data.registry,
     version: data.version,
     latest: data.latest,
-    customTags: data.custom_tags ?? (data.customTags || []),
+    customTags: data.custom_tags ?? (data.customTags || [])
   }));
 
 // Output schema
@@ -47,15 +47,15 @@ const TagImageOutput = z.object({
     z.object({
       tag: z.string(),
       fullTag: z.string(),
-      created: z.boolean(),
-    }),
+      created: z.boolean()
+    })
   ),
   registry: z.string().optional(),
   metadata: z.object({
     version: z.string().optional(),
     timestamp: z.string(),
-    sessionId: z.string().optional(),
-  }),
+    sessionId: z.string().optional()
+  })
 });
 
 // Type aliases
@@ -98,7 +98,7 @@ function generateStandardTags(
   projectName: string,
   version?: string,
   registry?: string,
-  includeLatest: boolean = true,
+  includeLatest: boolean = true
 ): string[] {
   const tags: string[] = [];
   const prefix = registry ? `${registry}/` : '';
@@ -137,7 +137,7 @@ function generateStandardTags(
 async function tagDockerImage(
   source: string,
   target: string,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<boolean> {
   const { dockerService, logger } = context;
 
@@ -171,9 +171,9 @@ const tagImageHandler: ToolDescriptor<TagInput, TagOutput> = {
         sourceImage,
         targetTags: targetTags.length,
         registry,
-        version,
+        version
       },
-      'Starting image tagging',
+      'Starting image tagging'
     );
 
     try {
@@ -229,9 +229,9 @@ const tagImageHandler: ToolDescriptor<TagInput, TagOutput> = {
       logger.info(
         {
           source,
-          tags: allTags,
+          tags: allTags
         },
-        'Tagging image',
+        'Tagging image'
       );
 
       // Apply tags
@@ -243,7 +243,7 @@ const tagImageHandler: ToolDescriptor<TagInput, TagOutput> = {
           tagResults.push({
             tag: tag.split('/').pop() || tag,
             fullTag: tag,
-            created: success,
+            created: success
           });
 
           if (success) {
@@ -256,7 +256,7 @@ const tagImageHandler: ToolDescriptor<TagInput, TagOutput> = {
           tagResults.push({
             tag: tag.split('/').pop() || tag,
             fullTag: tag,
-            created: false,
+            created: false
           });
         }
       }
@@ -278,9 +278,9 @@ const tagImageHandler: ToolDescriptor<TagInput, TagOutput> = {
                 .map((t) => t.fullTag)
                 .filter((tag): tag is string => tag !== undefined),
               registry,
-              success: true,
-            },
-          },
+              success: true
+            }
+          }
         }));
       }
 
@@ -288,9 +288,9 @@ const tagImageHandler: ToolDescriptor<TagInput, TagOutput> = {
         {
           source,
           successfulTags: successfulTags.length,
-          totalTags: tagResults.length,
+          totalTags: tagResults.length
         },
-        'Image tagging completed',
+        'Image tagging completed'
       );
 
       return {
@@ -299,14 +299,14 @@ const tagImageHandler: ToolDescriptor<TagInput, TagOutput> = {
         tags: tagResults.map((t) => ({
           tag: t.tag,
           fullTag: t.fullTag ?? '',
-          created: t.created ?? false,
+          created: t.created ?? false
         })),
         registry,
         metadata: {
           version: version ?? '',
           timestamp: new Date().toISOString(),
-          sessionId: sessionId ?? '',
-        },
+          sessionId: sessionId ?? ''
+        }
       };
     } catch (error) {
       logger.error({ error }, 'Image tagging failed');
@@ -319,9 +319,9 @@ const tagImageHandler: ToolDescriptor<TagInput, TagOutput> = {
     reason: 'Push tagged images to registry',
     paramMapper: (output) => ({
       tags: output.tags.filter((t) => t.created).map((t) => t.fullTag),
-      registry: output.registry,
-    }),
-  },
+      registry: output.registry
+    })
+  }
 };
 
 // Default export for registry

@@ -11,7 +11,7 @@ import { executeWithRecovery } from '../error-recovery.js';
 import {
   buildK8sRequest,
   buildKustomizationRequest,
-  type K8sVariables,
+  type K8sVariables
 } from '../../../infrastructure/ai/index.js';
 import type { ToolContext } from '../tool-types.js';
 
@@ -98,7 +98,7 @@ function generateWarnings(input: K8sManifestInput): string[] {
  */
 export async function generateK8sManifests(
   input: K8sManifestInput,
-  context: ToolContext,
+  context: ToolContext
 ): Promise<GenerationResult> {
   const { aiService, progressEmitter, logger } = context;
   const { sessionId } = input;
@@ -121,7 +121,7 @@ export async function generateK8sManifests(
         step: 'generate_k8s_manifests',
         status: 'in_progress',
         message: 'Generating Kubernetes manifests',
-        progress: 0.2,
+        progress: 0.2
       });
     }
 
@@ -137,12 +137,12 @@ export async function generateK8sManifests(
         replicas: input.replicas,
         ingressEnabled: input.ingressEnabled,
         ...(input.ingressHost && { ingressHost: input.ingressHost }),
-        autoscaling: input.autoscaling?.enabled || false,
+        autoscaling: input.autoscaling?.enabled || false
       };
 
       const builder = buildK8sRequest(k8sVariables, {
         temperature: 0.2,
-        maxTokens: 2000,
+        maxTokens: 2000
       });
 
       const result = await aiService.generate(builder);
@@ -161,7 +161,7 @@ export async function generateK8sManifests(
         step: 'generate_k8s_manifests',
         status: 'in_progress',
         message: 'Parsing generated manifests',
-        progress: 0.5,
+        progress: 0.5
       });
     }
 
@@ -180,7 +180,7 @@ export async function generateK8sManifests(
           validManifests.push({
             kind: manifest.kind,
             name: manifest.metadata.name,
-            manifest,
+            manifest
           });
         }
       }
@@ -189,7 +189,7 @@ export async function generateK8sManifests(
     if (validManifests.length === 0) {
       throw createDomainError(
         ErrorCode.AI_SERVICE_ERROR,
-        'No valid Kubernetes manifests were generated',
+        'No valid Kubernetes manifests were generated'
       );
     }
 
@@ -200,7 +200,7 @@ export async function generateK8sManifests(
         step: 'generate_k8s_manifests',
         status: 'in_progress',
         message: 'Writing manifest files',
-        progress: 0.7,
+        progress: 0.7
       });
     }
 
@@ -231,7 +231,7 @@ export async function generateK8sManifests(
         kind,
         name,
         path: filepath,
-        content,
+        content
       });
 
       logger?.info({ kind, path: filepath }, `Generated ${kind}`);
@@ -247,13 +247,13 @@ export async function generateK8sManifests(
           resources: outputManifests.filter((m) => m.path).map((m) => path.basename(m.path!)),
           commonLabels: {
             app: input.appName,
-            environment: input.environment,
-          },
+            environment: input.environment
+          }
         },
         {
           temperature: 0.1,
-          maxTokens: 600,
-        },
+          maxTokens: 600
+        }
       );
 
       const result = await aiService.generate(kustomizationBuilder);
@@ -267,9 +267,9 @@ kind: Kustomization
 namespace: ${input.namespace}
 resources:
 ${outputManifests
-        .filter((m) => m.path)
-        .map((m) => `  - ${path.basename(m.path!)}`)
-        .join('\n')}
+  .filter((m) => m.path)
+  .map((m) => `  - ${path.basename(m.path!)}`)
+  .join('\n')}
 commonLabels:
   app: ${input.appName}
   environment: ${input.environment}`;
@@ -288,7 +288,7 @@ commonLabels:
         step: 'generate_k8s_manifests',
         status: 'completed',
         message: `Generated ${validManifests.length} manifests`,
-        progress: 1.0,
+        progress: 1.0
       });
     }
 
@@ -298,9 +298,9 @@ commonLabels:
       metadata: {
         appName: input.appName,
         namespace: input.namespace,
-        environment: input.environment,
+        environment: input.environment
       },
-      warnings,
+      warnings
     };
   } catch (error) {
     // Progress: Error
@@ -310,7 +310,7 @@ commonLabels:
         step: 'generate_k8s_manifests',
         status: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error',
-        progress: 0,
+        progress: 0
       });
     }
 

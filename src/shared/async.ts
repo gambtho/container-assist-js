@@ -13,7 +13,7 @@ export const sleep = (ms: number): Promise<void> => new Promise<void>((r) => set
 
 export async function retry<T>(
   fn: () => Promise<T>,
-  { maxAttempts = 3, delayMs = 1000, backoff = 2, maxDelayMs = 30_000 }: RetryOptions = {},
+  { maxAttempts = 3, delayMs = 1000, backoff = 2, maxDelayMs = 30_000 }: RetryOptions = {}
 ): Promise<T> {
   let last: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -32,13 +32,13 @@ export async function retry<T>(
 export async function withTimeout<T>(
   fn: () => Promise<T>,
   timeoutMs: number,
-  message = 'Operation timed out',
+  message = 'Operation timed out'
 ): Promise<T> {
   return Promise.race([
     fn(),
     sleep(timeoutMs).then(() => {
       throw new Error(message);
-    }),
+    })
   ]) as Promise<T>;
 }
 
@@ -52,7 +52,7 @@ export interface TimeoutOptions {
 
 export async function withTimeoutOptions<T>(
   fn: () => Promise<T>,
-  options: TimeoutOptions,
+  options: TimeoutOptions
 ): Promise<T> {
   const { timeoutMs, errorMessage = 'Operation timed out' } = options;
   return withTimeout(fn, timeoutMs, errorMessage);
