@@ -10,9 +10,9 @@ import { detectEnvironment } from '../dist/test/utils/environment-detector.js';
 
 // Input validation
 const args = process.argv.slice(2);
-const validArgs = ['--verbose', '--watch', '--coverage', '--updateSnapshot'];
+const validArgs = ['--verbose', '--watch', '--coverage', '--updateSnapshot', '--help', '-h'];
 for (const arg of args) {
-    if (arg.startsWith('--') && !validArgs.includes(arg.split('=')[0])) {
+    if (arg.startsWith('--') && !validArgs.includes(arg.split('=')[0]) && arg !== '-h') {
         console.error(`Error: Invalid argument '${arg}'. Valid options: ${validArgs.join(', ')}`);
         process.exit(1);
     }
@@ -147,8 +147,7 @@ async function main() {
     }
 }
 
-// Parse command line arguments
-const args = process.argv.slice(2);
+// Parse command line arguments (already declared at top)
 if (args.includes('--help') || args.includes('-h')) {
     console.log('Auto Integration Test Runner');
     console.log('');
