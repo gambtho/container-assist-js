@@ -54,3 +54,4 @@ yarn-error.log*
 CLAUDE.md
 .claude
 plans
+docs/development/claude-guide.md
