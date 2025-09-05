@@ -145,7 +145,7 @@ export async function generateK8sManifests(
   input: K8sManifestInput,
   context: ToolContext,
 ): Promise<GenerationResult> {
-  const { aiService, progressEmitter, logger } = context;
+  const { aiService: _aiService, sampleFunction, progressEmitter, logger } = context;
   const { sessionId } = input;
 
   try {
@@ -185,10 +185,14 @@ export async function generateK8sManifests(
         maxTokens: 2000,
       });
 
-      const result = await aiService.generate(builder);
+      if (!sampleFunction) {
+        throw new Error('AI service not available');
+      }
 
-      if (result.data) {
-        return result.data;
+      const result = await sampleFunction(builder);
+
+      if (result.success && 'text' in result) {
+        return result.text;
       }
 
       throw new Error('Failed to generate manifests');
@@ -306,10 +310,25 @@ export async function generateK8sManifests(
         },
       );
 
-      const result = await aiService.generate(kustomizationBuilder);
+      if (!sampleFunction) {
+        // Fallback to basic kustomization without AI
+        return `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ${input.namespace}
+resources:
+${outputManifests
+  .filter((m) => m.path)
+  .map((m) => `  - ${path.basename(m.path!)}`)
+  .join('\n')}
+commonLabels:
+  app: ${input.appName}
+  environment: ${input.environment}`;
+      }
 
-      if (result.data) {
-        return result.data;
+      const result = await sampleFunction(kustomizationBuilder);
+
+      if (result.success && 'text' in result) {
+        return result.text;
       }
 
       return `apiVersion: kustomize.config.k8s.io/v1beta1
@@ -326,7 +345,7 @@ commonLabels:
     });
 
     const kustomizationPath = path.join(manifestDir, 'kustomization.yaml');
-    await fs.writeFile(kustomizationPath, kustomizationResult, 'utf-8');
+    await fs.writeFile(kustomizationPath, String(kustomizationResult || ''), 'utf-8');
 
     // Generate warnings
     const warnings = generateWarnings(input);

@@ -1,24 +1,15 @@
 import { z } from 'zod';
 import type { Logger } from 'pino';
-<<<<<<< HEAD
-import type { EventEmitter } from 'events';
-import type { WorkflowOrchestrator } from '../workflow/orchestrator';
-import type { WorkflowManager } from '../workflow/manager';
-import type { DependenciesConfig } from '../interfaces';
-import type { ProgressCallback } from '../workflow/types';
-import type {
-  SampleFunction,
-  StructuredSampler,
-  ContentValidator,
-} from '../../infrastructure/ai/index';
-=======
-// import type { Server, Tool } from '@modelcontextprotocol/sdk/types';
-// Server not exported from SDK, Tool unused
 import type { WorkflowOrchestrator } from '../workflow/orchestrator.js';
 import type { WorkflowManager } from '../workflow/manager.js';
 import type { ProgressEmitter, EventPublisher, DependenciesConfig } from '../interfaces.js';
 import type { ProgressCallback } from '../workflow/types.js';
->>>>>>> 8f344a2 (cleaning up kubernetes & docker service)
+import type {
+  SessionService,
+  AIService,
+  DockerService,
+  KubernetesService,
+} from '../services/interfaces';
 
 /**
  * MCP SDK compatible tool context
@@ -49,11 +40,10 @@ export interface ToolContext {
   logPerformanceMetrics?: (operation: string, duration: number, metadata?: unknown) => void;
 
   // Services - still being used in many tools
-  sessionService?: any;
-  aiService?: any;
-  dockerService?: any;
-  kubernetesService?: any;
-  toolRegistry?: any;
+  sessionService?: SessionService;
+  aiService?: AIService;
+  dockerService?: DockerService;
+  kubernetesService?: KubernetesService;
 }
 
 /**
@@ -66,7 +56,7 @@ export interface ToolHandler<TInput, TOutput> {
 /**
  * MCP SDK compatible tool descriptor
  */
-export interface ToolDescriptor<TInput = any, TOutput = any> {
+export interface ToolDescriptor<TInput = unknown, TOutput = unknown> {
   name: string;
   description: string;
   category:
@@ -78,8 +68,14 @@ export interface ToolDescriptor<TInput = any, TOutput = any> {
     | 'docker'
     | 'kubernetes'
     | 'optimization';
-  inputSchema: z.ZodType<TInput> | z.ZodEffects<any, TInput, any> | z.ZodObject<any>;
-  outputSchema: z.ZodType<TOutput> | z.ZodEffects<any, TOutput, any> | z.ZodObject<any>;
+  inputSchema:
+    | z.ZodType<TInput>
+    | z.ZodEffects<z.ZodTypeAny, TInput, unknown>
+    | z.ZodObject<z.ZodRawShape>;
+  outputSchema:
+    | z.ZodType<TOutput>
+    | z.ZodEffects<z.ZodTypeAny, TOutput, unknown>
+    | z.ZodObject<z.ZodRawShape>;
   handler: ToolHandler<TInput, TOutput>;
   chainHint?: {
     nextTool: string;

@@ -333,7 +333,7 @@ describe('DockerService', () => {
 
       expect(mockDockerClient.health).toHaveBeenCalled();
       expect(result.available).toBe(true);
-      expect(result.status).toBe('healthy');
+      expect(result.healthy).toBe(true);
     });
 
     test('should throw error when Docker is unavailable', async () => {

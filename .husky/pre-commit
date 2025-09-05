@@ -6,10 +6,23 @@ echo "🛡️ Running pre-commit quality gates..."
 # Fail fast on any error
 set -eu
 
+# Run format and add any changes
+echo "🎨 Running formatter..."
+npm run format > /dev/null 2>&1
+# Add any formatting changes
+git add -u
+
 # Run lint-staged for incremental checks
 npx lint-staged
 
 # Run quality gates
 ./scripts/quality-gates.sh
+
+# Stage the quality-gates.json file if it was modified
+# This ensures the updated metrics are included in the commit
+if git diff --name-only | grep -q "quality-gates.json"; then
+    echo "📊 Staging updated quality-gates.json metrics..."
+    git add quality-gates.json
+fi
 
 echo "✅ Pre-commit checks passed!"

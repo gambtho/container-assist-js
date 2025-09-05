@@ -287,39 +287,79 @@ sudo usermod -aG docker $USER
 
 ## Documentation
 
+📚 **[Documentation Index](docs/README.md)** - Complete documentation directory
+
+### Quick Links
+- **[Testing Guide](docs/guides/testing.md)** - Unit tests, integration tests, CI/CD
+- **[Quality Management](docs/guides/quality-management.md)** - Linting, quality gates, baseline management
+- **[AI Architecture](docs/reference/ai-architecture.md)** - AI system design and tool architecture
+- **[Claude Guide](docs/development/claude-guide.md)** - Guidelines for Claude Code AI assistant
+
 ## Development
 
 ### Commands
 
+#### Build & Development
 ```bash
-# Build and Development (Ultra-Fast with tsdown)
-npm run build          # Fast development build (90ms)
-npm run build:prod     # Minified production build (710ms)
-npm run build:watch    # Live rebuild on changes
+npm run build          # Fast development build with tsdown
+npm run build:prod     # Production build with minification
+npm run build:watch    # Watch mode with auto-rebuild
 npm run dev            # Development server with auto-reload
+npm start              # Start production server
+npm run clean          # Clean dist directory
+```
 
-# Code Quality
-npm run lint           # ESLint linting
-npm run lint:fix       # Auto-fix linting issues
+#### Code Quality
+```bash
+npm run lint           # ESLint code linting
+npm run lint:fix       # Auto-fix ESLint issues
 npm run typecheck      # TypeScript type checking
-npm run format         # Prettier formatting
-npm run validate       # Run all quality checks
+npm run format         # Prettier code formatting
+npm run format:check   # Check formatting without changes
+npm run validate       # Run lint + typecheck + test
+```
 
-# Testing
-npm test               # Run all tests
-npm run test:unit      # Unit tests with bail
-npm run test:integration # Integration tests
-npm run test:coverage  # Coverage report
+#### Quality Gates & Validation
+```bash
+npm run validate:pr:fast   # Quick PR validation (30s)
+npm run validate:pr        # Full PR validation with coverage
+npm run quality:check      # Comprehensive quality analysis
+npm run quality:gates      # TypeScript + quality analysis
+npm run baseline:report    # Quick quality summary
+npm run baseline:lint      # Set new lint baseline
+npm run check:quick        # Fast type + lint check
+npm run fix:all           # Auto-fix lint + format
+```
+
+#### Testing
+```bash
+npm test                   # Run all tests
+npm run test:unit          # Unit tests with bail
+npm run test:unit:quick    # Unit tests with 10s timeout
+npm run test:integration   # Integration tests
+npm run test:coverage      # Generate coverage report
+npm run test:ci            # Fast CI tests
+npm run test:watch         # Watch mode for development
 ```
 
 ### Code Standards
 
-- **Build System**: Ultra-fast tsdown (rolldown-based) - 10-100x faster than tsc
+- **Build System**: Ultra-fast tsdown (esbuild-based) - 10-100x faster than tsc
 - **TypeScript**: Strict mode with ES2022 modules and native ESM support
-- **Imports**: Relative paths only (no path aliases, no import extension hacks)
-- **Architecture**: Clean separation between layers with strict boundaries
-- **Error Handling**: Result monad pattern throughout
-- **Testing**: Comprehensive unit and integration tests (146 passing)
+- **Imports**: Relative paths only (no path aliases like @domain/@service)
+- **Architecture**: Clean 3-layer separation with strict boundaries
+- **Error Handling**: Result<T> monad pattern throughout
+- **Quality Gates**: Automated lint ratcheting prevents regression
+- **Testing**: Comprehensive unit and integration tests
+
+### Project Health
+
+- **ESLint Warnings**: 700 (baseline enforced, 46% reduction from initial)
+- **ESLint Errors**: 9 (must be fixed before PR)
+- **TypeScript Errors**: 45 (work in progress)
+- **Dead Code**: 234 unused exports (47% reduction)
+- **Build Time**: < 1 second
+- **Test Coverage**: > 70%
 
 
 ## License

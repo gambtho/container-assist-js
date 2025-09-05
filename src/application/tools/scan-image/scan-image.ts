@@ -103,19 +103,31 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
 
       if (dockerService && 'scan' in dockerService) {
         logger.info('Using Docker service for vulnerability scan');
-        const result = await dockerService.scan(scanTarget);
-        if (!result.success || !result.data) {
-          throw new Error(result.error?.message || 'Scan failed');
+        const result = await dockerService.scan({ image: scanTarget });
+        const scanResponse = result as {
+          success?: boolean;
+          data?: DockerScanResult;
+          error?: { message?: string };
+        };
+        if (!scanResponse.success || !scanResponse.data) {
+          throw new Error(scanResponse.error?.message ?? 'Scan failed');
         }
-        scanResult = result.data;
+        scanResult = scanResponse.data;
       } else {
         logger.warn('Docker service not available, using mock scan');
         scanResult = mockScan(scanTarget);
       }
 
-      // Extract vulnerability counts
-      const { critical, high, medium, low } = scanResult.summary;
-      const total = critical + high + medium + low;
+      // Extract counts; prefer service-reported total, include unknown
+      const {
+        critical = 0,
+        high = 0,
+        medium = 0,
+        low = 0,
+        unknown = 0,
+        total: reportedTotal,
+      } = scanResult.summary ?? {};
+      const total = reportedTotal ?? scanResult.vulnerabilities.length;
 
       // Update session with scan results
       await sessionService.updateAtomic(sessionId, (session: Session) => ({
@@ -123,12 +135,16 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
         workflow_state: {
           ...session.workflow_state,
           scan_result: {
-            vulnerabilities: total,
-            critical,
-            high,
-            medium,
-            low,
-            details: scanResult.vulnerabilities,
+            vulnerabilities: scanResult.vulnerabilities,
+            summary: {
+              vulnerabilities: total,
+              critical,
+              high,
+              medium,
+              low,
+              unknown,
+              total,
+            },
           },
         },
       }));

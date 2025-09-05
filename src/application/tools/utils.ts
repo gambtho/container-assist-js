@@ -46,7 +46,7 @@ export function emitProgress(
   },
 ): void {
   if (context.progressEmitter) {
-    const update: any = {
+    const update = {
       ...data,
       status: data.status as 'starting' | 'in_progress' | 'completed' | 'failed',
       sessionId: context.sessionId ?? 'system',

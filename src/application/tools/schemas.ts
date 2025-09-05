@@ -24,7 +24,7 @@ export const RepoPathInput = z.object({
 
 export const AnalyzeRepositoryInput = RepoPathInput.extend({
   sessionId: z.string().optional(),
-  depth: z.enum(['shallow', 'deep']).default('shallow'),
+  depth: z.number().min(1).max(10).default(3),
   includeTests: z.boolean().default(false),
 });
 

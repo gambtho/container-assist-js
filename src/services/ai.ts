@@ -9,11 +9,6 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import type { Logger } from 'pino';
-<<<<<<< HEAD
-import { AIClient } from '../infrastructure/ai-client';
-import type { SampleFunction } from '../infrastructure/ai/index';
-=======
->>>>>>> 8f344a2 (cleaning up kubernetes & docker service)
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
@@ -265,9 +260,11 @@ export class AIService {
       .replace(/\{\{structure\}\}/g, context.structure)
       .replace(/\{\{files\}\}/g, context.files.join('\n'));
   }
-
-  private buildOptimizationPrompt(template: string, dockerfile: string): string {
-    return template.replace(/\{\{dockerfile\}\}/g, dockerfile);
+  
+  async fixDockerfile(dockerfile: string, issues: string[]): Promise<string> {
+    // Convert array of issues to a single error string for the client
+    const error = issues.join('\n');
+    return this.client.fixDockerfile(dockerfile, error);
   }
 
   private buildFixPrompt(template: string, dockerfile: string, error: string): string {
@@ -282,6 +279,17 @@ export class AIService {
     }
     throw new Error('Unexpected response format - expected text content');
   }
+
+  /**
+   * Enhance Kubernetes manifests with best practices
+   */
+  enhanceManifests(manifests: unknown[]): Promise<unknown[]> {
+    // For now, return manifests as-is since AI enhancement would require
+    // additional implementation in the AIClient
+    this.logger.debug({ count: manifests.length }, 'Enhancing manifests (passthrough)');
+    return Promise.resolve(manifests);
+  }
+}
 
   private async buildRepositoryContext(repoPath: string, files?: string[]): Promise<{ path: string; structure: string; files: string[] }> {
     // Build a simple structure representation

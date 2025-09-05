@@ -4,11 +4,16 @@
  */
 
 import type { Logger } from 'pino';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { Services } from '../../services/index';
 import type { ApplicationConfig } from '../../config/types';
 import type { ToolDescriptor, ToolContext } from './tool-types';
+import type { Session } from '../../domain/types/session';
+// import type { SessionService } from '../session/manager'; // unused import
 import { convertToMcpError } from '../errors/mcp-error-mapper';
+import { z } from 'zod';
+
+// Track registered tools for getRegisteredTools()
+const registeredTools: Array<{ name: string; description: string }> = [];
 
 // MCP Server interface (minimal needed for registration)
 interface McpServer {
@@ -41,13 +46,59 @@ export async function registerToolsNatively(
 ): Promise<void> {
   const toolLogger = logger.child({ component: 'NativeToolRegistration' });
 
+  // Clear registered tools array at start of registration
+  registeredTools.length = 0;
+
   // Create reusable tool context factory
   const createToolContext = async (contextOrSignal?: unknown): Promise<ToolContext> => {
     const { WorkflowManager } = await import('../workflow/manager');
     const { WorkflowOrchestrator } = await import('../workflow/orchestrator');
+    const { SessionService: AppSessionService } = await import('../session/manager');
+    const { SessionStore: InfraSessionStore } = await import('../../infrastructure/session-store');
 
     const workflowManager = new WorkflowManager(logger);
-    const workflowOrchestrator = new WorkflowOrchestrator(services.session as any, logger);
+
+    // Create an application-layer SessionService with an in-memory store
+    const sessionStore = new InfraSessionStore(logger);
+
+    // Create an adapter that implements the domain SessionStore interface
+    const storeAdapter = {
+      create: (session: Session) => {
+        sessionStore.set(session.id, session);
+        return Promise.resolve();
+      },
+      get: (id: string) => Promise.resolve(sessionStore.get(id)),
+      update: (id: string, session: Session) => {
+        sessionStore.set(id, session);
+        return Promise.resolve();
+      },
+      delete: (id: string) => {
+        sessionStore.delete(id);
+        return Promise.resolve();
+      },
+      list: () => Promise.resolve(sessionStore.list()),
+      updateAtomic: (id: string, updater: (current: Session) => Session) => {
+        const current = sessionStore.get(id);
+        if (current) {
+          const updated = updater(current);
+          sessionStore.set(id, updated);
+        }
+        return Promise.resolve();
+      },
+      createBatch: (sessions: Session[]) => {
+        for (const session of sessions) {
+          sessionStore.set(session.id, session);
+        }
+        return Promise.resolve();
+      },
+      getActiveCount: () => Promise.resolve(sessionStore.list().length),
+      getByStatus: (status: Session['status']) =>
+        Promise.resolve(sessionStore.list().filter((s) => s.status === status)),
+      getRecentlyUpdated: (limit: number) => Promise.resolve(sessionStore.list().slice(0, limit)),
+    };
+
+    const appSessionService = new AppSessionService(storeAdapter as any, logger);
+    const workflowOrchestrator = new WorkflowOrchestrator(appSessionService, logger);
 
     const progressEmitter = services.events;
     const eventPublisher = services.events;
@@ -87,6 +138,7 @@ export async function registerToolsNatively(
 
     // Only add signal if it's defined
     if (contextOrSignal && typeof contextOrSignal === 'object' && 'aborted' in contextOrSignal) {
+      // Safely add signal to context without type assertion issues
       (context as any).signal = contextOrSignal;
     }
 
@@ -94,13 +146,24 @@ export async function registerToolsNatively(
   };
 
   // Helper function to register a single tool
-  const registerTool = <TInput, TOutput>(descriptor: ToolDescriptor<TInput, TOutput>) => {
+  const registerTool = <TInput, TOutput>(descriptor: ToolDescriptor<TInput, TOutput>): void => {
+    // Track tool for getRegisteredTools()
+    registeredTools.push({ name: descriptor.name, description: descriptor.description });
+
+    // MCP SDK expects ZodRawShape (the .shape property of a ZodObject)
+    // Check if the schema is a ZodObject and extract its shape
+    let inputSchemaForMcp: z.ZodRawShape | undefined;
+
+    if (descriptor.inputSchema instanceof z.ZodObject) {
+      inputSchemaForMcp = descriptor.inputSchema.shape;
+    }
+
     server.registerTool(
       descriptor.name,
       {
         title: descriptor.name,
         description: descriptor.description,
-        inputSchema: zodToJsonSchema(descriptor.inputSchema),
+        inputSchema: inputSchemaForMcp,
       },
       async (params: unknown, context: unknown) => {
         const toolLogger = logger.child({ tool: descriptor.name });
@@ -149,20 +212,95 @@ export async function registerToolsNatively(
 
   // Load and register tools directly
   try {
-    // Import tools directly (eliminates complex discovery logic)
-    const pingTool = await import('./ops/ping.js');
-    const serverStatusTool = await import('./ops/server-status.js');
+    let registeredCount = 0;
 
-    // Register each tool directly with the MCP SDK
+    // Import and register utility tools
+    const pingTool = await import('./ops/ping.js');
     if (pingTool.default) {
       registerTool(pingTool.default);
+      registeredCount++;
     }
 
+    const serverStatusTool = await import('./ops/server-status.js');
     if (serverStatusTool.default) {
       registerTool(serverStatusTool.default);
+      registeredCount++;
     }
 
-    toolLogger.info({ toolCount: 2 }, 'All tools registered natively with MCP SDK');
+    // Import and register workflow tools
+    const analyzeRepoTool = await import('./analyze-repo/index.js');
+    if (analyzeRepoTool.default) {
+      registerTool(analyzeRepoTool.default);
+      registeredCount++;
+    }
+
+    const generateDockerfileTool = await import('./generate-dockerfile/index.js');
+    if (generateDockerfileTool.default) {
+      registerTool(generateDockerfileTool.default);
+      registeredCount++;
+    }
+
+    const buildImageTool = await import('./build-image/index.js');
+    if (buildImageTool.default) {
+      registerTool(buildImageTool.default);
+      registeredCount++;
+    }
+
+    const tagImageTool = await import('./tag-image/index.js');
+    if (tagImageTool.default) {
+      registerTool(tagImageTool.default);
+      registeredCount++;
+    }
+
+    const pushImageTool = await import('./push-image/index.js');
+    if (pushImageTool.default) {
+      registerTool(pushImageTool.default);
+      registeredCount++;
+    }
+
+    const scanImageTool = await import('./scan-image/index.js');
+    if (scanImageTool.default) {
+      registerTool(scanImageTool.default);
+      registeredCount++;
+    }
+
+    const fixDockerfileTool = await import('./fix-dockerfile/index.js');
+    if (fixDockerfileTool.default) {
+      registerTool(fixDockerfileTool.default);
+      registeredCount++;
+    }
+
+    const generateK8sTool = await import('./generate-k8s-manifests/index.js');
+    if (generateK8sTool.default) {
+      registerTool(generateK8sTool.default);
+      registeredCount++;
+    }
+
+    const deployAppTool = await import('./deploy-application/index.js');
+    if (deployAppTool.default) {
+      registerTool(deployAppTool.default);
+      registeredCount++;
+    }
+
+    const verifyDeploymentTool = await import('./verify-deployment/index.js');
+    if (verifyDeploymentTool.default) {
+      registerTool(verifyDeploymentTool.default);
+      registeredCount++;
+    }
+
+    const resolveBaseImagesTool = await import('./resolve-base-images/index.js');
+    if (resolveBaseImagesTool.default) {
+      registerTool(resolveBaseImagesTool.default);
+      registeredCount++;
+    }
+
+    const prepareClusterTool = await import('./prepare-cluster/prepare-cluster.js');
+    if (prepareClusterTool.default) {
+      registerTool(prepareClusterTool.default);
+      registeredCount++;
+    }
+
+    toolLogger.info({ toolCount: registeredCount }, 'All tools registered natively with MCP SDK');
   } catch (error) {
     toolLogger.error({ error }, 'Failed to register tools natively');
     throw convertToMcpError(error);
@@ -171,11 +309,9 @@ export async function registerToolsNatively(
 
 /**
  * Simple tool listing for status/debugging
+ * Returns the actual list of registered tools to prevent drift
  */
 export function getRegisteredTools(): Array<{ name: string; description: string }> {
-  return [
-    { name: 'ping', description: 'Test MCP server connectivity and health' },
-    { name: 'server_status', description: 'Get MCP server status and system information' },
-    // Additional tools can be added here as they are migrated
-  ];
+  // Return a copy of the registered tools array
+  return [...registeredTools];
 }

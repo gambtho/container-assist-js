@@ -84,12 +84,11 @@ export class DockerService {
   }
 
   async health(): Promise<{
-    available: boolean;
-    status?: string;
+    healthy: boolean;
+    available?: boolean;
     version?: string;
-    trivyAvailable?: boolean;
-    systemInfo?: unknown;
-    client?: DockerClient;
+    info?: unknown;
+    client?: unknown;
   }> {
     // Use the enhanced health check from client
     const healthStatus = await this.client.health();
@@ -98,32 +97,13 @@ export class DockerService {
       throw new DockerError('Docker not available', ErrorCode.DOCKER_HEALTH_CHECK_FAILED, 'health');
     }
 
-    const result: {
-      available: boolean;
-      status?: string;
-      version?: string;
-      trivyAvailable?: boolean;
-      systemInfo?: unknown;
-      client?: DockerClient;
-    } = {
+    return {
+      healthy: healthStatus.available,
       available: healthStatus.available,
-      status: 'healthy',
+      ...(healthStatus.version && { version: healthStatus.version }),
+      ...(healthStatus.systemInfo && { info: healthStatus.systemInfo }),
+      ...(healthStatus.client && { client: healthStatus.client }),
     };
-
-    if (healthStatus.version !== undefined) {
-      result.version = healthStatus.version;
-    }
-    if (healthStatus.trivyAvailable !== undefined) {
-      result.trivyAvailable = healthStatus.trivyAvailable;
-    }
-    if (healthStatus.systemInfo !== undefined) {
-      result.systemInfo = healthStatus.systemInfo;
-    }
-    if (healthStatus.client !== undefined) {
-      result.client = healthStatus.client;
-    }
-
-    return result;
   }
 
   // Additional methods needed by resource providers
@@ -131,26 +111,36 @@ export class DockerService {
     return this.buildImage(options);
   }
 
-  async scan(imageId: string): Promise<DockerScanResult> {
-    return this.scanImage(imageId);
+  async scan(options: { image: string; severity?: string; format?: string }): Promise<unknown> {
+    const scanOptions: ScanOptions | undefined =
+      (options.severity ?? options.format)
+        ? {
+            ...(options.severity && { severity: [options.severity] }),
+            ...(options.format && { format: options.format }),
+          }
+        : undefined;
+    return this.scanImage(options.image, scanOptions);
   }
 
-  async push(tag: string): Promise<{ digest?: string }> {
-    return this.pushImage(tag);
+  async push(options: { image: string; registry?: string }): Promise<void> {
+    await this.pushImage(options.image, options.registry);
   }
 
-  async tag(source: string, target: string): Promise<void> {
-    await this.client.tag(source, target);
+  async tag(options: { image: string; tag: string }): Promise<void> {
+    await this.client.tag(options.image, options.tag);
   }
 
   async getSystemInfo(): Promise<Record<string, unknown> | null> {
-    const health = await this.health();
-    const systemInfo = health.systemInfo;
-    if (systemInfo && typeof systemInfo === 'object') {
-      return systemInfo as Record<string, unknown>;
+    try {
+      const health = await this.health();
+      const systemInfo = health.info;
+      if (systemInfo && typeof systemInfo === 'object') {
+        return systemInfo as Record<string, unknown>;
+      }
+      return null;
+    } catch {
+      return null;
     }
-    // Return null when no system info is available instead of empty object
-    return null;
   }
 
   async listContainers(options?: Record<string, unknown>): Promise<

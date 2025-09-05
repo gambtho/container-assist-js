@@ -6,7 +6,11 @@
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import { SessionService } from '../../session/manager';
-import { WorkflowOrchestrator, WorkflowExecutionResult } from '../../workflow/orchestrator';
+import {
+  WorkflowOrchestrator,
+  WorkflowExecutionResult,
+  type WorkflowConfig,
+} from '../../workflow/orchestrator';
 import { WorkflowManager } from '../../workflow/manager';
 import { getWorkflowConfig, validateWorkflowConfig } from '../../workflow/configs';
 import { runContainerizationWorkflow } from '../../workflow/containerization';
@@ -266,7 +270,15 @@ export async function startWorkflowHandler(
     );
 
     // Estimate duration based on workflow type and options
-    const estimatedDuration = estimateWorkflowDuration(workflowConfig, validated);
+    const estimatedDuration = estimateWorkflowDuration(workflowConfig, {
+      ...validated,
+      workflow_type: validated.workflow_type as
+        | 'full'
+        | 'build-only'
+        | 'deploy-only'
+        | 'quick'
+        | 'containerization',
+    });
 
     return {
       success: true,
@@ -403,7 +415,13 @@ async function validateInput(
     'Input validated',
   );
 
-  const validated: any = {
+  const validated: {
+    repo_path: string;
+    workflow_type: string;
+    session_id?: string;
+    automated: boolean;
+    options: NonNullable<StartWorkflowInput['options']>;
+  } = {
     repo_path,
     workflow_type,
     automated,
@@ -424,7 +442,13 @@ async function validateInput(
 async function createNewSession(
   sessionService: SessionService,
   sessionId: string,
-  validated: any,
+  validated: {
+    repo_path: string;
+    workflow_type: string;
+    session_id?: string;
+    automated: boolean;
+    options: NonNullable<StartWorkflowInput['options']>;
+  },
   logger: Logger,
 ): Promise<Session> {
   try {
@@ -462,7 +486,10 @@ async function createNewSession(
 /**
  * Estimate workflow duration based on configuration and options
  */
-function estimateWorkflowDuration(workflowConfig: any, validated: any): number {
+function estimateWorkflowDuration(
+  workflowConfig: WorkflowConfig,
+  validated: StartWorkflowInput,
+): number {
   // Step duration estimates (ms)
   const stepEstimates: Record<string, number> = {
     analyze: 15000, // 15 seconds
@@ -480,7 +507,7 @@ function estimateWorkflowDuration(workflowConfig: any, validated: any): number {
   let totalEstimate = 0;
 
   for (const step of workflowConfig.steps) {
-    const baseEstimate = stepEstimates[step.name] || 30000; // Default 30s
+    const baseEstimate = stepEstimates[step.name] ?? 30000; // Default 30s
 
     // Adjust for retries
     const retryMultiplier = step.retryable ? 1 + step.maxRetries * 0.3 : 1;
@@ -488,7 +515,7 @@ function estimateWorkflowDuration(workflowConfig: any, validated: any): number {
   }
 
   // Adjust for options
-  if (validated.options?.skip_tests && validated.options.skip_tests.length > 0) {
+  if (validated.options?.skip_tests) {
     totalEstimate *= 0.8; // 20% faster
   }
 
@@ -496,7 +523,7 @@ function estimateWorkflowDuration(workflowConfig: any, validated: any): number {
     totalEstimate *= 0.9; // 10% faster
   }
 
-  if (validated.options?.parallel_steps && validated.options.parallel_steps.length > 0) {
+  if (validated.options?.parallel_steps) {
     totalEstimate *= 0.7; // 30% faster with parallelism
   }
 

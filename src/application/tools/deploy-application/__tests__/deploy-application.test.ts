@@ -33,6 +33,7 @@ import type { DeployInput, DeployOutput } from '../deploy-application';
 import type { ToolContext } from '../../tool-types';
 import { ErrorCode, DomainError } from '../../../../domain/types/errors';
 import { createMockToolContext, createMockLogger } from '../../__tests__/shared/test-utils';
+import { expectEmit } from '../../__tests__/shared/test-helpers';
 import { createMockSession } from '../../../../../test/utils/mock-factories';
 import { createMockKubernetesService } from '../../__tests__/shared/kubernetes-mocks';
 import type { KubernetesManifest } from '../../../../domain/types/index';
@@ -49,7 +50,10 @@ import type {
   waitForAllDeployments,
   getEndpoints,
 } from '../helper';
-import type { SessionService, ProgressEmitter } from '../../../services/interfaces';
+import type {
+  SessionService,
+  ProgressEmitter as _ProgressEmitter,
+} from '../../../services/interfaces';
 
 const _mockFs = fs as jest.Mocked<typeof fs>;
 
@@ -515,8 +519,7 @@ describe('deploy-application tool', () => {
 
       await deployApplicationHandler.handler(input, mockContext);
 
-      const mockProgressEmitter = mockContext.progressEmitter as jest.Mocked<ProgressEmitter>;
-      expect((mockProgressEmitter as any).emit).toHaveBeenCalledWith({
+      expectEmit(mockContext.progressEmitter, {
         sessionId: 'progress-test-session',
         step: 'deploy_application',
         status: 'in_progress',
@@ -524,7 +527,7 @@ describe('deploy-application tool', () => {
         progress: 0.5,
       });
 
-      expect((mockProgressEmitter as any).emit).toHaveBeenCalledWith({
+      expectEmit(mockContext.progressEmitter, {
         sessionId: 'progress-test-session',
         step: 'deploy_application',
         status: 'completed',
@@ -551,8 +554,7 @@ describe('deploy-application tool', () => {
 
       await expect(deployApplicationHandler.handler(input, mockContext)).rejects.toThrow();
 
-      const mockProgressEmitter = mockContext.progressEmitter as jest.Mocked<ProgressEmitter>;
-      expect((mockProgressEmitter as any).emit).toHaveBeenCalledWith({
+      expectEmit(mockContext.progressEmitter, {
         sessionId: 'failure-test-session',
         step: 'deploy_application',
         status: 'failed',
@@ -974,7 +976,8 @@ describe('deploy-application tool', () => {
       expect(result.success).toBe(true);
 
       // Verify complex workflow state is preserved
-      expect(mockContext.sessionService.updateAtomic).toHaveBeenCalledWith(
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(mockContext.sessionService!.updateAtomic).toHaveBeenCalledWith(
         'complex-session',
         expect.any(Function),
       );

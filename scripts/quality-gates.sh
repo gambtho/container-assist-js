@@ -7,22 +7,18 @@ echo "========================================="
 echo ""
 
 # Configuration
-BASELINE_FILE="reports/baseline-count.txt"
-DEADCODE_BASELINE_FILE="reports/deadcode-baseline.txt"
-CURRENT_COUNT_FILE="reports/current-count.txt"
-LINT_OUTPUT_FILE="reports/current-lint-output.txt"
+QUALITY_CONFIG="quality-gates.json"
+
 
 # Check for required tools
-for cmd in npm bc; do
+for cmd in npm bc jq; do
     if ! command -v $cmd &> /dev/null; then
         echo "Error: $cmd is required but not installed."
         exit 1
     fi
 done
 
-# Quality Gate Thresholds
-MAX_WARNINGS_THRESHOLD=${MAX_WARNINGS_THRESHOLD:-1048}
-MAX_DEADCODE_THRESHOLD=${MAX_DEADCODE_THRESHOLD:-441}
+# Environment config
 ALLOW_REGRESSION=${ALLOW_REGRESSION:-false}
 
 # Colors
@@ -43,15 +39,51 @@ print_status() {
     esac
 }
 
+# Bootstrap quality-gates.json if it doesn't exist
+if [ ! -f "$QUALITY_CONFIG" ]; then
+    echo "Creating default quality-gates.json configuration file..."
+    cat > "$QUALITY_CONFIG" << 'EOF'
+{
+  "metrics": {
+    "lint": {
+      "baseline": null,
+      "current": 0,
+      "warnings": 0,
+      "errors": 0,
+      "lastUpdated": null
+    },
+    "deadcode": {
+      "baseline": null,
+      "current": 0,
+      "lastUpdated": null
+    },
+    "typescript": {
+      "errors": 0,
+      "lastUpdated": null
+    },
+    "build": {
+      "lastBuildTimeMs": 0,
+      "lastUpdated": null
+    }
+  }
+}
+EOF
+    print_status "INFO" "Created default quality-gates.json configuration file"
+fi
+
+# Read baselines from JSON
+BASELINE_WARNINGS=$(jq -r '.metrics.lint.baseline' $QUALITY_CONFIG)
+DEADCODE_BASELINE=$(jq -r '.metrics.deadcode.baseline' $QUALITY_CONFIG)
+
 # Gate 1: ESLint Errors Must Be Zero
 echo "Gate 1: ESLint Error Check"
 echo "-------------------------"
 
 # Run lint and get current counts
-npm run lint > $LINT_OUTPUT_FILE 2>&1 || true
+LINT_OUTPUT=$(npm run lint 2>&1 || true)
 
 # Parse errors and warnings
-SUMMARY_LINE=$(grep -E "problems.*error.*warning" $LINT_OUTPUT_FILE | tail -1 2>/dev/null || echo "")
+SUMMARY_LINE=$(echo "$LINT_OUTPUT" | grep -E "problems.*error.*warning" | tail -1 2>/dev/null || echo "")
 if [ -n "$SUMMARY_LINE" ]; then
     CURRENT_ERRORS=$(echo "$SUMMARY_LINE" | sed -n 's/.*(\([0-9]\+\) error.*/\1/p' 2>/dev/null || echo "0")
     CURRENT_WARNINGS=$(echo "$SUMMARY_LINE" | sed -n 's/.*, \([0-9]\+\) warning.*/\1/p' 2>/dev/null || echo "0")
@@ -67,8 +99,11 @@ else
     CURRENT_WARNINGS=0
 fi
 
-# Save current count
-echo "$CURRENT_WARNINGS" > "$CURRENT_COUNT_FILE"
+# Update current metrics in JSON
+TIMESTAMP=$(date -Iseconds)
+jq --arg warnings "$CURRENT_WARNINGS" --arg errors "$CURRENT_ERRORS" --arg ts "$TIMESTAMP" \
+   '.metrics.lint.current = ($warnings | tonumber) | .metrics.lint.warnings = ($warnings | tonumber) | .metrics.lint.errors = ($errors | tonumber) | .metrics.lint.lastUpdated = $ts' \
+   $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
 
 if [ "$CURRENT_ERRORS" -eq 0 ]; then
     print_status "PASS" "No ESLint errors found"
@@ -79,36 +114,39 @@ fi
 
 echo ""
 
+# Handle null lint baseline for first run
+if [ "$BASELINE_WARNINGS" = "null" ] || [ -z "$BASELINE_WARNINGS" ]; then
+    print_status "INFO" "No lint baseline set, using current warnings ($CURRENT_WARNINGS) as baseline"
+    BASELINE_WARNINGS="$CURRENT_WARNINGS"
+    # Update the baseline in the config file
+    jq --arg warnings "$CURRENT_WARNINGS" \
+       '.metrics.lint.baseline = ($warnings | tonumber)' \
+       $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+fi
+
 # Gate 2: ESLint Warning Ratcheting
 echo "Gate 2: ESLint Warning Ratcheting"
 echo "----------------------------------"
 
-if [ -f "$BASELINE_FILE" ]; then
-    BASELINE_WARNINGS=$(cat $BASELINE_FILE)
-    
-    if [ "$CURRENT_WARNINGS" -le "$BASELINE_WARNINGS" ]; then
-        REDUCTION=$((BASELINE_WARNINGS - CURRENT_WARNINGS))
-        if [ "$REDUCTION" -gt 0 ]; then
-            PERCENTAGE=$(echo "scale=1; ($REDUCTION * 100) / $BASELINE_WARNINGS" | bc -l 2>/dev/null || echo "N/A")
-            print_status "PASS" "Warnings reduced by $REDUCTION (${PERCENTAGE}%) - $CURRENT_WARNINGS ≤ $BASELINE_WARNINGS"
-        else
-            print_status "PASS" "Warning count maintained at baseline ($CURRENT_WARNINGS)"
-        fi
+if [ "$CURRENT_WARNINGS" -le "$BASELINE_WARNINGS" ]; then
+    REDUCTION=$((BASELINE_WARNINGS - CURRENT_WARNINGS))
+    if [ "$REDUCTION" -gt 0 ]; then
+        PERCENTAGE=$(echo "scale=1; ($REDUCTION * 100) / $BASELINE_WARNINGS" | bc -l 2>/dev/null || echo "N/A")
+        print_status "PASS" "Warnings reduced by $REDUCTION (${PERCENTAGE}%) - $CURRENT_WARNINGS ≤ $BASELINE_WARNINGS"
+        # Auto-update baseline when improved
+        jq --arg warnings "$CURRENT_WARNINGS" \
+           '.metrics.lint.baseline = ($warnings | tonumber)' \
+           $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+        print_status "INFO" "Updated ESLint baseline: $BASELINE_WARNINGS → $CURRENT_WARNINGS"
     else
-        INCREASE=$((CURRENT_WARNINGS - BASELINE_WARNINGS))
-        if [ "$ALLOW_REGRESSION" = "true" ]; then
-            print_status "WARN" "Warning count increased by $INCREASE ($CURRENT_WARNINGS > $BASELINE_WARNINGS) - ALLOWED by config"
-        else
-            print_status "FAIL" "Warning count increased by $INCREASE ($CURRENT_WARNINGS > $BASELINE_WARNINGS) - REGRESSION NOT ALLOWED"
-            exit 1
-        fi
+        print_status "PASS" "Warning count maintained at baseline ($CURRENT_WARNINGS)"
     fi
 else
-    if [ "$CURRENT_WARNINGS" -le "$MAX_WARNINGS_THRESHOLD" ]; then
-        print_status "PASS" "Warning count within threshold ($CURRENT_WARNINGS ≤ $MAX_WARNINGS_THRESHOLD)"
+    INCREASE=$((CURRENT_WARNINGS - BASELINE_WARNINGS))
+    if [ "$ALLOW_REGRESSION" = "true" ]; then
+        print_status "WARN" "Warning count increased by $INCREASE ($CURRENT_WARNINGS > $BASELINE_WARNINGS) - ALLOWED by config"
     else
-        EXCESS=$((CURRENT_WARNINGS - MAX_WARNINGS_THRESHOLD))
-        print_status "FAIL" "Warning count exceeds threshold by $EXCESS ($CURRENT_WARNINGS > $MAX_WARNINGS_THRESHOLD)"
+        print_status "FAIL" "Warning count increased by $INCREASE ($CURRENT_WARNINGS > $BASELINE_WARNINGS) - REGRESSION NOT ALLOWED"
         exit 1
     fi
 fi
@@ -122,6 +160,8 @@ if [ "${SKIP_TYPECHECK:-false}" != "true" ]; then
 
     if npm run typecheck > /dev/null 2>&1; then
         print_status "PASS" "TypeScript compilation successful"
+        jq --arg ts "$TIMESTAMP" '.metrics.typescript.errors = 0 | .metrics.typescript.lastUpdated = $ts' \
+           $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
     else
         print_status "FAIL" "TypeScript compilation failed"
         exit 1
@@ -141,32 +181,40 @@ echo "-----------------------"
 
 DEADCODE_COUNT=$(npx ts-prune --project tsconfig.json 2>/dev/null | grep -v 'used in module' | wc -l | tr -d ' ' || echo "0")
 
-if [ -f "$DEADCODE_BASELINE_FILE" ]; then
-    DEADCODE_BASELINE=$(cat $DEADCODE_BASELINE_FILE)
-    
-    if [ "$DEADCODE_COUNT" -le "$DEADCODE_BASELINE" ]; then
-        DEADCODE_REDUCTION=$((DEADCODE_BASELINE - DEADCODE_COUNT))
-        if [ $DEADCODE_REDUCTION -gt 0 ]; then
-            DEADCODE_PERCENTAGE=$(echo "scale=1; ($DEADCODE_REDUCTION * 100) / $DEADCODE_BASELINE" | bc -l 2>/dev/null || echo "N/A")
-            print_status "PASS" "Unused exports reduced by $DEADCODE_REDUCTION (${DEADCODE_PERCENTAGE}%) - $DEADCODE_COUNT ≤ $DEADCODE_BASELINE"
-        else
-            print_status "PASS" "Unused exports maintained at baseline ($DEADCODE_COUNT)"
-        fi
+# Update deadcode metrics in JSON
+jq --arg count "$DEADCODE_COUNT" --arg ts "$TIMESTAMP" \
+   '.metrics.deadcode.current = ($count | tonumber) | .metrics.deadcode.lastUpdated = $ts' \
+   $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+
+# Handle null deadcode baseline for first run
+if [ "$DEADCODE_BASELINE" = "null" ] || [ -z "$DEADCODE_BASELINE" ]; then
+    print_status "INFO" "No deadcode baseline set, using current dead code count ($DEADCODE_COUNT) as baseline"
+    DEADCODE_BASELINE="$DEADCODE_COUNT"
+    # Update the baseline in the config file
+    jq --arg deadcode "$DEADCODE_COUNT" \
+       '.metrics.deadcode.baseline = ($deadcode | tonumber)' \
+       $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+fi
+
+if [ "$DEADCODE_COUNT" -le "$DEADCODE_BASELINE" ]; then
+    DEADCODE_REDUCTION=$((DEADCODE_BASELINE - DEADCODE_COUNT))
+    if [ $DEADCODE_REDUCTION -gt 0 ]; then
+        DEADCODE_PERCENTAGE=$(echo "scale=1; ($DEADCODE_REDUCTION * 100) / $DEADCODE_BASELINE" | bc -l 2>/dev/null || echo "N/A")
+        print_status "PASS" "Unused exports reduced by $DEADCODE_REDUCTION (${DEADCODE_PERCENTAGE}%) - $DEADCODE_COUNT ≤ $DEADCODE_BASELINE"
+        # Auto-update baseline when improved
+        jq --arg deadcode "$DEADCODE_COUNT" \
+           '.metrics.deadcode.baseline = ($deadcode | tonumber)' \
+           $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+        print_status "INFO" "Updated deadcode baseline: $DEADCODE_BASELINE → $DEADCODE_COUNT"
     else
-        DEADCODE_INCREASE=$((DEADCODE_COUNT - DEADCODE_BASELINE))
-        if [ "$ALLOW_REGRESSION" = "true" ]; then
-            print_status "WARN" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - ALLOWED by config"
-        else
-            print_status "FAIL" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - REGRESSION NOT ALLOWED"
-            exit 1
-        fi
+        print_status "PASS" "Unused exports maintained at baseline ($DEADCODE_COUNT)"
     fi
 else
-    if [ "$DEADCODE_COUNT" -le "$MAX_DEADCODE_THRESHOLD" ]; then
-        print_status "PASS" "Unused exports within threshold ($DEADCODE_COUNT ≤ $MAX_DEADCODE_THRESHOLD)"
+    DEADCODE_INCREASE=$((DEADCODE_COUNT - DEADCODE_BASELINE))
+    if [ "$ALLOW_REGRESSION" = "true" ]; then
+        print_status "WARN" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - ALLOWED by config"
     else
-        EXCESS=$((DEADCODE_COUNT - MAX_DEADCODE_THRESHOLD))
-        print_status "FAIL" "Unused exports exceed threshold by $EXCESS ($DEADCODE_COUNT > $MAX_DEADCODE_THRESHOLD)"
+        print_status "FAIL" "Unused exports increased by $DEADCODE_INCREASE ($DEADCODE_COUNT > $DEADCODE_BASELINE) - REGRESSION NOT ALLOWED"
         exit 1
     fi
 fi
@@ -182,6 +230,12 @@ if command -v time >/dev/null 2>&1; then
     if npm run build > /dev/null 2>&1; then
         BUILD_END=$(date +%s.%N)
         BUILD_TIME=$(echo "$BUILD_END - $BUILD_START" | bc -l 2>/dev/null || echo "N/A")
+        BUILD_TIME_MS=$(echo "($BUILD_TIME * 1000) / 1" | bc 2>/dev/null || echo "0")
+        
+        # Update build metrics in JSON
+        jq --arg time "$BUILD_TIME_MS" --arg ts "$TIMESTAMP" \
+           '.metrics.build.lastBuildTimeMs = ($time | tonumber) | .metrics.build.lastUpdated = $ts' \
+           $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
         
         if [ "$BUILD_TIME" != "N/A" ] && (( $(echo "$BUILD_TIME < 5.0" | bc -l 2>/dev/null || echo 0) )); then
             print_status "PASS" "Build completed in ${BUILD_TIME}s (< 5.0s threshold)"
@@ -215,12 +269,3 @@ fi
 
 print_status "PASS" "All quality gates passed! 🚀"
 echo ""
-
-# Optionally update baselines if --update-baseline flag is provided
-if [ "${1:-}" == "--update-baseline" ]; then
-    echo $CURRENT_WARNINGS > $BASELINE_FILE
-    echo $DEADCODE_COUNT > $DEADCODE_BASELINE_FILE
-    print_status "INFO" "Baselines updated:"
-    echo "  • ESLint baseline: $CURRENT_WARNINGS"
-    echo "  • Deadcode baseline: $DEADCODE_COUNT"
-fi

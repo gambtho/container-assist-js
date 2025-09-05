@@ -112,45 +112,32 @@ export async function deployToCluster(
     //   namespace: string;
     //   wait: boolean;
     //   timeout: number;
-    //   dryRun: boolean;
-    // }) => Promise<KubernetesServiceResponse>;
+    const serviceResponse = await kubernetesService.deploy(manifests);
 
-    // Use input parameters with fallback to defaults
-    const namespace = input.namespace ?? 'default';
-    const wait = input.wait ?? true;
-    const dryRun = input.dryRun ?? false;
-
-    // Convert timeout to number if it's a string, with fallback to default
-    let timeout = 300 * 1000; // Default: 300 seconds in milliseconds
-    if (input.timeout !== undefined) {
-      if (typeof input.timeout === 'string') {
-        const parsed = parseInt(input.timeout, 10);
-        if (!isNaN(parsed)) {
-          timeout = parsed * 1000; // Convert seconds to milliseconds
-        }
-      } else if (typeof input.timeout === 'number') {
-        timeout = input.timeout * 1000; // Convert seconds to milliseconds
-      }
+    if ((serviceResponse as any)?.success) {
+      const resources = Array.isArray((serviceResponse as any).resources)
+        ? (serviceResponse as any).resources
+        : [];
+      return {
+        success: true,
+        resources: resources.map((r: any) => ({
+          kind: r.kind || 'Unknown',
+          name: r.metadata?.name || 'unknown',
+          namespace: r.metadata?.namespace || input.namespace || 'default',
+          status: 'created' as const,
+        })),
+        deployed: resources.map(
+          (r: any) => `${r.kind || 'Unknown'}/${r.metadata?.name || 'unknown'}`,
+        ),
+        failed: [],
+        // propagate endpoints if provided by the service
+        ...(Array.isArray((serviceResponse as any).endpoints)
+          ? { endpoints: (serviceResponse as any).endpoints }
+          : {}),
+      } as KubernetesDeploymentResult;
     }
 
-    const k8sService = kubernetesService as any;
-    const serviceResponse = await k8sService.deploy({
-      manifests,
-      namespace,
-      wait,
-      timeout,
-      dryRun,
-    });
-
-    if (
-      isKubernetesServiceResponse(serviceResponse) &&
-      serviceResponse.success &&
-      serviceResponse.data
-    ) {
-      return serviceResponse.data as KubernetesDeploymentResult;
-    }
-
-    throw new Error(serviceResponse.error ?? 'Deployment failed');
+    throw new Error((serviceResponse as any)?.error?.message ?? 'Deployment failed');
   }
 
   // Mock deployment for testing

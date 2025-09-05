@@ -1,43 +1,24 @@
 {
-  "version": "1.0",
-  "description": "Quality gate configuration for containerization-assist-js",
-  "gates": {
+  "metrics": {
     "lint": {
-      "maxWarnings": "baseline",
-      "failOnIncrease": true,
-      "baselineFile": "reports/baseline-count.txt",
-      "allowedIncrease": 0,
-      "description": "ESLint warning ratcheting system"
+      "baseline": 376,
+      "current": 376,
+      "warnings": 376,
+      "errors": 0,
+      "lastUpdated": "2025-09-05T13:32:44-04:00"
     },
     "deadcode": {
-      "maxUnused": "baseline", 
-      "failOnIncrease": true,
-      "baselineFile": "reports/deadcode-baseline.txt",
-      "allowedIncrease": 0,
-      "description": "Unused export tracking system"
-    },
-    "build": {
-      "maxTimeMs": 5000,
-      "failOnRegression": false,
-      "regressionThresholdMs": 1000,
-      "description": "Build performance monitoring"
+      "baseline": 224,
+      "current": 224,
+      "lastUpdated": "2025-09-05T13:32:44-04:00"
     },
     "typescript": {
-      "maxErrors": 0,
-      "failOnAnyError": true,
-      "description": "TypeScript compilation requirements"
+      "errors": 0,
+      "lastUpdated": "2025-09-05T13:32:44-04:00"
     },
-    "tests": {
-      "minCoveragePercent": 0,
-      "failOnTestFailure": true,
-      "requiredTestTypes": ["unit"],
-      "description": "Test execution and coverage requirements"
+    "build": {
+      "lastBuildTimeMs": 3582,
+      "lastUpdated": "2025-09-05T13:32:44-04:00"
     }
-  },
-  "reporting": {
-    "showTopWarningTypes": 10,
-    "showTopDeadcodeFiles": 5,
-    "includeBuildTiming": true,
-    "includeProgressMetrics": true
   }
 }
