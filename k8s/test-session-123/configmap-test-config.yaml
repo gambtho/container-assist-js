@@ -5,7 +5,4 @@ metadata:
   namespace: default
 data:
   config.yaml: |
-    # Application configuration
     setting: value
-    debug: false
-    port: 8080
