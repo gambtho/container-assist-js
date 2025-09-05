@@ -5,14 +5,14 @@ describe('renderTemplate', () => {
     it('should reject templates with triple backticks', () => {
       const template = 'Hello {{name}}\n```bash\nrm -rf /\n```';
       expect(() => renderTemplate(template, { name: 'world' })).toThrow(
-        'Template contains prohibited triple backticks'
+        'Template contains prohibited triple backticks',
       );
     });
 
     it('should reject templates with non-printable characters', () => {
       const template = 'Hello {{name}}\x00\x1F';
       expect(() => renderTemplate(template, { name: 'world' })).toThrow(
-        'Template contains non-printable characters'
+        'Template contains non-printable characters',
       );
     });
 
