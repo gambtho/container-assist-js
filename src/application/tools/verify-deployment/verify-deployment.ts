@@ -53,8 +53,7 @@ const verifyDeploymentHandler: ToolDescriptor<VerifyInput, VerifyOutput> = {
         };
       }
 
-      const sessionServiceTyped = sessionService as { get: (id: string) => Promise<unknown> };
-      const session = (await sessionServiceTyped.get(sessionId)) as SessionWithWorkflowState | null;
+      const session = sessionService.get(sessionId) as SessionWithWorkflowState | null;
       if (!session) {
         throw new DomainError(ErrorCode.SessionNotFound, 'Session not found');
       }

@@ -101,7 +101,6 @@ export class ContainerizationAssistMCPServer {
 
     const sessionService = new SessionService(
       {
-        storeType: 'memory',
         ttl: this.appConfig.session?.ttl || 3600,
       },
       this.logger.child({ service: 'session' }),
