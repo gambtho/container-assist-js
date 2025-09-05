@@ -1,5 +1,5 @@
 /**
- * Tool Input/Output Validation Tests  
+ * Tool Input/Output Validation Tests
  * Team Delta - Schema Validation Tests
  */
 
@@ -19,7 +19,7 @@ import {
   GenerateK8sManifestsInput,
   PrepareClusterInput,
   VerifyDeploymentInput,
-  
+
   // Output Schemas
   AnalysisResultSchema,
   BuildResultSchema,
@@ -30,16 +30,12 @@ import {
   K8sManifestsResultSchema,
   BaseSuccessSchema,
   BaseSessionResultSchema,
-  
+
   // Type exports
   type AnalyzeRepositoryParams,
   type BuildImageParams,
-  type DeployApplicationParams,
   type AnalysisResult,
   type BuildResult,
-  type ScanResult,
-  type DeploymentResult,
-  type ServerStatus,
 } from '../../../../src/application/tools/schemas';
 
 describe('Tool Input Schemas', () => {
@@ -68,7 +64,7 @@ describe('Tool Input Schemas', () => {
 
     it('should reject empty repository path', () => {
       const invalid = { repoPath: '' };
-      expect(() => SessionIdInput.parse(invalid)).toThrow();
+      expect(() => RepoPathInput.parse(invalid)).toThrow();
     });
 
     it('should reject missing repository path', () => {
@@ -79,13 +75,13 @@ describe('Tool Input Schemas', () => {
 
   describe('AnalyzeRepositoryInput', () => {
     it('should validate minimal input', () => {
-      const valid = { repoPath: '/test/repo' };
+      const valid = { repoPath: '/test/repo', sessionId: 'test-session' };
       const result = AnalyzeRepositoryInput.parse(valid);
-      
+
       expect(result.repoPath).toBe('/test/repo');
+      expect(result.sessionId).toBe('test-session');
       expect(result.depth).toBe(3); // default
       expect(result.includeTests).toBe(false); // default
-      expect(result.sessionId).toBeUndefined();
     });
 
     it('should validate complete input', () => {
@@ -95,7 +91,7 @@ describe('Tool Input Schemas', () => {
         depth: 5,
         includeTests: true,
       };
-      
+
       const result = AnalyzeRepositoryInput.parse(valid);
       expect(result).toEqual(valid);
     });
@@ -105,7 +101,7 @@ describe('Tool Input Schemas', () => {
         repoPath: '/test/repo',
         depth: 15, // exceeds max of 10
       };
-      
+
       expect(() => AnalyzeRepositoryInput.parse(invalid)).toThrow();
     });
 
@@ -114,7 +110,7 @@ describe('Tool Input Schemas', () => {
         repoPath: '/test/repo',
         includeTests: 'yes',
       };
-      
+
       expect(() => AnalyzeRepositoryInput.parse(invalid)).toThrow();
     });
   });
@@ -123,7 +119,7 @@ describe('Tool Input Schemas', () => {
     it('should validate minimal input', () => {
       const valid = { sessionId: 'test-session' };
       const result = BuildImageInput.parse(valid);
-      
+
       expect(result.sessionId).toBe('test-session');
       expect(result.context).toBe('.'); // default
       expect(result.dockerfile).toBe('Dockerfile'); // default
@@ -149,7 +145,7 @@ describe('Tool Input Schemas', () => {
         squash: true,
         pull: false,
       };
-      
+
       const result = BuildImageInput.parse(valid);
       expect(result).toEqual(valid);
     });
@@ -163,7 +159,7 @@ describe('Tool Input Schemas', () => {
           PORT: '3000',
         },
       };
-      
+
       expect(() => BuildImageInput.parse(valid)).not.toThrow();
     });
 
@@ -175,7 +171,7 @@ describe('Tool Input Schemas', () => {
           PORT: 3000, // Should be string
         },
       };
-      
+
       expect(() => BuildImageInput.parse(invalid)).toThrow();
     });
   });
@@ -204,7 +200,7 @@ describe('Tool Input Schemas', () => {
     it('should validate PushImageInput', () => {
       const valid = { sessionId: 'test-session', registry: 'docker.io' };
       const minimal = { sessionId: 'test-session' };
-      
+
       expect(() => PushImageInput.parse(valid)).not.toThrow();
       expect(() => PushImageInput.parse(minimal)).not.toThrow();
     });
@@ -229,7 +225,7 @@ describe('Tool Input Schemas', () => {
     it('should validate minimal input with defaults', () => {
       const valid = { sessionId: 'test-session' };
       const result = DeployApplicationInput.parse(valid);
-      
+
       expect(result.sessionId).toBe('test-session');
       expect(result.wait).toBe(false); // default
       expect(result.dryRun).toBe(false); // default
@@ -245,7 +241,7 @@ describe('Tool Input Schemas', () => {
         timeout: '300s',
         dryRun: true,
       };
-      
+
       const result = DeployApplicationInput.parse(valid);
       expect(result).toEqual(valid);
     });
@@ -258,7 +254,7 @@ describe('Tool Input Schemas', () => {
         'a1b2c3',
         'namespace-with-dashes',
       ];
-      
+
       validNamespaces.forEach(namespace => {
         const input = { sessionId: 'test-session', namespace };
         expect(() => DeployApplicationInput.parse(input)).not.toThrow();
@@ -275,7 +271,7 @@ describe('Tool Input Schemas', () => {
         '123.456', // contains dot
         'UPPERCASE', // uppercase
       ];
-      
+
       invalidNamespaces.forEach(namespace => {
         const input = { sessionId: 'test-session', namespace };
         expect(() => DeployApplicationInput.parse(input)).toThrow();
@@ -285,12 +281,12 @@ describe('Tool Input Schemas', () => {
     it('should accept timeout as string or number', () => {
       const validTimeouts = [
         '300s',
-        '5m', 
+        '5m',
         '1h',
         300, // positive number
         1.5, // decimal number
       ];
-      
+
       validTimeouts.forEach(timeout => {
         const input = { sessionId: 'test-session', timeout };
         expect(() => DeployApplicationInput.parse(input)).not.toThrow();
@@ -305,7 +301,7 @@ describe('Tool Input Schemas', () => {
         0, // zero
         '-5m', // negative with unit
       ];
-      
+
       invalidTimeouts.forEach(timeout => {
         const input = { sessionId: 'test-session', timeout };
         expect(() => DeployApplicationInput.parse(input)).toThrow();
@@ -319,7 +315,7 @@ describe('Tool Input Schemas', () => {
         sessionId: 'test-session',
         errorMessage: 'Build failed: missing EXPOSE directive',
       };
-      
+
       expect(() => FixDockerfileInput.parse(valid)).not.toThrow();
     });
 
@@ -328,7 +324,7 @@ describe('Tool Input Schemas', () => {
         sessionId: 'test-session',
         errorMessage: '',
       };
-      
+
       expect(() => FixDockerfileInput.parse(invalid)).toThrow();
     });
   });
@@ -386,7 +382,7 @@ describe('Tool Output Schemas', () => {
         hasDockerCompose: false,
         hasKubernetes: false,
       };
-      
+
       expect(() => AnalysisResultSchema.parse(valid)).not.toThrow();
     });
 
@@ -419,7 +415,7 @@ describe('Tool Output Schemas', () => {
           securityNotes: ['Use non-root user'],
         },
       };
-      
+
       expect(() => AnalysisResultSchema.parse(valid)).not.toThrow();
     });
 
@@ -436,7 +432,7 @@ describe('Tool Output Schemas', () => {
         hasDockerCompose: false,
         hasKubernetes: false,
       };
-      
+
       expect(() => AnalysisResultSchema.parse(invalid)).toThrow();
     });
   });
@@ -449,7 +445,7 @@ describe('Tool Output Schemas', () => {
         dockerfile: 'FROM node:18\nWORKDIR /app',
         path: '/app/Dockerfile',
       };
-      
+
       expect(() => DockerfileResultSchema.parse(valid)).not.toThrow();
     });
 
@@ -461,7 +457,7 @@ describe('Tool Output Schemas', () => {
         path: '/app/Dockerfile',
         validation: ['Missing WORKDIR', 'Consider multi-stage build'],
       };
-      
+
       expect(() => DockerfileResultSchema.parse(valid)).not.toThrow();
     });
   });
@@ -479,7 +475,7 @@ describe('Tool Output Schemas', () => {
           context: '.',
         },
       };
-      
+
       expect(() => BuildResultSchema.parse(valid)).not.toThrow();
     });
 
@@ -502,7 +498,7 @@ describe('Tool Output Schemas', () => {
           cached: true,
         },
       };
-      
+
       expect(() => BuildResultSchema.parse(valid)).not.toThrow();
     });
   });
@@ -519,7 +515,7 @@ describe('Tool Output Schemas', () => {
         low: 2,
         details: [{ severity: 'high', package: 'openssl' }],
       };
-      
+
       expect(() => ScanResultSchema.parse(valid)).not.toThrow();
     });
   });
@@ -536,7 +532,7 @@ describe('Tool Output Schemas', () => {
           { kind: 'Service', name: 'myapp-service' },
         ],
       };
-      
+
       expect(() => K8sManifestsResultSchema.parse(valid)).not.toThrow();
     });
   });
@@ -553,7 +549,7 @@ describe('Tool Output Schemas', () => {
         ready: true,
         replicas: 3,
       };
-      
+
       expect(() => DeploymentResultSchema.parse(valid)).not.toThrow();
     });
 
@@ -567,7 +563,7 @@ describe('Tool Output Schemas', () => {
         ready: false,
         replicas: 1,
       };
-      
+
       expect(() => DeploymentResultSchema.parse(valid)).not.toThrow();
     });
   });
@@ -585,7 +581,7 @@ describe('Tool Output Schemas', () => {
         sessions: 5,
         tools: 15,
       };
-      
+
       expect(() => ServerStatusSchema.parse(valid)).not.toThrow();
     });
 
@@ -600,7 +596,7 @@ describe('Tool Output Schemas', () => {
         },
         tools: 15,
       };
-      
+
       expect(() => ServerStatusSchema.parse(valid)).not.toThrow();
     });
   });
@@ -609,7 +605,7 @@ describe('Tool Output Schemas', () => {
 describe('Schema Validation with safeParse', () => {
   it('should validate valid SessionId input', () => {
     const result = SessionIdInput.safeParse({ sessionId: 'test-123' });
-    
+
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data).toEqual({ sessionId: 'test-123' });
@@ -618,7 +614,7 @@ describe('Schema Validation with safeParse', () => {
 
   it('should return error for invalid SessionId input', () => {
     const result = SessionIdInput.safeParse({ sessionId: '' });
-    
+
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].path).toEqual(['sessionId']);
@@ -630,7 +626,7 @@ describe('Schema Validation with safeParse', () => {
       // Missing sessionId, invalid types
       buildArgs: 123, // should be record
     });
-    
+
     expect(result.success).toBe(false);
     if (!result.success) {
       const errors = result.error.issues;
@@ -647,7 +643,7 @@ describe('Type Inference', () => {
       depth: 'deep',
       includeTests: true,
     };
-    
+
     expect(params.repoPath).toBe('/test/repo');
     expect(params.depth).toBe('deep');
   });
@@ -659,7 +655,7 @@ describe('Type Inference', () => {
       dockerfile: 'Dockerfile',
       tags: ['app:latest'],
     };
-    
+
     expect(params.sessionId).toBe('test-session');
     expect(params.tags).toHaveLength(1);
   });
@@ -675,7 +671,7 @@ describe('Type Inference', () => {
       hasDockerCompose: false,
       hasKubernetes: false,
     };
-    
+
     expect(result.language).toBe('javascript');
     expect(result.ports).toContain(3000);
   });
@@ -692,7 +688,7 @@ describe('Type Inference', () => {
         context: '.',
       },
     };
-    
+
     expect(result.imageId).toContain('sha256');
     expect(result.buildTime).toBe(30000);
   });
