@@ -21,25 +21,21 @@ export interface RetryOptions {
 /**
  * Retry with Result type handling
  */
-export async function withRetry<T>(fn: () => Promise<T>, options?: RetryOptions): Promise<T> {
-  const pRetryOptions: {
-    retries: number;
-    minTimeout: number;
-    factor: number;
-    maxTimeout?: number;
-    randomize?: boolean;
-  } = {
-    retries: options?.retries ?? options?.maxAttempts ?? 3,
-    minTimeout: options?.minTimeout ?? options?.delayMs ?? 1000,
-    factor: options?.factor ?? 2,
-  };
+// Default retry configuration
+const DEFAULT_RETRY_CONFIG = {
+  retries: 3,
+  minTimeout: 1000,
+  factor: 2,
+} as const;
 
-  if (options?.maxTimeout !== undefined) {
-    pRetryOptions.maxTimeout = options.maxTimeout;
-  }
-  if (options?.randomize !== undefined) {
-    pRetryOptions.randomize = options.randomize;
-  }
+export async function withRetry<T>(fn: () => Promise<T>, options?: RetryOptions): Promise<T> {
+  const pRetryOptions = {
+    retries: options?.retries ?? options?.maxAttempts ?? DEFAULT_RETRY_CONFIG.retries,
+    minTimeout: options?.minTimeout ?? options?.delayMs ?? DEFAULT_RETRY_CONFIG.minTimeout,
+    factor: options?.factor ?? DEFAULT_RETRY_CONFIG.factor,
+    ...(options?.maxTimeout && { maxTimeout: options.maxTimeout }),
+    ...(options?.randomize !== undefined && { randomize: options.randomize }),
+  };
 
   return pRetry(fn, pRetryOptions);
 }

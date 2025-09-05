@@ -37,7 +37,10 @@ export function createMockDirent(name: string, isDirectory = false): Partial<Dir
 /**
  * Creates a mock Stats object
  */
-export function createMockStats(isDirectory = false, size = 1024): Partial<Stats> {
+export function createMockStats(
+  isDirectory = false,
+  size = isDirectory ? MOCK_DEFAULTS.DIRECTORY_SIZE : MOCK_DEFAULTS.FILE_SIZE,
+): Partial<Stats> {
   return {
     isDirectory: () => isDirectory,
     isFile: () => !isDirectory,
@@ -46,10 +49,17 @@ export function createMockStats(isDirectory = false, size = 1024): Partial<Stats
   };
 }
 
+// Constants for mock defaults
+const MOCK_DEFAULTS = {
+  SESSION_ID: 'mock-session-123',
+  FILE_SIZE: 1024,
+  DIRECTORY_SIZE: 0,
+} as const;
+
 /**
  * Simple session service mock using existing patterns
  */
-export function createMockSessionService(): {
+export function createMockSessionService(overrides?: { sessionId?: string }): {
   create: jest.MockedFunction<
     (params: { projectName: string; metadata: unknown }) => Promise<{ id: string }>
   >;
@@ -57,10 +67,12 @@ export function createMockSessionService(): {
     (id: string, updater: (session: unknown) => unknown) => Promise<void>
   >;
 } {
+  const sessionId = overrides?.sessionId ?? MOCK_DEFAULTS.SESSION_ID;
+
   return {
     create: jest
       .fn<(params: { projectName: string; metadata: unknown }) => Promise<{ id: string }>>()
-      .mockResolvedValue({ id: 'mock-session-123' }),
+      .mockResolvedValue({ id: sessionId }),
     updateAtomic: jest
       .fn<(id: string, updater: (session: unknown) => unknown) => Promise<void>>()
       .mockResolvedValue(undefined),

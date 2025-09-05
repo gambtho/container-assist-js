@@ -15,23 +15,23 @@
   222:5  warning  Unsafe assignment of an `any` value  @typescript-eslint/no-unsafe-assignment
 
 /home/tng/workspace/containerization-assist-js/src/application/tools/analyze-repo/__tests__/analyze-repo.test.ts
-  490:11  warning  Unsafe return of type `Promise<any>` from function with return type `Promise<string[]>`             @typescript-eslint/no-unsafe-return
-  490:93  warning  Unexpected any. Specify a different type                                                            @typescript-eslint/no-explicit-any
-  492:9   warning  Unsafe return of type `Promise<any>` from function with return type `Promise<string[]>`             @typescript-eslint/no-unsafe-return
-  495:14  warning  Unexpected any. Specify a different type                                                            @typescript-eslint/no-explicit-any
-  525:7   warning  Unsafe call of an `any` typed value                                                                 @typescript-eslint/no-unsafe-call
-  525:30  warning  Unsafe member access .mockResolvedValue on an `any` value                                           @typescript-eslint/no-unsafe-member-access
-  564:7   warning  Unsafe call of an `any` typed value                                                                 @typescript-eslint/no-unsafe-call
-  564:30  warning  Unsafe member access .mockRejectedValue on an `any` value                                           @typescript-eslint/no-unsafe-member-access
-  584:7   warning  Unsafe call of an `any` typed value                                                                 @typescript-eslint/no-unsafe-call
-  584:30  warning  Unsafe member access .mockResolvedValue on an `any` value                                           @typescript-eslint/no-unsafe-member-access
-  620:41  warning  Unsafe member access .create on an `any` value                                                      @typescript-eslint/no-unsafe-member-access
-  653:41  warning  Unsafe member access .updateAtomic on an `any` value                                                @typescript-eslint/no-unsafe-member-access
-  794:40  warning  Unsafe argument of type `any` assigned to a parameter of type `Dirent<Buffer>[]`                    @typescript-eslint/no-unsafe-argument
-  794:91  warning  Unexpected any. Specify a different type                                                            @typescript-eslint/no-explicit-any
-  917:32  warning  Unexpected any. Specify a different type                                                            @typescript-eslint/no-explicit-any
-  919:27  warning  Unsafe member access [`file${i}.js`] on an `any` value                                              @typescript-eslint/no-unsafe-member-access
-  922:28  warning  Unsafe argument of type `any` assigned to a parameter of type `Record<string, string> | undefined`  @typescript-eslint/no-unsafe-argument
+  491:11  warning  Unsafe return of type `Promise<any>` from function with return type `Promise<string[]>`             @typescript-eslint/no-unsafe-return
+  491:93  warning  Unexpected any. Specify a different type                                                            @typescript-eslint/no-explicit-any
+  493:9   warning  Unsafe return of type `Promise<any>` from function with return type `Promise<string[]>`             @typescript-eslint/no-unsafe-return
+  496:14  warning  Unexpected any. Specify a different type                                                            @typescript-eslint/no-explicit-any
+  526:7   warning  Unsafe call of an `any` typed value                                                                 @typescript-eslint/no-unsafe-call
+  526:30  warning  Unsafe member access .mockResolvedValue on an `any` value                                           @typescript-eslint/no-unsafe-member-access
+  565:7   warning  Unsafe call of an `any` typed value                                                                 @typescript-eslint/no-unsafe-call
+  565:30  warning  Unsafe member access .mockRejectedValue on an `any` value                                           @typescript-eslint/no-unsafe-member-access
+  585:7   warning  Unsafe call of an `any` typed value                                                                 @typescript-eslint/no-unsafe-call
+  585:30  warning  Unsafe member access .mockResolvedValue on an `any` value                                           @typescript-eslint/no-unsafe-member-access
+  621:41  warning  Unsafe member access .create on an `any` value                                                      @typescript-eslint/no-unsafe-member-access
+  654:41  warning  Unsafe member access .updateAtomic on an `any` value                                                @typescript-eslint/no-unsafe-member-access
+  795:40  warning  Unsafe argument of type `any` assigned to a parameter of type `Dirent<Buffer>[]`                    @typescript-eslint/no-unsafe-argument
+  795:91  warning  Unexpected any. Specify a different type                                                            @typescript-eslint/no-explicit-any
+  918:32  warning  Unexpected any. Specify a different type                                                            @typescript-eslint/no-explicit-any
+  920:27  warning  Unsafe member access [`file${i}.js`] on an `any` value                                              @typescript-eslint/no-unsafe-member-access
+  923:28  warning  Unsafe argument of type `any` assigned to a parameter of type `Record<string, string> | undefined`  @typescript-eslint/no-unsafe-argument
 
 /home/tng/workspace/containerization-assist-js/src/application/tools/analyze-repo/analyze-repo.ts
   51:11  warning  Unsafe assignment of an `any` value  @typescript-eslint/no-unsafe-assignment
@@ -40,36 +40,36 @@
    28:7   warning  Unsafe assignment of an `any` value                       @typescript-eslint/no-unsafe-assignment
    29:7   warning  Unsafe assignment of an `any` value                       @typescript-eslint/no-unsafe-assignment
   452:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
-  492:32  warning  Unsafe member access .executeWithRetry on an `any` value  @typescript-eslint/no-unsafe-member-access
-  598:21  warning  Unsafe member access .success on an `any` value           @typescript-eslint/no-unsafe-member-access
-  619:21  warning  Unsafe member access .success on an `any` value           @typescript-eslint/no-unsafe-member-access
-  632:21  warning  Unsafe member access .success on an `any` value           @typescript-eslint/no-unsafe-member-access
-  699:21  warning  Unsafe member access .success on an `any` value           @typescript-eslint/no-unsafe-member-access
-  711:42  warning  Unsafe member access .updateAtomic on an `any` value      @typescript-eslint/no-unsafe-member-access
-  717:13  warning  Unsafe assignment of an `any` value                       @typescript-eslint/no-unsafe-assignment
-  717:70  warning  Unsafe member access .updateAtomic on an `any` value      @typescript-eslint/no-unsafe-member-access
-  717:84  warning  Unsafe member access .mock on an `any` value              @typescript-eslint/no-unsafe-member-access
-  718:13  warning  Unsafe assignment of an `any` value                       @typescript-eslint/no-unsafe-assignment
-  718:30  warning  Unsafe call of an `any` typed value                       @typescript-eslint/no-unsafe-call
-  720:29  warning  Unsafe member access .workflow_state on an `any` value    @typescript-eslint/no-unsafe-member-access
-  721:29  warning  Unsafe member access .workflow_state on an `any` value    @typescript-eslint/no-unsafe-member-access
-  722:29  warning  Unsafe member access .workflow_state on an `any` value    @typescript-eslint/no-unsafe-member-access
-  781:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
-  794:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
-  817:21  warning  Unsafe member access .success on an `any` value           @typescript-eslint/no-unsafe-member-access
-  818:21  warning  Unsafe member access .sessionId on an `any` value         @typescript-eslint/no-unsafe-member-access
-  819:21  warning  Unsafe member access .imageId on an `any` value           @typescript-eslint/no-unsafe-member-access
-  820:21  warning  Unsafe member access .tags on an `any` value              @typescript-eslint/no-unsafe-member-access
-  821:28  warning  Unsafe member access .size on an `any` value              @typescript-eslint/no-unsafe-member-access
-  822:28  warning  Unsafe member access .layers on an `any` value            @typescript-eslint/no-unsafe-member-access
-  823:28  warning  Unsafe member access .buildTime on an `any` value         @typescript-eslint/no-unsafe-member-access
-  824:21  warning  Unsafe member access .digest on an `any` value            @typescript-eslint/no-unsafe-member-access
-  825:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
-  836:18  warning  Unsafe member access .warnings on an `any` value          @typescript-eslint/no-unsafe-member-access
-  837:23  warning  Unsafe member access .warnings on an `any` value          @typescript-eslint/no-unsafe-member-access
-  841:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
-  842:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
-  843:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
+  496:32  warning  Unsafe member access .executeWithRetry on an `any` value  @typescript-eslint/no-unsafe-member-access
+  602:21  warning  Unsafe member access .success on an `any` value           @typescript-eslint/no-unsafe-member-access
+  623:21  warning  Unsafe member access .success on an `any` value           @typescript-eslint/no-unsafe-member-access
+  636:21  warning  Unsafe member access .success on an `any` value           @typescript-eslint/no-unsafe-member-access
+  703:21  warning  Unsafe member access .success on an `any` value           @typescript-eslint/no-unsafe-member-access
+  715:42  warning  Unsafe member access .updateAtomic on an `any` value      @typescript-eslint/no-unsafe-member-access
+  721:13  warning  Unsafe assignment of an `any` value                       @typescript-eslint/no-unsafe-assignment
+  721:70  warning  Unsafe member access .updateAtomic on an `any` value      @typescript-eslint/no-unsafe-member-access
+  721:84  warning  Unsafe member access .mock on an `any` value              @typescript-eslint/no-unsafe-member-access
+  722:13  warning  Unsafe assignment of an `any` value                       @typescript-eslint/no-unsafe-assignment
+  722:30  warning  Unsafe call of an `any` typed value                       @typescript-eslint/no-unsafe-call
+  724:29  warning  Unsafe member access .workflow_state on an `any` value    @typescript-eslint/no-unsafe-member-access
+  725:29  warning  Unsafe member access .workflow_state on an `any` value    @typescript-eslint/no-unsafe-member-access
+  726:29  warning  Unsafe member access .workflow_state on an `any` value    @typescript-eslint/no-unsafe-member-access
+  785:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
+  798:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
+  821:21  warning  Unsafe member access .success on an `any` value           @typescript-eslint/no-unsafe-member-access
+  822:21  warning  Unsafe member access .sessionId on an `any` value         @typescript-eslint/no-unsafe-member-access
+  823:21  warning  Unsafe member access .imageId on an `any` value           @typescript-eslint/no-unsafe-member-access
+  824:21  warning  Unsafe member access .tags on an `any` value              @typescript-eslint/no-unsafe-member-access
+  825:28  warning  Unsafe member access .size on an `any` value              @typescript-eslint/no-unsafe-member-access
+  826:28  warning  Unsafe member access .layers on an `any` value            @typescript-eslint/no-unsafe-member-access
+  827:28  warning  Unsafe member access .buildTime on an `any` value         @typescript-eslint/no-unsafe-member-access
+  828:21  warning  Unsafe member access .digest on an `any` value            @typescript-eslint/no-unsafe-member-access
+  829:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
+  840:18  warning  Unsafe member access .warnings on an `any` value          @typescript-eslint/no-unsafe-member-access
+  841:23  warning  Unsafe member access .warnings on an `any` value          @typescript-eslint/no-unsafe-member-access
+  845:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
+  846:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
+  847:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
 
 /home/tng/workspace/containerization-assist-js/src/application/tools/build-image/build-image.ts
   224:13  warning  Unsafe assignment of an `any` value  @typescript-eslint/no-unsafe-assignment
@@ -168,26 +168,26 @@
   97:87  warning  Missing return type on function                                                 @typescript-eslint/explicit-function-return-type
 
 /home/tng/workspace/containerization-assist-js/src/application/tools/ops/__tests__/utility-tools.test.ts
-   66:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  142:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  143:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  247:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  249:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  250:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  252:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  253:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  289:9   warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  289:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
-  314:9   warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  314:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
-  322:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  366:9   warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  366:56  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
-  389:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  461:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  487:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  488:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
-  489:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+   73:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  149:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  150:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  254:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  256:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  257:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  259:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  260:11  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  296:9   warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  296:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  321:9   warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  321:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  329:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  373:9   warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  373:56  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  396:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  468:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  494:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  495:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
+  496:13  warning  Unsafe assignment of an `any` value       @typescript-eslint/no-unsafe-assignment
 
 /home/tng/workspace/containerization-assist-js/src/application/tools/ops/registry.ts
   592:7   warning  Unsafe argument of type `any` assigned to a parameter of type `SessionService`  @typescript-eslint/no-unsafe-argument

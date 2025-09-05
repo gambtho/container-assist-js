@@ -26,6 +26,13 @@ export interface DockerfileValidationResult {
   errors: string[];
 }
 
+// Helper function to check root user
+function checkRootUser(line: string, dockerfileContent: string): boolean {
+  return (
+    line.startsWith('USER root') || (!dockerfileContent.includes('USER ') && !line.startsWith('#'))
+  );
+}
+
 /**
  * Analyze Dockerfile for issues and generate fix recommendations
  */
@@ -48,10 +55,7 @@ export function analyzeDockerfile(
     const trimmedLine = line.trim();
 
     // Check for running as root
-    if (
-      trimmedLine.startsWith('USER root') ||
-      (!dockerfileContent.includes('USER ') && !trimmedLine.startsWith('#'))
-    ) {
+    if (checkRootUser(trimmedLine, dockerfileContent)) {
       detectedIssues.push({
         type: 'security',
         message: 'Running as root user - consider using a non-root user',
