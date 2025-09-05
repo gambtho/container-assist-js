@@ -78,11 +78,6 @@ jobs:
           - 5000:5000
         env:
           REGISTRY_STORAGE_DELETE_ENABLED: true
-        options: >-
-          --health-cmd "wget -q --spider http://localhost:5000/v2/ || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -98,6 +93,15 @@ jobs:
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Wait for local registry
+        run: |
+          for i in {1..30}; do
+            curl -fsS http://localhost:5000/v2/ && exit 0
+            sleep 1
+          done
+          echo "Registry did not become ready in time" >&2
+          exit 1
 
       - name: Build project (includes test utilities)
         run: npm run build:fast

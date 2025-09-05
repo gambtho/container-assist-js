@@ -90,10 +90,25 @@ npm test -- --testPathPattern="integration/" --verbose
 The `docker-compose.test.yml` provides containerized test dependencies:
 
 ```yaml
-Services:
-  test-registry:5000    # Docker registry for push/pull tests
-  trivy-scanner:4954    # Security scanner server
-  test-db:5432         # PostgreSQL for session testing
+services:
+  test-registry:
+    image: registry:2
+    ports:
+      - "5000:5000"
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: true
+  trivy-scanner:
+    image: aquasec/trivy:0.54.1
+    command: server --listen 0.0.0.0:4954
+    ports:
+      - "4954:4954"
+  test-db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"
 ```
 
 ### Service Health Checks
