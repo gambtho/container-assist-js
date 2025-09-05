@@ -42,24 +42,24 @@
   },
   "metrics": {
     "lint": {
-      "baseline": 711,
+      "baseline": 670,
       "current": 670,
-      "lastUpdated": "2025-09-05T11:12:39-04:00",
+      "lastUpdated": "2025-09-05T11:19:38-04:00",
       "errors": 0,
       "warnings": 670
     },
     "deadcode": {
       "baseline": 219,
       "current": 219,
-      "lastUpdated": "2025-09-05T11:12:39-04:00"
+      "lastUpdated": "2025-09-05T11:19:38-04:00"
     },
     "build": {
-      "lastBuildTimeMs": 5174,
-      "lastUpdated": "2025-09-05T11:12:39-04:00"
+      "lastBuildTimeMs": 1468,
+      "lastUpdated": "2025-09-05T11:19:38-04:00"
     },
     "typescript": {
       "errors": 0,
-      "lastUpdated": "2025-09-05T11:12:39-04:00"
+      "lastUpdated": "2025-09-05T11:19:38-04:00"
     },
     "tests": {
       "passed": null,

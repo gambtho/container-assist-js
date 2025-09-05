@@ -91,6 +91,11 @@ if [ "$CURRENT_WARNINGS" -le "$BASELINE_WARNINGS" ]; then
     if [ "$REDUCTION" -gt 0 ]; then
         PERCENTAGE=$(echo "scale=1; ($REDUCTION * 100) / $BASELINE_WARNINGS" | bc -l 2>/dev/null || echo "N/A")
         print_status "PASS" "Warnings reduced by $REDUCTION (${PERCENTAGE}%) - $CURRENT_WARNINGS ≤ $BASELINE_WARNINGS"
+        # Auto-update baseline when improved
+        jq --arg warnings "$CURRENT_WARNINGS" \
+           '.metrics.lint.baseline = ($warnings | tonumber)' \
+           $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+        print_status "INFO" "Updated ESLint baseline: $BASELINE_WARNINGS → $CURRENT_WARNINGS"
     else
         print_status "PASS" "Warning count maintained at baseline ($CURRENT_WARNINGS)"
     fi
@@ -144,6 +149,11 @@ if [ "$DEADCODE_COUNT" -le "$DEADCODE_BASELINE" ]; then
     if [ $DEADCODE_REDUCTION -gt 0 ]; then
         DEADCODE_PERCENTAGE=$(echo "scale=1; ($DEADCODE_REDUCTION * 100) / $DEADCODE_BASELINE" | bc -l 2>/dev/null || echo "N/A")
         print_status "PASS" "Unused exports reduced by $DEADCODE_REDUCTION (${DEADCODE_PERCENTAGE}%) - $DEADCODE_COUNT ≤ $DEADCODE_BASELINE"
+        # Auto-update baseline when improved
+        jq --arg deadcode "$DEADCODE_COUNT" \
+           '.metrics.deadcode.baseline = ($deadcode | tonumber)' \
+           $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+        print_status "INFO" "Updated deadcode baseline: $DEADCODE_BASELINE → $DEADCODE_COUNT"
     else
         print_status "PASS" "Unused exports maintained at baseline ($DEADCODE_COUNT)"
     fi
@@ -207,13 +217,3 @@ fi
 
 print_status "PASS" "All quality gates passed! 🚀"
 echo ""
-
-# Optionally update baselines if --update-baseline flag is provided
-if [ "${1:-}" == "--update-baseline" ]; then
-    jq --arg warnings "$CURRENT_WARNINGS" --arg deadcode "$DEADCODE_COUNT" \
-       '.metrics.lint.baseline = ($warnings | tonumber) | .metrics.deadcode.baseline = ($deadcode | tonumber)' \
-       $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
-    print_status "INFO" "Baselines updated in $QUALITY_CONFIG:"
-    echo "  • ESLint baseline: $CURRENT_WARNINGS"
-    echo "  • Deadcode baseline: $DEADCODE_COUNT"
-fi

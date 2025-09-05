@@ -12,4 +12,11 @@ npx lint-staged
 # Run quality gates
 ./scripts/quality-gates.sh
 
+# Stage the quality-gates.json file if it was modified
+# This ensures the updated metrics are included in the commit
+if git diff --name-only | grep -q "quality-gates.json"; then
+    echo "📊 Staging updated quality-gates.json metrics..."
+    git add quality-gates.json
+fi
+
 echo "✅ Pre-commit checks passed!"
