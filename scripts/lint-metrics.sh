@@ -2,8 +2,17 @@
 
 set -euo pipefail
 
-# Create reports directory if it doesn't exist
+# Configuration  
+QUALITY_CONFIG="quality-gates.json"
+
+# Create reports directory if it doesn't exist for lint output
 mkdir -p reports
+
+# Check for required tools
+if ! command -v jq &> /dev/null; then
+    echo "Error: jq is required but not installed."
+    exit 1
+fi
 
 echo "=== Code Quality Metrics $(date) ==="
 echo ""
@@ -39,6 +48,12 @@ else
     TOTAL_ERRORS=0
 fi
 
+# Update current metrics in JSON
+TIMESTAMP=$(date -Iseconds)
+jq --arg warnings "$TOTAL_WARNINGS" --arg errors "$TOTAL_ERRORS" --arg ts "$TIMESTAMP" \
+   '.metrics.lint.current = ($warnings | tonumber) | .metrics.lint.warnings = ($warnings | tonumber) | .metrics.lint.errors = ($errors | tonumber) | .metrics.lint.lastUpdated = $ts' \
+   $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+
 echo "Total warnings: $TOTAL_WARNINGS"
 echo "Total errors: $TOTAL_ERRORS"
 echo ""
@@ -61,10 +76,11 @@ fi
 echo ""
 
 echo "=== Progress Tracking ==="
-BASELINE_FILE="reports/baseline-count.txt"
 
-if [ -f "$BASELINE_FILE" ]; then
-    BASELINE=$(cat $BASELINE_FILE)
+# Read baseline from JSON
+BASELINE=$(jq -r '.metrics.lint.baseline' $QUALITY_CONFIG)
+
+if [ "$BASELINE" != "null" ]; then
     REDUCTION=$((BASELINE - TOTAL_WARNINGS))
     if [ $BASELINE -gt 0 ]; then
         PERCENTAGE=$(echo "scale=1; ($REDUCTION * 100) / $BASELINE" | bc -l 2>/dev/null || echo "N/A")
@@ -87,17 +103,6 @@ else
     echo "To set baseline: ./scripts/lint-metrics.sh --baseline"
 fi
 
-# Save current count if --baseline flag is provided
-if [ "${1:-}" == "--baseline" ]; then
-    echo $TOTAL_WARNINGS > $BASELINE_FILE
-    echo ""
-    echo "✅ Baseline set to $TOTAL_WARNINGS warnings"
-    echo "Saved to: $BASELINE_FILE"
-fi
-
-# Also save current snapshot for comparison
-echo $TOTAL_WARNINGS > reports/current-count.txt
-
 echo ""
 echo "🧹 Deadcode Analysis"
 echo "────────────────────"
@@ -108,11 +113,15 @@ DEADCODE_COUNT=$(npx ts-prune --project tsconfig.json 2>/dev/null | grep -v 'use
 echo "Total unused exports: $DEADCODE_COUNT"
 echo ""
 
-# Deadcode tracking
-DEADCODE_BASELINE_FILE="reports/deadcode-baseline.txt"
+# Update deadcode metrics in JSON
+jq --arg count "$DEADCODE_COUNT" --arg ts "$TIMESTAMP" \
+   '.metrics.deadcode.current = ($count | tonumber) | .metrics.deadcode.lastUpdated = $ts' \
+   $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
 
-if [ -f "$DEADCODE_BASELINE_FILE" ]; then
-    DEADCODE_BASELINE=$(cat $DEADCODE_BASELINE_FILE)
+# Read deadcode baseline from JSON
+DEADCODE_BASELINE=$(jq -r '.metrics.deadcode.baseline' $QUALITY_CONFIG)
+
+if [ "$DEADCODE_BASELINE" != "null" ]; then
     DEADCODE_REDUCTION=$((DEADCODE_BASELINE - DEADCODE_COUNT))
     if [ $DEADCODE_BASELINE -gt 0 ]; then
         DEADCODE_PERCENTAGE=$(echo "scale=1; ($DEADCODE_REDUCTION * 100) / $DEADCODE_BASELINE" | bc -l 2>/dev/null || echo "N/A")
@@ -136,11 +145,15 @@ else
     echo "To set baseline: ./scripts/lint-metrics.sh --baseline"
 fi
 
-# Save deadcode baseline if --baseline flag is provided
+# Save baselines if --baseline flag is provided
 if [ "${1:-}" == "--baseline" ]; then
-    echo $DEADCODE_COUNT > $DEADCODE_BASELINE_FILE
+    jq --arg warnings "$TOTAL_WARNINGS" --arg deadcode "$DEADCODE_COUNT" \
+       '.metrics.lint.baseline = ($warnings | tonumber) | .metrics.deadcode.baseline = ($deadcode | tonumber)' \
+       $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
     echo ""
-    echo "✅ Deadcode baseline set to $DEADCODE_COUNT unused exports"
+    echo "✅ Baselines updated in $QUALITY_CONFIG:"
+    echo "  • Lint baseline: $TOTAL_WARNINGS warnings"
+    echo "  • Deadcode baseline: $DEADCODE_COUNT unused exports"
 fi
 
 # Show top files with unused exports

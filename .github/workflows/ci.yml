@@ -103,17 +103,11 @@ jobs:
           echo "Registry did not become ready in time" >&2
           exit 1
 
-      - name: Build project (includes test utilities)
+      - name: Build project
         run: npm run build:fast
 
-      - name: Diagnose integration test environment
-        run: npm run diagnose:integration
-        env:
-          TEST_REGISTRY_HOST: localhost:5000
-          USE_LOCAL_REGISTRY: true
-
-      - name: Run integration tests (auto-detect)
-        run: npm run test:integration:auto
+      - name: Run integration tests
+        run: npm run test:integration
         env:
           NODE_OPTIONS: '--experimental-vm-modules'
           TEST_REGISTRY_HOST: localhost:5000
