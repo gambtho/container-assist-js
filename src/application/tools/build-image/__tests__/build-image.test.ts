@@ -449,7 +449,11 @@ describe('build-image tool', () => {
         }),
       );
 
-      expect(result.metadata?.cached).toBe(false);
+      expect(result.metadata).toEqual(
+        expect.objectContaining({
+          cached: false,
+        }),
+      );
     });
   });
 

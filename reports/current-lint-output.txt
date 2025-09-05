@@ -72,7 +72,7 @@
   843:21  warning  Unsafe member access .metadata on an `any` value          @typescript-eslint/no-unsafe-member-access
 
 /home/tng/workspace/containerization-assist-js/src/application/tools/build-image/build-image.ts
-  226:13  warning  Unsafe assignment of an `any` value  @typescript-eslint/no-unsafe-assignment
+  224:13  warning  Unsafe assignment of an `any` value  @typescript-eslint/no-unsafe-assignment
 
 /home/tng/workspace/containerization-assist-js/src/application/tools/build-image/helper.ts
   49:11  warning  Unsafe array destructuring of a tuple element with an `any` value  @typescript-eslint/no-unsafe-assignment
@@ -109,9 +109,9 @@
   764:29  warning  Unsafe member access .workflow_state on an `any` value  @typescript-eslint/no-unsafe-member-access
 
 /home/tng/workspace/containerization-assist-js/src/application/tools/generate-dockerfile/generate-dockerfile.ts
-  334:69  warning  Unexpected any. Specify a different type                @typescript-eslint/no-explicit-any
-  334:78  warning  Unsafe return of an `any` typed value                   @typescript-eslint/no-unsafe-return
-  337:31  warning  Unsafe member access .workflow_state on an `any` value  @typescript-eslint/no-unsafe-member-access
+  335:69  warning  Unexpected any. Specify a different type                @typescript-eslint/no-explicit-any
+  335:78  warning  Unsafe return of an `any` typed value                   @typescript-eslint/no-unsafe-return
+  338:31  warning  Unsafe member access .workflow_state on an `any` value  @typescript-eslint/no-unsafe-member-access
 
 /home/tng/workspace/containerization-assist-js/src/application/tools/generate-dockerfile/helper.ts
   171:13  warning  Unsafe assignment of an `any` value                         @typescript-eslint/no-unsafe-assignment

@@ -44,6 +44,7 @@ describe('analyze-repo tool', () => {
   });
 
   afterEach(() => {
+    jest.clearAllMocks();
     jest.restoreAllMocks();
   });
 

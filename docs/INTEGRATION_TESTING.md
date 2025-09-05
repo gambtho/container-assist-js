@@ -373,6 +373,16 @@ TEST_TIMEOUT=300000  # 5 minutes
    npm run validate:pr:fast
    ```
 
+### Mock Fallback Strategy
+
+When services are unavailable, the test framework automatically falls back to mock implementations:
+
+- **Trivy Scanner**: Falls back to mock scanner when binary/server/container unavailable
+- **Docker Registry**: Uses in-memory mock when registry unreachable
+- **Kubernetes**: Uses mock client when no cluster detected
+
+This ensures tests can run in any environment while still validating core logic.
+
 ### Debugging Test Issues
 
 #### Environment Issues
