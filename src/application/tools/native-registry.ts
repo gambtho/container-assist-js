@@ -7,7 +7,6 @@ import type { Logger } from 'pino';
 import type { Services } from '../../services/index';
 import type { ApplicationConfig } from '../../config/types';
 import type { ToolDescriptor, ToolContext } from './tool-types';
-import type { Session } from '../../domain/types/session';
 // import type { SessionService } from '../session/manager'; // unused import
 import { convertToMcpError } from '../errors/mcp-error-mapper';
 import { z } from 'zod';
@@ -36,7 +35,6 @@ interface McpServer {
 
 /**
  * Simple native MCP tool registration
- * Eliminates the complex ToolRegistry wrapper class
  */
 export async function registerToolsNatively(
   server: McpServer,
@@ -53,52 +51,10 @@ export async function registerToolsNatively(
   const createToolContext = async (contextOrSignal?: unknown): Promise<ToolContext> => {
     const { WorkflowManager } = await import('../workflow/manager');
     const { WorkflowOrchestrator } = await import('../workflow/orchestrator');
-    const { SessionService: AppSessionService } = await import('../session/manager');
-    const { SessionStore: InfraSessionStore } = await import('../../infrastructure/session-store');
-
     const workflowManager = new WorkflowManager(logger);
 
-    // Create an application-layer SessionService with an in-memory store
-    const sessionStore = new InfraSessionStore(logger);
-
-    // Create an adapter that implements the domain SessionStore interface
-    const storeAdapter = {
-      create: (session: Session) => {
-        sessionStore.set(session.id, session);
-        return Promise.resolve();
-      },
-      get: (id: string) => Promise.resolve(sessionStore.get(id)),
-      update: (id: string, session: Session) => {
-        sessionStore.set(id, session);
-        return Promise.resolve();
-      },
-      delete: (id: string) => {
-        sessionStore.delete(id);
-        return Promise.resolve();
-      },
-      list: () => Promise.resolve(sessionStore.list()),
-      updateAtomic: (id: string, updater: (current: Session) => Session) => {
-        const current = sessionStore.get(id);
-        if (current) {
-          const updated = updater(current);
-          sessionStore.set(id, updated);
-        }
-        return Promise.resolve();
-      },
-      createBatch: (sessions: Session[]) => {
-        for (const session of sessions) {
-          sessionStore.set(session.id, session);
-        }
-        return Promise.resolve();
-      },
-      getActiveCount: () => Promise.resolve(sessionStore.list().length),
-      getByStatus: (status: Session['status']) =>
-        Promise.resolve(sessionStore.list().filter((s) => s.status === status)),
-      getRecentlyUpdated: (limit: number) => Promise.resolve(sessionStore.list().slice(0, limit)),
-    };
-
-    const appSessionService = new AppSessionService(storeAdapter as any, logger);
-    const workflowOrchestrator = new WorkflowOrchestrator(appSessionService, logger);
+    // Use the services.session directly instead of creating a new one
+    const workflowOrchestrator = new WorkflowOrchestrator(services.session, logger);
 
     const progressEmitter = services.events;
     const eventPublisher = services.events;

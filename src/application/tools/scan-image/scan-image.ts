@@ -74,7 +74,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
         throw new DomainError(ErrorCode.VALIDATION_ERROR, 'Session service not available');
       }
 
-      const session = await sessionService.get(sessionId);
+      const session = sessionService.get(sessionId);
       if (!session) {
         throw new DomainError(ErrorCode.SessionNotFound, 'Session not found');
       }
@@ -130,7 +130,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
       const total = reportedTotal ?? scanResult.vulnerabilities.length;
 
       // Update session with scan results
-      await sessionService.updateAtomic(sessionId, (session: Session) => ({
+      sessionService.updateAtomic(sessionId, (session: Session) => ({
         ...session,
         workflow_state: {
           ...session.workflow_state,

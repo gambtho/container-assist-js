@@ -8,10 +8,7 @@ import {
   WorkflowOrchestrator,
   WorkflowConfig,
   WorkflowStep,
-  WorkflowExecutionResult,
-  ToolDependencies,
 } from '../../../../src/application/workflow/orchestrator';
-import { SessionService } from '../../../../src/application/session/manager';
 import { WorkflowState } from '../../../../src/domain/types/index';
 import type { Logger } from 'pino';
 import type { ProgressCallback } from '../../../../src/application/workflow/types';
@@ -21,11 +18,75 @@ class MockSessionService {
   private sessions = new Map<string, any>();
   private stepErrors = new Map<string, Error[]>();
 
+  // Missing properties to match SessionService interface
+  private store: any = null;
+  logger: any = mockLogger;
+  ttl: number = 3600;
+
   constructor() {
     // Mock implementation - no super call needed
   }
 
-  async getSession(sessionId: string) {
+  // Missing methods to match SessionService interface
+  close(): void {
+    // Mock implementation
+  }
+
+  list(): any[] {
+    return Array.from(this.sessions.values());
+  }
+
+  cleanup(): number {
+    return 0;
+  }
+
+  getActiveCount(): number {
+    return this.sessions.size;
+  }
+
+  // Core CRUD methods to match interface
+  get(sessionId: string) {
+    return this.sessions.get(sessionId) || null;
+  }
+
+  create(data: any = {}) {
+    const session = {
+      id: data.id || 'test-session',
+      status: 'active',
+      workflow_state: {},
+      ...data,
+    };
+    this.sessions.set(session.id, session);
+    return session;
+  }
+
+  update(sessionId: string, data: any) {
+    const existing = this.sessions.get(sessionId);
+    if (!existing) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+    const updated = { ...existing, ...data };
+    this.sessions.set(sessionId, updated);
+  }
+
+  updateAtomic(sessionId: string, updater: (session: any) => any) {
+    const existing = this.sessions.get(sessionId);
+    if (!existing) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+    const updated = updater(existing);
+    this.sessions.set(sessionId, updated);
+  }
+
+  delete(sessionId: string) {
+    this.sessions.delete(sessionId);
+  }
+
+  initialize() {
+    // Mock initialization
+  }
+
+  getSession(sessionId: string) {
     return this.sessions.get(sessionId) || {
       id: sessionId,
       status: 'active',
@@ -33,33 +94,37 @@ class MockSessionService {
     };
   }
 
-  async updateSession(sessionId: string, update: any) {
+  updateSession(sessionId: string, update: any) {
     const existing = this.sessions.get(sessionId) || {};
     this.sessions.set(sessionId, { ...existing, ...update });
+    return this.sessions.get(sessionId);
   }
 
-  async updateWorkflowState(sessionId: string, stateUpdate: Partial<WorkflowState>) {
-    const session = await this.getSession(sessionId);
+  updateWorkflowState(sessionId: string, stateUpdate: Partial<WorkflowState>) {
+    const session = this.getSession(sessionId);
     session.workflow_state = { ...session.workflow_state, ...stateUpdate };
     this.sessions.set(sessionId, session);
+    return session;
   }
 
-  async setCurrentStep(sessionId: string, stepName: string) {
-    await this.updateWorkflowState(sessionId, { current_step: stepName });
+  setCurrentStep(sessionId: string, stepName: string) {
+    return this.updateWorkflowState(sessionId, { current_step: stepName });
   }
 
-  async markStepCompleted(sessionId: string, stepName: string) {
-    const session = await this.getSession(sessionId);
+  markStepCompleted(sessionId: string, stepName: string) {
+    const session = this.getSession(sessionId);
     const completedSteps = session.workflow_state?.completed_steps || [];
-    await this.updateWorkflowState(sessionId, {
+    return this.updateWorkflowState(sessionId, {
       completed_steps: [...completedSteps, stepName],
     });
   }
 
-  async addStepError(sessionId: string, stepName: string, error: Error) {
+  addStepError(sessionId: string, stepName: string, error: Error) {
     const key = `${sessionId}:${stepName}`;
     const existing = this.stepErrors.get(key) || [];
     this.stepErrors.set(key, [...existing, error]);
+    const session = this.getSession(sessionId);
+    return session;
   }
 
   getStepErrors(sessionId: string, stepName: string): Error[] {
@@ -108,12 +173,12 @@ class ProgressTracker {
     step: string;
     status: string;
     progress: number;
-    message: string;
+    message?: string;
     metadata?: any;
   }> = [];
 
   getCallback(): ProgressCallback {
-    return async (event) => {
+    return (event) => {
       this.events.push(event);
     };
   }
@@ -212,7 +277,7 @@ describe('WorkflowOrchestrator', () => {
         steps: [
           createTestStep({
             name: 'conditional-step',
-            condition: (state: WorkflowState) => false, // Always skip
+            condition: (_state: WorkflowState) => false, // Always skip
           }),
           createTestStep({ name: 'regular-step' }),
         ],
@@ -229,7 +294,7 @@ describe('WorkflowOrchestrator', () => {
       const workflow = createTestWorkflow({
         steps: [
           createTestStep({
-            paramMapper: (state: WorkflowState, sessionId: string) => ({
+            paramMapper: (_state: WorkflowState, sessionId: string) => ({
               customParam: 'mapped-value',
               sessionId,
             }),
@@ -307,7 +372,7 @@ describe('WorkflowOrchestrator', () => {
 
       const result = await orchestrator.executeWorkflow(workflow, 'test-session', {});
 
-      // Just verify execution completes 
+      // Just verify execution completes
       expect(result.status).toBeDefined();
       expect(result.workflowId).toBeDefined();
       expect(result.duration).toBeGreaterThan(0);
@@ -353,9 +418,9 @@ describe('WorkflowOrchestrator', () => {
     it('should handle timeout in step execution', async () => {
       const originalExecute = (orchestrator as any).executeToolWithTimeout;
       (orchestrator as any).executeToolWithTimeout = jest.fn().mockImplementation(
-        (toolName, params, timeout) => {
+        (toolName, _params, _timeout) => {
           return new Promise((_, reject) => {
-            setTimeout(() => reject(new Error(`Tool execution timeout: ${toolName}`)), 100);
+            setTimeout(() => reject(new Error(`Tool execution timeout: ${String(toolName)}`)), 100);
           });
         },
       );
@@ -617,7 +682,7 @@ describe('WorkflowOrchestrator', () => {
       });
 
       const result = await orchestrator.executeWorkflow(workflow, 'test-session', {});
-      
+
       // Just verify execution completes
       expect(result.workflowId).toBeDefined();
       expect(result.sessionId).toBe('test-session');

@@ -60,7 +60,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
         throw new DomainError(ErrorCode.VALIDATION_ERROR, 'Session service not available');
       }
 
-      const sessionResult = await sessionService.get(sessionId);
+      const sessionResult = sessionService.get(sessionId);
       const session = sessionResult as Session;
       if (!session) {
         throw new DomainError(ErrorCode.SessionNotFound, 'Session not found');
@@ -114,7 +114,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
       const replicas = 1;
 
       // Update session with deployment info
-      await sessionService.updateAtomic(sessionId, (currentSession: Session) => {
+      sessionService.updateAtomic(sessionId, (currentSession: Session) => {
         const updatedSession: Session = {
           ...currentSession,
           workflow_state: {

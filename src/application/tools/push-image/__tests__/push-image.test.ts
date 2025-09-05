@@ -269,11 +269,11 @@ describe('push-image tool', () => {
 
       (mockContext.sessionService as jest.Mocked<SessionService>).get = jest
         .fn<SessionService['get']>()
-        .mockResolvedValue(session);
+        .mockReturnValue(session);
       (mockContext.sessionService as jest.Mocked<SessionService>).updateAtomic = jest
         .fn<SessionService['updateAtomic']>()
         .mockImplementation((id, updateFn) => {
-          return Promise.resolve(updateFn(session));
+          return updateFn(session);
         });
 
       const pushResult = {
@@ -457,7 +457,7 @@ describe('push-image tool', () => {
       ).mock.calls[0][1];
       const updatedSession = updaterFunction(session);
 
-      expect(updatedSession.workflow_state.pushResult).toMatchObject({
+      expect(updatedSession.workflow_state.push_result).toMatchObject({
         pushed: [{ tag: 'app:v1.2.3', digest: pushResult.digest }],
         registry: 'docker.io',
         timestamp: expect.any(String),

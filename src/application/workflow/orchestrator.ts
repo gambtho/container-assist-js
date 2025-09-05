@@ -6,7 +6,7 @@
 
 import { WorkflowState } from '../../domain/types/index';
 import type { Logger } from 'pino';
-import { SessionService } from '../session/manager';
+import { SessionService } from '../../services/session';
 import { WorkflowManager } from './manager';
 import { normalizeWorkflowStateUpdate } from './property-mappers';
 import { SimpleProgressTracker } from './progress';
@@ -116,7 +116,7 @@ export class WorkflowOrchestrator {
 
     try {
       // Update session with workflow start
-      await this.sessionService.updateSession(sessionId, {
+      this.sessionService.updateSession(sessionId, {
         status: 'active',
         stage: 'workflow_started',
         metadata: {
@@ -133,7 +133,7 @@ export class WorkflowOrchestrator {
       result.duration = Date.now() - startTime;
 
       // Update session with workflow completion
-      await this.sessionService.updateSession(sessionId, {
+      this.sessionService.updateSession(sessionId, {
         status: result.status === 'completed' ? 'completed' : 'failed',
         stage: 'workflow_completed',
         metadata: {
@@ -191,7 +191,7 @@ export class WorkflowOrchestrator {
     params: Record<string, unknown>,
     result: WorkflowExecutionResult,
   ): Promise<void> {
-    const session = await this.sessionService.getSession(sessionId);
+    const session = this.sessionService.getSession(sessionId);
     const state = session.workflow_state ?? {};
 
     const stepGroups = this.groupStepsForExecution(config);
@@ -245,7 +245,7 @@ export class WorkflowOrchestrator {
     );
 
     // Update session with current step
-    await this.sessionService.setCurrentStep(sessionId, step.name);
+    this.sessionService.setCurrentStep(sessionId, step.name);
 
     // Report progress for step start
     await this.progressTracker.reportProgress(this.currentExecution?.onProgress, {
@@ -270,14 +270,14 @@ export class WorkflowOrchestrator {
         const toolResult = await this.executeToolWithTimeout(step.tool, toolParams, step.timeout);
 
         // Update workflow state with tool output
-        await this.updateWorkflowState(sessionId, step.name, toolResult);
+        this.updateWorkflowState(sessionId, step.name, toolResult);
 
         // Store output and mark as completed
         result.outputs[step.name] = toolResult;
         result.completedSteps.push(step.name);
 
         // Mark step as completed in session
-        await this.sessionService.markStepCompleted(sessionId, step.name);
+        this.sessionService.markStepCompleted(sessionId, step.name);
 
         // Report progress for step completion
         await this.progressTracker.reportProgress(this.currentExecution?.onProgress, {
@@ -308,7 +308,7 @@ export class WorkflowOrchestrator {
         );
 
         // Add error to session
-        await this.sessionService.addStepError(sessionId, step.name, lastError);
+        this.sessionService.addStepError(sessionId, step.name, lastError);
 
         if (retries <= step.maxRetries && step.retryable) {
           // Exponential backoff
@@ -409,18 +409,14 @@ export class WorkflowOrchestrator {
   /**
    * Update workflow state in session
    */
-  private async updateWorkflowState(
-    sessionId: string,
-    stepName: string,
-    output: unknown,
-  ): Promise<void> {
+  private updateWorkflowState(sessionId: string, stepName: string, output: unknown): void {
     const update = {
       [`${stepName}_result`]: output,
       last_completed_step: stepName,
       last_updated: new Date().toISOString(),
     };
     const normalizedUpdate = normalizeWorkflowStateUpdate(update);
-    await this.sessionService.updateWorkflowState(sessionId, normalizedUpdate);
+    this.sessionService.updateWorkflowState(sessionId, normalizedUpdate);
   }
 
   /**
@@ -482,7 +478,7 @@ export class WorkflowOrchestrator {
       'Executing rollback steps',
     );
 
-    const session = await this.sessionService.getSession(sessionId);
+    const session = this.sessionService.getSession(sessionId);
     const state = session.workflow_state ?? {
       completed_steps: [],
       errors: {},

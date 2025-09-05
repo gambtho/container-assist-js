@@ -28,10 +28,10 @@ export class SessionResourceProvider {
         mimeType: 'application/json',
         handler: () => {
           try {
-            const activeSessions = this.sessionService.query({
-              status: 'active',
-              limit: 50,
-            });
+            const activeSessions = this.sessionService
+              .list()
+              .filter((session) => session.status === 'active')
+              .slice(0, 50);
 
             if (activeSessions == null) {
               throw new Error('Failed to query active sessions');
@@ -98,9 +98,9 @@ export class SessionResourceProvider {
         name: 'Session Details',
         description: 'Detailed information about a specific session',
         mimeType: 'application/json',
-        handler: async (params: { sessionId: string }) => {
+        handler: (params: { sessionId: string }) => {
           try {
-            const session = await this.sessionService.get(params.sessionId);
+            const session = this.sessionService.get(params.sessionId);
 
             if (!session) {
               return {
@@ -183,7 +183,7 @@ export class SessionResourceProvider {
         handler: () => {
           try {
             // Get session statistics for management
-            const allSessions = this.sessionService.query({ limit: 200 });
+            const allSessions = this.sessionService.list().slice(0, 200);
 
             if (!allSessions) {
               throw new Error('Failed to query sessions for management');

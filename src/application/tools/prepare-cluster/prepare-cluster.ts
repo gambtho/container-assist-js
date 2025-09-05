@@ -45,7 +45,7 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInputType, PrepareClus
         );
       }
 
-      const session = await sessionService.get(sessionId);
+      const session = sessionService.get(sessionId);
       if (!session) {
         throw new InfrastructureError(ErrorCode.SessionNotFound, `Session ${sessionId} not found`);
       }
@@ -65,7 +65,7 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInputType, PrepareClus
       const clusterReady = true; // In real implementation, would check cluster connectivity
 
       // Store cluster readiness in session
-      await sessionService.updateAtomic(sessionId, (session: Session) => ({
+      sessionService.updateAtomic(sessionId, (session: Session) => ({
         ...session,
         workflow_state: {
           ...session.workflow_state,
@@ -86,10 +86,10 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInputType, PrepareClus
 
       logger.info({ sessionId, clusterReady }, 'Cluster preparation completed');
 
-      return {
+      return Promise.resolve({
         success: true,
         sessionId,
-      };
+      });
     } catch (error) {
       logger.error({ error, sessionId }, 'Cluster preparation failed');
 
