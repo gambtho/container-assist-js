@@ -72,7 +72,9 @@ export interface FileSystem {
   exists(path: string): Promise<Result<boolean>>;
   mkdir(path: string, recursive?: boolean): Promise<Result<void>>;
   readdir(path: string): Promise<Result<string[]>>;
-  stat(path: string): Promise<Result<any>>;
+  stat(
+    path: string,
+  ): Promise<Result<{ isFile(): boolean; isDirectory(): boolean; size: number; mtime: Date }>>;
   copy(src: string, dest: string): Promise<Result<void>>;
   remove(path: string): Promise<Result<void>>;
 }
@@ -89,15 +91,19 @@ export interface CommandExecutor {
       exitCode: number;
     }>
   >;
-  spawn(command: string, args?: string[], options?: unknown): Promise<Result<any>>;
+  spawn(
+    command: string,
+    args?: string[],
+    options?: unknown,
+  ): Promise<Result<{ pid: number; kill: (signal?: string) => boolean }>>;
 }
 
-export type EventHandler<T = any> = (data: T) => void;
+export type EventHandler<T = unknown> = (data: T) => void;
 
 export interface EventPublisher {
-  publish<T = any>(eventType: string, data: T): void;
-  subscribe<T = any>(eventType: string, handler: EventHandler<T>): void;
-  unsubscribe<T = any>(eventType: string, handler: EventHandler<T>): void;
+  publish<T = unknown>(eventType: string, data: T): void;
+  subscribe<T = unknown>(eventType: string, handler: EventHandler<T>): void;
+  unsubscribe<T = unknown>(eventType: string, handler: EventHandler<T>): void;
   removeAllSubscribers(eventType?: string): void;
   getSubscriberCount(eventType: string): number;
 }
@@ -106,6 +112,6 @@ export interface Configuration {
   get<T>(key: string): T;
   set<T>(key: string, value: T): void;
   has(key: string): boolean;
-  getAll(): Record<string, any>;
+  getAll(): Record<string, unknown>;
   validate(): Result<void>;
 }

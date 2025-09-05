@@ -1,187 +1,295 @@
 /**
- * Session Types
- * Domain types for workflow sessions and state management
+ * Session types for workflow state management with Zod validation
+ * Provides complete type safety and runtime validation
  */
 
 import { z } from 'zod';
+import {
+  DockerfileFixSchema,
+  DockerBuildResultSchema,
+  DockerScanResultSchema,
+  DockerTagResultSchema,
+  DockerPushResultSchema,
+} from './docker';
 
-/**
- * Base session schema
- */
-export const SessionSchema = z.object({
-  id: z.string(),
-  status: z.enum(['active', 'completed', 'failed', 'paused']),
-  repoPath: z.string(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  expires_at: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
-});
-
-/**
- * Workflow state schema
- */
-export const WorkflowStateSchema = z.object({
-  currentStep: z.string(),
-  steps: z.array(z.string()),
-  stepResults: z.record(z.unknown()).optional(),
-  progress: z.number().min(0).max(1),
-  error: z.string().optional(),
-});
-
-/**
- * Analysis result schema
- */
 export const AnalysisResultSchema = z.object({
   language: z.string(),
+  language_version: z.string().optional(),
   framework: z.string().optional(),
-  buildTool: z.string().optional(),
-  dependencies: z.array(z.string()).optional(),
-  hasDockerfile: z.boolean(),
-  recommendations: z.array(z.string()),
-  confidence: z.number().min(0).max(1),
+  framework_version: z.string().optional(),
+  build_system: z
+    .object({
+      type: z.string(),
+      build_file: z.string(),
+      build_command: z.string().optional(),
+    })
+    .optional(),
+  dependencies: z
+    .array(
+      z.object({
+        name: z.string(),
+        version: z.string().optional(),
+        type: z.enum(['runtime', 'dev', 'test']).optional(),
+      }),
+    )
+    .optional(),
+  has_tests: z.boolean().default(false),
+  test_framework: z.string().optional(),
+  database: z.string().optional().nullable(),
+  required_ports: z.array(z.number()).optional(),
+  ports: z.array(z.number()).optional(),
+  env_variables: z.record(z.string(), z.string()).optional(),
+  docker_compose_exists: z.boolean().default(false),
+  ci_cd_platform: z.string().optional(),
+  java_version: z.string().optional(),
+  build_tool_version: z.string().optional(),
+  packaging: z.enum(['jar', 'war', 'ear']).optional(),
+  recommendations: z
+    .object({
+      baseImage: z.string().optional(),
+      buildStrategy: z.string().optional(),
+      securityNotes: z.array(z.string()).optional(),
+    })
+    .optional(),
 });
 
-/**
- * Docker build result schema
- */
-export const DockerBuildResultSchema = z.object({
-  imageId: z.string(),
-  imageTag: z.string(),
-  success: z.boolean(),
-  buildTime: z.number(),
-  buildLogs: z.string().optional(),
-  warnings: z.array(z.string()).optional(),
-});
-
-/**
- * Dockerfile result schema
- */
 export const DockerfileResultSchema = z.object({
   content: z.string(),
-  baseImage: z.string(),
-  instructions: z.array(z.string()),
+  path: z.string(),
+  base_image: z.string().optional(),
+  stages: z.array(z.string()).optional(),
   optimizations: z.array(z.string()).optional(),
-  securityIssues: z.array(z.string()).optional(),
+  multistage: z.boolean().default(false),
 });
 
-/**
- * Scan result schema
- */
-export const ScanResultSchema = z.object({
-  vulnerabilities: z.array(
-    z.object({
-      id: z.string(),
-      severity: z.enum(['low', 'medium', 'high', 'critical']),
-      description: z.string(),
-      fix: z.string().optional(),
-    }),
-  ),
-  totalCount: z.number(),
-  criticalCount: z.number(),
-  success: z.boolean(),
-});
+export const ScanResultSchema = DockerScanResultSchema;
 
-/**
- * Kubernetes manifest result schema
- */
 export const K8sManifestResultSchema = z.object({
   manifests: z.array(
     z.object({
-      apiVersion: z.string(),
       kind: z.string(),
-      metadata: z.object({
-        name: z.string(),
-        namespace: z.string().optional(),
-      }),
-      spec: z.unknown(),
+      name: z.string(),
+      namespace: z.string().optional(),
+      content: z.string(),
+      file_path: z.string(),
     }),
   ),
-  success: z.boolean(),
+  deployment_strategy: z.enum(['rolling', 'recreate', 'blue-green', 'canary']).optional(),
+  replicas: z.number().default(1),
+  resources: z
+    .object({
+      requests: z
+        .object({
+          cpu: z.string().optional(),
+          memory: z.string().optional(),
+        })
+        .optional(),
+      limits: z
+        .object({
+          cpu: z.string().optional(),
+          memory: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  output_path: z.string().optional(),
 });
 
-/**
- * Deployment result schema
- */
 export const DeploymentResultSchema = z.object({
-  deploymentId: z.string(),
   namespace: z.string(),
-  status: z.enum(['pending', 'running', 'succeeded', 'failed']),
-  podCount: z.number(),
-  success: z.boolean(),
+  deployment_name: z.string(),
+  service_name: z.string().optional(),
+  endpoints: z
+    .array(
+      z.object({
+        type: z.enum(['internal', 'external', 'nodeport', 'loadbalancer']),
+        url: z.string(),
+        port: z.number(),
+      }),
+    )
+    .optional(),
+  status: z.object({
+    ready_replicas: z.number(),
+    total_replicas: z.number(),
+    conditions: z
+      .array(
+        z.object({
+          type: z.string(),
+          status: z.string(),
+          reason: z.string().optional(),
+          message: z.string().optional(),
+        }),
+      )
+      .optional(),
+  }),
+  deployment_duration_ms: z.number().optional(),
+  ready: z.boolean().default(false),
 });
 
-/**
- * Workflow steps enum
- */
-export enum WorkflowStep {
-  ANALYSIS = 'analysis',
-  DOCKERFILE = 'dockerfile',
-  BUILD = 'build',
-  SCAN = 'scan',
-  KUBERNETES = 'kubernetes',
-  DEPLOY = 'deploy',
-}
+export const WorkflowStateSchema = z.object({
+  current_step: z.string().nullable().optional(),
+  completed_steps: z.array(z.string()).default([]),
 
-/**
- * Get workflow steps in order
- */
-export function getWorkflowSteps(): WorkflowStep[] {
-  return [
-    WorkflowStep.ANALYSIS,
-    WorkflowStep.DOCKERFILE,
-    WorkflowStep.BUILD,
-    WorkflowStep.SCAN,
-    WorkflowStep.KUBERNETES,
-    WorkflowStep.DEPLOY,
-  ];
-}
+  analysis_result: AnalysisResultSchema.optional(),
 
-/**
- * Type exports
- */
+  dockerfile_result: DockerfileResultSchema.optional(),
+
+  build_result: DockerBuildResultSchema.optional(),
+
+  scan_result: ScanResultSchema.optional(),
+
+  tag_result: DockerTagResultSchema.optional(),
+
+  push_result: DockerPushResultSchema.optional(),
+
+  k8s_result: K8sManifestResultSchema.optional(),
+
+  cluster_result: z
+    .object({
+      cluster_name: z.string(),
+      context: z.string(),
+      kubernetes_version: z.string(),
+      namespaces_created: z.array(z.string()).optional(),
+      secrets_created: z.array(z.string()).optional(),
+    })
+    .optional(),
+
+  deployment_result: DeploymentResultSchema.optional(),
+
+  verification_result: z
+    .object({
+      health_checks: z.array(
+        z.object({
+          name: z.string(),
+          endpoint: z.string(),
+          status: z.enum(['healthy', 'unhealthy', 'degraded']),
+          response_time_ms: z.number(),
+        }),
+      ),
+      readiness_passed: z.boolean(),
+      liveness_passed: z.boolean(),
+      smoke_tests: z
+        .array(
+          z.object({
+            name: z.string(),
+            passed: z.boolean(),
+            error: z.string().optional(),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
+
+  errors: z.record(z.string(), z.unknown()).default({}),
+
+  metadata: z.record(z.string(), z.unknown()).default({}),
+
+  registry_url: z.string().optional(),
+  registry_config: z
+    .object({
+      url: z.string(),
+      credentials: z.string().optional(),
+    })
+    .optional(),
+
+  dockerfile_fix_history: z
+    .array(
+      z.object({
+        error: z.string(),
+        fix: DockerfileFixSchema,
+        timestamp: z.string(),
+      }),
+    )
+    .optional()
+    .default([]),
+});
+
+export const SessionSchema = z.object({
+  id: z.string(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+
+  expires_at: z.string().datetime().optional(),
+  status: z
+    .enum([
+      'active',
+      'pending',
+      'analyzing',
+      'building',
+      'deploying',
+      'completed',
+      'failed',
+      'expired',
+    ])
+    .default('active'),
+
+  repo_path: z.string(),
+
+  stage: z.string().optional(),
+  labels: z.record(z.string(), z.string()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+
+  workflow_state: WorkflowStateSchema.default(() => ({
+    completed_steps: [],
+    errors: {},
+    metadata: {},
+  })),
+
+  version: z.number().default(0),
+
+  config: z
+    .object({
+      auto_push: z.boolean().default(false),
+      registry: z.string().optional(),
+      namespace: z.string().default('default'),
+      skip_scan: z.boolean().default(false),
+    })
+    .optional(),
+
+  progress: z
+    .object({
+      current_step: z.number(),
+      total_steps: z.number(),
+      percentage: z.number().min(0).max(100),
+      estimated_completion: z.string().datetime().optional(),
+    })
+    .optional(),
+});
+
 export type Session = z.infer<typeof SessionSchema>;
 export type WorkflowState = z.infer<typeof WorkflowStateSchema>;
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
-export type DockerBuildResult = z.infer<typeof DockerBuildResultSchema>;
+export type { DockerBuildResult, DockerScanResult as ScanResult } from './docker';
 export type DockerfileResult = z.infer<typeof DockerfileResultSchema>;
-export type ScanResult = z.infer<typeof ScanResultSchema>;
 export type K8sManifestResult = z.infer<typeof K8sManifestResultSchema>;
 export type DeploymentResult = z.infer<typeof DeploymentResultSchema>;
 
-/**
- * Helper functions for creating mock data
- */
-export function createMockSession(overrides?: Partial<Session>): Session {
-  return {
-    id: `session-${Date.now()}`,
-    status: 'active',
-    repoPath: '/tmp/test-repo',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 3600000).toISOString(),
-    ...overrides,
-  };
-}
+export const WorkflowStep = {
+  ANALYZE: 'analyze_repository',
+  GENERATE_DOCKERFILE: 'generate_dockerfile',
+  BUILD_IMAGE: 'build_image',
+  SCAN_IMAGE: 'scan_image',
+  TAG_IMAGE: 'tag_image',
+  PUSH_IMAGE: 'push_image',
+  GENERATE_K8S: 'generate_k8s_manifests',
+  PREPARE_CLUSTER: 'prepare_cluster',
+  DEPLOY: 'deploy_application',
+  VERIFY: 'verify_deployment',
+} as const;
 
-export function createMockWorkflowState(overrides?: Partial<WorkflowState>): WorkflowState {
-  return {
-    currentStep: WorkflowStep.ANALYSIS,
-    steps: getWorkflowSteps(),
-    progress: 0,
-    ...overrides,
-  };
-}
+export type WorkflowStepType = (typeof WorkflowStep)[keyof typeof WorkflowStep];
 
-export function createMockAnalysisResult(overrides?: Partial<AnalysisResult>): AnalysisResult {
-  return {
-    language: 'typescript',
-    framework: 'node',
-    buildTool: 'npm',
-    dependencies: ['express', 'typescript'],
-    hasDockerfile: false,
-    recommendations: ['Add Dockerfile', 'Add .dockerignore'],
-    confidence: 0.95,
-    ...overrides,
-  };
+export function getWorkflowSteps(): WorkflowStepType[] {
+  return [
+    WorkflowStep.ANALYZE,
+    WorkflowStep.GENERATE_DOCKERFILE,
+    WorkflowStep.BUILD_IMAGE,
+    WorkflowStep.SCAN_IMAGE,
+    WorkflowStep.TAG_IMAGE,
+    WorkflowStep.PUSH_IMAGE,
+    WorkflowStep.GENERATE_K8S,
+    WorkflowStep.PREPARE_CLUSTER,
+    WorkflowStep.DEPLOY,
+    WorkflowStep.VERIFY,
+  ];
 }

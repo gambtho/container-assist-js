@@ -7,8 +7,8 @@ export interface KubernetesResource {
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
   };
-  spec?: Record<string, any>;
-  status?: Record<string, any>;
+  spec?: Record<string, unknown>;
+  status?: Record<string, unknown>;
 }
 
 // KubernetesManifest is an alias for KubernetesResource for consistency

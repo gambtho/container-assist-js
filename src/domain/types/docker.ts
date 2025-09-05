@@ -141,42 +141,6 @@ export interface DockerImage {
   };
 }
 
-export interface ImageInfo {
-  id: string;
-  repoTags: string[];
-  repoDigests: string[];
-  created: string;
-  size: number;
-  virtualSize: number;
-  architecture: string;
-  os: string;
-  variant?: string;
-  config: {
-    cmd?: string[];
-    entrypoint?: string[];
-    env?: string[];
-    workingDir?: string;
-    user?: string;
-    exposedPorts?: Record<string, unknown>;
-    labels: Record<string, string>;
-  };
-  rootFS: {
-    type: string;
-    layers: string[];
-  };
-}
-
-export interface DockerRegistry {
-  url: string;
-  username?: string;
-  password?: string;
-  token?: string;
-  email?: string;
-  serveraddress?: string;
-  identitytoken?: string;
-  registrytoken?: string;
-}
-
 export interface DockerPushResult {
   registry: string;
   repository: string;
@@ -228,55 +192,31 @@ export interface DockerSystemInfo {
   [key: string]: unknown;
 }
 
-export interface DockerVersionInfo {
-  Client?: {
-    Version?: string;
-    ApiVersion?: string;
-    Platform?: {
-      Name?: string;
-    };
-    Experimental?: boolean;
-  };
-  Server?: {
-    Version?: string;
-    ApiVersion?: string;
-    MinAPIVersion?: string;
-    GitCommit?: string;
-    Os?: string;
-    Arch?: string;
-    Experimental?: boolean;
-  };
-}
-
 export interface ScanOptions {
-  severity?: string;
+  severity?: string[];
   ignoreUnfixed?: boolean;
   scanners?: string[];
   format?: string;
   exitCode?: number;
 }
 
-export interface DockerfileChange {
-  line_changed: string;
-  old_content: string;
-  new_content: string;
-  reasoning: string;
-}
-
-export interface AlternativeApproach {
-  approach: string;
-  pros: string[];
-  cons: string[];
-  when_to_use: string;
-}
-
 export interface DockerfileFix {
   root_cause_analysis: string;
   fixed_dockerfile: string;
-  changes_made: DockerfileChange[];
+  changes_made: Array<{
+    line_changed: string;
+    old_content: string;
+    new_content: string;
+    reasoning: string;
+  }>;
   security_improvements: string[];
   performance_optimizations: string[];
-  alternative_approaches: AlternativeApproach[];
+  alternative_approaches: Array<{
+    approach: string;
+    pros: string[];
+    cons: string[];
+    when_to_use: string;
+  }>;
   testing_recommendations: string[];
   prevention_tips: string[];
 }
@@ -396,27 +336,27 @@ export const DockerTagResultSchema = z.object({
   error: z.string().optional(),
 });
 
-export const DockerfileChangeSchema = z.object({
-  line_changed: z.string(),
-  old_content: z.string(),
-  new_content: z.string(),
-  reasoning: z.string(),
-});
-
-export const AlternativeApproachSchema = z.object({
-  approach: z.string(),
-  pros: z.array(z.string()),
-  cons: z.array(z.string()),
-  when_to_use: z.string(),
-});
-
 export const DockerfileFixSchema = z.object({
   root_cause_analysis: z.string(),
   fixed_dockerfile: z.string(),
-  changes_made: z.array(DockerfileChangeSchema),
+  changes_made: z.array(
+    z.object({
+      line_changed: z.string(),
+      old_content: z.string(),
+      new_content: z.string(),
+      reasoning: z.string(),
+    }),
+  ),
   security_improvements: z.array(z.string()),
   performance_optimizations: z.array(z.string()),
-  alternative_approaches: z.array(AlternativeApproachSchema),
+  alternative_approaches: z.array(
+    z.object({
+      approach: z.string(),
+      pros: z.array(z.string()),
+      cons: z.array(z.string()),
+      when_to_use: z.string(),
+    }),
+  ),
   testing_recommendations: z.array(z.string()),
   prevention_tips: z.array(z.string()),
 });
