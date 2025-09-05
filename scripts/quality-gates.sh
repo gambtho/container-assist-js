@@ -12,6 +12,14 @@ DEADCODE_BASELINE_FILE="reports/deadcode-baseline.txt"
 CURRENT_COUNT_FILE="reports/current-count.txt"
 LINT_OUTPUT_FILE="reports/current-lint-output.txt"
 
+# Check for required tools
+for cmd in npm bc; do
+    if ! command -v $cmd &> /dev/null; then
+        echo "Error: $cmd is required but not installed."
+        exit 1
+    fi
+done
+
 # Quality Gate Thresholds
 MAX_WARNINGS_THRESHOLD=${MAX_WARNINGS_THRESHOLD:-1048}
 MAX_DEADCODE_THRESHOLD=${MAX_DEADCODE_THRESHOLD:-441}
@@ -60,7 +68,7 @@ else
 fi
 
 # Save current count
-echo $CURRENT_WARNINGS > $CURRENT_COUNT_FILE
+echo "$CURRENT_WARNINGS" > "$CURRENT_COUNT_FILE"
 
 if [ "$CURRENT_ERRORS" -eq 0 ]; then
     print_status "PASS" "No ESLint errors found"
@@ -80,7 +88,7 @@ if [ -f "$BASELINE_FILE" ]; then
     
     if [ "$CURRENT_WARNINGS" -le "$BASELINE_WARNINGS" ]; then
         REDUCTION=$((BASELINE_WARNINGS - CURRENT_WARNINGS))
-        if [ $REDUCTION -gt 0 ]; then
+        if [ "$REDUCTION" -gt 0 ]; then
             PERCENTAGE=$(echo "scale=1; ($REDUCTION * 100) / $BASELINE_WARNINGS" | bc -l 2>/dev/null || echo "N/A")
             print_status "PASS" "Warnings reduced by $REDUCTION (${PERCENTAGE}%) - $CURRENT_WARNINGS ≤ $BASELINE_WARNINGS"
         else
@@ -198,7 +206,7 @@ echo "TypeScript: ✅ Compiles"
 echo "Build: ✅ Successful"
 echo ""
 
-if [ "$CURRENT_WARNINGS" -gt 400 ] || [ "$DEADCODE_COUNT" -gt 200 ]; then
+if [ "${CURRENT_WARNINGS:-0}" -gt 400 ] || [ "${DEADCODE_COUNT:-0}" -gt 200 ]; then
     print_status "INFO" "Consider running aggressive cleanup to reach production targets:"
     echo "  • ESLint warnings target: <400 (current: $CURRENT_WARNINGS)"
     echo "  • Dead code target: <200 (current: $DEADCODE_COUNT)"

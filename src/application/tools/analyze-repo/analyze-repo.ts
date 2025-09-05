@@ -70,7 +70,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
     type AIService = {
       generate: (request: unknown) => Promise<AIServiceResponse>;
     };
-    const { repoPath, sessionId: inputSessionId, depth, includeTests } = input;
+    const { repoPath, sessionId: inputSessionId, depth = 3, includeTests = false } = input;
 
     logger.info(
       {

@@ -7,6 +7,19 @@
 
 import { detectEnvironment, createEnvironmentReport } from '../dist/test/utils/environment-detector.js';
 
+// Input validation
+const args = process.argv.slice(2);
+const validArgs = ['--json', '--verbose'];
+for (const arg of args) {
+    if (arg.startsWith('--') && !validArgs.includes(arg)) {
+        console.error(`Error: Invalid argument '${arg}'. Valid options: ${validArgs.join(', ')}`);
+        process.exit(1);
+    }
+}
+
+const outputJson = args.includes('--json');
+const verbose = args.includes('--verbose');
+
 async function main() {
     console.log('🔍 Diagnosing Integration Test Environment...\n');
     
@@ -18,7 +31,12 @@ async function main() {
         
         // Create detailed report
         const report = createEnvironmentReport(capabilities);
-        console.log(report);
+        
+        if (outputJson) {
+            console.log(JSON.stringify(capabilities, null, 2));
+        } else {
+            console.log(report);
+        }
         
         // Provide actionable recommendations
         console.log('=== Quick Setup Commands ===');

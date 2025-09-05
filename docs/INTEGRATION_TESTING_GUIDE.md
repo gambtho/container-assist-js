@@ -275,10 +275,10 @@ await waitFor(condition, {
 ```
 
 ### 4. Performance Optimization
-- Use parallel test execution where safe
-- Implement proper timeout values (not too short, not too long)
-- Clean up resources immediately after use
-- Use appropriate test categorization
+- Use parallel test execution where safe: `npm test -- --maxWorkers=4`
+- Implement proper timeout values (unit: 10-30s, integration: 60-120s)
+- Clean up resources immediately after use in afterEach/afterAll hooks
+- Use appropriate test categorization with test.describe blocks
 
 ## Troubleshooting
 

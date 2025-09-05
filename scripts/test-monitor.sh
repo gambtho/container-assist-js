@@ -62,7 +62,7 @@ run_test_suite() {
         # Log to progress file
         echo "$(date '+%Y-%m-%d %H:%M:%S'),${passed_tests},${failed_tests},${total_tests},${test_pass_rate}" >> "$LOG_DIR/progress.csv"
         
-        return $failed_tests
+        return "$failed_tests"
     else
         echo -e "${RED}Failed to parse test results${NC}"
         return 1
@@ -293,12 +293,16 @@ main() {
 }
 
 # Handle script arguments
-case "$1" in
+case "${1:-}" in
     "--once")
         main --once
         ;;
     "--monitor")
         shift
+        if [ -z "${1:-}" ]; then
+            echo "Error: --monitor requires a test file path"
+            exit 1
+        fi
         monitor_test_file "$1"
         ;;
     "--report")

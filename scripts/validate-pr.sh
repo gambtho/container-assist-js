@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 
 # Function to print colored output
 print_status() {
-    local color=$1
+    local color=${1:-}
     local message=$2
     echo -e "${color}${message}${NC}"
 }

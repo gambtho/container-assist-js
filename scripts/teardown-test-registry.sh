@@ -201,7 +201,7 @@ main() {
     cleanup_env_file
     show_summary
     
-    log_success "✅ Registry teardown complete!"
+    log_success "Registry teardown complete!"
 }
 
 # Parse command line arguments

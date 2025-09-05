@@ -8,6 +8,16 @@
 import { spawn } from 'child_process';
 import { detectEnvironment } from '../dist/test/utils/environment-detector.js';
 
+// Input validation
+const args = process.argv.slice(2);
+const validArgs = ['--verbose', '--watch', '--coverage', '--updateSnapshot'];
+for (const arg of args) {
+    if (arg.startsWith('--') && !validArgs.includes(arg.split('=')[0])) {
+        console.error(`Error: Invalid argument '${arg}'. Valid options: ${validArgs.join(', ')}`);
+        process.exit(1);
+    }
+}
+
 function runCommand(command, args, options = {}) {
     return new Promise((resolve, reject) => {
         const child = spawn(command, args, {
@@ -23,7 +33,10 @@ function runCommand(command, args, options = {}) {
             }
         });
         
-        child.on('error', reject);
+        child.on('error', (err) => {
+            console.error(`Failed to spawn process: ${err.message}`);
+            reject(err);
+        });
     });
 }
 

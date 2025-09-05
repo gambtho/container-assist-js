@@ -16,6 +16,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: write
     steps:
       - name: Checkout PR
         uses: actions/checkout@v4
@@ -120,8 +121,19 @@ jobs:
           echo "$TOP_WARNINGS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Upload quality report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-report-${{ github.run_id }}
+          path: |
+            quality-full.txt
+            coverage/coverage-summary.json
+          retention-days: 7
+
       - name: Run test coverage (lightweight)
         id: coverage
+        continue-on-error: true
         run: |
           # Quick coverage check
           npm run test:coverage -- --coverageReporters=json-summary >/dev/null 2>&1 || true

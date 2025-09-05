@@ -10,7 +10,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 print_status() {
-    local color=$1
+    local color=${1:-}
     local message=$2
     echo -e "${color}${message}${NC}"
 }

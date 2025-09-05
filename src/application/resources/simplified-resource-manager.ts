@@ -18,10 +18,12 @@ export class SimplifiedResourceManager {
     private config: ApplicationConfig,
     private sessionService: SessionService,
     private dockerService: DockerService,
-    private logger: Logger,
+    logger: Logger,
   ) {
     this.logger = logger.child({ component: 'SimplifiedResourceManager' });
   }
+
+  private logger: Logger;
 
   /**
    * Register all resources directly with MCP server
