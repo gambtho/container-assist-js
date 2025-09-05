@@ -3,7 +3,7 @@
  * These replace the Result<T> monad pattern with standard TypeScript error handling.
  */
 
-import { ErrorCode } from '../contracts/types/errors.js';
+import { ErrorCode } from '../domain/types/errors';
 
 /**
  * Base error class for all application errors
@@ -207,7 +207,7 @@ export class RateLimitError extends ApplicationError {
 }
 
 /**
- * Helper function to check if an error is one of our custom error types
+ * Type guard to check if an error is an ApplicationError
  */
 export function isApplicationError(error: unknown): error is ApplicationError {
   return error instanceof ApplicationError;
@@ -255,37 +255,4 @@ export function normalizeError(
     undefined,
     { originalError: error },
   );
-}
-
-/**
- * Type guard for specific error types
- */
-export function isDockerError(error: unknown): error is DockerError {
-  return error instanceof DockerError;
-}
-
-export function isKubernetesError(error: unknown): error is KubernetesError {
-  return error instanceof KubernetesError;
-}
-
-export function isValidationError(error: unknown): error is ValidationError {
-  return error instanceof ValidationError;
-}
-
-export function isNotFoundError(error: unknown): error is NotFoundError {
-  return error instanceof NotFoundError;
-}
-
-/**
- * Error serialization for MCP responses
- */
-export function serializeErrorForMCP(error: ApplicationError): Record<string, unknown> {
-  return {
-    error: {
-      code: error.code,
-      message: error.message,
-      details: error.context,
-      timestamp: error.timestamp.toISOString(),
-    },
-  };
 }

@@ -3,9 +3,8 @@
  * Provides access to Docker context, images, containers, and system information
  */
 
-// import type { Server } from '@modelcontextprotocol/sdk/server/index';
 import type { Logger } from 'pino';
-import type { DockerService } from '../../services/docker.js';
+import type { DockerService } from '../../services/docker';
 
 // Docker API types
 interface DockerImageInfo {

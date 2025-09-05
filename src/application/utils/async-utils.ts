@@ -203,7 +203,7 @@ export async function parallelLimit<T, R>(
 /**
  * Check if a promise is resolved (helper for parallelLimit)
  */
-function isPromiseResolved(promise: Promise<any>): boolean {
+function isPromiseResolved(promise: Promise<unknown>): boolean {
   const marker = Symbol('marker');
   return Promise.race([promise, Promise.resolve(marker)]).then(
     (value) => value === marker,
@@ -213,7 +213,7 @@ function isPromiseResolved(promise: Promise<any>): boolean {
 /**
  * Debounce function execution
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   fn: T,
   delay: number,
 ): (...args: Parameters<T>) => void {
@@ -233,7 +233,7 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Throttle function execution
  */
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   fn: T,
   limit: number,
 ): (...args: Parameters<T>) => void {

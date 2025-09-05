@@ -2,15 +2,18 @@
  * Build Image - Helper Functions
  */
 
-import { DockerBuildOptions, DockerBuildResult } from '../../../contracts/types/index.js';
-import type { ToolContext } from '../tool-types.js';
+import { DockerBuildOptions, DockerBuildResult } from '../../../domain/types/index';
+import type { ToolContext } from '../tool-types';
+import { safeGetWorkflowState } from '../../../domain/types/workflow-state';
 
 /**
  * Prepare build arguments with defaults
  */
+import type { Session } from '../../../domain/types/session';
+
 export function prepareBuildArgs(
   buildArgs: Record<string, string>,
-  session: any,
+  session: Session | null,
 ): Record<string, string> {
   const defaults: Record<string, string> = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',
@@ -19,8 +22,12 @@ export function prepareBuildArgs(
   };
 
   // Add session-specific args if available
-  if (session?.workflow_state?.analysis_result) {
-    const analysis = session.workflow_state.analysis_result;
+  const workflowState = safeGetWorkflowState(session?.workflow_state);
+  if (workflowState?.metadata?.analysis_result) {
+    const analysis = workflowState.metadata.analysis_result as {
+      language?: string;
+      framework?: string;
+    };
     if (analysis.language) {
       defaults.LANGUAGE = analysis.language;
     }
@@ -42,8 +49,15 @@ export async function buildDockerImage(
   const { dockerService, logger } = context;
 
   // Use Docker service if available
-  if (dockerService && 'build' in dockerService) {
-    const result = await dockerService.build(options);
+  if (
+    dockerService &&
+    typeof dockerService === 'object' &&
+    'build' in dockerService &&
+    typeof dockerService.build === 'function'
+  ) {
+    const result = await (
+      dockerService as { build: (options: DockerBuildOptions) => Promise<DockerBuildResult> }
+    ).build(options);
     return result;
   }
 

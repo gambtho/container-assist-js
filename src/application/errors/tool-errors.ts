@@ -3,16 +3,14 @@
  * Provides clear error handling for tool-related issues
  */
 
-import { ErrorCode, ErrorSeverity, ToolError } from '../../domain/types/errors.js';
+import { ErrorCode, ToolError } from '../../domain/types/errors';
 
 /**
  * Error thrown when a tool is not implemented
  */
-export class ToolNotImplementedError extends Error implements ToolError {
-  code: ErrorCode;
-  severity: ErrorSeverity;
+export class ToolNotImplementedError extends ToolError {
+  override toolName: string;
   timestamp: string;
-  toolName: string;
   availableTools?: string[];
   suggestedAlternatives?: string[];
 
@@ -24,12 +22,10 @@ export class ToolNotImplementedError extends Error implements ToolError {
       suggestedAlternatives?: string[];
     },
   ) {
-    super(message);
+    super(toolName, message, ErrorCode.ToolNotFound);
     this.name = 'ToolNotImplementedError';
-    this.code = ErrorCode.TOOL_ERROR;
-    this.severity = ErrorSeverity.HIGH;
-    this.timestamp = new Date().toISOString();
     this.toolName = toolName;
+    this.timestamp = new Date().toISOString();
     if (context?.availableTools !== undefined) {
       this.availableTools = context.availableTools;
     }
@@ -42,51 +38,19 @@ export class ToolNotImplementedError extends Error implements ToolError {
       Error.captureStackTrace(this, ToolNotImplementedError);
     }
   }
-
-  /**
-   * Convert to domain error format
-   */
-  toDomainError(): ToolError {
-    const error: ToolError = {
-      code: this.code,
-      message: this.message,
-      severity: this.severity,
-      timestamp: this.timestamp,
-      toolName: this.toolName,
-    };
-
-    if (this.availableTools !== undefined || this.suggestedAlternatives !== undefined) {
-      error.context = {
-        availableTools: this.availableTools ?? [],
-        suggestedAlternatives: this.suggestedAlternatives ?? [],
-      };
-    }
-
-    if (this.stack !== undefined) {
-      error.stack = this.stack;
-    }
-
-    return error;
-  }
 }
 
 /**
  * Error thrown when tool validation fails
  */
-export class ToolValidationError extends Error implements ToolError {
-  code: ErrorCode;
-  severity: ErrorSeverity;
+export class ToolValidationError extends ToolError {
   timestamp: string;
-  toolName: string;
   validationErrors?: Record<string, unknown>;
 
   constructor(message: string, toolName: string, validationErrors?: Record<string, unknown>) {
-    super(message);
+    super(toolName, message, ErrorCode.ValidationFailed);
     this.name = 'ToolValidationError';
-    this.code = ErrorCode.VALIDATION;
-    this.severity = ErrorSeverity.MEDIUM;
     this.timestamp = new Date().toISOString();
-    this.toolName = toolName;
     if (validationErrors !== undefined) {
       this.validationErrors = validationErrors;
     }
@@ -95,48 +59,20 @@ export class ToolValidationError extends Error implements ToolError {
       Error.captureStackTrace(this, ToolValidationError);
     }
   }
-
-  toDomainError(): ToolError {
-    const error: ToolError = {
-      code: this.code,
-      message: this.message,
-      severity: this.severity,
-      timestamp: this.timestamp,
-      toolName: this.toolName,
-    };
-
-    if (this.validationErrors !== undefined) {
-      error.context = {
-        validationErrors: this.validationErrors,
-      };
-    }
-
-    if (this.stack !== undefined) {
-      error.stack = this.stack;
-    }
-
-    return error;
-  }
 }
 
 /**
  * Error thrown when tool execution fails
  */
-export class ToolExecutionError extends Error implements ToolError {
-  code: ErrorCode;
-  severity: ErrorSeverity;
+export class ToolExecutionError extends ToolError {
   timestamp: string;
-  toolName: string;
   operation?: string;
   originalError?: unknown;
 
   constructor(message: string, toolName: string, operation?: string, originalError?: unknown) {
-    super(message);
+    super(toolName, message, ErrorCode.ToolExecutionFailed);
     this.name = 'ToolExecutionError';
-    this.code = ErrorCode.TOOL_ERROR;
-    this.severity = ErrorSeverity.HIGH;
     this.timestamp = new Date().toISOString();
-    this.toolName = toolName;
     if (operation !== undefined) {
       this.operation = operation;
     }
@@ -147,29 +83,6 @@ export class ToolExecutionError extends Error implements ToolError {
     if (Error.captureStackTrace != null) {
       Error.captureStackTrace(this, ToolExecutionError);
     }
-  }
-
-  toDomainError(): ToolError {
-    const error: ToolError = {
-      code: this.code,
-      message: this.message,
-      severity: this.severity,
-      timestamp: this.timestamp,
-      toolName: this.toolName,
-    };
-
-    if (this.operation !== undefined || this.originalError !== undefined) {
-      error.context = {
-        operation: this.operation ?? '',
-        originalError: this.originalError ?? null,
-      };
-    }
-
-    if (this.stack !== undefined) {
-      error.stack = this.stack;
-    }
-
-    return error;
   }
 }
 

@@ -139,7 +139,7 @@ export class RepositoryAnalyzer {
     packageJsonContent: string,
   ): Promise<Partial<RepositoryAnalysis> | null> {
     try {
-      const packageData = JSON.parse(packageJsonContent);
+      const packageData: unknown = JSON.parse(packageJsonContent);
 
       const prompt = `Analyze this package.json file and provide containerization recommendations:
 

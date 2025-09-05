@@ -1,0 +1,88 @@
+# Docker Compose Configuration for Integration Testing
+# Provides test dependencies including registry and other services
+
+version: '3.8'
+
+services:
+  # Local Docker Registry for testing push/pull operations
+  test-registry:
+    image: registry:2
+    container_name: test-registry
+    ports:
+      - "5000:5000"
+    environment:
+      - REGISTRY_STORAGE_DELETE_ENABLED=true
+      - REGISTRY_HTTP_ADDR=0.0.0.0:5000
+      - REGISTRY_LOG_LEVEL=info
+      - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/lib/registry
+    volumes:
+      - test-registry-data:/var/lib/registry
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/v2/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - test-network
+
+  # Trivy vulnerability scanner container (for fallback scanning)
+  trivy-scanner:
+    image: aquasec/trivy:latest
+    container_name: trivy-scanner
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - trivy-cache:/root/.cache/trivy
+    command: ["server", "--listen", "0.0.0.0:4954"]
+    ports:
+      - "4954:4954"
+    environment:
+      - TRIVY_LISTEN=0.0.0.0:4954
+      - TRIVY_CACHE_DIR=/root/.cache/trivy
+      - TRIVY_DEBUG=false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4954/version"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - test-network
+
+  # Test database for session/state management testing (optional)
+  test-db:
+    image: postgres:15-alpine
+    container_name: test-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=integration_test
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - test-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d integration_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - test-network
+
+volumes:
+  test-registry-data:
+    name: test-registry-data
+  trivy-cache:
+    name: trivy-cache
+  test-db-data:
+    name: test-db-data
+
+networks:
+  test-network:
+    name: containerization-assist-test-network
+    driver: bridge

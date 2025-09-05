@@ -2,14 +2,15 @@
  * Generate K8s Manifests - MCP SDK Compatible Version
  */
 
-import { generateK8sManifests } from './helper.js';
+import path from 'node:path';
+import { generateK8sManifests } from './helper';
 import {
   GenerateK8sManifestsInput,
   type GenerateK8sManifestsParams,
   K8sManifestsResultSchema,
   type K8sManifestsResult,
-} from '../schemas.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
+} from '../schemas';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
 
 const generateKubernetesManifestsHandler: ToolDescriptor<
   GenerateK8sManifestsParams,
@@ -40,13 +41,13 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
       const result = await generateK8sManifests(
         {
           sessionId: sessionId || '',
-          appName: '',
-          namespace: '',
-          replicas: 0,
+          appName: 'app',
+          namespace: 'default',
+          replicas: 1,
           serviceType: 'ClusterIP',
           ingressEnabled: false,
-          environment: '',
-          outputPath: '',
+          environment: 'prod',
+          outputPath: path.join('k8s', sessionId || 'default'),
         },
         context,
       );

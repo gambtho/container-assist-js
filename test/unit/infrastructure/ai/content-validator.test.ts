@@ -60,10 +60,10 @@ COPY --privileged . .`;
 
       expect(result.valid).toBe(false);
       expect((result.securityIssues || []).length).toBeGreaterThan(0);
-      
+
       const highSeverityIssues = (result.securityIssues || []).filter(i => i.severity === 'high');
       expect(highSeverityIssues.length).toBeGreaterThan(0);
-      
+
       // Check for specific security issues
       expect((result.securityIssues || []).some(i => i.description.includes('curl') && i.description.includes('shell'))).toBe(true);
       expect((result.securityIssues || []).some(i => i.description.includes('wget') && i.description.includes('shell'))).toBe(true);
@@ -78,10 +78,10 @@ ADD http://example.com/file.tar.gz /app/`;
 
       expect(result.valid).toBe(true); // No high/critical-severity issues
       expect((result.securityIssues || []).length).toBeGreaterThan(0);
-      
+
       const lowSeverityIssues = (result.securityIssues || []).filter(i => i.severity === 'low');
       expect(lowSeverityIssues.length).toBeGreaterThan(0);
-      
+
       // Check for latest tag warning
       expect((result.securityIssues || []).some(i => i.description.includes('latest tag'))).toBe(true);
     });
@@ -97,9 +97,9 @@ COPY . .`;
 
       expect(result.valid).toBe(false);
       expect((result.securityIssues || []).length).toBeGreaterThan(0);
-      
-      const credentialIssues = (result.securityIssues || []).filter(i => 
-        i.type === 'credential'
+
+      const credentialIssues = (result.securityIssues || []).filter(i =>
+        i.type === 'credential',
       );
       expect(credentialIssues.length).toBeGreaterThan(0);
     });
@@ -199,7 +199,7 @@ spec:
 
       expect(result.valid).toBe(false);
       expect((result.securityIssues || []).length).toBeGreaterThan(0);
-      
+
       const credentialIssues = (result.securityIssues || []).filter(i => i.severity === 'high' || i.severity === 'critical');
       expect(credentialIssues.length).toBeGreaterThan(0);
     });
@@ -214,7 +214,7 @@ spec:
       const result = validator.validateContent(insecureContent, { contentType: 'text' });
 
       expect((result.securityIssues || []).length).toBeGreaterThan(0);
-      
+
       // Should detect eval usage
       const evalIssues = (result.securityIssues || []).filter(i => i.type === 'injection');
       expect(evalIssues.length).toBeGreaterThan(0);
@@ -252,9 +252,9 @@ ENV PASSWORD=password123`;
 
     it('should validate content with security issues', () => {
       const contentWithCredentials = 'password=secret123456';
-      
+
       const result = validator.validateContent(contentWithCredentials, { contentType: 'text' });
-      
+
       // Text content validation focuses on syntax and basic patterns
       expect(result.valid).toBe(true);
       expect(result.errors || []).toHaveLength(0);

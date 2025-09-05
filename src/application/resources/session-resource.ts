@@ -3,10 +3,9 @@
  * Provides access to session data and management capabilities
  */
 
-// import type { Server } from '@modelcontextprotocol/sdk/server/index';
 import type { Logger } from 'pino';
-import type { SessionService } from '../../services/session.js';
-import type { Session } from '../../contracts/types/session.js';
+import type { SessionService } from '../../services/session';
+import type { Session } from '../../domain/types/session';
 
 export class SessionResourceProvider {
   constructor(

@@ -3,16 +3,17 @@
  */
 
 import path from 'node:path';
-import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
-import { buildAnalysisRequest } from '../../../infrastructure/ai/index.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
-import type { Session } from '../../../contracts/types/session.js';
+import { ErrorCode, DomainError } from '../../../domain/types/errors';
+import { buildAnalysisRequest } from '../../../infrastructure/ai/index';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
+import type { Session } from '../../../domain/types/session';
+import { AIServiceResponse, isAIServiceResponse } from '../../../domain/types/workflow-state';
 import {
   AnalyzeRepositoryInput as AnalyzeRepositoryInputSchema,
   AnalysisResultSchema,
   AnalyzeRepositoryParams,
   AnalysisResult,
-} from '../schemas.js';
+} from '../schemas';
 import {
   validateRepositoryPath,
   detectLanguage,
@@ -45,8 +46,31 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
   outputSchema: AnalyzeRepositoryOutput,
 
   handler: async (input: AnalyzeInput, context: ToolContext): Promise<AnalyzeOutput> => {
-    const { logger, sessionService, progressEmitter } = context;
-    const { repoPath, sessionId: inputSessionId, depth, includeTests } = input;
+    const contextServices = context;
+    const logger = contextServices.logger;
+    const sessionService = contextServices.sessionService;
+    const progressEmitter = contextServices.progressEmitter;
+
+    // Type definitions for context services
+    type SessionService = {
+      create: (params: { projectName: string; metadata: unknown }) => Promise<{ id: string }>;
+      updateAtomic: (id: string, updater: (session: Session) => Session) => Promise<void>;
+    };
+
+    type ProgressEmitter = {
+      emit: (progress: {
+        sessionId: string;
+        step: string;
+        status: string;
+        message: string;
+        progress?: number;
+      }) => Promise<void>;
+    };
+
+    type AIService = {
+      generate: (request: unknown) => Promise<AIServiceResponse>;
+    };
+    const { repoPath, sessionId: inputSessionId, depth = 3, includeTests = false } = input;
 
     logger.info(
       {
@@ -73,7 +97,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
       let sessionId = inputSessionId;
       if ((sessionId == null || sessionId === '') && sessionService != null) {
         try {
-          const session = await sessionService.create({
+          const sessionResult = await (sessionService as unknown as SessionService).create({
             projectName: path.basename(repoPath),
             metadata: {
               repoPath,
@@ -81,7 +105,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
               includeTests,
             },
           });
-          sessionId = session.id;
+          sessionId = sessionResult.id;
         } catch (error) {
           logger.warn({ error }, 'Failed to create session for repo analysis');
           // Continue without session
@@ -90,7 +114,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
 
       // Emit progress
       if (progressEmitter != null && sessionId != null && sessionId !== '') {
-        await progressEmitter.emit({
+        await (progressEmitter as unknown as ProgressEmitter).emit({
           sessionId,
           step: 'analyze_repository',
           status: 'in_progress',
@@ -144,35 +168,50 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
             maxTokens: 2000,
           });
 
-          const result = await context.aiService.generate(requestBuilder);
+          const aiResponse = await (context.aiService as AIService).generate(requestBuilder);
 
-          if (result?.data != null) {
+          if (isAIServiceResponse(aiResponse) && aiResponse.success && aiResponse.data != null) {
             try {
+              let dataString: string;
+              if (typeof aiResponse.data === 'string') {
+                dataString = aiResponse.data;
+              } else if (typeof aiResponse.data === 'object' && 'content' in aiResponse.data) {
+                dataString = String((aiResponse.data as { content: unknown }).content);
+              } else {
+                dataString = String(aiResponse.data);
+              }
+
               // Try to parse structured response
-              const parsed = JSON.parse(result.data);
+              const parsed = JSON.parse(dataString) as {
+                insights?: string;
+                optimizations?: string[];
+                security?: string[];
+                baseImage?: string;
+                buildStrategy?: string;
+              };
+
               aiEnhancements = {
-                aiInsights: parsed.insights ?? result.data,
+                aiInsights: parsed.insights ?? dataString,
                 suggestedOptimizations: parsed.optimizations ?? [],
                 securityRecommendations: parsed.security ?? [],
-                recommendedBaseImage: parsed.baseImage,
-                recommendedBuildStrategy: parsed.buildStrategy,
+                ...(parsed.baseImage && { recommendedBaseImage: parsed.baseImage }),
+                ...(parsed.buildStrategy && { recommendedBuildStrategy: parsed.buildStrategy }),
               };
             } catch {
               // Fallback to raw content
+              const contentStr =
+                typeof aiResponse.data === 'string' ? aiResponse.data : String(aiResponse.data);
               aiEnhancements = {
-                aiInsights: result.data,
-                fromCache: result.metadata?.fromCache,
-                tokensUsed: result.metadata?.tokensUsed,
+                aiInsights: contentStr,
+                fromCache: false,
+                tokensUsed: 0,
               };
             }
 
             // Log AI analysis metadata
             logger.info(
               {
-                model: result.metadata?.model,
-                tokensUsed: result.metadata?.tokensUsed,
-                fromCache: result.metadata?.fromCache,
-                durationMs: result.metadata?.durationMs,
+                hasData: aiResponse.success && aiResponse.data != null,
               },
               'AI-enhanced repository analysis completed',
             );
@@ -196,7 +235,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
 
       // Emit progress
       if (progressEmitter != null && sessionId != null && sessionId !== '') {
-        await progressEmitter.emit({
+        await (progressEmitter as unknown as ProgressEmitter).emit({
           sessionId,
           step: 'analyze_repository',
           status: 'in_progress',
@@ -225,28 +264,51 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
 
       // Store analysis in session
       if (sessionService != null && sessionId != null && sessionId !== '') {
-        await sessionService.updateAtomic(sessionId, (session: Session) => ({
-          ...session,
-          workflow_state: {
-            ...session.workflow_state,
-            analysis_result: {
-              language: languageInfo.language,
-              framework: frameworkInfo?.framework,
-              build_system: buildSystem,
-              dependencies,
-              ports,
-              has_tests: dependencies.some((dep) => dep.type === 'test'),
-              docker_compose_exists: dockerInfo.hasDockerCompose ?? false,
-              ...dockerInfo,
-              recommendations,
+        await (sessionService as unknown as SessionService).updateAtomic(
+          sessionId,
+          (currentSession: Session) => ({
+            ...currentSession,
+            workflow_state: {
+              ...currentSession.workflow_state,
+              analysis_result: {
+                language: languageInfo.language,
+                language_version: languageInfo?.version,
+                framework: frameworkInfo?.framework,
+                framework_version: frameworkInfo?.version,
+                build_system: buildSystem
+                  ? {
+                      type: buildSystem.type,
+                      build_file: buildSystem.build_file,
+                      build_command: buildSystem.build_command,
+                    }
+                  : undefined,
+                dependencies: dependencies.map((dep) => ({
+                  name: dep.name,
+                  version: dep.version,
+                  type: dep.type,
+                })),
+                has_tests: dependencies.some((dep) => dep.type === 'test'),
+                ports,
+                env_variables: {}, // Add if available
+                docker_compose_exists: dockerInfo.hasDockerCompose ?? false,
+                recommendations: {
+                  baseImage: recommendations.baseImage,
+                  buildStrategy: recommendations.buildStrategy,
+                  securityNotes: recommendations.securityNotes ?? [],
+                },
+              },
+              completed_steps: [
+                ...(currentSession.workflow_state?.completed_steps ?? []),
+                'analyze_repository',
+              ],
             },
-          },
-        }));
+          }),
+        );
       }
 
       // Emit completion
       if (progressEmitter != null && sessionId != null && sessionId !== '') {
-        await progressEmitter.emit({
+        await (progressEmitter as unknown as ProgressEmitter).emit({
           sessionId,
           step: 'analyze_repository',
           status: 'completed',

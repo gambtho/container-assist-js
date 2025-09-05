@@ -3,14 +3,16 @@
  * Intelligently analyzes and fixes Dockerfile build errors with comprehensive solutions
  */
 
-import { withRetry } from '../error-recovery.js';
+import { withRetry } from '../../utils/async-utils';
+import { ErrorCode, DomainError } from '../../../domain/types/errors';
+import { SessionNotFoundError } from '../../../domain/types/session-store';
 import {
   FixDockerfileInput,
   type FixDockerfileParams,
   DockerfileResultSchema,
   type DockerfileResult,
-} from '../schemas.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
+} from '../schemas';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
 
 /**
  * AI-Powered Dockerfile Fixing Handler
@@ -29,7 +31,7 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileParams, Dockerfil
 
   handler: async (input: FixDockerfileParams, context: ToolContext): Promise<DockerfileResult> => {
     if (context.sessionService == null) {
-      throw new Error('Session service not available');
+      throw new DomainError(ErrorCode.DependencyNotInitialized, 'Session service not available');
     }
 
     return await withRetry(
@@ -42,9 +44,11 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileParams, Dockerfil
         );
 
         // Get session and fix dockerfile
-        const session = await context.sessionService.get(input.sessionId);
+        type SessionService = { get: (id: string) => Promise<unknown> };
+        const sessionResult = await (context.sessionService as SessionService).get(input.sessionId);
+        const session = sessionResult;
         if (!session) {
-          throw new Error('Session not found');
+          throw new SessionNotFoundError(input.sessionId);
         }
 
         const fixedDockerfile =
@@ -60,7 +64,14 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileParams, Dockerfil
       },
       {
         maxAttempts: 2,
-        delayMs: 1000,
+        initialDelay: 1000,
+        retryIf: (error: Error) => {
+          // Don't retry session not found errors - they are non-transient
+          if (error instanceof SessionNotFoundError) {
+            return false;
+          }
+          return true;
+        },
       },
     );
   },

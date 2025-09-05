@@ -9,4 +9,4 @@
  * @module src/application/tools/verify-deployment/index
  */
 
-export { default } from './verify-deployment.js';
+export { default } from './verify-deployment';

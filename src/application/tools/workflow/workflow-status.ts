@@ -4,10 +4,10 @@
  */
 
 import { z } from 'zod';
-import { SessionService } from '../../session/manager.js';
-import { WorkflowManager } from '../../workflow/manager.js';
-import { Session } from '../../../contracts/types/index.js';
-import { getWorkflowSteps } from '../../workflow/configs.js';
+import { SessionService } from '../../session/manager';
+import { WorkflowManager } from '../../workflow/manager';
+import { Session } from '../../../domain/types/index';
+import { getWorkflowSteps } from '../../workflow/configs';
 import type { Logger } from 'pino';
 
 export interface WorkflowStatusInput {
@@ -79,10 +79,21 @@ export interface WorkflowStatusOutput {
   error?: string;
 }
 
+interface ProgressEmitterService {
+  getCurrentProgress?: (sessionId: string) =>
+    | {
+        progress?: number;
+        currentStep?: string;
+        completedSteps?: string[];
+        failedSteps?: string[];
+      }
+    | undefined;
+}
+
 export interface WorkflowStatusDeps {
   sessionService: SessionService;
   workflowManager: WorkflowManager;
-  progressEmitter: unknown;
+  progressEmitter: ProgressEmitterService;
   logger: Logger;
 }
 
@@ -165,7 +176,7 @@ export async function workflowStatusHandler(
     const workflowExecution = workflowManager.getWorkflow(input.session_id);
 
     // Get progress information from progress emitter
-    const progressInfo = (progressEmitter as any)?.getCurrentProgress?.(input.session_id) ?? {};
+    const progressInfo = progressEmitter?.getCurrentProgress?.(input.session_id) ?? {};
 
     // Extract workflow information from session
     const workflowType = session.metadata?.workflow_type as string;
@@ -182,16 +193,18 @@ export async function workflowStatusHandler(
     const skippedSteps = getSkippedSteps(session, progressInfo);
     const remainingSteps = allSteps.filter(
       (step) =>
-        !(completedSteps as string[])?.includes?.(step) &&
-        !(failedSteps as string[])?.includes?.(step) &&
+        !completedSteps?.includes(step) &&
+        !failedSteps?.includes(step) &&
         !skippedSteps.includes(step),
     );
 
     const progress = {
       percentage: Math.round((progressInfo?.progress ?? 0) * 100),
-      current_step: progressInfo?.currentStep ?? undefined,
-      completed_steps: completedSteps as string[],
-      failed_steps: failedSteps as string[],
+      ...(progressInfo?.currentStep !== undefined
+        ? { current_step: progressInfo.currentStep }
+        : {}),
+      completed_steps: completedSteps,
+      failed_steps: failedSteps,
       skipped_steps: skippedSteps,
       remaining_steps: remainingSteps,
       total_steps: allSteps.length,
@@ -328,7 +341,8 @@ function determineWorkflowStatus(
     typeof workflowExecution === 'object' &&
     'status' in workflowExecution
   ) {
-    const status = (workflowExecution as any)?.status;
+    const execWithStatus = workflowExecution as { status?: string };
+    const status = execWithStatus.status;
     if (status === 'aborted') return 'aborted';
     if (status === 'failed') return 'failed';
     if (status === 'completed') return 'completed';
@@ -357,10 +371,10 @@ function getSkippedSteps(session: Session, _progressInfo: unknown): string[] {
   const skippedSteps: string[] = [];
 
   // Extract from workflow state if available
-  if (session.workflow_state) {
-    const state = session.workflow_state as any;
-    if (state.skipped_steps && Array.isArray(state.skipped_steps)) {
-      skippedSteps.push(...state.skipped_steps);
+  if (session.workflow_state && typeof session.workflow_state === 'object') {
+    const state = session.workflow_state as { skipped_steps?: unknown };
+    if (Array.isArray(state.skipped_steps)) {
+      skippedSteps.push(...(state.skipped_steps as string[]));
     }
   }
 
@@ -371,7 +385,7 @@ function getSkippedSteps(session: Session, _progressInfo: unknown): string[] {
  * Calculate estimated remaining time
  */
 function calculateEstimatedRemaining(
-  progress: any,
+  progress: { percentage: number },
   duration: number,
   _totalSteps: number,
 ): number | undefined {
@@ -391,7 +405,17 @@ function calculateEstimatedRemaining(
  */
 function getWorkflowErrors(
   session: Session,
-  progressEmitter: any,
+  progressEmitter: ProgressEmitterService & {
+    getHistory?: (
+      sessionId: string,
+      filter: { status: string },
+    ) => Array<{
+      step?: string;
+      message?: string;
+      timestamp?: string;
+      metadata?: { retry?: unknown };
+    }>;
+  },
   sessionId: string,
   stepFilter?: string,
 ): Array<{
@@ -409,34 +433,54 @@ function getWorkflowErrors(
 
   // Get errors from progress history
   const progressHistory =
-    progressEmitter.getHistory(sessionId, {
+    progressEmitter.getHistory?.(sessionId, {
       status: 'failed',
-    }) || [];
+    }) ?? [];
 
   for (const update of progressHistory) {
     if (stepFilter && update.step !== stepFilter) continue;
 
-    errors.push({
-      step: update.step,
-      message: update.message ?? 'Step failed',
-      timestamp: update.timestamp,
-      retry_count: update.metadata?.retry as number,
-    });
+    // Only add if we have required fields
+    if (update.step && update.timestamp) {
+      const errorEntry: any = {
+        step: update.step,
+        message: update.message ?? 'Step failed',
+        timestamp: update.timestamp,
+      };
+      if (typeof update.metadata?.retry === 'number') {
+        errorEntry.retry_count = update.metadata.retry;
+      }
+      errors.push(errorEntry);
+    }
   }
 
   // Get errors from session workflow state
-  if (session.workflow_state) {
-    const state = session.workflow_state as any;
-    if (state.errors && Array.isArray(state.errors)) {
+  if (session.workflow_state && typeof session.workflow_state === 'object') {
+    const state = session.workflow_state as unknown as {
+      errors?: Array<{
+        step?: string;
+        message?: string;
+        error?: string;
+        timestamp?: string;
+        retry_count?: number;
+      }>;
+    };
+    if (Array.isArray(state.errors)) {
       for (const error of state.errors) {
         if (stepFilter && error.step !== stepFilter) continue;
 
-        errors.push({
-          step: error.step,
-          message: error.message ?? error.error,
-          timestamp: error.timestamp ?? session.updated_at,
-          retry_count: error.retry_count,
-        });
+        // Only add if we have required fields
+        if (error.step) {
+          const errorEntry: any = {
+            step: error.step,
+            message: error.message ?? error.error ?? 'Unknown error',
+            timestamp: error.timestamp ?? session.updated_at,
+          };
+          if (error.retry_count !== undefined) {
+            errorEntry.retry_count = error.retry_count;
+          }
+          errors.push(errorEntry);
+        }
       }
     }
   }
@@ -450,8 +494,8 @@ function getWorkflowErrors(
 function getWorkflowOutputs(session: Session, stepFilter?: string): Record<string, unknown> {
   const outputs: Record<string, unknown> = {};
 
-  if (session.workflow_state) {
-    const state = session.workflow_state as any;
+  if (session.workflow_state && typeof session.workflow_state === 'object') {
+    const state = session.workflow_state as Record<string, unknown>;
 
     // Extract all step results
     for (const [key, value] of Object.entries(state)) {
@@ -472,7 +516,19 @@ function getWorkflowOutputs(session: Session, stepFilter?: string): Record<strin
  * Get progress history
  */
 function getProgressHistory(
-  progressEmitter: any,
+  progressEmitter: ProgressEmitterService & {
+    getHistory?: (
+      sessionId: string,
+      filter: { step?: string },
+    ) => Array<{
+      step?: string;
+      status?: string;
+      progress?: number;
+      message?: string;
+      timestamp?: string;
+      duration?: number;
+    }>;
+  },
   sessionId: string,
   stepFilter?: string,
 ): Array<{
@@ -484,18 +540,26 @@ function getProgressHistory(
   duration?: number;
 }> {
   const history =
-    progressEmitter.getHistory(sessionId, {
-      step: stepFilter,
-    }) || [];
+    progressEmitter.getHistory?.(sessionId, stepFilter !== undefined ? { step: stepFilter } : {}) ??
+    [];
 
-  return history.map((update: any) => ({
-    step: update.step,
-    status: update.status,
-    progress: Math.round(update.progress * 100),
-    message: update.message,
-    timestamp: update.timestamp,
-    duration: update.metadata?.duration as number,
-  }));
+  return history
+    .filter((update) => update.step && update.status && update.timestamp)
+    .map((update) => {
+      const entry: any = {
+        step: update.step!,
+        status: update.status!,
+        progress: Math.round((update.progress ?? 0) * 100),
+        timestamp: update.timestamp!,
+      };
+      if (update.message !== undefined) {
+        entry.message = update.message;
+      }
+      if (typeof update.duration === 'number') {
+        entry.duration = update.duration;
+      }
+      return entry;
+    });
 }
 
 /**
@@ -503,7 +567,7 @@ function getProgressHistory(
  */
 function generateNextSteps(
   status: WorkflowStatusOutput['status'],
-  progress: any,
+  progress: { current_step?: string },
   workflowType?: string,
 ): string[] {
   const nextSteps: string[] = [];

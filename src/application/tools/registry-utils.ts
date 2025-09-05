@@ -1,9 +1,9 @@
 import type { Logger } from 'pino';
-import type { Services } from '../../services/index.js';
-import type { ToolDescriptor } from './tool-types.js';
-import { ToolRegistry } from './ops/registry.js';
-import type { ApplicationConfig } from '../../config/types.js';
-import { TOOL_MANIFEST, ToolStatus } from './tool-manifest.js';
+import type { Services } from '../../services/index';
+import type { ToolDescriptor } from './tool-types';
+import { ToolRegistry } from './ops/registry';
+import type { ApplicationConfig } from '../../config/types';
+import { TOOL_MANIFEST, ToolStatus } from './tool-manifest';
 
 /**
  * Create a tool registry with injected services

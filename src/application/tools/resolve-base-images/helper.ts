@@ -6,7 +6,7 @@ import {
   BaseImageRecommendation,
   ValidationResult,
   SuggestedImage,
-} from '../../../contracts/types/index.js';
+} from '../../../domain/types/index';
 
 /**
  * Provide reference images as context, NOT hardcoded decisions
@@ -143,7 +143,7 @@ export function getSuggestedImagesForReference(
   };
 
   return (
-    references[language.toLowerCase()] || [
+    references[language.toLowerCase()] ?? [
       { category: 'minimal', image: 'alpine:3.19', notes: 'Generic minimal base' },
       { category: 'standard', image: 'ubuntu:22.04', notes: 'Full-featured Linux base' },
     ]
@@ -201,8 +201,15 @@ export function validateBaseImageRecommendation(
  * Generate AI request for base image resolution
  */
 export function buildBaseImageAIRequest(
-  analysis: any,
-  input: any,
+  analysis: { language?: string; framework?: string; dependencies?: string[] },
+  input: {
+    session_id: string;
+    target_environment?: string;
+    security_level?: string;
+    performance_priority?: string;
+    architectures?: string[];
+    compliance_requirements?: string;
+  },
   suggestedImages: SuggestedImage[],
 ): {
   purpose: string;
@@ -226,10 +233,10 @@ export function buildBaseImageAIRequest(
     sessionId: input.session_id,
     sampling: { temperature: 0.7, maxTokens: 2000 },
     variables: {
-      targetEnvironment: input.target_environment,
-      securityLevel: input.security_level,
-      performancePriority: input.performance_priority,
-      architectures: input.architectures,
+      targetEnvironment: input.target_environment ?? 'cloud',
+      securityLevel: input.security_level ?? 'standard',
+      performancePriority: input.performance_priority ?? 'size',
+      architectures: input.architectures ? input.architectures.join(', ') : 'amd64',
       complianceRequirements: input.compliance_requirements ?? 'none',
       suggestedImages: JSON.stringify(suggestedImages),
     },

@@ -1,25 +1,13 @@
 /**
- * External System Integrations
- * Exports for external service clients and adapters
+ * External System Integrations - Minimal Exports
+ * Reduced from wildcard exports to prevent unused export proliferation
+ * Note: This file had no direct imports - most exports were unused
  */
 
-// Docker-related exports
-export * from '../docker-client.js';
+// Essential client exports only (matching main infrastructure/index.ts pattern)
+export { DockerClient } from '../docker-client';
+export { KubernetesClient } from '../kubernetes-client';
+export { AIClient } from '../ai-client';
 
-// Kubernetes-related exports
-export * from '../kubernetes-client.js';
-
-// AI service exports
-export * from '../ai-client.js';
-export * from '../ai-service.js';
-
-// Request builder
-export * from '../ai/requests.js';
-
-// Sampling strategy
-export * from '../sampling-strategy.js';
-
-// Types and interfaces
-// AI types now come from unified API
-export type { SampleFunction, SampleResult } from '../ai/index.js';
-export type { AIServiceConfig, AIAnalysisResult, AIGenerationResult } from '../ai/ai-types.js';
+// Note: Removed all wildcard exports and type re-exports
+// If specific exports are needed, they should be imported directly from their source files

@@ -7,9 +7,10 @@ import {
   BaseImageRecommendationSchema,
   BaseImageResolutionInput,
   BaseImageResolutionInputSchema,
-} from '../../../contracts/types/index.js';
-import { executeWithRetry } from '../error-recovery.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
+} from '../../../domain/types/index';
+import { executeWithRetry } from '../error-recovery';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
+import { safeGetWorkflowState } from '../../../domain/types/workflow-state';
 import {
   getSuggestedImagesForReference,
   validateBaseImageRecommendation,
@@ -33,7 +34,7 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
       context: ToolContext,
     ): Promise<BaseImageRecommendation> => {
       return executeWithRetry(
-        async () => {
+        async (): Promise<BaseImageRecommendation> => {
           // Get repository analysis from session
           if (!context.sessionService) {
             throw new Error('Session service not available');
@@ -44,16 +45,20 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
             throw new Error('Session not found');
           }
 
-          if (!session.workflow_state?.analysis_result) {
+          const workflowState = safeGetWorkflowState(session.workflow_state);
+          if (!workflowState?.metadata?.analysis_result) {
             throw new Error('Repository must be analyzed first. Run analyze-repository tool.');
           }
 
-          const analysis = session.workflow_state.analysis_result;
+          const analysis = workflowState.metadata.analysis_result as {
+            language?: string;
+            framework?: string;
+          };
 
           // Prepare suggested images as reference (not hardcoded decision)
           const suggestedImages = getSuggestedImagesForReference(
-            analysis.language,
-            analysis.framework,
+            analysis.language ?? 'unknown',
+            analysis.framework ?? 'unknown',
           );
 
           // Use AI for intelligent decision making
@@ -62,7 +67,21 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
           }
 
           // Build AI request using helper function
-          const aiRequest = buildBaseImageAIRequest(analysis, input, suggestedImages);
+          const cleanedInput = {
+            session_id: input.session_id,
+            ...(input.target_environment !== undefined
+              ? { target_environment: input.target_environment }
+              : {}),
+            ...(input.security_level !== undefined ? { security_level: input.security_level } : {}),
+            ...(input.performance_priority !== undefined
+              ? { performance_priority: input.performance_priority }
+              : {}),
+            ...(input.architectures !== undefined ? { architectures: input.architectures } : {}),
+            ...(input.compliance_requirements !== undefined
+              ? { compliance_requirements: input.compliance_requirements }
+              : {}),
+          };
+          const aiRequest = buildBaseImageAIRequest(analysis, cleanedInput, suggestedImages);
 
           const recommendation = await context.structuredSampler.sampleJSON(
             JSON.stringify(aiRequest),
@@ -74,7 +93,7 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
           }
 
           // Validate the AI's recommendation'
-          const validationResult = validateBaseImageRecommendation(recommendation.data);
+          const validationResult = validateBaseImageRecommendation(recommendation.data as any);
           if (!validationResult.isValid) {
             throw new Error(
               `AI recommendation validation failed: ${validationResult.issues.join(', ')}`,
@@ -100,7 +119,7 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
             );
           }
 
-          return recommendation.data;
+          return recommendation.data as any;
         },
         { maxAttempts: 2 },
       );

@@ -4,8 +4,8 @@
  */
 
 import type { Logger } from 'pino';
-import { withRetry, withTimeout } from './async-utils.js';
-import { toError } from './validation-utils.js';
+import { withRetry, withTimeout, RetryOptions } from './async-utils';
+import { toError } from './validation-utils';
 
 /**
  * Error recovery strategy options
@@ -229,7 +229,7 @@ export class RecoveryCache<T> {
   set(key: string, value: T): void {
     // Evict oldest if at max size
     if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
+      const firstKey = this.cache.keys().next().value as string | undefined;
       if (firstKey) {
         this.cache.delete(firstKey);
       }
@@ -332,10 +332,12 @@ export async function withRecovery<T>(
   // Apply retry
   if (options.retry) {
     const originalOp = wrappedOperation;
-    const retryOptions: any = { ...options.retry };
-    if (options.logger) {
-      retryOptions.logger = options.logger;
-    }
+    // Properly construct RetryOptions object instead of unsafe casting
+    const retryOptions: RetryOptions = {
+      maxAttempts: options.retry.maxAttempts ?? 3,
+      backoff: options.retry.backoff ?? 'exponential',
+      ...(options.logger ? { logger: options.logger } : {}),
+    };
     wrappedOperation = () => withRetry(originalOp, retryOptions);
   }
 

@@ -4,21 +4,24 @@
 
 import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { ErrorCode, DomainError } from '../../../contracts/types/errors.js';
+import { ErrorCode, DomainError } from '../../../domain/types/errors';
 import {
   GenerateDockerfileInput,
   type GenerateDockerfileParams,
   DockerfileResultSchema,
   type DockerfileResult,
-} from '../schemas.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
-import type { AnalysisResult, Session } from '../../../contracts/types/session.js';
+} from '../schemas';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
+import type { AnalysisResult, Session } from '../../../domain/types/session';
+import type { SessionService } from '../../services/interfaces';
+import { safeGetMetadataField, isWorkflowMetadata } from '../../../domain/types/workflow-state';
 
 /**
  * Simple interface for generation options
  */
 interface GenerationOptions {
   baseImage?: string;
+  runtimeImage?: string;
   optimization?: boolean;
   multistage?: boolean;
   securityHardening?: boolean;
@@ -34,7 +37,7 @@ interface GenerationOptions {
 function generateOptimizedDockerfile(analysis: AnalysisResult, options: GenerationOptions): string {
   const baseImage = options.baseImage ?? getRecommendedBaseImage(analysis.language);
   const framework = analysis.framework ?? '';
-  const deps = analysis.dependencies?.map((d) => d.name) || [];
+  const deps = analysis.dependencies?.map((d: { name: string }) => d.name) ?? [];
 
   // Build optimized Dockerfile content
   let dockerfile = `# AI-Optimized Dockerfile for ${analysis.language}${framework ? ` (${framework})` : ''}
@@ -43,6 +46,9 @@ function generateOptimizedDockerfile(analysis: AnalysisResult, options: Generati
 `;
 
   if (options.multistage && deps.length > 5) {
+    // Use explicit runtimeImage if provided, otherwise reuse the exact baseImage
+    const runtimeImage = options.runtimeImage ?? baseImage;
+
     dockerfile += `# Build stage
 FROM ${baseImage} AS builder
 WORKDIR /app
@@ -51,7 +57,7 @@ WORKDIR /app
 ${getBuildCommands(analysis, 'build')}
 
 # Runtime stage
-FROM ${baseImage.includes('alpine') ? baseImage : baseImage.replace(/:\d+/, ':alpine')}
+FROM ${runtimeImage}
 WORKDIR /app
 
 # Create non-root user for security
@@ -81,7 +87,7 @@ ${getBuildCommands(analysis, 'single')}
 
   // Add health check if requested
   if (options.includeHealthcheck) {
-    const primaryPort = ports[0] || 3000;
+    const primaryPort = ports[0] ?? 3000;
     dockerfile += `
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
@@ -93,7 +99,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
   if (options.customCommands && options.customCommands.length > 0) {
     dockerfile += `
 # Custom commands
-${options.customCommands?.map((cmd: string) => `RUN ${cmd}`).join('\n') || ''}
+${options.customCommands?.map((cmd: string) => `RUN ${cmd}`).join('\n') ?? ''}
 `;
   }
 
@@ -157,12 +163,13 @@ function getStartCommand(analysis: AnalysisResult): string {
 
   if (lang === 'javascript' || lang === 'typescript') {
     if (framework === 'nextjs') return 'CMD ["npm", "start"]';
-    return 'CMD ["node", "index.js"]';
+    return 'CMD ["node", "."]';
   } else if (lang === 'python') {
-    if (framework === 'django') return 'CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]';
-    if (framework === 'flask') return 'CMD ["python", "app.py"]';
+    if (framework === 'django')
+      return 'CMD ["gunicorn", "--bind", "0.0.0.0:8000", "myproject.wsgi:application"]';
+    if (framework === 'flask') return 'CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]';
     if (framework === 'fastapi')
-      return 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]';
+      return 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]';
     return 'CMD ["python", "main.py"]';
   } else if (lang === 'java') {
     return 'ENTRYPOINT ["java", "-jar", "app.jar"]';
@@ -188,7 +195,7 @@ function getRecommendedBaseImage(language: string): string {
     php: 'php:8.2-fpm-alpine',
   };
 
-  return imageMap[language] || 'alpine:3.19';
+  return imageMap[language] ?? 'alpine:3.19';
 }
 
 /**
@@ -246,7 +253,9 @@ const generateDockerfileHandler: ToolDescriptor<GenerateDockerfileParams, Docker
     input: GenerateDockerfileParams,
     context: ToolContext,
   ): Promise<DockerfileResult> => {
-    const { logger, sessionService } = context;
+    const contextServices = context;
+    const logger = contextServices.logger;
+    const sessionService = contextServices.sessionService as SessionService;
     const { sessionId } = input;
 
     logger.info(
@@ -262,12 +271,30 @@ const generateDockerfileHandler: ToolDescriptor<GenerateDockerfileParams, Docker
         throw new DomainError(ErrorCode.DependencyNotInitialized, 'Session service not available');
       }
 
-      const session = await sessionService.get(sessionId);
-      if (!session) {
+      type SessionService = { get: (id: string) => Promise<Session | null> };
+      const sessionResult = await (sessionService as SessionService).get(sessionId);
+      if (!sessionResult) {
         throw new DomainError(ErrorCode.SessionNotFound, 'Session not found');
       }
 
-      const analysis = session.workflow_state?.analysis_result;
+      // Type-safe session access
+      const session = sessionResult;
+      const workflowState = session.workflow_state as unknown;
+
+      // Safe metadata extraction
+      let analysis: AnalysisResult | undefined;
+      if (isWorkflowMetadata(workflowState)) {
+        analysis = safeGetMetadataField(workflowState, 'analysis_result', undefined) as
+          | AnalysisResult
+          | undefined;
+      } else if (
+        workflowState &&
+        typeof workflowState === 'object' &&
+        'analysis_result' in workflowState
+      ) {
+        analysis = (workflowState as { analysis_result?: AnalysisResult }).analysis_result;
+      }
+
       if (!analysis) {
         throw new DomainError(
           ErrorCode.VALIDATION_ERROR,
@@ -276,10 +303,15 @@ const generateDockerfileHandler: ToolDescriptor<GenerateDockerfileParams, Docker
       }
 
       // Use simple options for generation
-      const generationOptions = {
-        baseImage: analysis.recommendations?.baseImage || 'node:20-alpine',
+      const recommendedImage = getRecommendedBaseImage(analysis.language);
+      const deps = analysis.dependencies?.map((d: { name: string }) => d.name) ?? [];
+      const shouldUseMultistage = deps.length > 5;
+
+      const generationOptions: GenerationOptions = {
+        baseImage:
+          (analysis.recommendations as { baseImage?: string })?.baseImage ?? recommendedImage,
         optimization: true,
-        multistage: true,
+        multistage: shouldUseMultistage,
         securityHardening: true,
         includeHealthcheck: true,
         customInstructions: '',
@@ -300,17 +332,19 @@ const generateDockerfileHandler: ToolDescriptor<GenerateDockerfileParams, Docker
       const validation = analyzeDockerfileSecurity(dockerfileContent);
 
       // Update session with Dockerfile info
-      await sessionService.updateAtomic(sessionId, (session: Session) => ({
-        ...session,
+      await sessionService.updateAtomic(sessionId, (currentSession: any) => ({
+        ...currentSession,
         workflow_state: {
-          ...session.workflow_state,
+          ...((currentSession.workflow_state as Record<string, unknown>) ?? {}),
           dockerfile_result: {
             content: dockerfileContent,
             path: dockerfilePath,
             base_image: generationOptions.baseImage,
             stages: [],
-            optimizations: ['Multi-stage build', 'Security hardening', 'Health checks'],
-            multistage: true,
+            optimizations: shouldUseMultistage
+              ? ['Multi-stage build', 'Security hardening', 'Health checks']
+              : ['Security hardening', 'Health checks'],
+            multistage: shouldUseMultistage,
           },
         },
       }));
@@ -339,7 +373,7 @@ const generateDockerfileHandler: ToolDescriptor<GenerateDockerfileParams, Docker
   chainHint: {
     nextTool: 'build_image',
     reason: 'Build Docker image from generated Dockerfile',
-    paramMapper: (output) => ({
+    paramMapper: (output: DockerfileResult) => ({
       session_id: output.path.includes('/') ? undefined : output.path,
       dockerfile_path: output.path,
       tags: [`app:${Date.now()}`],

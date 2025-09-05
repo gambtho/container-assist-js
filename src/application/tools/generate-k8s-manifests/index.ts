@@ -9,4 +9,4 @@
  * @module src/application/tools/generate-k8s-manifests/index
  */
 
-export { default } from './generate-k8s-manifests.js';
+export { default } from './generate-k8s-manifests';

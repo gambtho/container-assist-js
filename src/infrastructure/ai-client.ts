@@ -3,14 +3,15 @@
  */
 
 import type { Logger } from 'pino';
-import { AIServiceError } from '../errors/index.js';
-import { ErrorCode } from '../contracts/types/errors.js';
+import { AIServiceError } from '../errors/index';
+import { ErrorCode } from '../domain/types/errors';
 import {
-  createSampler,
+  createNativeMCPSampler,
   isSuccessResult,
   type SampleFunction,
   type AIRequest,
-} from './ai/sampling.js';
+} from './ai/sampling';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export interface AIClientConfig {
   modelPreferences?: {
@@ -88,8 +89,8 @@ export class AIClient {
   /**
    * Create and set MCP sampler from server
    */
-  setMCPServer(server: any): void {
-    this.sampler = createSampler({ type: 'mcp', server }, this.logger);
+  setMCPServer(server: McpServer): void {
+    this.sampler = createNativeMCPSampler(server, this.logger);
     this.available = true;
 
     this.logger.info('AI client updated with MCP server sampler');
@@ -99,8 +100,8 @@ export class AIClient {
     try {
       const request: AIRequest = {
         prompt: options.prompt,
-        maxTokens: options.maxTokens ?? (this.config.maxTokens || 2000),
-        temperature: options.temperature ?? (this.config.temperature || 0.7),
+        maxTokens: options.maxTokens ?? this.config.maxTokens ?? 2000,
+        temperature: options.temperature ?? this.config.temperature ?? 0.7,
         model: options.model,
       };
 
@@ -118,11 +119,11 @@ export class AIClient {
 
       const response: AIGenerationResult = {
         text: result.text,
-        tokenCount: result.tokenCount || result.text.length, // Use actual or rough estimate
+        tokenCount: result.tokenCount ?? result.text.length, // Use actual or rough estimate
       };
 
-      if (result.model || options.model) {
-        response.model = result.model || options.model!;
+      if (result.model ?? options.model) {
+        response.model = result.model ?? options.model!;
       }
 
       return response;
@@ -212,8 +213,7 @@ export class AIClient {
   getModelPreference(taskType: string): string {
     const preferences = this.config.modelPreferences ?? {};
     return (
-      (preferences[taskType as keyof typeof preferences] || preferences.default) ??
-      'claude-3-sonnet'
+      preferences[taskType as keyof typeof preferences] ?? preferences.default ?? 'claude-3-sonnet'
     );
   }
 
@@ -224,7 +224,7 @@ export class AIClient {
 Language: ${context.language ?? 'unknown'}
 Dependencies: ${JSON.stringify(context.dependencies ?? [])}
 Build System: ${context.buildSystem ?? 'unknown'}
-Ports: ${context.ports?.join(', ') || 'none specified'}
+Ports: ${context.ports?.join(', ') ?? 'none specified'}
 
 Requirements:
 - Use appropriate base image for ${context.language}

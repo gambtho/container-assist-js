@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
 
 // Input schema
 const PingInputSchema = z.object({

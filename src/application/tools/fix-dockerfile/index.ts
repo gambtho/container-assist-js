@@ -9,4 +9,4 @@
  * @module src/application/tools/fix-dockerfile/index
  */
 
-export { fixDockerfileHandler as default } from './fix-dockerfile.js';
+export { fixDockerfileHandler as default } from './fix-dockerfile';

@@ -5,14 +5,14 @@
 
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
-import { SessionService } from '../../session/manager.js';
-import { WorkflowOrchestrator } from '../../workflow/orchestrator.js';
-import { WorkflowManager } from '../../workflow/manager.js';
-import { getWorkflowConfig, validateWorkflowConfig } from '../../workflow/configs.js';
-import { runContainerizationWorkflow } from '../../workflow/containerization.js';
+import { SessionService } from '../../session/manager';
+import { WorkflowOrchestrator, WorkflowExecutionResult } from '../../workflow/orchestrator';
+import { WorkflowManager } from '../../workflow/manager';
+import { getWorkflowConfig, validateWorkflowConfig } from '../../workflow/configs';
+import { runContainerizationWorkflow } from '../../workflow/containerization';
 import type { Logger } from 'pino';
-import type { ProgressCallback } from '../../workflow/types.js';
-import type { Session } from '../../../domain/types/index.js';
+import type { ProgressCallback } from '../../workflow/types';
+import type { Session } from '../../../domain/types/index';
 
 export interface StartWorkflowInput {
   repo_path?: string;
@@ -226,11 +226,15 @@ export async function startWorkflowHandler(
     // Start workflow execution asynchronously
     const abortController = new AbortController();
 
-    let workflowPromise: Promise<any>;
+    let workflowPromise: Promise<unknown>;
 
     // Use specific workflow functions for better type safety and performance
     if (validated.workflow_type === 'containerization' || validated.workflow_type === 'full') {
-      const workflowParams: any = {
+      const workflowParams: {
+        repositoryPath: string;
+        includeSecurityScan: boolean;
+        baseImage?: string;
+      } = {
         repositoryPath: validated.repo_path,
         includeSecurityScan: !validated.options?.skip_security,
       };
@@ -257,7 +261,7 @@ export async function startWorkflowHandler(
     workflowManager.registerWorkflow(
       sessionId,
       workflowConfig.id,
-      workflowPromise,
+      workflowPromise as Promise<WorkflowExecutionResult>,
       abortController,
     );
 
@@ -443,7 +447,7 @@ async function createNewSession(
       status:
         session.status === 'pending'
           ? 'active'
-          : (session.status as 'active' | 'completed' | 'failed' | 'paused'),
+          : (session.status as 'active' | 'completed' | 'failed'),
     };
 
     return transformedSession;

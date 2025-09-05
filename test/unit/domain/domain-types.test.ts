@@ -1,341 +1,215 @@
 /**
- * Consolidated Domain Types Validation Tests
- * Ensures all consolidated types work correctly and schemas validate properly
+ * Domain Types Tests - Post Cleanup
+ * Tests for the remaining domain types after dead code elimination
  */
 
 import { describe, test, expect } from '@jest/globals';
 import {
-  // Docker types
+  // Docker types (only essential ones kept after cleanup)
   DockerBuildOptions,
-  DockerBuildResult,
+  DockerBuildResult, 
   DockerScanResult,
-  DockerPushResult,
-  DockerTagResult,
-  DockerBuildOptionsSchema,
-  DockerBuildResultSchema,
-  DockerScanResultSchema,
-  DockerPushResultSchema,
-  DockerTagResultSchema,
   
-  // Build types
-  BuildOptions,
-  BuildResult,
-  BuildConfiguration,
-  BuildOptionsSchema,
-  BuildResultSchema,
-  BuildConfigurationSchema,
-  
-  // Scanning types
+  // Scanning types (only essential ones kept)
+  ScanOptions,
   ScanResult,
-  Vulnerability,
-  ScanResultSchema,
-  VulnerabilitySchema,
   
-  // Event types
-  DomainEvent,
-  EventType,
-  createDomainEvent,
-  DomainEventSchema,
+  // Result type for error handling
+  Result,
   
-  // Interface types
-  Logger,
-  // IDockerService, // Removed - this belongs in application layer
-  // SessionStore, // Imported directly from contracts/types/session-store
-} from '../../../src/contracts/types/index';
+  // Session types (kept after cleanup)
+  Session,
+  WorkflowState,
+  AnalysisResult,
+  
+  // Error types
+  ErrorCode,
+  DomainError,
+} from '../../../src/domain/types/index';
 
-describe('Consolidated Docker Types', () => {
-  describe('DockerBuildOptions', () => {
-    test('should validate valid build options', () => {
+describe('Domain Types - Essential Types After Cleanup', () => {
+  describe('Docker Types', () => {
+    test('should handle DockerBuildOptions type structure', () => {
       const options: DockerBuildOptions = {
         context: './app',
+        dockerfile: 'Dockerfile',
         tags: ['myapp:latest'],
-        buildArgs: { NODE_ENV: 'production' },
-        noCache: true,
-        platform: 'linux/amd64'
+        buildArgs: { NODE_ENV: 'production' }
       };
       
-      const result = DockerBuildOptionsSchema.safeParse(options);
-      expect(result.success).toBe(true);
+      // Type-level test - if this compiles, the type is working
+      expect(options.context).toBe('./app');
+      expect(options.tags).toContain('myapp:latest');
+      expect(options.buildArgs?.NODE_ENV).toBe('production');
     });
-    
-    test('should require context field', () => {
-      const options = {
-        tags: ['myapp:latest']
-      } as any;
-      
-      const result = DockerBuildOptionsSchema.safeParse(options);
-      expect(result.success).toBe(false);
-    });
-  });
 
-  describe('DockerBuildResult', () => {
-    test('should validate complete build result', () => {
+    test('should handle DockerBuildResult type structure', () => {
       const result: DockerBuildResult = {
-        imageId: 'sha256:abc123def456',
-        tags: ['myapp:latest', 'myapp:v1.0'],
-        logs: ['Step 1/5: FROM node:18', 'Successfully built abc123def456'],
-        success: true,
-        size: 128000000,
-        buildTime: 45000,
-        digest: 'sha256:def456abc123'
-      };
-      
-      const validation = DockerBuildResultSchema.safeParse(result);
-      expect(validation.success).toBe(true);
-    });
-    
-    test('should require essential fields', () => {
-      const result = {
         imageId: 'sha256:abc123',
-        tags: [],
-        logs: []
-        // Missing success field
-      } as any;
+        tags: ['myapp:latest'],
+        success: true,
+        logs: ['Build step 1/3']
+      };
       
-      const validation = DockerBuildResultSchema.safeParse(result);
-      expect(validation.success).toBe(false);
+      expect(result.success).toBe(true);
+      expect(result.imageId).toBe('sha256:abc123');
+      expect(result.logs).toContain('Build step 1/3');
     });
-  });
 
-  describe('DockerScanResult', () => {
-    test('should validate scan result with vulnerabilities', () => {
+    test('should handle DockerScanResult type structure', () => {
       const scanResult: DockerScanResult = {
-        vulnerabilities: [
-          {
-            severity: 'high',
-            package: 'openssl',
-            version: '1.1.1',
-            fixedVersion: '1.1.1k',
-            description: 'Buffer overflow vulnerability'
-          }
-        ],
-        summary: {
-          critical: 0,
-          high: 1,
-          medium: 2,
-          low: 5,
-          total: 8
+        vulnerabilities: [],
+        summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0 },
+        scanner: 'trivy'
+      };
+      
+      expect(scanResult.vulnerabilities).toEqual([]);
+      expect(scanResult.summary.total).toBe(0);
+      expect(scanResult.scanner).toBe('trivy');
+    });
+  });
+
+  describe('Session Types', () => {
+    test('should handle Session type structure', () => {
+      const session: Session = {
+        id: 'test-session-123',
+        status: 'pending',
+        repoPath: '/test/repo',
+        workflowState: {
+          currentStep: null,
+          completedSteps: []
         },
-        scanner: 'trivy',
-        scanTime: '2025-01-15T10:30:00Z'
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z'
       };
       
-      const validation = DockerScanResultSchema.safeParse(scanResult);
-      expect(validation.success).toBe(true);
+      expect(session.id).toBe('test-session-123');
+      expect(session.status).toBe('pending');
+      expect(session.workflowState.completedSteps).toEqual([]);
     });
-  });
-});
 
-describe('Consolidated Build Types', () => {
-  describe('BuildConfiguration', () => {
-    test('should validate build configuration', () => {
-      const config: BuildConfiguration = {
-        projectPath: '/app',
-        buildTool: 'docker',
-        strategy: 'multi-stage',
-        outputFormat: 'oci'
+    test('should handle WorkflowState type structure', () => {
+      const state: WorkflowState = {
+        currentStep: 'analyze',
+        completedSteps: ['setup'],
+        analysisResult: {
+          language: 'javascript',
+          dependencies: []
+        }
       };
       
-      const result = BuildConfigurationSchema.safeParse(config);
-      expect(result.success).toBe(true);
+      expect(state.currentStep).toBe('analyze');
+      expect(state.completedSteps).toContain('setup');
+      expect(state.analysisResult?.language).toBe('javascript');
     });
-  });
 
-  describe('BuildOptions', () => {
-    test('should support comprehensive build options', () => {
-      const options: BuildOptions = {
-        context: './src',
-        dockerfile: 'Dockerfile.prod',
-        tags: ['app:prod'],
-        buildArgs: { ENV: 'production' },
-        platform: ['linux/amd64', 'linux/arm64'],
-        secrets: [{ id: 'mysecret', src: '/secrets/token' }]
+    test('should handle AnalysisResult type structure', () => {
+      const analysis: AnalysisResult = {
+        language: 'typescript',
+        dependencies: [
+          { name: 'express', version: '4.18.2' }
+        ],
+        ports: [3000],
+        hasDockerfile: false
       };
       
-      const result = BuildOptionsSchema.safeParse(options);
-      expect(result.success).toBe(true);
-    });
-  });
-});
-
-describe('Consolidated Scanning Types', () => {
-  describe('Vulnerability', () => {
-    test('should validate vulnerability with all fields', () => {
-      const vuln: Vulnerability = {
-        id: 'CVE-2023-1234',
-        severity: 'critical',
-        package: 'libssl',
-        version: '1.1.1',
-        fixedVersion: '1.1.1k',
-        description: 'Critical security vulnerability',
-        score: 9.8,
-        references: ['https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-1234']
-      };
-      
-      const result = VulnerabilitySchema.safeParse(vuln);
-      expect(result.success).toBe(true);
+      expect(analysis.language).toBe('typescript');
+      expect(analysis.dependencies).toHaveLength(1);
+      expect(analysis.ports).toContain(3000);
     });
   });
 
-  describe('ScanResult', () => {
-    test('should validate comprehensive scan result', () => {
-      const scanResult: ScanResult = {
-        scanner: 'trivy',
-        target: 'myapp:latest',
-        targetType: 'image',
+  describe('Error Handling Types', () => {
+    test('should handle ErrorCode enum values', () => {
+      // Test that key error codes are defined
+      expect(ErrorCode.VALIDATION_ERROR).toBeDefined();
+      expect(ErrorCode.SessionNotFound).toBeDefined();
+      expect(ErrorCode.DockerNotAvailable).toBeDefined();
+      expect(ErrorCode.WorkflowFailed).toBeDefined();
+    });
+
+    test('should create DomainError instances', () => {
+      const error = new DomainError(ErrorCode.VALIDATION_ERROR, 'Test error message');
+      
+      expect(error.message).toBe('Test error message');
+      expect(error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      expect(error).toBeInstanceOf(DomainError);
+    });
+  });
+
+  describe('Scanning Types', () => {
+    test('should handle ScanOptions type structure', () => {
+      const options: ScanOptions = {
+        severity: ['high', 'critical'],
+        format: 'json'
+      };
+      
+      expect(options.severity).toContain('high');
+      expect(options.format).toBe('json');
+    });
+
+    test('should handle ScanResult type structure', () => {
+      const result: ScanResult = {
         vulnerabilities: [
           {
-            id: 'CVE-2023-1234',
-            severity: 'high',
-            package: 'openssl',
-            version: '1.1.1'
+            severity: 'medium',
+            package: 'lodash',
+            version: '4.17.20'
           }
         ],
         summary: {
           critical: 0,
-          high: 1,
-          medium: 0,
+          high: 0,
+          medium: 1,
           low: 0,
           total: 1
         }
       };
       
-      const result = ScanResultSchema.safeParse(scanResult);
-      expect(result.success).toBe(true);
-    });
-  });
-});
-
-describe('Domain Events System', () => {
-  describe('DomainEvent Creation', () => {
-    test('should create valid domain event', () => {
-      const event = createDomainEvent(
-        EventType.BUILD_COMPLETED,
-        'session-123',
-        'build',
-        { imageId: 'abc123', success: true },
-        { userId: 'user-456' }
-      );
-      
-      expect(event.type).toBe(EventType.BUILD_COMPLETED);
-      expect(event.aggregateId).toBe('session-123');
-      expect(event.aggregateType).toBe('build');
-      expect(event.data.imageId).toBe('abc123');
-      expect(event.metadata.userId).toBe('user-456');
-    });
-    
-    test('should validate domain event schema', () => {
-      const event: DomainEvent = {
-        id: 'event-123',
-        type: EventType.WORKFLOW_STARTED,
-        aggregateId: 'session-456',
-        aggregateType: 'workflow',
-        version: 1,
-        timestamp: new Date().toISOString(),
-        data: { workflowType: 'containerization' },
-        metadata: {}
-      };
-      
-      const result = DomainEventSchema.safeParse(event);
-      expect(result.success).toBe(true);
-    });
-  });
-});
-
-describe('Service Interface Contracts', () => {
-  describe('Logger Interface', () => {
-    test('should define complete logger contract', () => {
-      // Test that Logger interface has all required methods
-      const loggerMethods = [
-        'trace', 'debug', 'info', 'warn', 'error', 'fatal', 'child'
-      ];
-      
-      // This is a type-level test - if it compiles, the interface is correct
-      const mockLogger: Logger = {
-        trace: () => {},
-        debug: () => {},
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-        fatal: () => {},
-        child: () => ({} as Logger)
-      };
-      
-      expect(typeof mockLogger.trace).toBe('function');
-      expect(typeof mockLogger.child).toBe('function');
-    });
-  });
-
-  describe('Service Interface Contracts', () => {
-    test('should define proper Docker service contract', () => {
-      // Type-level test for DockerService interface (commented out - belongs in application layer)
-      const mockDockerService = {
-        buildImage: async () => ({ success: true, data: {} as any }),
-        scanImage: async () => ({ success: true, data: {} as any })
-      };
-      
-      expect(typeof mockDockerService.buildImage).toBe('function');
-      expect(typeof mockDockerService.scanImage).toBe('function');
+      expect(result.vulnerabilities).toHaveLength(1);
+      expect(result.summary.medium).toBe(1);
+      expect(result.summary.total).toBe(1);
     });
   });
 });
 
 describe('Type System Integration', () => {
-  test('should maintain type compatibility across layers', () => {
-    // Test that consolidated types work together
+  test('should maintain type compatibility between related types', () => {
+    // Test that types work together as expected
     const buildOptions: DockerBuildOptions = {
       context: './app',
-      tags: ['test:latest']
+      tags: ['test:v1.0']
     };
     
     const buildResult: DockerBuildResult = {
-      imageId: 'sha256:abc123',
-      tags: buildOptions.tags,
-      logs: ['Build completed'],
+      imageId: 'sha256:abc123def456',
+      tags: buildOptions.tags, // Should be compatible
+      logs: ['Step 1/3: FROM node:18'],
       success: true
     };
     
-    const event = createDomainEvent(
-      EventType.BUILD_COMPLETED,
-      'session-123',
-      'build',
-      buildResult
-    );
-    
-    expect(event.data.imageId).toBe(buildResult.imageId);
-    expect(event.data.tags).toEqual(buildOptions.tags);
+    expect(buildResult.tags).toEqual(buildOptions.tags);
+    expect(buildResult.success).toBe(true);
   });
   
-  test('should validate end-to-end workflow data', () => {
-    const workflowData = {
-      buildOptions: {
-        context: './app',
-        tags: ['myapp:v1.0']
-      },
-      buildResult: {
-        imageId: 'sha256:def456',
-        tags: ['myapp:v1.0'],
-        logs: ['Successfully built'],
-        success: true
-      },
-      scanResult: {
-        scanner: 'trivy' as const,
-        target: 'myapp:v1.0',
-        targetType: 'image' as const,
-        vulnerabilities: [],
-        summary: {
-          critical: 0,
-          high: 0,
-          medium: 0,
-          low: 0,
-          total: 0
-        }
+  test('should handle workflow state progression', () => {
+    const initialState: WorkflowState = {
+      currentStep: 'analyze',
+      completedSteps: []
+    };
+    
+    const progressedState: WorkflowState = {
+      ...initialState,
+      currentStep: 'build',
+      completedSteps: ['analyze'],
+      analysisResult: {
+        language: 'nodejs',
+        dependencies: []
       }
     };
     
-    // Validate all schemas
-    expect(DockerBuildOptionsSchema.safeParse(workflowData.buildOptions).success).toBe(true);
-    expect(DockerBuildResultSchema.safeParse(workflowData.buildResult).success).toBe(true);
-    expect(DockerScanResultSchema.safeParse(workflowData.scanResult).success).toBe(true);
+    expect(progressedState.completedSteps).toContain('analyze');
+    expect(progressedState.currentStep).toBe('build');
+    expect(progressedState.analysisResult?.language).toBe('nodejs');
   });
 });

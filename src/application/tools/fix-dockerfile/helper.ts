@@ -2,8 +2,9 @@
  * Fix Dockerfile - Helper Functions
  */
 
-import { buildAIRequest } from '../../../infrastructure/ai/index.js';
-import type { ToolContext } from '../tool-types.js';
+import { buildAIRequest } from '../../../infrastructure/ai/index';
+import type { ToolContext } from '../tool-types';
+import { AIServiceResponse, isAIServiceResponse } from '../../../domain/types/workflow-state';
 
 export interface DockerfileIssue {
   type: string;
@@ -23,6 +24,13 @@ export interface DockerfileValidationResult {
   isValid: boolean;
   warnings: string[];
   errors: string[];
+}
+
+// Helper function to check root user
+function checkRootUser(line: string, dockerfileContent: string): boolean {
+  return (
+    line.startsWith('USER root') || (!dockerfileContent.includes('USER ') && !line.startsWith('#'))
+  );
 }
 
 /**
@@ -47,10 +55,7 @@ export function analyzeDockerfile(
     const trimmedLine = line.trim();
 
     // Check for running as root
-    if (
-      trimmedLine.startsWith('USER root') ||
-      (!dockerfileContent.includes('USER ') && !trimmedLine.startsWith('#'))
-    ) {
+    if (checkRootUser(trimmedLine, dockerfileContent)) {
       detectedIssues.push({
         type: 'security',
         message: 'Running as root user - consider using a non-root user',
@@ -158,10 +163,19 @@ export async function generateFixedDockerfile(
         },
       });
 
-      const result = await context.aiService.generate(requestBuilder);
+      type AIService = { generate: (request: unknown) => Promise<AIServiceResponse> };
+      const aiResponse = await (context.aiService as AIService).generate(requestBuilder);
 
-      if (result?.data != null && typeof result.data === 'string') {
-        let fixedContent = result.data;
+      if (isAIServiceResponse(aiResponse) && aiResponse.success && aiResponse.data != null) {
+        let fixedContent: string;
+
+        if (typeof aiResponse.data === 'string') {
+          fixedContent = aiResponse.data;
+        } else if (typeof aiResponse.data === 'object' && 'content' in aiResponse.data) {
+          fixedContent = String((aiResponse.data as { content: unknown }).content);
+        } else {
+          throw new Error('Invalid AI response data format');
+        }
 
         // If response includes markdown, extract the dockerfile content
         const dockerfileMatch = fixedContent.match(/```dockerfile\n([\s\S]*?)\n```/);
@@ -177,10 +191,7 @@ export async function generateFixedDockerfile(
         // Log AI generation with metadata
         logger.info(
           {
-            model: result.metadata.model,
-            tokensUsed: result.metadata.tokensUsed,
-            fromCache: result.metadata.fromCache,
-            durationMs: result.metadata.durationMs,
+            hasMetadata: typeof aiResponse.data === 'object' && aiResponse.data != null,
           },
           'AI-fixed Dockerfile successfully',
         );

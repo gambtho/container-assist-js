@@ -3,8 +3,8 @@
  */
 
 import type { Logger } from 'pino';
-import { AIClient } from '../infrastructure/ai-client.js';
-import type { SampleFunction } from '../infrastructure/ai/index.js';
+import { AIClient } from '../infrastructure/ai-client';
+import type { SampleFunction } from '../infrastructure/ai/index';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export interface AIConfig {
