@@ -34,7 +34,13 @@ export interface DockerService {
   /**
    * Get service health status
    */
-  health(): Promise<{ healthy: boolean; version?: string; info?: unknown }>;
+  health(): Promise<{
+    healthy: boolean;
+    available?: boolean;
+    version?: string;
+    info?: unknown;
+    client?: unknown;
+  }>;
 
   /**
    * Initialize the service (async setup)

@@ -10,6 +10,13 @@ import { Session } from '../../../domain/types/index';
 import { getWorkflowSteps } from '../../workflow/configs';
 import type { Logger } from 'pino';
 
+interface WorkflowError {
+  step: string;
+  message: string;
+  timestamp: string;
+  retry_count?: number;
+}
+
 export interface WorkflowStatusInput {
   session_id: string;
   include_history?: boolean;
@@ -442,7 +449,7 @@ function getWorkflowErrors(
 
     // Only add if we have required fields
     if (update.step && update.timestamp) {
-      const errorEntry: any = {
+      const errorEntry: WorkflowError = {
         step: update.step,
         message: update.message ?? 'Step failed',
         timestamp: update.timestamp,
@@ -471,7 +478,7 @@ function getWorkflowErrors(
 
         // Only add if we have required fields
         if (error.step) {
-          const errorEntry: any = {
+          const errorEntry: WorkflowError = {
             step: error.step,
             message: error.message ?? error.error ?? 'Unknown error',
             timestamp: error.timestamp ?? session.updated_at,
@@ -546,7 +553,14 @@ function getProgressHistory(
   return history
     .filter((update) => update.step && update.status && update.timestamp)
     .map((update) => {
-      const entry: any = {
+      const entry: {
+        step: string;
+        status: string;
+        progress: number;
+        message?: string;
+        timestamp: string;
+        duration?: number;
+      } = {
         step: update.step!,
         status: update.status!,
         progress: Math.round((update.progress ?? 0) * 100),

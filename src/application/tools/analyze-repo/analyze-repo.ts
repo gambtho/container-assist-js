@@ -7,7 +7,6 @@ import { ErrorCode, DomainError } from '../../../domain/types/errors';
 import { buildAnalysisRequest } from '../../../infrastructure/ai/index';
 import type { ToolDescriptor, ToolContext } from '../tool-types';
 import type { Session } from '../../../domain/types/session';
-import { AIServiceResponse, isAIServiceResponse } from '../../../domain/types/workflow-state';
 import {
   AnalyzeRepositoryInput as AnalyzeRepositoryInputSchema,
   AnalysisResultSchema,
@@ -67,9 +66,6 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
       }) => Promise<void>;
     };
 
-    type AIService = {
-      generate: (request: unknown) => Promise<AIServiceResponse>;
-    };
     const { repoPath, sessionId: inputSessionId, depth = 3, includeTests = false } = input;
 
     logger.info(
@@ -148,9 +144,9 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
       }
       let aiEnhancements: AIEnhancements = {};
       try {
-        if (context.aiService != null) {
+        if (context.sampleFunction != null) {
           // Gather file structure for AI context
-          const fileList = await gatherFileStructure(repoPath, depth === 'deep' ? 3 : 1);
+          const fileList = await gatherFileStructure(repoPath, depth);
 
           // Build AI request for repository analysis
           const analysisVariables = {
@@ -168,18 +164,11 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
             maxTokens: 2000,
           });
 
-          const aiResponse = await (context.aiService as AIService).generate(requestBuilder);
+          const aiResponse = await context.sampleFunction(requestBuilder);
 
-          if (isAIServiceResponse(aiResponse) && aiResponse.success && aiResponse.data != null) {
+          if (aiResponse.success && 'text' in aiResponse) {
             try {
-              let dataString: string;
-              if (typeof aiResponse.data === 'string') {
-                dataString = aiResponse.data;
-              } else if (typeof aiResponse.data === 'object' && 'content' in aiResponse.data) {
-                dataString = String((aiResponse.data as { content: unknown }).content);
-              } else {
-                dataString = String(aiResponse.data);
-              }
+              const dataString = aiResponse.text;
 
               // Try to parse structured response
               const parsed = JSON.parse(dataString) as {
@@ -199,8 +188,7 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
               };
             } catch {
               // Fallback to raw content
-              const contentStr =
-                typeof aiResponse.data === 'string' ? aiResponse.data : String(aiResponse.data);
+              const contentStr = aiResponse.text || '';
               aiEnhancements = {
                 aiInsights: contentStr,
                 fromCache: false,
@@ -211,13 +199,13 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
             // Log AI analysis metadata
             logger.info(
               {
-                hasData: aiResponse.success && aiResponse.data != null,
+                hasData: aiResponse.success && 'text' in aiResponse,
               },
               'AI-enhanced repository analysis completed',
             );
           }
         } else {
-          logger.debug('AI service not available, using basic analysis');
+          logger.debug('AI helper function not available, using basic analysis');
         }
       } catch (error) {
         logger.warn({ error }, 'AI enhancement failed, continuing with basic analysis');

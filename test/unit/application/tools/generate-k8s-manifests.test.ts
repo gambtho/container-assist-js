@@ -44,6 +44,7 @@ describe('Generate K8s Manifests Tool', () => {
   let mockContext: ToolContext;
   let mockProgressEmitter: any;
   let mockAiService: any;
+  let mockSampleFunction: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -99,10 +100,48 @@ spec:
       }),
     };
 
+    mockSampleFunction = jest.fn().mockResolvedValue({
+      success: true,
+      text: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-app
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      containers:
+      - name: test-app
+        image: app:latest
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-app-service
+  namespace: default
+spec:
+  selector:
+    app: test-app
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP`
+    });
+
     mockContext = {
       logger: mockLogger,
       progressEmitter: mockProgressEmitter,
       aiService: mockAiService,
+      sampleFunction: mockSampleFunction,
     } as ToolContext;
 
     // Setup YAML mocks
@@ -176,8 +215,9 @@ spec:
 
     it('should handle different AI service responses', async () => {
       // Test with a different YAML structure  
-      mockAiService.generate.mockResolvedValueOnce({
-        data: `apiVersion: v1
+      mockSampleFunction.mockResolvedValueOnce({
+        success: true,
+        text: `apiVersion: v1
 kind: ConfigMap
 metadata:
   name: test-config
@@ -211,26 +251,27 @@ data:
       expect(result.success).toBe(true);
       expect(result.sessionId).toBe('test-session-123');
       
-      // Verify AI service was called
-      expect(mockAiService.generate).toHaveBeenCalled();
+      // Verify sample function was called
+      expect(mockSampleFunction).toHaveBeenCalled();
     });
 
     it('should handle AI service errors', async () => {
-      const error = new Error('AI service unavailable');
+      const error = new Error('AI service not available');
       // Reset the mock and set rejection
-      mockAiService.generate.mockReset();
-      mockAiService.generate.mockRejectedValue(error);
+      mockSampleFunction.mockReset();
+      mockSampleFunction.mockRejectedValue(error);
 
       await expect(
         generateKubernetesManifestsHandler.handler(mockInput, mockContext)
-      ).rejects.toThrow('AI service unavailable');
+      ).rejects.toThrow('AI service not available');
     });
 
     it('should handle invalid AI response', async () => {
       // Reset the mock and set invalid response
-      mockAiService.generate.mockReset();
-      mockAiService.generate.mockResolvedValue({
-        data: null // Invalid response
+      mockSampleFunction.mockReset();
+      mockSampleFunction.mockResolvedValue({
+        success: false,
+        error: 'Invalid response'
       });
 
       await expect(

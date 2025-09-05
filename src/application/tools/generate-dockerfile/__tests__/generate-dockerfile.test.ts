@@ -748,13 +748,16 @@ describe('generate-dockerfile tool', () => {
 
       const _result = await generateDockerfileHandler.handler(input, mockContext);
 
-      expect(mockContext.sessionService?.updateAtomic).toHaveBeenCalledWith(
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(jest.mocked(mockContext.sessionService!.updateAtomic)).toHaveBeenCalledWith(
         'test-session-123',
         expect.any(Function),
       );
 
       // Verify the session update includes dockerfile_result
-      const updateFunction = jest.mocked(mockContext.sessionService!.updateAtomic).mock.calls[0][1];
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const updateFunction = jest.mocked(mockContext.sessionService!.updateAtomic).mock
+        .calls[0]![1];
       const updatedSession = updateFunction(mockSession);
 
       expect(updatedSession.workflow_state.dockerfile_result).toBeDefined();

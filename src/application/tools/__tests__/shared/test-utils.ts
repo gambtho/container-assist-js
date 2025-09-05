@@ -1,8 +1,6 @@
 /**
  * Shared test utilities for MCP Tools
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 import { jest } from '@jest/globals';
 import type { Logger } from 'pino';
@@ -14,6 +12,7 @@ import type {
   ProgressEmitter,
 } from '../../../services/interfaces.js';
 import type { ToolContext } from '../../tool-types.js';
+import type { EventEmitter } from 'events';
 
 /**
  * Mock logger factory for consistent testing
@@ -129,7 +128,30 @@ export function createMockCoreServices(overrides?: Partial<CoreServices>): CoreS
 /**
  * Type-safe mock interfaces for ToolContext components
  */
-type MockEventEmitter = any;
+type MockEventEmitter = jest.Mocked<EventEmitter>;
+
+/**
+ * Create a mock EventEmitter with all methods properly typed
+ */
+function createMockEventEmitter(): MockEventEmitter {
+  return {
+    emit: jest.fn().mockReturnValue(true),
+    on: jest.fn().mockReturnThis(),
+    once: jest.fn().mockReturnThis(),
+    off: jest.fn().mockReturnThis(),
+    removeAllListeners: jest.fn().mockReturnThis(),
+    addListener: jest.fn().mockReturnThis(),
+    removeListener: jest.fn().mockReturnThis(),
+    setMaxListeners: jest.fn().mockReturnThis(),
+    getMaxListeners: jest.fn().mockReturnValue(10),
+    listeners: jest.fn().mockReturnValue([]),
+    rawListeners: jest.fn().mockReturnValue([]),
+    listenerCount: jest.fn().mockReturnValue(0),
+    prependListener: jest.fn().mockReturnThis(),
+    prependOnceListener: jest.fn().mockReturnThis(),
+    eventNames: jest.fn().mockReturnValue([]),
+  } as MockEventEmitter;
+}
 
 /**
  * Mock tool context for testing
@@ -151,41 +173,8 @@ export function createMockToolContext(overrides?: Partial<ToolContext>): ToolCon
     deleteSession: jest.fn().mockImplementation(() => Promise.resolve(undefined)),
   };
 
-  const mockEventPublisher: MockEventEmitter = {
-    emit: jest.fn().mockReturnValue(true),
-    on: jest.fn().mockReturnThis(),
-    once: jest.fn().mockReturnThis(),
-    off: jest.fn().mockReturnThis(),
-    removeAllListeners: jest.fn().mockReturnThis(),
-    addListener: jest.fn().mockReturnThis(),
-    removeListener: jest.fn().mockReturnThis(),
-    setMaxListeners: jest.fn().mockReturnThis(),
-    getMaxListeners: jest.fn().mockReturnValue(10),
-    listeners: jest.fn().mockReturnValue([]),
-    rawListeners: jest.fn().mockReturnValue([]),
-    listenerCount: jest.fn().mockReturnValue(0),
-    prependListener: jest.fn().mockReturnThis(),
-    prependOnceListener: jest.fn().mockReturnThis(),
-    eventNames: jest.fn().mockReturnValue([]),
-  } as any;
-
-  const mockProgressEmitter: MockEventEmitter = {
-    emit: jest.fn().mockReturnValue(true),
-    on: jest.fn().mockReturnThis(),
-    once: jest.fn().mockReturnThis(),
-    off: jest.fn().mockReturnThis(),
-    removeAllListeners: jest.fn().mockReturnThis(),
-    addListener: jest.fn().mockReturnThis(),
-    removeListener: jest.fn().mockReturnThis(),
-    setMaxListeners: jest.fn().mockReturnThis(),
-    getMaxListeners: jest.fn().mockReturnValue(10),
-    listeners: jest.fn().mockReturnValue([]),
-    rawListeners: jest.fn().mockReturnValue([]),
-    listenerCount: jest.fn().mockReturnValue(0),
-    prependListener: jest.fn().mockReturnThis(),
-    prependOnceListener: jest.fn().mockReturnThis(),
-    eventNames: jest.fn().mockReturnValue([]),
-  } as any;
+  const mockEventPublisher = createMockEventEmitter();
+  const mockProgressEmitter = createMockEventEmitter();
 
   const mockSampleFunction = jest.fn().mockImplementation(() =>
     Promise.resolve({
@@ -194,36 +183,48 @@ export function createMockToolContext(overrides?: Partial<ToolContext>): ToolCon
     }),
   );
 
-  return {
+  // Type assertions for complex types that are properly mocked but need type casting
+  const typedWorkflowOrchestrator =
+    mockWorkflowOrchestrator as unknown as ToolContext['workflowOrchestrator'];
+  const typedWorkflowManager = mockWorkflowManager as unknown as ToolContext['workflowManager'];
+  const typedSampleFunction = mockSampleFunction as unknown as ToolContext['sampleFunction'];
+
+  const structuredSampler = {
+    generateStructured: jest
+      .fn()
+      .mockImplementation(() => Promise.resolve({ success: true, data: 'test' })),
+    generateDockerfile: jest
+      .fn()
+      .mockImplementation(() => Promise.resolve({ success: true, data: 'test' })),
+    generateKubernetesManifests: jest
+      .fn()
+      .mockImplementation(() => Promise.resolve({ success: true, data: 'test' })),
+    sampleStructured: jest
+      .fn()
+      .mockImplementation(() => Promise.resolve({ success: true, data: 'test' })),
+    sampleJSON: jest
+      .fn()
+      .mockImplementation(() => Promise.resolve({ success: true, data: 'test' })),
+  };
+
+  const contentValidator = {
+    validate: jest.fn().mockImplementation(() => ({ valid: true })),
+    validateDockerfile: jest.fn().mockImplementation(() => ({ valid: true })),
+    validateKubernetes: jest.fn().mockImplementation(() => ({ valid: true })),
+  };
+
+  const context: ToolContext = {
     server: {},
     logger: mockLogger,
-    workflowOrchestrator: mockWorkflowOrchestrator as any,
-    workflowManager: mockWorkflowManager as any,
+    workflowOrchestrator: typedWorkflowOrchestrator,
+    workflowManager: typedWorkflowManager,
     eventPublisher: mockEventPublisher,
     progressEmitter: mockProgressEmitter,
-    sampleFunction: mockSampleFunction as any,
-    structuredSampler: {
-      generateStructured: jest
-        .fn()
-        .mockImplementation(() => Promise.resolve({ success: true, data: 'test' })),
-      generateDockerfile: jest
-        .fn()
-        .mockImplementation(() => Promise.resolve({ success: true, data: 'test' })),
-      generateKubernetesManifests: jest
-        .fn()
-        .mockImplementation(() => Promise.resolve({ success: true, data: 'test' })),
-      sampleStructured: jest
-        .fn()
-        .mockImplementation(() => Promise.resolve({ success: true, data: 'test' })),
-      sampleJSON: jest
-        .fn()
-        .mockImplementation(() => Promise.resolve({ success: true, data: 'test' })),
-    } as any,
-    contentValidator: {
-      validate: jest.fn().mockImplementation(() => ({ valid: true })),
-      validateDockerfile: jest.fn().mockImplementation(() => ({ valid: true })),
-      validateKubernetes: jest.fn().mockImplementation(() => ({ valid: true })),
-    } as any,
+    ...(typedSampleFunction && { sampleFunction: typedSampleFunction }),
+    structuredSampler: structuredSampler as unknown as NonNullable<
+      ToolContext['structuredSampler']
+    >,
+    contentValidator: contentValidator as unknown as NonNullable<ToolContext['contentValidator']>,
     config: {
       aiServices: {
         ai: {
@@ -329,7 +330,7 @@ export function createMockToolContext(overrides?: Partial<ToolContext>): ToolCon
       isAvailable: jest.fn().mockImplementation(() => Promise.resolve(true)),
       validateContent: jest.fn().mockImplementation(() => Promise.resolve(true)),
       getModelInfo: jest.fn().mockImplementation(() => Promise.resolve({ model: 'test' })),
-    } as jest.Mocked<Partial<AIService>>,
+    } as unknown as jest.Mocked<AIService>,
     dockerService: {
       build: jest.fn().mockImplementation(() => Promise.resolve({ imageId: 'test-image' })),
       tag: jest.fn().mockImplementation(() => Promise.resolve(undefined)),
@@ -338,16 +339,18 @@ export function createMockToolContext(overrides?: Partial<ToolContext>): ToolCon
       inspect: jest.fn().mockImplementation(() => Promise.resolve({})),
       remove: jest.fn().mockImplementation(() => Promise.resolve(undefined)),
       isAvailable: jest.fn().mockImplementation(() => Promise.resolve(true)),
-    } as jest.Mocked<Partial<DockerService>>,
+    } as unknown as jest.Mocked<DockerService>,
     kubernetesService: {
       apply: jest.fn().mockImplementation(() => Promise.resolve({ success: true })),
       get: jest.fn().mockImplementation(() => Promise.resolve({})),
       delete: jest.fn().mockImplementation(() => Promise.resolve({ success: true })),
       create: jest.fn().mockImplementation(() => Promise.resolve({ success: true })),
       isAvailable: jest.fn().mockImplementation(() => Promise.resolve(true)),
-    } as jest.Mocked<Partial<KubernetesService>>,
+    } as unknown as jest.Mocked<KubernetesService>,
     ...overrides,
   };
+
+  return context;
 }
 
 /**

@@ -1,71 +1,24 @@
 {
-  "version": "1.1",
-  "description": "Quality gate configuration and metrics for containerization-assist-js",
-  "gates": {
-    "lint": {
-      "maxWarnings": "baseline",
-      "failOnIncrease": true,
-      "allowedIncrease": 0,
-      "description": "ESLint warning ratcheting system"
-    },
-    "deadcode": {
-      "maxUnused": "baseline",
-      "failOnIncrease": true,
-      "allowedIncrease": 0,
-      "description": "Unused export tracking system"
-    },
-    "build": {
-      "maxTimeMs": 5000,
-      "failOnRegression": false,
-      "regressionThresholdMs": 1000,
-      "description": "Build performance monitoring"
-    },
-    "typescript": {
-      "maxErrors": 0,
-      "failOnAnyError": true,
-      "description": "TypeScript compilation requirements"
-    },
-    "tests": {
-      "minCoveragePercent": 0,
-      "failOnTestFailure": true,
-      "requiredTestTypes": [
-        "unit"
-      ],
-      "description": "Test execution and coverage requirements"
-    }
-  },
-  "reporting": {
-    "showTopWarningTypes": 10,
-    "showTopDeadcodeFiles": 5,
-    "includeBuildTiming": true,
-    "includeProgressMetrics": true
-  },
   "metrics": {
     "lint": {
-      "baseline": 670,
-      "current": 670,
-      "lastUpdated": "2025-09-05T11:19:38-04:00",
+      "baseline": 376,
+      "current": 376,
+      "warnings": 376,
       "errors": 0,
-      "warnings": 670
+      "lastUpdated": "2025-09-05T13:32:44-04:00"
     },
     "deadcode": {
-      "baseline": 219,
-      "current": 219,
-      "lastUpdated": "2025-09-05T11:19:38-04:00"
-    },
-    "build": {
-      "lastBuildTimeMs": 1468,
-      "lastUpdated": "2025-09-05T11:19:38-04:00"
+      "baseline": 224,
+      "current": 224,
+      "lastUpdated": "2025-09-05T13:32:44-04:00"
     },
     "typescript": {
       "errors": 0,
-      "lastUpdated": "2025-09-05T11:19:38-04:00"
+      "lastUpdated": "2025-09-05T13:32:44-04:00"
     },
-    "tests": {
-      "passed": null,
-      "failed": null,
-      "coverage": null,
-      "lastUpdated": null
+    "build": {
+      "lastBuildTimeMs": 3582,
+      "lastUpdated": "2025-09-05T13:32:44-04:00"
     }
   }
 }

@@ -135,7 +135,13 @@ export async function getServiceEndpoints(
           (endpoint) => !serviceName || serviceName === '' || endpoint.service === serviceName,
         )
         .map((endpoint) => {
-          const entry: any = {
+          const entry: {
+            service: string;
+            type: string;
+            url?: string;
+            port?: number;
+            external: boolean;
+          } = {
             service: endpoint.service ?? 'unknown',
             type: 'ClusterIP',
             port: 80,
@@ -167,7 +173,11 @@ export async function getServiceEndpoints(
  * Analyze deployment issues
  */
 export function analyzeIssues(
-  deployments: Array<{ name: string; ready?: boolean; replicas?: any }>,
+  deployments: Array<{
+    name: string;
+    ready?: boolean;
+    replicas?: { ready: number; desired: number };
+  }>,
   pods: Array<{ ready: boolean; status?: string; restarts?: number }>,
   minReadyPods: number,
 ): string[] {
@@ -211,7 +221,18 @@ export async function getTargetResources(
   deployments: string[],
   services: string[],
   sessionId: string | undefined,
-  sessionService: any,
+  sessionService:
+    | {
+        get: (id: string) => Promise<{
+          workflow_state?: {
+            deployment_result?: {
+              deployment_name?: string;
+              service_name?: string;
+            };
+          };
+        }>;
+      }
+    | undefined,
 ): Promise<{ targetDeployments: string[]; targetServices: string[] }> {
   let targetDeployments = deployments;
   let targetServices = services;
@@ -249,7 +270,11 @@ export async function checkAllDeployments(
   Array<{
     name: string;
     ready: boolean;
-    replicas: any;
+    replicas: {
+      desired: number;
+      current: number;
+      ready: number;
+    };
     conditions?: unknown[];
   }>
 > {
@@ -257,7 +282,11 @@ export async function checkAllDeployments(
   const deploymentResults: Array<{
     name: string;
     ready: boolean;
-    replicas: any;
+    replicas: {
+      desired: number;
+      current: number;
+      ready: number;
+    };
     conditions?: unknown[];
   }> = [];
 

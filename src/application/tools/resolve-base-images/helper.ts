@@ -214,15 +214,15 @@ export function buildBaseImageAIRequest(
 ): {
   purpose: string;
   format: string;
-  context: any;
-  sessionId: any;
+  context: unknown;
+  sessionId: unknown;
   sampling: { temperature: number; maxTokens: number };
   variables: {
-    targetEnvironment: any;
-    securityLevel: any;
-    performancePriority: any;
-    architectures: any;
-    complianceRequirements: any;
+    targetEnvironment: unknown;
+    securityLevel: unknown;
+    performancePriority: unknown;
+    architectures: unknown;
+    complianceRequirements: unknown;
     suggestedImages: string;
   };
 } {

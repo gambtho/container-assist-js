@@ -271,8 +271,8 @@ const generateDockerfileHandler: ToolDescriptor<GenerateDockerfileParams, Docker
         throw new DomainError(ErrorCode.DependencyNotInitialized, 'Session service not available');
       }
 
-      type SessionService = { get: (id: string) => Promise<Session | null> };
-      const sessionResult = await (sessionService as SessionService).get(sessionId);
+      type MinimalSessionService = { get: (id: string) => Promise<Session | null> };
+      const sessionResult = await (sessionService as MinimalSessionService).get(sessionId);
       if (!sessionResult) {
         throw new DomainError(ErrorCode.SessionNotFound, 'Session not found');
       }
@@ -332,10 +332,49 @@ const generateDockerfileHandler: ToolDescriptor<GenerateDockerfileParams, Docker
       const validation = analyzeDockerfileSecurity(dockerfileContent);
 
       // Update session with Dockerfile info
-      await sessionService.updateAtomic(sessionId, (currentSession: any) => ({
+      await sessionService.updateAtomic(sessionId, (currentSession) => ({
         ...currentSession,
         workflow_state: {
           ...((currentSession.workflow_state as Record<string, unknown>) ?? {}),
+          metadata:
+            ((currentSession.workflow_state as Record<string, unknown>)?.metadata as Record<
+              string,
+              unknown
+            >) || {},
+          completed_steps:
+            ((currentSession.workflow_state as Record<string, unknown>)
+              ?.completed_steps as string[]) ?? [],
+          errors:
+            ((currentSession.workflow_state as Record<string, unknown>)?.errors as Record<
+              string,
+              unknown
+            >) ?? {},
+          dockerfile_fix_history:
+            ((currentSession.workflow_state as Record<string, unknown>)
+              ?.dockerfile_fix_history as Array<{
+              error: string;
+              timestamp: string;
+              fix: {
+                root_cause_analysis: string;
+                fixed_dockerfile: string;
+                changes_made: {
+                  line_changed: string;
+                  old_content: string;
+                  new_content: string;
+                  reasoning: string;
+                }[];
+                security_improvements: string[];
+                performance_optimizations: string[];
+                alternative_approaches: {
+                  approach: string;
+                  pros: string[];
+                  cons: string[];
+                  when_to_use: string;
+                }[];
+                testing_recommendations: string[];
+                prevention_tips: string[];
+              };
+            }>) ?? [],
           dockerfile_result: {
             content: dockerfileContent,
             path: dockerfilePath,

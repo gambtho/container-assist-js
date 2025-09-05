@@ -12,14 +12,8 @@ if (process.env.SKIP_DECLARATIONS === 'true') {
 } else {
   try {
     console.log('📝 Generating TypeScript declarations...');
-    // Generate declarations in parallel for multiple entry points
-    const declarationPromises = [
-      new Promise((resolve) => {
-        execSync('npx tsc --emitDeclarationOnly --outDir dist --skipLibCheck --skipDefaultLibCheck --incremental --tsBuildInfoFile .tsbuildinfo', { stdio: 'pipe' });
-        resolve();
-      })
-    ];
-    await Promise.all(declarationPromises);
+    // Generate declarations synchronously
+    execSync('npx tsc --emitDeclarationOnly --outDir dist --skipLibCheck --skipDefaultLibCheck --incremental --tsBuildInfoFile .tsbuildinfo', { stdio: 'pipe' });
     console.log('✅ TypeScript declarations generated');
   } catch (error) {
     console.warn('⚠️  Warning: Could not generate TypeScript declarations:', error.message);

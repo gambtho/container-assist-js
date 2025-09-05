@@ -9,10 +9,6 @@ Comprehensive guides for working with the project:
 - **[testing.md](./guides/testing.md)** - Complete testing guide (unit, integration, CI/CD)
 - **[quality-management.md](./guides/quality-management.md)** - Code quality, linting, and technical debt management
 
-### [Development](./development/)
-Developer-specific documentation:
-- **[claude-guide.md](./development/claude-guide.md)** - Guidelines specific to Claude Code AI assistant
-
 ### [Reference](./reference/)
 Technical reference documentation:
 - **[ai-architecture.md](./reference/ai-architecture.md)** - AI system architecture and tool design
@@ -38,4 +34,3 @@ All documentation in this project follows these conventions:
 - **Testing Procedures**: See [guides/testing.md](./guides/testing.md)
 - **Quality Gates**: See [guides/quality-management.md](./guides/quality-management.md)
 - **AI Tools**: See [reference/ai-architecture.md](./reference/ai-architecture.md)
-- **Claude-Specific**: See [development/claude-guide.md](./development/claude-guide.md)

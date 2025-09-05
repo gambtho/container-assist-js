@@ -9,10 +9,17 @@ import { type Result, Success, Failure } from '../../../domain/types/result';
  * Validate Docker tag format
  */
 function isValidDockerTag(tag: string): boolean {
-  // Docker tag rules: lowercase alphanumeric, periods, underscores, hyphens
-  // Cannot start with period or hyphen, max 128 characters
-  const tagRegex = /^[a-z0-9][a-z0-9._-]{0,127}$/;
-  return tagRegex.test(tag.toLowerCase());
+  // Docker tag rules: [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
+  const tagRegex = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
+  return tagRegex.test(tag);
+}
+
+/**
+ * Validate Docker repository name format
+ */
+function isValidDockerRepoName(name: string): boolean {
+  // single-segment repo name, lowercase only
+  return /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(name);
 }
 
 /**
@@ -53,9 +60,10 @@ export function generateSemanticTags(
       tags.push(`${prefix}${imageName}:v${major}.${minor}.${patch}-${prerelease}`);
     }
 
-    // Add build metadata tag if present
+    // Add build metadata tag if present ('+' is invalid in Docker tags, use '.')
     if (buildMeta) {
-      tags.push(`${prefix}${imageName}:${major}.${minor}.${patch}+${buildMeta}`);
+      const safeBuildMeta = buildMeta.replace(/[^A-Za-z0-9_.-]/g, '.');
+      tags.push(`${prefix}${imageName}:${major}.${minor}.${patch}.${safeBuildMeta}`);
     }
   } else {
     // Non-semantic version - validate it's safe for Docker tags
@@ -82,7 +90,7 @@ export function generateStandardTags(
   const timestamp = new Date().toISOString().split('T')[0];
 
   // Validate project name
-  if (!projectName || !isValidDockerTag(projectName)) {
+  if (!projectName || !isValidDockerRepoName(projectName)) {
     return Failure(`Invalid project name for Docker image: ${projectName}`);
   }
 
@@ -148,10 +156,7 @@ export async function tagDockerImage(
 
   try {
     if (dockerService && 'tag' in dockerService) {
-      interface DockerTagService {
-        tag: (source: string, target: string) => Promise<void>;
-      }
-      await (dockerService as DockerTagService).tag(source, target);
+      await dockerService.tag({ image: source, tag: target });
       return Success({ source, target, success: true });
     }
 
@@ -170,7 +175,7 @@ export async function tagDockerImage(
 export async function getSourceImage(
   sourceImage: string | undefined,
   sessionId: string | undefined,
-  sessionService: any,
+  sessionService: unknown,
 ): Promise<Result<{ source: string; projectName: string }>> {
   let source = sourceImage;
   let projectName = 'app';
@@ -178,10 +183,17 @@ export async function getSourceImage(
   // Get from session if not provided
   if (!source && sessionId && sessionService) {
     try {
-      const session = await sessionService.get(sessionId);
-      if (!session) {
+      const sessionData = await (sessionService as { get: (id: string) => Promise<unknown> }).get(
+        sessionId,
+      );
+      if (!sessionData) {
         return Failure('Session not found');
       }
+
+      const session = sessionData as {
+        workflow_state?: { build_result?: { imageId?: string; tag?: string } };
+        metadata?: { projectName?: string };
+      };
 
       const buildResult = session.workflow_state?.build_result;
       if (buildResult) {
@@ -200,7 +212,7 @@ export async function getSourceImage(
   }
 
   // Validate project name for Docker compatibility
-  if (!isValidDockerTag(projectName)) {
+  if (!isValidDockerRepoName(projectName)) {
     projectName = 'app'; // Fallback to safe default
   }
 
@@ -255,8 +267,9 @@ export function generateAllTags(
   }
 
   // Add registry prefix if not already present
-  if (registry != null) {
-    allTags = allTags.map((tag) => (tag.startsWith(registry) ? tag : `${registry}/${tag}`));
+  if (registry && registry.trim() !== '') {
+    const pref = registry.trim().replace(/\/+$/, '');
+    allTags = allTags.map((tag) => (tag.startsWith(`${pref}/`) ? tag : `${pref}/${tag}`));
   }
 
   // Remove duplicates
@@ -281,7 +294,7 @@ export async function applyTags(
 
     if (result.ok) {
       tagResults.push({
-        tag: tag.split('/').pop() || tag,
+        tag: tag.split('/').pop() ?? tag,
         fullTag: tag,
         created: result.value.success,
       });
@@ -294,7 +307,7 @@ export async function applyTags(
     } else {
       logger.error({ source, tag, error: result.error }, 'Error tagging image');
       tagResults.push({
-        tag: tag.split('/').pop() || tag,
+        tag: tag.split('/').pop() ?? tag,
         fullTag: tag,
         created: false,
       });

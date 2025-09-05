@@ -107,9 +107,9 @@ describe('generate-k8s-manifests tool', () => {
       expect(result).toEqual({
         success: true,
         sessionId: 'test-session',
-        manifests: expect.any(String),
+        manifests: expect.any(String) as string,
         path: './k8s/',
-        resources: expect.any(Array),
+        resources: expect.any(Array) as unknown[],
       });
 
       expect(mockHelper.generateK8sManifests).toHaveBeenCalledWith(
@@ -299,7 +299,7 @@ describe('generate-k8s-manifests tool', () => {
       );
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        { error: expect.any(Error) },
+        { error: expect.any(Error) as Error },
         'K8s manifest generation failed',
       );
     });
@@ -309,7 +309,8 @@ describe('generate-k8s-manifests tool', () => {
         ErrorCode.AI_SERVICE_ERROR,
         'Failed to parse YAML manifests',
       );
-      (mockHelper.generateK8sManifests as jest.Mock).mockRejectedValue(domainError);
+      const mockGenerateK8s = mockHelper.generateK8sManifests as jest.Mock;
+      mockGenerateK8s.mockRejectedValue(domainError);
 
       const input: GenerateK8sManifestsParams = {
         sessionId: 'domain-error-test',
@@ -392,7 +393,7 @@ describe('generate-k8s-manifests tool', () => {
       expect(generateKubernetesManifestsHandler.chainHint).toMatchObject({
         nextTool: 'deploy_application',
         reason: 'Deploy generated manifests to Kubernetes cluster',
-        paramMapper: expect.any(Function),
+        paramMapper: expect.any(Function) as unknown,
       });
     });
 
@@ -443,9 +444,9 @@ describe('generate-k8s-manifests tool', () => {
       expect(result).toMatchObject({
         success: true,
         sessionId: 'output-validation-test',
-        manifests: expect.any(String),
-        path: expect.any(String),
-        resources: expect.any(Array),
+        manifests: expect.any(String) as string,
+        path: expect.any(String) as string,
+        resources: expect.any(Array) as unknown[],
       });
     });
 

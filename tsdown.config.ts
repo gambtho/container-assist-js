@@ -5,17 +5,17 @@ import { existsSync } from 'fs';
 const isTestBuild = process.env.BUILD_TEST_UTILS === 'true';
 
 const mainEntries = {
+  // Main entry point (package.json main/exports ".")
   'src/index': 'src/index.ts',
+  // CLI entry point (package.json bin)
   'apps/cli': 'apps/cli.ts',
-  'apps/server': 'apps/server.ts',
-  // Additional exports from package.json
-  'service/tools/ops/registry': 'src/application/tools/ops/registry.ts',
+  // Additional exports from package.json exports (match output paths)
   'domain/types/index': 'src/domain/types/index.ts',
   'service/config/config': 'src/config/index.ts'
 };
 
 const testEntries = {
-  // Test utilities for integration scripts
+  // Test utilities for integration scripts (only included when BUILD_TEST_UTILS=true)
   'test/utils/environment-detector': 'test/utils/environment-detector.ts',
   'test/utils/integration-test-utils': 'test/utils/integration-test-utils.ts',
   'test/utils/trivy-scanner-factory': 'test/utils/trivy-scanner-factory.ts'

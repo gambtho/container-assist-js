@@ -85,7 +85,9 @@ export class AIService {
     return this.client.suggestOptimizations(dockerfile);
   }
 
-  async fixDockerfile(dockerfile: string, error: string): Promise<string> {
+  async fixDockerfile(dockerfile: string, issues: string[]): Promise<string> {
+    // Convert array of issues to a single error string for the client
+    const error = issues.join('\n');
     return this.client.fixDockerfile(dockerfile, error);
   }
 
@@ -95,6 +97,16 @@ export class AIService {
 
   getModelPreference(taskType: string): string {
     return this.client.getModelPreference(taskType);
+  }
+
+  /**
+   * Enhance Kubernetes manifests with best practices
+   */
+  enhanceManifests(manifests: unknown[]): Promise<unknown[]> {
+    // For now, return manifests as-is since AI enhancement would require
+    // additional implementation in the AIClient
+    this.logger.debug({ count: manifests.length }, 'Enhancing manifests (passthrough)');
+    return Promise.resolve(manifests);
   }
 }
 

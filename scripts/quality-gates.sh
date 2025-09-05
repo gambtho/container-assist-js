@@ -8,7 +8,7 @@ echo ""
 
 # Configuration
 QUALITY_CONFIG="quality-gates.json"
-LINT_OUTPUT_FILE="reports/current-lint-output.txt"
+
 
 # Check for required tools
 for cmd in npm bc jq; do
@@ -39,6 +39,38 @@ print_status() {
     esac
 }
 
+# Bootstrap quality-gates.json if it doesn't exist
+if [ ! -f "$QUALITY_CONFIG" ]; then
+    echo "Creating default quality-gates.json configuration file..."
+    cat > "$QUALITY_CONFIG" << 'EOF'
+{
+  "metrics": {
+    "lint": {
+      "baseline": null,
+      "current": 0,
+      "warnings": 0,
+      "errors": 0,
+      "lastUpdated": null
+    },
+    "deadcode": {
+      "baseline": null,
+      "current": 0,
+      "lastUpdated": null
+    },
+    "typescript": {
+      "errors": 0,
+      "lastUpdated": null
+    },
+    "build": {
+      "lastBuildTimeMs": 0,
+      "lastUpdated": null
+    }
+  }
+}
+EOF
+    print_status "INFO" "Created default quality-gates.json configuration file"
+fi
+
 # Read baselines from JSON
 BASELINE_WARNINGS=$(jq -r '.metrics.lint.baseline' $QUALITY_CONFIG)
 DEADCODE_BASELINE=$(jq -r '.metrics.deadcode.baseline' $QUALITY_CONFIG)
@@ -48,10 +80,10 @@ echo "Gate 1: ESLint Error Check"
 echo "-------------------------"
 
 # Run lint and get current counts
-npm run lint > $LINT_OUTPUT_FILE 2>&1 || true
+LINT_OUTPUT=$(npm run lint 2>&1 || true)
 
 # Parse errors and warnings
-SUMMARY_LINE=$(grep -E "problems.*error.*warning" $LINT_OUTPUT_FILE | tail -1 2>/dev/null || echo "")
+SUMMARY_LINE=$(echo "$LINT_OUTPUT" | grep -E "problems.*error.*warning" | tail -1 2>/dev/null || echo "")
 if [ -n "$SUMMARY_LINE" ]; then
     CURRENT_ERRORS=$(echo "$SUMMARY_LINE" | sed -n 's/.*(\([0-9]\+\) error.*/\1/p' 2>/dev/null || echo "0")
     CURRENT_WARNINGS=$(echo "$SUMMARY_LINE" | sed -n 's/.*, \([0-9]\+\) warning.*/\1/p' 2>/dev/null || echo "0")
@@ -81,6 +113,16 @@ else
 fi
 
 echo ""
+
+# Handle null lint baseline for first run
+if [ "$BASELINE_WARNINGS" = "null" ] || [ -z "$BASELINE_WARNINGS" ]; then
+    print_status "INFO" "No lint baseline set, using current warnings ($CURRENT_WARNINGS) as baseline"
+    BASELINE_WARNINGS="$CURRENT_WARNINGS"
+    # Update the baseline in the config file
+    jq --arg warnings "$CURRENT_WARNINGS" \
+       '.metrics.lint.baseline = ($warnings | tonumber)' \
+       $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+fi
 
 # Gate 2: ESLint Warning Ratcheting
 echo "Gate 2: ESLint Warning Ratcheting"
@@ -143,6 +185,16 @@ DEADCODE_COUNT=$(npx ts-prune --project tsconfig.json 2>/dev/null | grep -v 'use
 jq --arg count "$DEADCODE_COUNT" --arg ts "$TIMESTAMP" \
    '.metrics.deadcode.current = ($count | tonumber) | .metrics.deadcode.lastUpdated = $ts' \
    $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+
+# Handle null deadcode baseline for first run
+if [ "$DEADCODE_BASELINE" = "null" ] || [ -z "$DEADCODE_BASELINE" ]; then
+    print_status "INFO" "No deadcode baseline set, using current dead code count ($DEADCODE_COUNT) as baseline"
+    DEADCODE_BASELINE="$DEADCODE_COUNT"
+    # Update the baseline in the config file
+    jq --arg deadcode "$DEADCODE_COUNT" \
+       '.metrics.deadcode.baseline = ($deadcode | tonumber)' \
+       $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+fi
 
 if [ "$DEADCODE_COUNT" -le "$DEADCODE_BASELINE" ]; then
     DEADCODE_REDUCTION=$((DEADCODE_BASELINE - DEADCODE_COUNT))
