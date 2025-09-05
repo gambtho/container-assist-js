@@ -3,9 +3,8 @@
  * Provides access to workflow states and session data via MCP resources
  */
 
-// import type { Server } from '@modelcontextprotocol/sdk/server/index';
 import type { Logger } from 'pino';
-import type { SessionService } from '../../services/session.js';
+import type { SessionService } from '../../services/session';
 
 // Type definitions for session data
 interface SessionData {

@@ -4,9 +4,9 @@
  */
 
 import type { Logger } from 'pino';
-import { CommandExecutor } from '../command-executor.js';
-import { DockerScanResult, ScanOptions } from '../../contracts/types/index.js';
-import { ok, fail, Result } from '../../domain/types/result.js';
+import { CommandExecutor } from '../command-executor';
+import { DockerScanResult, ScanOptions } from '../../domain/types/index';
+import { Success, Failure, Result } from '../../domain/types/result';
 
 export interface TrivyConfig {
   scannerPath?: string;
@@ -63,8 +63,9 @@ export class TrivyScanner {
   constructor(
     private readonly logger: Logger,
     config?: TrivyConfig,
+    executor?: CommandExecutor,
   ) {
-    this.executor = new CommandExecutor(logger);
+    this.executor = executor ?? new CommandExecutor(logger);
     this.config = {
       scannerPath: config?.scannerPath ?? 'trivy',
       cacheDir: config?.cacheDir ?? '/tmp/trivy-cache',
@@ -83,9 +84,8 @@ export class TrivyScanner {
       // Check if Trivy is available
       const isAvailable = await this.executor.isAvailable(this.config.scannerPath);
       if (!isAvailable) {
-        return fail(
+        return Failure(
           'Trivy is not installed. Please install Trivy to enable vulnerability scanning.',
-          'TRIVY_NOT_FOUND',
         );
       }
 
@@ -111,10 +111,10 @@ export class TrivyScanner {
       }
 
       this.isInitialized = true;
-      return ok(undefined);
+      return Success(undefined);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      return fail(`Failed to initialize Trivy scanner: ${message}`, 'TRIVY_INIT_FAILED');
+      return Failure(`Failed to initialize Trivy scanner: ${message}`);
     }
   }
 
@@ -124,7 +124,7 @@ export class TrivyScanner {
   async isAvailable(): Promise<boolean> {
     if (!this.isInitialized) {
       const initResult = await this.initialize();
-      return initResult.kind === 'ok';
+      return initResult.ok;
     }
     return true;
   }
@@ -136,7 +136,7 @@ export class TrivyScanner {
     // Ensure scanner is initialized
     if (!this.isInitialized) {
       const initResult = await this.initialize();
-      if (initResult.kind === 'fail') {
+      if (!initResult.ok) {
         return initResult;
       }
     }
@@ -169,19 +169,19 @@ export class TrivyScanner {
       });
 
       if (result.timedOut) {
-        return fail('Trivy scan timed out', 'SCAN_TIMEOUT');
+        return Failure('Trivy scan timed out');
       }
 
       if (result.exitCode !== 0 && !result.stdout) {
-        return fail(`Trivy scan failed: ${result.stderr || 'Unknown error'}`, 'SCAN_FAILED');
+        return Failure(`Trivy scan failed: ${result.stderr || 'Unknown error'}`);
       }
 
       // Parse Trivy output
       const scanResult = this.parseTrivyOutput(result.stdout, image);
-      return ok(scanResult);
+      return Success(scanResult);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      return fail(`Image scan failed: ${message}`, 'SCAN_ERROR');
+      return Failure(`Image scan failed: ${message}`);
     }
   }
 

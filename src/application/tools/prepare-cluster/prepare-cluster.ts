@@ -2,15 +2,15 @@
  * Prepare Cluster - MCP SDK Compatible Version
  */
 
-import { ErrorCode, InfrastructureError } from '../../../contracts/types/errors.js';
+import { ErrorCode, InfrastructureError } from '../../../domain/types/errors';
 import {
   PrepareClusterInput,
   type PrepareClusterParams,
   BaseSessionResultSchema,
-} from '../schemas.js';
+} from '../schemas';
 import { z } from 'zod';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
-import type { Session } from '../../../contracts/types/session.js';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
+import type { Session } from '../../../domain/types/session';
 
 // Type aliases
 export type PrepareClusterInputType = PrepareClusterParams;
@@ -52,7 +52,7 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInputType, PrepareClus
 
       // Emit progress
       if (progressEmitter) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'prepare_cluster',
           status: 'in_progress',
@@ -75,7 +75,7 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInputType, PrepareClus
 
       // Emit completion
       if (progressEmitter) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'prepare_cluster',
           status: 'completed',
@@ -95,7 +95,7 @@ const prepareClusterHandler: ToolDescriptor<PrepareClusterInputType, PrepareClus
 
       // Emit error
       if (progressEmitter) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'prepare_cluster',
           status: 'failed',

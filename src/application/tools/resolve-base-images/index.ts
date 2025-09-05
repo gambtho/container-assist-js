@@ -9,4 +9,4 @@
  * @module src/application/tools/resolve-base-images/index
  */
 
-export { default } from './resolve-base-images.js';
+export { default } from './resolve-base-images';

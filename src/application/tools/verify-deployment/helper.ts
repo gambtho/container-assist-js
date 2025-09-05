@@ -2,7 +2,7 @@
  * Verify Deployment - Helper Functions
  */
 
-import type { ToolContext } from '../tool-types.js';
+import type { ToolContext } from '../tool-types';
 
 /**
  * Check deployment health
@@ -17,14 +17,34 @@ export async function checkDeploymentHealth(
   status?: 'healthy' | 'unhealthy' | 'degraded';
   response_time_ms?: number;
 }> {
-  const { kubernetesService, logger } = context;
+  const kubernetesService: unknown = context.kubernetesService;
+  const logger = context.logger;
 
   if (
     kubernetesService != null &&
+    typeof kubernetesService === 'object' &&
     'getStatus' in kubernetesService &&
     typeof kubernetesService.getStatus === 'function'
   ) {
-    const result = await kubernetesService.getStatus(`deployment/${deploymentName}`, namespace);
+    interface KubernetesStatusService {
+      getStatus: (
+        deployment: string,
+        namespace: string,
+      ) => Promise<{
+        success: boolean;
+        data?: {
+          name: string;
+          endpoint: string;
+          status?: 'healthy' | 'unhealthy' | 'degraded';
+          response_time_ms?: number;
+        };
+        error?: { message: string };
+      }>;
+    }
+    const result = await (kubernetesService as KubernetesStatusService).getStatus(
+      `deployment/${deploymentName}`,
+      namespace,
+    );
 
     if (result?.success === true && result?.data != null) {
       return result.data;
@@ -88,21 +108,44 @@ export async function getServiceEndpoints(
 ): Promise<
   Array<{ service: string; type: string; url?: string; port?: number; external: boolean }>
 > {
-  const { kubernetesService, logger } = context;
+  const kubernetesService: unknown = context.kubernetesService;
+  const logger = context.logger;
 
-  if (kubernetesService != null && 'getEndpoints' in kubernetesService) {
-    const result = await kubernetesService.getEndpoints(namespace);
+  if (
+    kubernetesService &&
+    typeof kubernetesService === 'object' &&
+    'getEndpoints' in kubernetesService &&
+    typeof kubernetesService.getEndpoints === 'function'
+  ) {
+    const serviceWithEndpoints = kubernetesService as {
+      getEndpoints: (namespace: string) => Promise<{
+        success?: boolean;
+        data?: Array<{
+          service?: string;
+          url?: string;
+        }>;
+      }>;
+    };
 
-    if (result?.success === true && result?.data != null) {
-      return (result.data as any[])
-        .filter((e: any) => serviceName == null || serviceName === '' || e.service === serviceName)
-        .map((e: any) => ({
-          service: e.service,
-          type: 'ClusterIP',
-          url: e.url,
-          port: 80,
-          external: Boolean(e.url) && !String(e.url).includes('cluster.local'),
-        }));
+    const result = await serviceWithEndpoints.getEndpoints(namespace);
+
+    if (result?.success === true && result?.data != null && Array.isArray(result.data)) {
+      return result.data
+        .filter(
+          (endpoint) => !serviceName || serviceName === '' || endpoint.service === serviceName,
+        )
+        .map((endpoint) => {
+          const entry: any = {
+            service: endpoint.service ?? 'unknown',
+            type: 'ClusterIP',
+            port: 80,
+            external: Boolean(endpoint.url) && !String(endpoint.url).includes('cluster.local'),
+          };
+          if (endpoint.url !== undefined) {
+            entry.url = endpoint.url;
+          }
+          return entry;
+        });
     }
   }
 

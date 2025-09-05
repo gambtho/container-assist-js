@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { AIResponseCache, type CacheOptions } from '../response-cache.js';
+import { AIResponseCache, type CacheOptions } from '../response-cache';
 import type { Logger } from 'pino';
-import type { AIRequest } from '../../ai-request-builder.js';
+import type { AIRequest } from '../requests';
 
 // Mock logger
 const mockLogger: Logger = {
@@ -14,11 +14,11 @@ const mockLogger: Logger = {
   info: jest.fn(),
   warn: jest.fn(),
   error: jest.fn(),
-} as any;
+} as Logger;
 
 describe('AIResponseCache', () => {
   let cache: AIResponseCache;
-  let mockClock: any;
+  let mockClock: { now: number; advance: (ms: number) => void };
 
   const sampleRequest: AIRequest = {
     prompt: 'Generate a Dockerfile for Python',
@@ -78,14 +78,14 @@ describe('AIResponseCache', () => {
     });
 
     it('should return null for non-existent entries', async () => {
-      const nonExistentRequest = { ...sampleRequest, prompt: 'Different prompt' };
+      const nonExistentRequest: AIRequest = { ...sampleRequest, prompt: 'Different prompt' };
       const cached = await cache.get(nonExistentRequest);
       expect(cached).toBeNull();
     });
 
     it('should generate different keys for different requests', async () => {
-      const request1 = { ...sampleRequest };
-      const request2 = { ...sampleRequest, temperature: 0.5 };
+      const request1: AIRequest = { ...sampleRequest };
+      const request2: AIRequest = { ...sampleRequest, temperature: 0.5 };
 
       await cache.set(request1, 'response1', true);
       await cache.set(request2, 'response2', true);
@@ -102,8 +102,9 @@ describe('AIResponseCache', () => {
       await cache.set(sampleRequest, stringResponse, true);
       expect(await cache.get(sampleRequest)).toBe(stringResponse);
 
-      await cache.set({ ...sampleRequest, prompt: 'different' }, objectResponse, true);
-      expect(await cache.get({ ...sampleRequest, prompt: 'different' })).toEqual(objectResponse);
+      const differentRequest: AIRequest = { ...sampleRequest, prompt: 'different' };
+      await cache.set(differentRequest, objectResponse, true);
+      expect(await cache.get(differentRequest)).toEqual(objectResponse);
     });
   });
 
@@ -298,15 +299,17 @@ describe('AIResponseCache', () => {
       );
       const k8sTemplate = stats.topTemplates.find((t) => t.templateId === 'k8s-generation');
 
-      expect(dockerTemplate?.accessCount).toBeGreaterThan(k8sTemplate?.accessCount || 0);
+      expect(dockerTemplate?.accessCount).toBeGreaterThan(k8sTemplate?.accessCount ?? 0);
     });
 
     it('should calculate average response size', async () => {
       const smallResponse = 'small';
       const largeResponse = 'x'.repeat(1000);
 
-      await cache.set({ ...sampleRequest, prompt: 'small' }, smallResponse, true);
-      await cache.set({ ...sampleRequest, prompt: 'large' }, largeResponse, true);
+      const smallRequest: AIRequest = { ...sampleRequest, prompt: 'small' };
+      const largeRequest: AIRequest = { ...sampleRequest, prompt: 'large' };
+      await cache.set(smallRequest, smallResponse, true);
+      await cache.set(largeRequest, largeResponse, true);
 
       const stats = cache.getStats();
       expect(stats.averageResponseSize).toBeGreaterThan(0);

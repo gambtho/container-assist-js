@@ -3,9 +3,9 @@
  * Provides high-level operations on top of the session store
  */
 
-import { Session, WorkflowState, ServiceError, ErrorCode } from '../../contracts/types/index.js';
+import { Session, WorkflowState, ServiceError, ErrorCode } from '../../domain/types';
 import type { Logger } from 'pino';
-import { SessionStore, SessionFilter } from '../../contracts/types/session-store.js';
+import { SessionStore, SessionFilter } from '../../domain/types/session-store';
 import { SessionUtils } from './utils';
 import { EventEmitter } from 'events';
 import * as path from 'node:path';

@@ -2,16 +2,16 @@
  * Scan Image - MCP SDK Compatible Version
  */
 
-import { DockerScanResult } from '../../../contracts/types/index.js';
-import { DomainError, ErrorCode } from '../../../contracts/types/errors.js';
+import { DockerScanResult } from '../../../domain/types/index';
+import { DomainError, ErrorCode } from '../../../domain/types/errors';
 import {
   ScanImageInput,
   type ScanImageParams,
   ScanResultSchema,
   type ScanResult,
-} from '../schemas.js';
-import type { ToolDescriptor, ToolContext } from '../tool-types.js';
-import type { Session } from '../../../contracts/types/session.js';
+} from '../schemas';
+import type { ToolDescriptor, ToolContext } from '../tool-types';
+import type { Session } from '../../../domain/types/session';
 
 // Type aliases
 export type ScanInput = ScanImageParams;
@@ -89,7 +89,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
 
       // Emit progress
       if (progressEmitter) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'scan_image',
           status: 'in_progress',
@@ -135,7 +135,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
 
       // Emit completion
       if (progressEmitter) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'scan_image',
           status: 'completed',
@@ -160,7 +160,7 @@ const scanImageHandler: ToolDescriptor<ScanInput, ScanOutput> = {
       logger.error({ error }, 'Image scan failed');
 
       if (progressEmitter) {
-        await progressEmitter.emit({
+        progressEmitter.emit('progress', {
           sessionId,
           step: 'scan_image',
           status: 'failed',

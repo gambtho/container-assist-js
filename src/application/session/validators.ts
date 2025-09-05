@@ -3,7 +3,7 @@
  * Provides safe access to session workflow state
  */
 
-import type { Session, AnalysisResult, DockerBuildResult } from '../../contracts/types/index.js';
+import type { Session, AnalysisResult, DockerBuildResult } from '../../domain/types/index';
 
 /**
  * Get analysis result from session workflow state

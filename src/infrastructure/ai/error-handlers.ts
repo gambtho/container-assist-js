@@ -3,7 +3,7 @@
  * Replaces complex strategy pattern with direct function-based error handling
  */
 
-import type { AIRequest } from './requests.js';
+import type { AIRequest } from './requests';
 
 /**
  * Error handler function type - much simpler than strategy classes
@@ -68,12 +68,12 @@ const ERROR_HANDLERS: Record<string, ErrorHandler> = {
 function handleJsonParseError(error: Error, request: AIRequest): AIRequest {
   // Extract any malformed JSON from error message for context
   const jsonMatch = error.message.match(/(?:JSON|json)[\s\S]*?(\{[\s\S]*?\}|\[[\s\S]*?\])/);
-  const malformedContent = jsonMatch?.[1] || '';
+  const malformedContent = jsonMatch?.[1] ?? '';
 
   return {
     ...request,
     temperature: 0.1, // Very low for precise JSON
-    maxTokens: Math.min(request.maxTokens || 1000, 2000),
+    maxTokens: Math.min(request.maxTokens ?? 1000, 2000),
     prompt: `${request.prompt}\n\nIMPORTANT: Return only valid JSON with no additional text or formatting.`,
     context: {
       ...request.context,
@@ -91,12 +91,12 @@ function handleJsonParseError(error: Error, request: AIRequest): AIRequest {
  * Timeout error recovery - reduce token count and simplify
  */
 function handleTimeoutError(_error: Error, request: AIRequest): AIRequest {
-  const currentTokens = request.maxTokens || 1000;
+  const currentTokens = request.maxTokens ?? 1000;
 
   return {
     ...request,
     maxTokens: Math.floor(currentTokens * 0.7), // 30% reduction
-    temperature: Math.max(0.1, (request.temperature || 0.2) * 0.9), // Slightly lower
+    temperature: Math.max(0.1, (request.temperature ?? 0.2) * 0.9), // Slightly lower
     prompt: `${request.prompt}\n\nProvide a concise, focused response.`,
     context: {
       ...request.context,
@@ -130,7 +130,7 @@ function handleRateLimitError(_error: Error, request: AIRequest): AIRequest {
  * Token limit error recovery - reduce both prompt and max tokens
  */
 function handleTokenLimitError(_error: Error, request: AIRequest): AIRequest {
-  const currentTokens = request.maxTokens || 1000;
+  const currentTokens = request.maxTokens ?? 1000;
 
   // Truncate prompt if very long (rough heuristic: 1 token ≈ 4 characters)
   let prompt = request.prompt;

@@ -9,4 +9,4 @@
  * @module src/application/tools/push-image/index
  */
 
-export { default } from './push-image.js';
+export { default } from './push-image';

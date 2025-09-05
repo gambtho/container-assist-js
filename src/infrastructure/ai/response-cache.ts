@@ -5,7 +5,7 @@
 
 import type { Logger } from 'pino';
 import { createHash } from 'crypto';
-import type { AIRequest } from './requests.js';
+import type { AIRequest } from './requests';
 
 /**
  * Cached response with metadata
@@ -153,7 +153,7 @@ export class AIResponseCache {
    * Get cached response if available and not expired
    * @param request - AI request to check cache for
    */
-  async get<T = any>(request: AIRequest): Promise<T | null> {
+  async get<T = unknown>(request: AIRequest): Promise<T | null> {
     if (!this.options.enabled) {
       return null;
     }
@@ -200,7 +200,7 @@ export class AIResponseCache {
    * @param wasSuccessful - Whether the response was successful
    * @param tokensUsed - Number of tokens used (if available)
    */
-  async set<T = any>(
+  async set<T = unknown>(
     request: AIRequest,
     response: T,
     wasSuccessful: boolean = true,
@@ -220,7 +220,7 @@ export class AIResponseCache {
 
     // Determine TTL for this template
     const templateId = this.extractTemplateId(request);
-    const ttl = this.options.templateTtlMs[templateId] || this.options.defaultTtlMs;
+    const ttl = this.options.templateTtlMs[templateId] ?? this.options.defaultTtlMs;
 
     // Calculate response size
     const responseSizeBytes = this.estimateResponseSize(response);
@@ -316,7 +316,7 @@ export class AIResponseCache {
     // Get top templates by access count
     const templateStats = new Map<string, number>();
     for (const cached of Array.from(this.cache.values())) {
-      const current = templateStats.get(cached.metadata.templateId) || 0;
+      const current = templateStats.get(cached.metadata.templateId) ?? 0;
       templateStats.set(cached.metadata.templateId, current + cached.accessCount);
     }
 
@@ -430,7 +430,7 @@ export class AIResponseCache {
   /**
    * Create hash of variables for cache key stability
    */
-  private hashVariables(variables: Record<string, any>): string {
+  private hashVariables(variables: Record<string, unknown>): string {
     const sorted = this.sortObject(variables);
     return createHash('md5').update(JSON.stringify(sorted)).digest('hex').substring(0, 8);
   }

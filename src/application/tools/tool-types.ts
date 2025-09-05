@@ -1,16 +1,15 @@
 import { z } from 'zod';
 import type { Logger } from 'pino';
-// import type { Server, Tool } from '@modelcontextprotocol/sdk/types';
-// Server not exported from SDK, Tool unused
-import type { WorkflowOrchestrator } from '../workflow/orchestrator.js';
-import type { WorkflowManager } from '../workflow/manager.js';
-import type { ProgressEmitter, EventPublisher, DependenciesConfig } from '../interfaces.js';
-import type { ProgressCallback } from '../workflow/types.js';
+import type { EventEmitter } from 'events';
+import type { WorkflowOrchestrator } from '../workflow/orchestrator';
+import type { WorkflowManager } from '../workflow/manager';
+import type { DependenciesConfig } from '../interfaces';
+import type { ProgressCallback } from '../workflow/types';
 import type {
   SampleFunction,
   StructuredSampler,
   ContentValidator,
-} from '../../infrastructure/ai/index.js';
+} from '../../infrastructure/ai/index';
 
 /**
  * MCP SDK compatible tool context
@@ -27,9 +26,9 @@ export interface ToolContext {
   workflowOrchestrator: WorkflowOrchestrator;
   workflowManager: WorkflowManager;
 
-  // Event handling
-  eventPublisher: EventPublisher;
-  progressEmitter: ProgressEmitter;
+  // Event handling - use EventEmitter directly
+  eventPublisher: EventEmitter;
+  progressEmitter: EventEmitter;
   onProgress?: ProgressCallback;
 
   // AI components
@@ -50,6 +49,7 @@ export interface ToolContext {
   aiService?: any;
   dockerService?: any;
   kubernetesService?: any;
+  toolRegistry?: any;
 }
 
 /**

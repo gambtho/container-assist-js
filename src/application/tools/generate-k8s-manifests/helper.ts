@@ -5,15 +5,15 @@
 import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
 import * as yaml from 'js-yaml';
-import { KubernetesManifest } from '../../../contracts/types/index.js';
-import { createDomainError, ErrorCode } from '../../../domain/types/errors.js';
-import { executeWithRecovery } from '../error-recovery.js';
+import { KubernetesManifest } from '../../../domain/types/index';
+import { ErrorCode, DomainError } from '../../../domain/types/errors';
+import { executeWithRecovery } from '../error-recovery';
 import {
   buildK8sRequest,
   buildKustomizationRequest,
   type K8sVariables,
-} from '../../../infrastructure/ai/index.js';
-import type { ToolContext } from '../tool-types.js';
+} from '../../../infrastructure/ai/index';
+import type { ToolContext } from '../tool-types';
 
 /**
  * Sanitize filename to be safe for filesystem
@@ -57,7 +57,7 @@ function getDefaultApiVersion(kind?: string): string {
     CronJob: 'batch/v1',
   };
 
-  return apiVersionMap[kind] || 'v1';
+  return apiVersionMap[kind] ?? 'v1';
 }
 
 // Type for input options
@@ -148,20 +148,10 @@ export async function generateK8sManifests(
   const { aiService, progressEmitter, logger } = context;
   const { sessionId } = input;
 
-  // Get session for analysis context (currently unused but may be needed for future enhancements)
-  // let session: Session | null = null;
-  // if (sessionId && sessionService) {
-  //   try {
-  //     session = await sessionService.get(sessionId);
-  //   } catch (error) {
-  //     logger?.warn({ error, sessionId }, 'Failed to get session for analysis context');
-  //   }
-  // }
-
   try {
     // Progress: Starting generation
     if (progressEmitter && sessionId) {
-      await progressEmitter.emit({
+      progressEmitter.emit('progress', {
         sessionId,
         step: 'generate_k8s_manifests',
         status: 'in_progress',
@@ -182,7 +172,7 @@ export async function generateK8sManifests(
         replicas: input.replicas,
         ingressEnabled: input.ingressEnabled,
         ...(input.ingressHost && { ingressHost: input.ingressHost }),
-        autoscaling: input.autoscaling?.enabled || false,
+        autoscaling: input.autoscaling?.enabled ?? false,
         ...(input.autoscaling?.enabled && {
           minReplicas: input.autoscaling.minReplicas ?? input.replicas,
           maxReplicas: input.autoscaling.maxReplicas ?? input.replicas * 3,
@@ -206,7 +196,7 @@ export async function generateK8sManifests(
 
     // Progress: Parsing manifests
     if (progressEmitter && sessionId) {
-      await progressEmitter.emit({
+      progressEmitter.emit('progress', {
         sessionId,
         step: 'generate_k8s_manifests',
         status: 'in_progress',
@@ -245,15 +235,15 @@ export async function generateK8sManifests(
     }
 
     if (validManifests.length === 0) {
-      throw createDomainError(
-        ErrorCode.AI_SERVICE_ERROR,
+      throw new DomainError(
+        ErrorCode.AIGenerationError,
         'No valid Kubernetes manifests were generated',
       );
     }
 
     // Progress: Writing files
     if (progressEmitter && sessionId) {
-      await progressEmitter.emit({
+      progressEmitter.emit('progress', {
         sessionId,
         step: 'generate_k8s_manifests',
         status: 'in_progress',
@@ -343,7 +333,7 @@ commonLabels:
 
     // Progress: Complete
     if (progressEmitter && sessionId) {
-      await progressEmitter.emit({
+      progressEmitter.emit('progress', {
         sessionId,
         step: 'generate_k8s_manifests',
         status: 'completed',
@@ -365,7 +355,7 @@ commonLabels:
   } catch (error) {
     // Progress: Error
     if (progressEmitter && sessionId) {
-      await progressEmitter.emit({
+      progressEmitter.emit('progress', {
         sessionId,
         step: 'generate_k8s_manifests',
         status: 'failed',

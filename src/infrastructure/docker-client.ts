@@ -4,17 +4,17 @@
  */
 
 import Docker from 'dockerode';
-import { DockerError } from '../errors/index.js';
-import { ErrorCode } from '../contracts/types/errors.js';
+import { DockerError } from '../errors/index';
+import { ErrorCode } from '../domain/types/errors';
 import type { Logger } from 'pino';
 import {
   DockerBuildOptions,
   DockerBuildResult,
   DockerScanResult,
   ScanOptions,
-} from '../contracts/types/index.js';
-import { TrivyScanner } from './scanners/trivy-scanner.js';
-import { isOk } from '../domain/types/result.js';
+} from '../domain/types/index';
+import { TrivyScanner } from './scanners/trivy-scanner';
+import { isOk } from '../domain/types/result';
 
 interface DockerSystemInfo {
   os?: string;
@@ -85,7 +85,7 @@ export class DockerClient {
     } else if (config.host != null) {
       dockerOptions.host = config.host;
       dockerOptions.port = config.port ?? 2375;
-      dockerOptions.protocol = (config.protocol as 'ssh' | 'https' | 'http' | undefined) || 'http';
+      dockerOptions.protocol = (config.protocol as 'ssh' | 'https' | 'http' | undefined) ?? 'http';
     }
 
     this.docker = new Docker(dockerOptions);
@@ -104,7 +104,7 @@ export class DockerClient {
       // Initialize Trivy scanner if available
       if (this.trivyScanner) {
         const trivyResult = await this.trivyScanner.initialize();
-        if (trivyResult.kind === 'fail') {
+        if (!trivyResult.ok) {
           this.logger.warn(
             { error: trivyResult.error },
             'Trivy scanner initialization failed, scanning will be disabled',
@@ -133,8 +133,8 @@ export class DockerClient {
 
       // Prepare build options
       const buildOptions: Docker.ImageBuildOptions = {
-        t: options.tags?.[0] || options.tag,
-        dockerfile: options.dockerfile ?? (options.dockerfilePath || 'Dockerfile'),
+        t: options.tags?.[0] ?? options.tag,
+        dockerfile: options.dockerfile ?? options.dockerfilePath ?? 'Dockerfile',
         buildargs: options.buildArgs,
         target: options.target,
         nocache: options.noCache,
@@ -163,6 +163,7 @@ export class DockerClient {
       // Process build output
       const logs: string[] = [];
       let imageId: string | undefined;
+      let buildError: string | undefined;
 
       await new Promise((resolve, reject) => {
         this.docker.modem.followProgress(
@@ -171,11 +172,26 @@ export class DockerClient {
             if (err) {
               reject(err);
             } else {
-              // Extract image ID from build output
-              const lastLog = res[res.length - 1];
-              if (lastLog?.aux?.ID) {
-                imageId = lastLog.aux.ID;
+              // Extract image ID from build output - try multiple approaches
+              for (const event of res.reverse()) {
+                if (event?.aux?.ID) {
+                  imageId = event.aux.ID;
+                  break;
+                }
               }
+
+              // If no aux ID found, try to extract from successful completion message
+              if (!imageId) {
+                const successLog = logs.find(
+                  (log) => log.includes('Successfully built') || log.includes('sha256:'),
+                );
+                if (successLog) {
+                  const sha256Match = successLog.match(/sha256:([a-f0-9]{64})/);
+                  const builtMatch = successLog.match(/Successfully built ([a-f0-9]+)/);
+                  imageId = sha256Match?.[1] ?? builtMatch?.[1];
+                }
+              }
+
               resolve(res);
             }
           },
@@ -184,11 +200,51 @@ export class DockerClient {
               logs.push(event.stream.trim());
             }
             if (event.error) {
+              buildError = event.error;
               logs.push(`ERROR: ${event.error}`);
             }
           },
         );
       });
+
+      // Check if build actually succeeded - be more specific about fatal errors
+      const hasFatalErrors =
+        buildError ??
+        logs.some((log) => {
+          const lowerLog = log.toLowerCase();
+          return (
+            lowerLog.includes('pull access denied') ||
+            lowerLog.includes('repository does not exist') ||
+            (lowerLog.includes('no such file or directory') && lowerLog.includes('dockerfile')) ||
+            lowerLog.includes('failed to solve') ||
+            lowerLog.includes('error response from daemon')
+          );
+        });
+
+      // If no image ID found but build seems successful, try to find it by tag
+      if (!imageId && !hasFatalErrors && (options.tags?.[0] ?? options.tag)) {
+        try {
+          const targetTag = options.tags?.[0] ?? options.tag;
+          const images = await this.listImages();
+          const builtImage = images.find((img) => img.RepoTags?.some((tag) => tag === targetTag));
+          if (builtImage) {
+            imageId = builtImage.Id;
+          }
+        } catch (error) {
+          this.logger.warn({ error }, 'Failed to find built image by tag');
+        }
+      }
+
+      // Only throw if we have fatal errors and no image was produced
+      if (hasFatalErrors && !imageId) {
+        throw new DockerError(
+          `Docker build failed: ${buildError ?? 'Fatal build errors detected'}`,
+          ErrorCode.DockerBuildFailed,
+          'build',
+          new Error(buildError ?? 'Build failed'),
+          { contextPath, options, logs },
+        );
+      }
 
       // Tag additional tags if provided
       if (imageId && options.tags && options.tags.length > 1) {
@@ -203,7 +259,7 @@ export class DockerClient {
       const result: DockerBuildResult = {
         imageId: imageId ?? '',
         tags: options.tags ?? (options.tag ? [options.tag] : []),
-        success: true,
+        success: !!imageId && !hasFatalErrors,
         logs,
         buildTime: Date.now(),
       };
@@ -260,11 +316,11 @@ export class DockerClient {
       return scanResult.value;
     } else {
       // Log the error and throw with proper context
-      this.logger.error({ error: scanResult.error, code: scanResult.code }, 'Security scan failed');
+      this.logger.error({ error: scanResult.error }, 'Security scan failed');
 
       throw new DockerError(
         `Security scan failed: ${scanResult.error}`,
-        (scanResult.code as ErrorCode) || ErrorCode.SCANNER_NOT_AVAILABLE,
+        ErrorCode.SCANNER_NOT_AVAILABLE,
         'scan',
         undefined,
         { image, options },
@@ -286,6 +342,22 @@ export class DockerClient {
       });
       this.logger.debug({ imageId, tag }, 'Image tagged successfully');
     } catch (error) {
+      const dockerError = error as { statusCode?: number };
+      // Handle 301 redirects by retrying with different approach
+      if (dockerError?.statusCode === 301) {
+        try {
+          // Try using Docker engine API directly with different parameters
+          const parts = tag.includes(':') ? tag.split(':') : [tag, 'latest'];
+          const repo = parts[0] ?? tag;
+          const tagName = parts[1] ?? 'latest';
+          const image = this.docker.getImage(imageId);
+          image.tag({ repo, tag: tagName } as any);
+          this.logger.debug({ imageId, tag }, 'Image tagged successfully (retry)');
+          return;
+        } catch (retryError) {
+          this.logger.warn({ error: retryError }, 'Tag retry failed, using original error');
+        }
+      }
       throw new DockerError(
         `Failed to tag image: ${error instanceof Error ? error.message : 'Unknown error'}`,
         ErrorCode.DOCKER_TAG_FAILED,
@@ -398,18 +470,24 @@ export class DockerClient {
     try {
       await this.docker.ping();
       const version = await this.docker.version();
-      const info = await this.docker.info();
+      const info = (await this.docker.info()) as {
+        OperatingSystem?: string;
+        Architecture?: string;
+        Containers?: number;
+        Images?: number;
+        ServerVersion?: string;
+      };
 
       return {
         available: true,
         version: version.Version,
         trivyAvailable: this.trivyScanner ? await this.trivyScanner.isAvailable() : false,
         systemInfo: {
-          os: info.OperatingSystem,
-          arch: info.Architecture,
-          containers: info.Containers,
-          images: info.Images,
-          serverVersion: info.ServerVersion,
+          os: info.OperatingSystem ?? 'unknown',
+          arch: info.Architecture ?? 'unknown',
+          containers: info.Containers ?? 0,
+          images: info.Images ?? 0,
+          serverVersion: info.ServerVersion ?? 'unknown',
         },
         client: this,
       };

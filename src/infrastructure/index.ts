@@ -1,52 +1,9 @@
 /**
- * Infrastructure Layer - Consolidated exports
- * Organized into 3 logical groups: external, ai, and core
+ * Infrastructure Layer - Index file
+ *
+ * Components are imported directly from their specific files:
+ * - DockerClient from './docker-client'
+ * - KubernetesClient from './kubernetes-client'
+ * - AIClient from './ai-client'
+ * - AI utilities from './ai/index'
  */
-
-// External system integrations
-export * from './external/index';
-
-// AI/ML services - unified API with explicit exports to avoid conflicts
-export {
-  // Request building
-  buildAIRequest,
-  buildDockerfileRequest,
-  buildAnalysisRequest,
-  buildK8sRequest,
-  extractDockerfileVariables,
-
-  // Sampling
-  createSampler,
-  isSuccessResult,
-  isErrorResult,
-  getResultText,
-
-  // Error handling
-  recoverFromError,
-  executeWithRecovery,
-  retryWithBackoff,
-
-  // Structured processing
-  StructuredSampler,
-  ContentValidator,
-
-  // Caching
-  AIResponseCache,
-} from './ai/index.js';
-
-export type {
-  AIRequest,
-  RequestTemplate,
-  RequestOptions,
-  DockerfileVariables,
-  AnalysisVariables,
-  K8sVariables,
-  SampleFunction,
-  SampleResult,
-  SamplerConfig,
-  ErrorHandler,
-  RecoveryResult,
-  CacheOptions,
-  CacheStats,
-  EnhancedAIConfig as AIEnhancedConfig, // Rename to avoid conflict
-} from './ai/index.js';

@@ -2,48 +2,19 @@
  * Unified Configuration Module
  */
 
-// Export all types
+// Export essential types only (removed unused configuration type exports)
 export type {
   ApplicationConfig,
-  ServerConfig,
-  McpConfig,
-  WorkspaceConfig,
-  DockerConfig,
-  KubernetesConfig,
-  AIConfig,
-  SamplerConfig,
-  MockConfig,
-  SessionConfig,
-  LoggingConfig,
-  ScanningConfig,
-  BuildConfig,
-  JavaConfig,
-  InfrastructureConfig,
-  AIServicesConfig,
-  WorkflowConfig,
-  FeatureFlags,
-  NodeEnv,
-  LogLevel,
-  WorkflowMode,
-  StoreType,
-  SamplerMode,
+  // Note: Individual config types removed as they were unused
+  // If specific config types are needed, import directly from './types'
 } from './types';
 
-// Export configuration functions
-export {
-  createConfiguration,
-  createConfigurationForEnv,
-  validateConfiguration,
-  getConfigurationSummary,
-} from './config.js';
+// Export essential configuration functions only
+export { createConfiguration, createConfigurationForEnv } from './config';
 
 // Import configuration
-import {
-  createConfiguration,
-  createConfigurationForEnv,
-  getConfigurationSummary,
-} from './config.js';
-import type { ApplicationConfig } from './types.js';
+import { createConfiguration, getConfigurationSummary } from './config';
+import type { ApplicationConfig } from './types';
 
 /**
  * Lazy-loaded configuration instance
@@ -64,89 +35,107 @@ export function getConfig(): ApplicationConfig {
   return _config;
 }
 
-/**
- * Reset configuration (mainly for testing)
- */
-export function resetConfig(): void {
-  _config = undefined;
-}
+// Note: resetConfig function removed as unused
 
 export const config = new Proxy({} as ApplicationConfig, {
   get(_target, prop) {
     return getConfig()[prop as keyof ApplicationConfig];
   },
   set(_target, prop, value) {
-    getConfig()[prop as keyof ApplicationConfig] = value;
+    (getConfig() as unknown as Record<string, unknown>)[prop as keyof ApplicationConfig] = value;
     return true;
   },
 });
 
 /**
- * Create configuration with defaults
+ * Create configuration with defaults (used by CLI)
  */
 export const createConfig = createConfiguration;
 
 /**
- * Create configuration for testing
- */
-export const createTestConfig = (): ApplicationConfig => createConfigurationForEnv('test');
-
-/**
- * Create minimal configuration
- */
-export const createMinimalConfig = (): ApplicationConfig => createConfigurationForEnv('test');
-
-/**
- * Get configuration summary
- */
-export const getConfigSummary = getConfigurationSummary;
-
-/**
- * Development helper: log configuration summary on startup
- * This is moved to be called explicitly in CLI to avoid side effects during import
- *
- * Usage: logConfigSummaryIfDev(config)
+ * Development helper: log configuration summary on startup (used by CLI)
  */
 export function logConfigSummaryIfDev(configInstance: ApplicationConfig): void {
   if (configInstance.server.nodeEnv === 'development' && configInstance.features.enableDebugLogs) {
-    console.error('Configuration loaded:', getConfigurationSummary(configInstance));
+    // eslint-disable-next-line no-console
+    console.log('Configuration loaded:', getConfigurationSummary(configInstance));
   }
 }
 
 /**
- * Configuration helper functions
+ * Reset lazy-loaded configuration instance
+ */
+export function resetConfig(): void {
+  _config = undefined;
+}
+
+/**
+ * Create test configuration with test-specific defaults
+ */
+export function createTestConfig(): ApplicationConfig {
+  const config = createConfiguration();
+  config.server.nodeEnv = 'test';
+  config.server.logLevel = 'error';
+  config.features.mockMode = true;
+  config.features.enableEvents = false;
+  config.session.store = 'memory';
+  return config;
+}
+
+/**
+ * Create minimal configuration (currently same as test)
+ */
+export function createMinimalConfig(): ApplicationConfig {
+  return createTestConfig();
+}
+
+/**
+ * Get configuration summary
+ */
+export function getConfigSummary(config: ApplicationConfig): object {
+  return getConfigurationSummary(config);
+}
+
+/**
+ * Configuration helper utilities
  */
 export const ConfigHelpers = {
-  /**
-   * Check if running in production
-   */
-  isProduction: (config: ApplicationConfig) => config.server.nodeEnv === 'production',
+  isProduction(config: ApplicationConfig): boolean {
+    return config.server.nodeEnv === 'production';
+  },
 
-  /**
-   * Check if running in development
-   */
-  isDevelopment: (config: ApplicationConfig) => config.server.nodeEnv === 'development',
+  isDevelopment(config: ApplicationConfig): boolean {
+    return config.server.nodeEnv === 'development';
+  },
 
-  /**
-   * Check if running in test mode
-   */
-  isTest: (config: ApplicationConfig) => config.server.nodeEnv === 'test',
+  isTest(config: ApplicationConfig): boolean {
+    return config.server.nodeEnv === 'test';
+  },
 
-  /**
-   * Check if AI services are available
-   */
-  hasAI: (config: ApplicationConfig) =>
-    config.features.aiEnabled && (config.aiServices.ai.apiKey != null ?? config.features.mockMode),
+  hasAI(config: ApplicationConfig): boolean {
+    return (
+      config.features.aiEnabled && (config.aiServices.ai.apiKey !== '' || config.features.mockMode)
+    );
+  },
 
-  /**
-   * Parse TTL string to milliseconds
-   */
-  parseTTL: (ttl: string) => {
-    const match = ttl.match(/^(\d+)(h|m|s)$/);
-    if (!match) throw new Error(`Invalid TTL format: ${ttl}`);
-    const [, value, unit] = match;
-    if (!value) throw new Error(`Invalid TTL format: ${ttl}`);
-    const num = parseInt(value, 10);
-    return unit === 'h' ? num * 3600000 : unit === 'm' ? num * 60000 : num * 1000;
+  parseTTL(ttl: string): number {
+    const match = ttl.match(/^(\d+)([hms])$/);
+    if (!match) {
+      throw new Error(`Invalid TTL format: ${ttl}`);
+    }
+
+    const [, amount, unit] = match;
+    const value = parseInt(amount || '0', 10);
+
+    switch (unit) {
+      case 'h':
+        return value * 3600000; // hours to milliseconds
+      case 'm':
+        return value * 60000; // minutes to milliseconds
+      case 's':
+        return value * 1000; // seconds to milliseconds
+      default:
+        throw new Error(`Invalid TTL format: ${ttl}`);
+    }
   },
 };

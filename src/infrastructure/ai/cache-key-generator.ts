@@ -4,7 +4,7 @@
  */
 
 import { createHash } from 'crypto';
-import type { AIRequest } from './requests.js';
+import type { AIRequest } from './requests';
 
 /**
  * Options for cache key generation
@@ -170,7 +170,7 @@ export class CacheKeyGenerator {
     const normalized = this.normalizeRequest(request);
     const normalizedKey = this.generateNormalizedKey(normalized);
 
-    return Array.from(this.keyRegistry.get(normalizedKey) || []);
+    return Array.from(this.keyRegistry.get(normalizedKey) ?? []);
   }
 
   /**
@@ -257,7 +257,7 @@ export class CacheKeyGenerator {
   /**
    * Generate hash for context variables
    */
-  private hashContext(context?: Record<string, any>): string {
+  private hashContext(context?: Record<string, unknown>): string {
     if (!context || Object.keys(context).length === 0) {
       return ';';
     }
@@ -272,7 +272,7 @@ export class CacheKeyGenerator {
    * Generate hash for sampling parameters
    */
   private hashParameters(request: AIRequest): string {
-    const params: Record<string, any> = {};
+    const params: Record<string, unknown> = {};
 
     if (this.options.includeTemperature && request.temperature !== undefined) {
       params.temperature = request.temperature;
@@ -322,12 +322,12 @@ export class CacheKeyGenerator {
   /**
    * Filter context variables based on options
    */
-  private filterContext(context: Record<string, any>): Record<string, any> {
+  private filterContext(context: Record<string, unknown>): Record<string, unknown> {
     let filtered = { ...context };
 
     // If includeOnly is specified, use only those variables
     if (this.options.includeOnlyVariables && this.options.includeOnlyVariables.length > 0) {
-      const included: Record<string, any> = {};
+      const included: Record<string, unknown> = {};
       for (const key of this.options.includeOnlyVariables) {
         if (key in filtered) {
           included[key] = filtered[key];
@@ -398,9 +398,9 @@ export class CacheKeyGenerator {
   /**
    * Extract essential context variables for similarity
    */
-  private extractEssentialContext(context: Record<string, any>): Record<string, any> {
+  private extractEssentialContext(context: Record<string, unknown>): Record<string, unknown> {
     const essential = ['language', 'framework', 'port', 'entryPoint', 'buildSystem'];
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
 
     for (const key of essential) {
       if (key in context) {
@@ -443,7 +443,7 @@ export class CacheKeyGenerator {
     // Limit the number of similar keys tracked
     if (keySet.size > this.similarityOptions.maxSimilarKeys) {
       // Remove oldest key (simple FIFO)
-      const first = keySet.values().next().value;
+      const first = keySet.values().next().value as string;
       keySet.delete(first);
     }
   }

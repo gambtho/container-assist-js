@@ -9,4 +9,4 @@
  * @module src/application/tools/build-image/index
  */
 
-export { default } from './build-image.js';
+export { default } from './build-image';

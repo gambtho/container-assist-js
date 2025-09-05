@@ -3,9 +3,8 @@
  * Provides access to tool registry, tool metadata, and tool usage analytics
  */
 
-// import type { Server } from '@modelcontextprotocol/sdk/server/index';
 import type { Logger } from 'pino';
-import type { ToolRegistry } from '../tools/ops/registry.js';
+import { getRegisteredTools } from '../tools/native-registry';
 
 // Type definitions for tool metadata
 interface ToolInfo {
@@ -38,10 +37,7 @@ function isToolInfo(obj: unknown): obj is ToolInfo {
 export class ToolsResourceProvider {
   private toolUsageStats = new Map<string, ToolUsageStats>();
 
-  constructor(
-    private toolRegistry: ToolRegistry,
-    private logger: Logger,
-  ) {
+  constructor(private logger: Logger) {
     this.logger = logger.child({ component: 'ToolsResourceProvider' });
   }
 
@@ -58,35 +54,24 @@ export class ToolsResourceProvider {
         mimeType: 'application/json',
         handler: () => {
           try {
-            const toolList = this.toolRegistry.listTools();
-            const toolCount = this.toolRegistry.getToolCount();
+            const registeredTools = getRegisteredTools();
 
             const registry = {
-              total: toolCount,
+              total: registeredTools.length,
               categories: {} as Record<string, number>,
-              tools:
-                toolList.tools
-                  ?.map((tool: unknown) => {
-                    if (!isToolInfo(tool)) {
-                      this.logger.warn({ tool }, 'Invalid tool format in registry');
-                      return null;
-                    }
-                    return {
-                      name: tool.name,
-                      description: tool.description ?? '',
-                      category: this.getToolCategory(tool.name),
-                      inputSchema: tool.inputSchema ?? {},
-                      capabilities: this.getToolCapabilities(tool.name),
-                      usage: this.toolUsageStats.get(tool.name) ?? {
-                        count: 0,
-                        lastUsed: 'never',
-                        averageDuration: 0,
-                        successRate: 0,
-                        errors: 0,
-                      },
-                    };
-                  })
-                  .filter((t): t is NonNullable<typeof t> => t !== null) || [],
+              tools: registeredTools.map((tool) => ({
+                name: tool.name,
+                description: tool.description,
+                category: this.getToolCategory(tool.name),
+                capabilities: this.getToolCapabilities(tool.name),
+                usage: this.toolUsageStats.get(tool.name) ?? {
+                  count: 0,
+                  lastUsed: 'never',
+                  averageDuration: 0,
+                  successRate: 0,
+                  errors: 0,
+                },
+              })),
               timestamp: new Date().toISOString(),
             };
 
@@ -134,7 +119,7 @@ export class ToolsResourceProvider {
           try {
             const analytics = {
               overview: {
-                totalTools: this.toolRegistry.getToolCount(),
+                totalTools: getRegisteredTools().length,
                 totalUsage: Array.from(this.toolUsageStats.values()).reduce(
                   (sum, stats) => sum + stats.count,
                   0,
@@ -242,7 +227,7 @@ export class ToolsResourceProvider {
         mimeType: 'application/json',
         handler: () => {
           try {
-            const toolList = this.toolRegistry.listTools();
+            const toolList = { tools: getRegisteredTools() };
 
             const documentation = {
               tools:
@@ -418,7 +403,7 @@ export class ToolsResourceProvider {
     const stats = Array.from(this.toolUsageStats.values());
     return {
       averageDuration:
-        stats.reduce((sum, stat) => sum + stat.averageDuration, 0) / (stats.length || 1),
+        stats.reduce((sum, stat) => sum + stat.averageDuration, 0) / (stats.length ?? 1),
       slowestTools: Array.from(this.toolUsageStats.entries())
         .sort(([, a], [, b]) => b.averageDuration - a.averageDuration)
         .slice(0, 3)
@@ -439,7 +424,7 @@ export class ToolsResourceProvider {
       mostProblematic: errorStats.slice(0, 5).map(([name, stats]) => ({
         name,
         errors: stats.errors,
-        errorRate: (stats.errors / stats.count) * 100,
+        errorRate: stats.count === 0 ? 0 : (stats.errors / stats.count) * 100,
       })),
     };
   }
@@ -467,7 +452,7 @@ export class ToolsResourceProvider {
   }
 
   private getToolsByService(service: string): string[] {
-    const toolList = this.toolRegistry.listTools();
+    const toolList = { tools: getRegisteredTools() };
     return (toolList.tools ?? [])
       .filter((tool: unknown) => {
         if (!isToolInfo(tool)) return false;

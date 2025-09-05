@@ -5,9 +5,11 @@
 import {
   buildDockerfileRequest,
   extractDockerfileVariables,
-} from '../../../infrastructure/ai/index.js';
-import type { ToolContext } from '../tool-types.js';
-import type { AnalysisResult } from '../../../contracts/types/session.js';
+} from '../../../infrastructure/ai/index';
+import type { ToolContext } from '../tool-types';
+import { isAIServiceResponse } from '../../../domain/types/workflow-state';
+import type { AnalysisResult } from '../../../domain/types/session';
+import type { AIService } from '../../services/interfaces';
 
 interface DockerfileStage {
   name: string;
@@ -24,6 +26,7 @@ interface DockerfileGenerationResult {
 // Type for input options
 interface DockerfileInput {
   baseImage?: string;
+  runtimeImage?: string;
   optimization: 'size' | 'build-speed' | 'security' | 'balanced';
   multistage: boolean;
   optimizeSize: boolean;
@@ -49,7 +52,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --chown=nodejs:nodejs . .
 USER nodejs
 EXPOSE 3000
-CMD ["node", "index.js"]
+CMD ["node", "index"]
 `,
   typescript: `# Build stage
 FROM node:18-alpine AS builder
@@ -68,7 +71,7 @@ RUN npm ci --only=production && npm cache clean --force
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 USER nodejs
 EXPOSE 3000
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/index"]
 `,
   python: `# Build stage
 FROM python:3.11-slim AS builder
@@ -134,10 +137,11 @@ export async function generateDockerfileContent(
   options: DockerfileInput,
   context: ToolContext,
 ): Promise<DockerfileGenerationResult> {
-  const { logger, aiService } = context;
+  const logger = context.logger;
+  const aiService = context.aiService as AIService;
 
   // Use template as base fallback
-  let baseTemplate = DOCKERFILE_TEMPLATES[analysis.language] || DOCKERFILE_TEMPLATES.javascript;
+  let baseTemplate = DOCKERFILE_TEMPLATES[analysis.language] ?? DOCKERFILE_TEMPLATES.javascript;
 
   // Enhanced AI generation
   try {
@@ -162,21 +166,45 @@ export async function generateDockerfileContent(
         maxTokens: 3000,
       });
 
-      const result = await aiService.generate(requestBuilder);
+      // Type commented out to avoid unused declaration
 
-      if (result.data) {
-        baseTemplate = result.data;
+      const service = aiService as any;
+      const generateMethod = service.generateDockerfile ?? service.generate;
+
+      if (!generateMethod || typeof generateMethod !== 'function') {
+        throw new Error('AI service does not have a generate or generateDockerfile method');
+      }
+
+      const result = await generateMethod(requestBuilder);
+
+      if (isAIServiceResponse(result) && result.success && result.data) {
+        const data = typeof result.data === 'string' ? result.data : String(result.data);
+        baseTemplate = data;
 
         // Log AI generation with metadata
-        logger.info(
-          {
-            model: result.metadata.model,
-            tokensUsed: result.metadata.tokensUsed,
-            fromCache: result.metadata.fromCache,
-            durationMs: result.metadata.durationMs,
-          },
-          'AI-generated Dockerfile successfully',
-        );
+        const metadata = (
+          result as {
+            metadata?: {
+              model?: unknown;
+              tokensUsed?: unknown;
+              fromCache?: unknown;
+              durationMs?: unknown;
+            };
+          }
+        ).metadata;
+        if (metadata) {
+          logger.info(
+            {
+              model: metadata.model,
+              tokensUsed: metadata.tokensUsed,
+              fromCache: metadata.fromCache,
+              durationMs: metadata.durationMs,
+            },
+            'AI-generated Dockerfile successfully',
+          );
+        } else {
+          logger.info('AI-generated Dockerfile successfully');
+        }
       }
     } else {
       // If no AI service is available, use the optimized static generation
@@ -220,7 +248,7 @@ USER appuser`;
 
   if (options.includeHealthcheck) {
     optimizations.push('Health check endpoint');
-    const port = analysis.ports?.[0] || 3000;
+    const port = analysis.ports?.[0] ?? 3000;
     const healthcheck = `
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
@@ -275,7 +303,7 @@ ${options.customCommands.map((cmd) => `RUN ${cmd}`).join('\n')}`;
 function generateOptimizedDockerfile(analysis: AnalysisResult, options: DockerfileInput): string {
   const baseImage = options.baseImage ?? getRecommendedBaseImage(analysis.language);
   const framework = analysis.framework ?? '';
-  const deps = analysis.dependencies?.map((d: any) => d.name) || [];
+  const deps = analysis.dependencies?.map((d: { name: string }) => d.name) ?? [];
 
   // Build optimized Dockerfile content
   let dockerfile = `# AI-Optimized Dockerfile for ${analysis.language}${framework ? ` (${framework})` : ''}
@@ -284,6 +312,9 @@ function generateOptimizedDockerfile(analysis: AnalysisResult, options: Dockerfi
 `;
 
   if (options.multistage && deps.length > 5) {
+    // Use explicit runtimeImage if provided, otherwise reuse the exact baseImage
+    const runtimeImage = options.runtimeImage ?? baseImage;
+
     dockerfile += `# Build stage
 FROM ${baseImage} AS builder
 WORKDIR /app
@@ -292,7 +323,7 @@ WORKDIR /app
 ${getBuildCommands(analysis, 'build')}
 
 # Runtime stage
-FROM ${baseImage.includes('alpine') ? baseImage : baseImage.replace(/:\d+/, ':alpine')}
+FROM ${runtimeImage}
 WORKDIR /app
 
 # Create non-root user for security
@@ -322,7 +353,7 @@ ${getBuildCommands(analysis, 'single')}
 
   // Add health check if requested
   if (options.includeHealthcheck) {
-    const primaryPort = ports[0] || 3000;
+    const primaryPort = ports[0] ?? 3000;
     dockerfile += `
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
@@ -398,6 +429,7 @@ function getStartCommand(analysis: AnalysisResult): string {
 
   if (lang === 'javascript' || lang === 'typescript') {
     if (framework === 'nextjs') return 'CMD ["npm", "start"]';
+    if (lang === 'typescript') return 'CMD ["node", "dist/index.js"]';
     return 'CMD ["node", "index.js"]';
   } else if (lang === 'python') {
     if (framework === 'django') return 'CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]';
@@ -429,7 +461,7 @@ function getRecommendedBaseImage(language: string): string {
     php: 'php:8.2-fpm-alpine',
   };
 
-  return imageMap[language] || 'alpine:3.19';
+  return imageMap[language] ?? 'alpine:3.19';
 }
 
 /**

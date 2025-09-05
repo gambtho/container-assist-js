@@ -3,13 +3,13 @@
  */
 
 import type { Logger } from 'pino';
-import { KubernetesClient, K8sHealthStatus } from '../infrastructure/kubernetes-client.js';
+import { KubernetesClient, K8sHealthStatus } from '../infrastructure/kubernetes-client';
 import type {
   K8sDeploymentOptions,
   K8sDeploymentResult,
   K8sManifest,
   K8sServiceStatus,
-} from '../contracts/types/index.js';
+} from '../domain/types/index';
 
 export interface KubernetesConfig {
   kubeconfig?: string;
@@ -90,8 +90,4 @@ export class KubernetesService {
 }
 
 // Re-export types for convenience
-export type {
-  K8sManifest,
-  K8sDeploymentResult,
-  K8sServiceStatus,
-} from '../contracts/types/index.js';
+export type { K8sManifest, K8sDeploymentResult, K8sServiceStatus } from '../domain/types/index';

@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Session, SessionSchema } from '../contracts/types/session.js';
+import { Session, SessionSchema } from '../domain/types/session';
 
 export interface SessionStoreOptions {
   cleanupIntervalMs?: number;
@@ -63,11 +63,14 @@ export class SessionStore {
    * Create or update a session
    */
   set(id: string, session: Partial<Session>): void {
+    // Get existing session to preserve version counter
+    const existing = this.sessions.get(id);
+
     // Validate and complete session data
     const now = new Date().toISOString();
     const fullSession: Session = {
       id,
-      created_at: session.created_at ?? now,
+      created_at: session.created_at ?? existing?.created_at ?? now,
       updated_at: now,
       expires_at: session.expires_at ?? new Date(Date.now() + this.defaultTtlMs).toISOString(),
       status: session.status ?? 'active',
@@ -78,7 +81,7 @@ export class SessionStore {
         metadata: {},
         dockerfile_fix_history: [],
       },
-      version: (session.version ?? 0) + 1,
+      version: (existing?.version ?? 0) + 1,
       ...session,
     };
 
@@ -174,17 +177,22 @@ export class SessionStore {
    */
   private cleanExpired(): number {
     let removed = 0;
-    const now = Date.now();
 
-    for (const [id, session] of Array.from(this.sessions)) {
-      if (this.isExpired(session, now)) {
-        this.sessions.delete(id);
-        removed++;
+    try {
+      const now = Date.now();
+
+      for (const [id, session] of Array.from(this.sessions)) {
+        if (this.isExpired(session, now)) {
+          this.sessions.delete(id);
+          removed++;
+        }
       }
-    }
 
-    if (removed > 0) {
-      this.logger.debug({ removed }, 'Cleaned expired sessions');
+      if (removed > 0) {
+        this.logger.debug({ removed }, 'Cleaned expired sessions');
+      }
+    } catch (err) {
+      this.logger.warn({ error: err }, 'Error during session cleanup');
     }
 
     return removed;

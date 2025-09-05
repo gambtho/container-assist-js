@@ -4,9 +4,9 @@
  * Modernized to use callback-based progress reporting instead of EventEmitter
  */
 
-import { WorkflowState } from '../../contracts/types/index.js';
+import { WorkflowState } from '../../domain/types/index';
 import type { Logger } from 'pino';
-import { SessionService } from '../session/manager.js';
+import { SessionService } from '../session/manager';
 import { WorkflowManager } from './manager';
 import { normalizeWorkflowStateUpdate } from './property-mappers';
 import { SimpleProgressTracker } from './progress';

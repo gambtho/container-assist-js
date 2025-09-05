@@ -9,4 +9,4 @@
  * @module src/application/tools/scan-image/index
  */
 
-export { default } from './scan-image.js';
+export { default } from './scan-image';
