@@ -39,9 +39,10 @@
   ],
   "scripts": {
     "clean": "rm -rf dist coverage .tsbuildinfo*",
-    "build": "tsdown && node scripts/post-build.js",
+    "build": "BUILD_TEST_UTILS=true tsdown && node scripts/post-build.js",
     "build:fast": "tsdown && SKIP_DECLARATIONS=true node scripts/post-build.js",
-    "build:prod": "tsdown --minify && node scripts/post-build.js",
+    "build:prod": "NODE_ENV=production tsdown --minify && node scripts/post-build.js",
+    "build:dev": "SKIP_DECLARATIONS=true tsdown",
     "build:watch": "tsdown --watch",
     "dev": "tsx watch apps/cli.ts",
     "start": "node dist/apps/cli.js",
