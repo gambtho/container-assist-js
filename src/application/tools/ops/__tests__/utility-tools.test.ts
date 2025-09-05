@@ -54,6 +54,13 @@ describe('utility tools', () => {
   });
 
   describe('ping tool', () => {
+    // Test data constants
+    const _defaultPingExpectations = {
+      success: true,
+      message: 'pong: ping',
+      timestampFormat: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    };
+
     describe('basic ping operations', () => {
       it('should respond to ping with default message', async () => {
         const input: PingInput = {};
