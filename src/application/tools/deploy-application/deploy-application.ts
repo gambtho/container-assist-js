@@ -46,7 +46,7 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
     const { sessionId } = input;
 
     // Validate sessionId early
-    if (!sessionId || sessionId.trim() === '') {
+    if (!sessionId?.trim()) {
       const errorMessage = 'sessionId is required';
       logger.error({ sessionId }, errorMessage);
       throw new DomainError(ErrorCode.VALIDATION_ERROR, errorMessage);
@@ -69,7 +69,11 @@ const deployApplicationHandler: ToolDescriptor<DeployInput, DeployOutput> = {
       // Get manifests from session
       const k8sResult = session.workflow_state?.k8s_result;
       if (!k8sResult?.output_path) {
-        throw new DomainError(ErrorCode.VALIDATION_ERROR, 'No K8s manifests found in session');
+        logger.warn({ sessionId }, 'No K8s manifests found in session workflow state');
+        throw new DomainError(
+          ErrorCode.VALIDATION_ERROR,
+          'No Kubernetes manifests found. Please generate manifests first using generate-k8s-manifests tool.',
+        );
       }
 
       const targetPath = k8sResult.output_path;

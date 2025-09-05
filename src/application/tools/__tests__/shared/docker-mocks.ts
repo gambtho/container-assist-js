@@ -162,7 +162,7 @@ export function createMockDockerService(): {
 
         const result: DockerPushResult = {
           digest: `sha256:${digestHash}${'0'.repeat(58)}`, // Deterministic digest
-          size: 25000000 + (imageHash % 475000000), // Deterministic size 25MB-500MB
+          size: 25000000 + Math.abs(imageHash % 475000000), // Deterministic size 25MB-500MB
           repository: repository ?? 'unknown',
           tag: tag ?? 'latest',
         };

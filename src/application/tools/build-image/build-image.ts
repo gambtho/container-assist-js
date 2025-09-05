@@ -83,9 +83,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
 
       // Determine paths
       const repoPath = session.repo_path ?? buildContext;
-      let dockerfilePath = path.isAbsolute(dockerfile)
-        ? dockerfile
-        : path.join(repoPath, dockerfile);
+      let dockerfilePath = path.resolve(repoPath, dockerfile);
 
       // Check if we should use a generated Dockerfile
       const generatedPath = session.workflow_state?.dockerfile_result?.path;

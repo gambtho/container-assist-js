@@ -165,10 +165,11 @@ function getStartCommand(analysis: AnalysisResult): string {
     if (framework === 'nextjs') return 'CMD ["npm", "start"]';
     return 'CMD ["node", "."]';
   } else if (lang === 'python') {
-    if (framework === 'django') return 'CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]';
-    if (framework === 'flask') return 'CMD ["python", "app.py"]';
+    if (framework === 'django')
+      return 'CMD ["gunicorn", "--bind", "0.0.0.0:8000", "myproject.wsgi:application"]';
+    if (framework === 'flask') return 'CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]';
     if (framework === 'fastapi')
-      return 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]';
+      return 'CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]';
     return 'CMD ["python", "main.py"]';
   } else if (lang === 'java') {
     return 'ENTRYPOINT ["java", "-jar", "app.jar"]';
