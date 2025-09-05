@@ -49,7 +49,7 @@ program
   .option(
     '--docker-socket <path>',
     'Docker socket path (default: /var/run/docker.sock)',
-    '/var/run/docker.sock',
+    '',
   )
   .option(
     '--k8s-namespace <namespace>',
@@ -98,6 +98,7 @@ Environment Variables:
 program.parse(argv);
 
 const options = program.opts();
+const defaultDockerSockets = ['/var/run/docker.sock', '~/.colima/default/docker.socket'];
 
 // Validation function for CLI options
 function validateOptions(opts: any): { valid: boolean; errors: string[] } {
@@ -125,16 +126,28 @@ function validateOptions(opts: any): { valid: boolean; errors: string[] } {
     }
   }
 
+  let dockerSocket = ""
   // Validate Docker socket path (if not mock mode)
-  if (!opts.mock && opts.dockerSocket) {
-    try {
-      statSync(opts.dockerSocket);
-    } catch (error) {
+  if (!opts.mock) {
+    const allSocketOptions = [opts.dockerSocket, process.env.DOCKER_SOCKET, ...defaultDockerSockets]
+    for (const thisSocket of allSocketOptions) {
+      if (!thisSocket) continue;
+      try {
+        statSync(thisSocket);
+        console.error(`Using Docker socket: ${thisSocket}`);
+        dockerSocket = thisSocket;
+        break;
+      } catch (error) {
+        console.error(`Docker socket not found at ${thisSocket}, trying next option...`);
+      }
+    }
+    if (!dockerSocket) {
       errors.push(
-        `Docker socket not found: ${opts.dockerSocket}. Try --mock for testing without Docker.`,
+        `No valid Docker socket found in: ${allSocketOptions.join(', ')}. Try --mock for testing without Docker.`,
       );
     }
   }
+  opts.dockerSocket = dockerSocket;
 
   // Validate config file exists if specified
   if (opts.config) {
