@@ -23,10 +23,7 @@ async function tagDockerImage(
   const { dockerService, logger } = context;
 
   if (dockerService && 'tag' in dockerService) {
-    interface DockerTagService {
-      tag: (source: string, target: string) => Promise<void>;
-    }
-    await (dockerService as DockerTagService).tag(source, target);
+    await dockerService.tag({ image: source, tag: target });
     return true;
   }
 

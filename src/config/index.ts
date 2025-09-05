@@ -2,12 +2,8 @@
  * Unified Configuration Module
  */
 
-// Export essential types only (removed unused configuration type exports)
-export type {
-  ApplicationConfig,
-  // Note: Individual config types removed as they were unused
-  // If specific config types are needed, import directly from './types'
-} from './types';
+// Export essential types only
+export type { ApplicationConfig } from './types';
 
 // Export essential configuration functions only
 export { createConfiguration, createConfigurationForEnv } from './config';
@@ -34,8 +30,6 @@ export function getConfig(): ApplicationConfig {
   }
   return _config;
 }
-
-// Note: resetConfig function removed as unused
 
 export const config = new Proxy({} as ApplicationConfig, {
   get(_target, prop) {
@@ -125,7 +119,7 @@ export const ConfigHelpers = {
     }
 
     const [, amount, unit] = match;
-    const value = parseInt(amount || '0', 10);
+    const value = parseInt(amount ?? '0', 10);
 
     switch (unit) {
       case 'h':

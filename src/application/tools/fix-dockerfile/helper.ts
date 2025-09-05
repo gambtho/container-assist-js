@@ -4,7 +4,6 @@
 
 import { buildAIRequest } from '../../../infrastructure/ai/index';
 import type { ToolContext } from '../tool-types';
-import { AIServiceResponse, isAIServiceResponse } from '../../../domain/types/workflow-state';
 
 export interface DockerfileIssue {
   type: string;
@@ -148,8 +147,8 @@ export async function generateFixedDockerfile(
   logger.info('Generating fixed Dockerfile content');
 
   try {
-    // Use the AI service from context if available
-    if (context.aiService) {
+    // Use the sampling function if available
+    if (context.sampleFunction) {
       // Build the AI request for Dockerfile fixing
       const requestBuilder = buildAIRequest({
         template: 'dockerfile-fix',
@@ -163,19 +162,10 @@ export async function generateFixedDockerfile(
         },
       });
 
-      type AIService = { generate: (request: unknown) => Promise<AIServiceResponse> };
-      const aiResponse = await (context.aiService as AIService).generate(requestBuilder);
+      const aiResponse = await context.sampleFunction(requestBuilder);
 
-      if (isAIServiceResponse(aiResponse) && aiResponse.success && aiResponse.data != null) {
-        let fixedContent: string;
-
-        if (typeof aiResponse.data === 'string') {
-          fixedContent = aiResponse.data;
-        } else if (typeof aiResponse.data === 'object' && 'content' in aiResponse.data) {
-          fixedContent = String((aiResponse.data as { content: unknown }).content);
-        } else {
-          throw new Error('Invalid AI response data format');
-        }
+      if (aiResponse.success && 'text' in aiResponse) {
+        let fixedContent = aiResponse.text;
 
         // If response includes markdown, extract the dockerfile content
         const dockerfileMatch = fixedContent.match(/```dockerfile\n([\s\S]*?)\n```/);
@@ -191,7 +181,7 @@ export async function generateFixedDockerfile(
         // Log AI generation with metadata
         logger.info(
           {
-            hasMetadata: typeof aiResponse.data === 'object' && aiResponse.data != null,
+            hasText: 'text' in aiResponse && Boolean(aiResponse.text),
           },
           'AI-fixed Dockerfile successfully',
         );

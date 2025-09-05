@@ -351,7 +351,7 @@ export class DockerClient {
           const repo = parts[0] ?? tag;
           const tagName = parts[1] ?? 'latest';
           const image = this.docker.getImage(imageId);
-          image.tag({ repo, tag: tagName } as any);
+          await image.tag({ repo, tag: tagName });
           this.logger.debug({ imageId, tag }, 'Image tagged successfully (retry)');
           return;
         } catch (retryError) {

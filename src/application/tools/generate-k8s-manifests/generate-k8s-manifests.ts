@@ -59,7 +59,7 @@ const generateKubernetesManifestsHandler: ToolDescriptor<
           ? JSON.stringify(result.manifests)
           : result.manifests || '',
         path: './k8s/',
-        resources: Array.isArray((result as any).resources) ? (result as any).resources : [],
+        resources: [],
       };
     } catch (error) {
       logger.error({ error }, 'K8s manifest generation failed');

@@ -48,7 +48,7 @@ const pushImageHandler: ToolDescriptor<PushInput, PushOutput> = {
         throw new DomainError(ErrorCode.VALIDATION_ERROR, 'No tagged images found in session');
       }
 
-      const targetRegistry = registry || 'docker.io';
+      const targetRegistry = registry ?? 'docker.io';
       const imagesToPush = buildResult.tags;
 
       // Emit progress

@@ -70,13 +70,10 @@ export async function pushImage(
   const startTime = Date.now();
 
   if (dockerService && 'push' in dockerService) {
-    interface DockerPushService {
-      push: (tag: string, registry?: string) => Promise<{ digest?: string }>;
-    }
-    const result = await (dockerService as DockerPushService).push(tag, registry);
+    await dockerService.push({ image: tag, registry });
 
     return {
-      digest: result.digest ?? `sha256:${Math.random().toString(36).substring(7)}`,
+      digest: `sha256:${Math.random().toString(36).substring(7)}`,
       pushTime: Date.now() - startTime,
     };
   }

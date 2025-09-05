@@ -83,7 +83,7 @@ describe('Tool Input Schemas', () => {
       const result = AnalyzeRepositoryInput.parse(valid);
       
       expect(result.repoPath).toBe('/test/repo');
-      expect(result.depth).toBe('shallow'); // default
+      expect(result.depth).toBe(3); // default
       expect(result.includeTests).toBe(false); // default
       expect(result.sessionId).toBeUndefined();
     });
@@ -92,7 +92,7 @@ describe('Tool Input Schemas', () => {
       const valid = {
         repoPath: '/test/repo',
         sessionId: 'test-session',
-        depth: 'deep' as const,
+        depth: 5,
         includeTests: true,
       };
       
@@ -103,7 +103,7 @@ describe('Tool Input Schemas', () => {
     it('should reject invalid depth', () => {
       const invalid = {
         repoPath: '/test/repo',
-        depth: 'invalid',
+        depth: 15, // exceeds max of 10
       };
       
       expect(() => AnalyzeRepositoryInput.parse(invalid)).toThrow();
@@ -704,7 +704,7 @@ describe('Schema Integration', () => {
     const analyzeInput = {
       repoPath: '/test/app',
       sessionId: 'workflow-123',
-      depth: 'deep' as const,
+      depth: 5,
       includeTests: false,
     };
     expect(() => AnalyzeRepositoryInput.parse(analyzeInput)).not.toThrow();

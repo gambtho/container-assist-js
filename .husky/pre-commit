@@ -6,6 +6,12 @@ echo "🛡️ Running pre-commit quality gates..."
 # Fail fast on any error
 set -eu
 
+# Run format and add any changes
+echo "🎨 Running formatter..."
+npm run format > /dev/null 2>&1
+# Add any formatting changes
+git add -u
+
 # Run lint-staged for incremental checks
 npx lint-staged
 

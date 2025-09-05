@@ -38,39 +38,69 @@ The project uses automated quality gates to prevent regression and encourage imp
 ### PR Quality Gates
 Your PR will **fail** if:
 - ❌ Any ESLint errors exist
-- ❌ Warning count exceeds baseline
+- ❌ Warning count exceeds the baseline (repo-wide) or the lint-staged threshold (750 for staged files)
 - ❌ TypeScript compilation fails
 - ❌ Tests fail
+- ❌ Quality gates scripts fail
 
 Your PR will **pass** if:
-- ✅ Warnings stay same or decrease
-- ✅ No lint errors (warnings allowed)
+- ✅ Warnings are within thresholds (≤ baseline repo-wide; ≤ 750 for staged files via lint-staged)
+- ✅ No lint errors (warnings allowed up to the threshold)
 - ✅ TypeScript compiles
 - ✅ All tests pass
+- ✅ Quality gates are met
+
+## Package.json Updates
+
+The `package.json` has been updated with improved scripts:
+
+### Build Scripts
+- `build`: Standard build with test utils and declarations
+- `build:fast`: Quick build skipping declarations
+- `build:prod`: Production build with minification
+- `build:dev`: Development build (skip declarations)
+- `build:watch`: Watch mode for continuous building
+
+### Quality Scripts
+- `quality:check`: Full quality analysis using lint-metrics.sh
+- `quality:gates`: Run quality gates (supports SKIP_TYPECHECK)
+- `baseline:update`: Update quality baselines after improvements
+- `baseline:report`: Quick baseline summary (top 20 lines)
+
+### Bundle Management
+- `bundle:size`: Analyze total bundle and CLI binary size
+- `bundle:check`: Dry run npm pack to verify publishing
+- `prepublishOnly`: Runs validation and prod build before publish
+- `release`: Complete release process (validate, build, publish)
+
+### Husky Integration
+- `prepare`: Installs husky hooks automatically
+- Pre-commit hook runs lint-staged and quality gates
+- Quality-gates.json auto-staged when improved
 
 ## Commands Reference
 
 ### Quality Checks
 ```bash
 npm run quality:check      # Full quality analysis
-npm run quality:gates      # TypeScript + quality analysis
-npm run validate:pr:fast   # Quick PR validation
-npm run validate:pr        # Full validation with coverage
+npm run quality:gates      # Run quality gates with optional SKIP_TYPECHECK
+npm run validate           # Run lint, typecheck, and unit tests
+npm run typecheck          # TypeScript compilation check
 ```
 
 ### Baseline Management
 ```bash
-npm run baseline:check     # Compare current vs baseline
 npm run baseline:report    # Quick summary (top 20 lines)
-npm run baseline:lint      # Set new baseline after improvements
+npm run baseline:update    # Set new baseline after improvements
+# Note: baseline:check and baseline:lint commands have been removed
 ```
 
 ### Quick Fixes
 ```bash
-npm run check:quick        # Fast type + lint check
 npm run fix:all           # Auto-fix lint + format
 npm run lint:fix          # Fix linting issues
 npm run format            # Fix formatting
+npm run format:check      # Check formatting without fixing
 ```
 
 ## Improvement Workflow
@@ -106,10 +136,15 @@ npm run quality:check
 ### 4. Update Baseline
 ```bash
 # After improvements
+npm run baseline:update
+# or
 ./scripts/lint-metrics.sh --baseline
 
+# The quality-gates.json file will be automatically updated
+# and staged if modified during pre-commit hooks
+
 # Commit baseline
-git add reports/baseline-count.txt reports/deadcode-baseline.txt
+git add quality-gates.json
 git commit -m "chore: update quality baselines
 
 - ESLint warnings: OLD → NEW
@@ -126,6 +161,8 @@ npm run baseline:report    # Quick health check
 ### Weekly
 ```bash
 # Full assessment
+npm run quality:check
+# or
 ./scripts/lint-metrics.sh
 
 # Fix new warnings immediately
@@ -137,11 +174,11 @@ npm run fix:all
 # Deep analysis
 ./scripts/lint-metrics.sh > reports/monthly-quality.txt
 
-# Dependency audit
-npm audit
+# Dependency audit (set to fail only on high severity)
+npm audit --audit-level high
 
 # Update baselines if improved
-npm run baseline:lint
+npm run baseline:update
 ```
 
 ## Troubleshooting
@@ -149,22 +186,26 @@ npm run baseline:lint
 ### "Ratchet Violation" Error
 ```bash
 # See what increased
-npm run validate:pr:fast
+npm run quality:gates
 
 # Fix warnings in changed files
-npm run lint -- path/to/file.ts
+npm run lint -- src/path/to/file.ts
 
 # Auto-fix and retry
 npm run fix:all
+
+# Note: lint-staged enforces max 750 warnings
 ```
 
 ### Baseline Issues
 ```bash
 # Reset baseline if corrupted
+npm run baseline:update
+# or
 ./scripts/lint-metrics.sh --baseline
 
-# Manual override (emergency only)
-echo "1000" > reports/baseline-count.txt
+# The baseline is now stored in quality-gates.json
+# Manual override (emergency only) - edit quality-gates.json
 ```
 
 ### Script Failures
@@ -180,21 +221,22 @@ bash -x scripts/lint-metrics.sh
 
 ### Quality Gates Config
 **File**: `quality-gates.json`
+This file is automatically maintained by the quality gates system and includes:
+- Current baseline warning count
+- Unused exports baseline
+- Metrics history
+- Quality gate thresholds
+
+The file is automatically updated during pre-commit hooks when improvements are detected.
+
+### Lint-staged Configuration
+**File**: `package.json`
 ```json
-{
-  "gates": {
-    "lint": {
-      "maxWarnings": "baseline",
-      "failOnIncrease": true
-    },
-    "deadcode": {
-      "maxUnused": "baseline",
-      "failOnIncrease": true
-    },
-    "typescript": {
-      "maxErrors": 0
-    }
-  }
+"lint-staged": {
+  "src/**/*.ts": [
+    "eslint --fix --max-warnings 750",
+    "prettier --write"
+  ]
 }
 ```
 
@@ -225,15 +267,17 @@ bash -x scripts/lint-metrics.sh
 
 ### Historical Progress
 - **Initial**: ~1294 warnings
-- **Current**: 700 warnings
-- **Reduction**: 594 warnings (46% improvement)
-- **Dead Code**: 234 unused exports (47% reduction from 441)
+- **Current**: Check with `npm run baseline:report`
+- **Reduction**: Progressive improvement tracked
+- **Dead Code**: Tracked in quality-gates.json
+- **Lint-staged Max**: 750 warnings enforced
 
 ### Current Health
-- ⚠️ **TypeScript**: 45 compilation errors
-- ✅ **ESLint Warnings**: 700 (baseline enforced)
-- ⚠️ **ESLint Errors**: 9 (must be fixed)
-- ✅ **Infrastructure Layer**: 100% clean
+Run `npm run quality:check` for current status:
+- **TypeScript**: Check with `npm run typecheck`
+- **ESLint Warnings**: Max 750 (enforced by lint-staged)
+- **ESLint Errors**: Must be 0 to pass
+- **Quality Gates**: Tracked in quality-gates.json
 
 ## Related Documentation
 - [Testing Guide](./testing.md)

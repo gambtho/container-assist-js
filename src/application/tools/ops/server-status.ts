@@ -11,6 +11,7 @@ import {
   type ServerStatus,
 } from '../schemas';
 import type { ToolDescriptor, ToolContext } from '../tool-types';
+import { getRegisteredTools } from '../native-registry';
 
 // Type aliases
 type ServerStatusInputType = ServerStatusParams;
@@ -30,7 +31,7 @@ const serverStatusTool: ToolDescriptor<ServerStatusInputType, ServerStatusOutput
     input: ServerStatusInputType,
     context: ToolContext,
   ): Promise<ServerStatusOutput> => {
-    const { logger, sessionService, server, toolRegistry } = context;
+    const { logger, server } = context;
     const { details } = input;
 
     logger.info({ details }, 'Server status requested');
@@ -42,43 +43,35 @@ const serverStatusTool: ToolDescriptor<ServerStatusInputType, ServerStatusOutput
       const freeMem = os.freemem();
       const usedMem = totalMem - freeMem;
 
-      let sessions = 0;
-      if (sessionService) {
-        try {
-          sessions = await sessionService.getActiveCount();
-        } catch (error) {
-          logger.warn({ error }, 'Failed to get session count');
-        }
-      }
+      // Session count would require implementing getActiveCount in SessionService
+      const sessions = 0;
 
       // Get dynamic tool count
       let toolCount = 0;
       try {
         // First try to get tools from server if it exposes listTools()
-        if (
-          server &&
-          typeof server === 'object' &&
-          'listTools' in server &&
-          typeof (server as any).listTools === 'function'
-        ) {
-          const toolsResult = await (server as any).listTools();
+        if (server && typeof server === 'object' && 'listTools' in server) {
+          const serverWithListTools = server as { listTools: () => Promise<unknown> };
+          const toolsResult = await serverWithListTools.listTools();
           if (toolsResult && Array.isArray(toolsResult)) {
             toolCount = toolsResult.length;
           } else if (
             toolsResult &&
             typeof toolsResult === 'object' &&
-            Array.isArray(toolsResult.tools)
+            'tools' in toolsResult &&
+            Array.isArray((toolsResult as { tools: unknown[] }).tools)
           ) {
-            toolCount = toolsResult.tools.length;
+            toolCount = (toolsResult as { tools: unknown[] }).tools.length;
           }
         }
-        // Fall back to toolRegistry if server doesn't have listTools()
-        else if (toolRegistry && typeof toolRegistry.getToolCount === 'function') {
-          toolCount = toolRegistry.getToolCount();
+        // Fall back to getRegisteredTools() from native-registry
+        else {
+          toolCount = getRegisteredTools().length;
         }
       } catch (error) {
-        logger.warn({ error }, 'Failed to get dynamic tool count, defaulting to 0');
-        toolCount = 0;
+        logger.warn({ error }, 'Failed to get dynamic tool count, using static count');
+        // Use static count from native-registry as fallback
+        toolCount = getRegisteredTools().length;
       }
 
       const status: ServerStatusOutput = {

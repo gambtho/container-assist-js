@@ -4,6 +4,18 @@ Comprehensive guide for all testing in the containerization-assist project, incl
 
 ## Quick Start
 
+### Development Commands
+```bash
+# Clean build artifacts
+npm run clean              # Remove dist, coverage, .tsbuildinfo
+
+# Development mode with watch
+npm run dev                # Run CLI with tsx watch mode
+
+# Start built CLI
+npm run start              # Run dist/apps/cli.js
+```
+
 ### Run Tests
 ```bash
 # All tests
@@ -18,15 +30,21 @@ npm run test:integration
 
 # With coverage
 npm run test:coverage
+
+# Watch mode for development
+npm run test:watch
 ```
 
 ### Validate Code Quality
 ```bash
-# Quick validation before PR
-npm run validate:pr:fast
+# Standard validation (lint, typecheck, unit tests)
+npm run validate
 
-# Full validation with coverage
-npm run validate:pr
+# Run quality gates check
+npm run quality:gates
+
+# Check formatting
+npm run format:check
 ```
 
 ## Test Categories
@@ -41,8 +59,8 @@ npm run validate:pr
 # Run specific unit test
 npm test -- test/unit/specific.test.ts
 
-# Run with bail on first failure
-npm run test:ci
+# Quick unit tests with 10s timeout
+npm run test:unit:quick
 ```
 
 ### Integration Tests
@@ -147,46 +165,83 @@ describeWithEnvironment(
 ### Jest Configuration
 - **Config File**: `jest.config.js`
 - **Test Match**: `**/*.test.ts`
-- **Coverage Threshold**: 70% (statements, branches, functions, lines)
-- **Timeout**: 30s default, configurable per suite
+- **Coverage**: Tracked but no hard thresholds enforced
+- **Timeout**: 30s default for unit tests, 120s for integration tests
 
 ### Environment Variables
 ```bash
-# Skip integration tests
-SKIP_INTEGRATION_TESTS=true
+# Node options for ES modules
+NODE_OPTIONS='--experimental-vm-modules'
 
-# Custom test timeout
-TEST_TIMEOUT=60000
+# Skip typecheck in quality gates
+SKIP_TYPECHECK=true
 
 # Use local registry
 TEST_REGISTRY_HOST=localhost:5000
+USE_LOCAL_REGISTRY=true
+
+# Docker availability
+DOCKER_AVAILABLE=true
+
+# CI environment
+CI=true
 ```
 
 ## CI/CD Integration
 
 ### GitHub Actions
-```yaml
-name: Tests
-on: [push, pull_request]
+The project uses multiple GitHub Actions workflows:
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm ci
-      - run: npm run test:unit
-      - run: npm run test:integration
-```
+1. **CI/CD** (`ci.yml`):
+   - Quality checks (format, lint, typecheck)
+   - Unit tests (Node 18 and 20)
+   - Integration tests with Docker registry
+   - Test coverage reporting
+   - Security scanning
+   - MCP protocol compatibility
+
+2. **PR Quality** (`pr-quality.yml`):
+   - Quality metrics analysis
+   - PR comment with quality report
+   - Gate enforcement (non-blocking)
+
+3. **Release** (`release.yml`):
+   - NPM publishing
+   - GitHub release creation
+   - Docker image building
 
 ### Pre-commit Validation
+**Husky Pre-commit Hook** (`.husky/pre-commit`):
 ```bash
-# Add to .git/hooks/pre-commit
-#!/bin/bash
-npm run validate:pr:fast
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🛡️ Running pre-commit quality gates..."
+set -eu
+
+# Run lint-staged for incremental checks
+npx lint-staged
+
+# Run quality gates
+./scripts/quality-gates.sh
+
+# Auto-stage updated quality-gates.json if modified
+if git diff --name-only | grep -q "quality-gates.json"; then
+    echo "📊 Staging updated quality-gates.json metrics..."
+    git add quality-gates.json
+fi
+
+echo "✅ Pre-commit checks passed!"
+```
+
+**Lint-staged Configuration** (`package.json`):
+```json
+"lint-staged": {
+  "src/**/*.ts": [
+    "eslint --fix --max-warnings 750",
+    "prettier --write"
+  ]
+}
 ```
 
 ## Troubleshooting
@@ -195,10 +250,11 @@ npm run validate:pr:fast
 
 #### Docker Permission Errors
 ```bash
-# Fix socket permissions
-sudo chmod 666 /var/run/docker.sock
-# Or add user to docker group
+# Add current user to the docker group (log out/in or start a new shell)
 sudo usermod -aG docker $USER
+newgrp docker
+# Alternatively (temporary): grant user-specific access with ACLs
+# sudo setfacl -m user:$USER:rw /var/run/docker.sock
 ```
 
 #### Test Timeouts
@@ -248,6 +304,38 @@ docker-compose -f docker-compose.test.yml restart test-registry
 - Don't skip cleanup
 - Don't use real external services
 - Don't commit .only() or .skip()
+
+## Build and Bundle Management
+
+### Build Commands
+```bash
+# Production build with minification
+npm run build:prod
+
+# Fast development build (skip declarations)
+npm run build:fast
+
+# Development build with watch mode
+npm run build:watch
+
+# Development build (skip declarations)
+npm run build:dev
+
+# Standard build with test utils
+npm run build
+```
+
+### Bundle Analysis
+```bash
+# Check bundle size
+npm run bundle:size
+
+# Dry run npm publish
+npm run bundle:check
+
+# Release process
+npm run release  # Runs validation, builds prod, and publishes
+```
 
 ## Related Documentation
 - [Quality Management](./quality-management.md)

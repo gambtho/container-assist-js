@@ -25,8 +25,8 @@ jest.unstable_mockModule('../error-recovery', () => ({
 // Import modules AFTER setting up mocks
 const buildImageHandler = (await import('../index')).default;
 const fs = await import('node:fs');
-const mockUtils = (await import('../utils')) as typeof import('../utils');
-const mockErrorRecovery = (await import('../error-recovery')) as typeof import('../error-recovery');
+const mockUtils = (await import('../utils')) as unknown;
+const mockErrorRecovery = (await import('../error-recovery')) as unknown;
 
 // Import types and utilities
 import type { BuildImageParams, BuildResult } from '../../schemas';
@@ -372,7 +372,7 @@ describe('build-image tool', () => {
         registry: 'registry.example.com',
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      await buildImageHandler.handler(input, mockContext);
 
       expect(mockDockerService.build).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -390,7 +390,7 @@ describe('build-image tool', () => {
         },
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      await buildImageHandler.handler(input, mockContext);
 
       expect(mockDockerService.build).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -409,7 +409,7 @@ describe('build-image tool', () => {
         platform: 'linux/arm64',
       };
 
-      const result = await buildImageHandler.handler(input, mockContext);
+      await buildImageHandler.handler(input, mockContext);
 
       expect(mockDockerService.build).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -426,7 +426,7 @@ describe('build-image tool', () => {
         target: 'production',
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      await buildImageHandler.handler(input, mockContext);
 
       expect(mockDockerService.build).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -441,7 +441,7 @@ describe('build-image tool', () => {
         noCache: true,
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      await buildImageHandler.handler(input, mockContext);
 
       expect(mockDockerService.build).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -597,7 +597,7 @@ CMD ["node", "index"]
         tags: ['app:v1.0.0'],
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      const result = await buildImageHandler.handler(input, mockContext);
 
       expect(result.success).toBe(true);
       expect(mockDockerService.push).toHaveBeenCalledWith({
@@ -618,7 +618,7 @@ CMD ["node", "index"]
         registry: 'registry.example.com',
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      const result = await buildImageHandler.handler(input, mockContext);
 
       expect(result.success).toBe(true);
       expect(mockDockerService.push).not.toHaveBeenCalled();
@@ -631,7 +631,7 @@ CMD ["node", "index"]
         // No registry specified
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      const result = await buildImageHandler.handler(input, mockContext);
 
       expect(result.success).toBe(true);
       expect(mockDockerService.push).not.toHaveBeenCalled();
@@ -698,7 +698,7 @@ CMD ["node", "index"]
         sessionId: 'test-session-123',
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      const result = await buildImageHandler.handler(input, mockContext);
 
       expect(result.success).toBe(true);
     });
@@ -710,15 +710,19 @@ CMD ["node", "index"]
         sessionId: 'test-session-123',
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      await buildImageHandler.handler(input, mockContext);
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockContext.sessionService?.updateAtomic).toHaveBeenCalledWith(
         'test-session-123',
         expect.any(Function),
       );
 
       // Verify the session update includes build_result
-      const updateFunction = jest.mocked(mockContext.sessionService!.updateAtomic).mock.calls[0][1];
+      const sessionService = mockContext.sessionService as any;
+      const updateAtomicMock = sessionService.updateAtomic;
+      const mockCalls = updateAtomicMock.mock.calls;
+      const updateFunction = mockCalls[0]![1] as (session: any) => any;
       const updatedSession = updateFunction(mockSession);
 
       expect(updatedSession.workflow_state.build_result).toBeDefined();
@@ -733,7 +737,7 @@ CMD ["node", "index"]
         sessionId: 'test-session-123',
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      await buildImageHandler.handler(input, mockContext);
 
       expect(mockDockerService.build).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -761,7 +765,7 @@ CMD ["node", "index"]
         updateAtomic: jest.fn(),
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      await buildImageHandler.handler(input, mockContext);
 
       expect(mockDockerService.build).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -780,7 +784,7 @@ CMD ["node", "index"]
         sessionId: 'test-session-123',
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      const result = await buildImageHandler.handler(input, mockContext);
 
       expect(result.metadata?.baseImage).toBe('node:18-alpine');
     });
@@ -793,7 +797,7 @@ CMD ["node", "index"]
         sessionId: 'test-session-123',
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      const result = await buildImageHandler.handler(input, mockContext);
 
       expect(result.metadata?.baseImage).toBe('unknown');
     });
@@ -805,7 +809,7 @@ CMD ["node", "index"]
         sessionId: 'test-session-123',
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      const result = await buildImageHandler.handler(input, mockContext);
 
       // Validate against output schema
       expect(() => buildImageHandler.outputSchema.parse(result)).not.toThrow();
@@ -816,7 +820,7 @@ CMD ["node", "index"]
         sessionId: 'test-session-123',
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      const result = await buildImageHandler.handler(input, mockContext);
 
       expect(result.success).toBe(true);
       expect(result.sessionId).toBe('test-session-123');
@@ -834,7 +838,7 @@ CMD ["node", "index"]
         sessionId: 'test-session-123',
       };
 
-      const _result = await buildImageHandler.handler(input, mockContext);
+      const result = await buildImageHandler.handler(input, mockContext);
 
       // Optional fields should be undefined when no warnings
       if (result.warnings !== undefined) {

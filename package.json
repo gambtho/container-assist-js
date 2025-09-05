@@ -14,10 +14,6 @@
       "import": "./dist/src/index.js",
       "default": "./dist/src/index.js"
     },
-    "./tools/registry": {
-      "types": "./dist/service/tools/ops/registry.d.ts",
-      "import": "./dist/service/tools/ops/registry.js"
-    },
     "./types": {
       "types": "./dist/domain/types/index.d.ts",
       "import": "./dist/domain/types/index.js"

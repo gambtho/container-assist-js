@@ -168,7 +168,10 @@ export async function generateDockerfileContent(
 
       // Type commented out to avoid unused declaration
 
-      const service = aiService as any;
+      const service = aiService as {
+        generateDockerfile?: (request: unknown) => Promise<unknown>;
+        generate?: (request: unknown) => Promise<unknown>;
+      };
       const generateMethod = service.generateDockerfile ?? service.generate;
 
       if (!generateMethod || typeof generateMethod !== 'function') {
@@ -259,7 +262,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
     }
   }
 
-  // Add custom commands
   if (options.customCommands.length > 0) {
     const customSection = `
 # Custom commands
@@ -470,22 +472,18 @@ function getRecommendedBaseImage(language: string): string {
 export function analyzeDockerfileSecurity(content: string): string[] {
   const warnings: string[] = [];
 
-  // Check for running as root
   if (!content.includes('USER ') || content.includes('USER root')) {
     warnings.push('Container runs as root user - consider adding a non-root user');
   }
 
-  // Check for latest tags
   if (content.includes(':latest')) {
     warnings.push('Using :latest tag - consider pinning to specific versions');
   }
 
-  // Check for sudo usage
   if (content.includes('sudo ')) {
     warnings.push('Avoid using sudo in containers');
   }
 
-  // Check for exposed sensitive ports
   const sensitiveports = [22, 23, 135, 139, 445];
   for (const port of sensitiveports) {
     if (content.includes(`EXPOSE ${port}`)) {
@@ -493,7 +491,6 @@ export function analyzeDockerfileSecurity(content: string): string[] {
     }
   }
 
-  // Check for package manager cleanup
   if (content.includes('apt-get install') && !content.includes('rm -rf /var/lib/apt/lists')) {
     warnings.push('Consider cleaning apt cache after installation');
   }
@@ -513,7 +510,6 @@ export function estimateImageSize(
   dependencies: string[],
   multistage: boolean,
 ): string {
-  // Updated base sizes with Node 20 and more accurate estimates
   const baseSizes: Record<string, number> = {
     'node:20-alpine': 55,
     'node:20': 380,
@@ -534,7 +530,6 @@ export function estimateImageSize(
     'debian:11-slim': 69,
   };
 
-  // Try to match the base image more accurately
   let baseSize = 100; // default
   for (const [image, size] of Object.entries(baseSizes)) {
     const langBase = language.split(':')[0];
@@ -546,43 +541,32 @@ export function estimateImageSize(
 
   let estimatedSize = baseSize;
 
-  // More accurate dependency overhead calculation
-  // Different dependency types have different sizes
   const depOverhead = dependencies.reduce((total, dep) => {
-    // Large dependencies
     if (dep.includes('tensorflow') || dep.includes('torch') || dep.includes('opencv')) {
       return total + 500;
     }
-    // Medium dependencies
     if (dep.includes('pandas') || dep.includes('numpy') || dep.includes('react')) {
       return total + 50;
     }
-    // Development dependencies (if not using multistage, they add to size)
     if (
       !multistage &&
       (dep.includes('webpack') || dep.includes('typescript') || dep.includes('eslint'))
     ) {
       return total + 30;
     }
-    // Default small dependency
     return total + 2;
   }, 0);
 
   estimatedSize += depOverhead;
 
-  // Add application code estimate (assuming ~10-50MB for typical apps)
   estimatedSize += 25;
 
-  // Multistage reduces final size by removing build tools
   if (multistage) {
-    // More realistic reduction - removes dev dependencies and build artifacts
     estimatedSize = Math.round(estimatedSize * 0.6);
   }
 
-  // Add layer overhead (~10%)
   estimatedSize = Math.round(estimatedSize * 1.1);
 
-  // Format output
   if (estimatedSize < 1000) {
     return `~${estimatedSize}MB`;
   } else {

@@ -1,5 +1,5 @@
 /**
- * Session data validator utilities for Team 4 improvements
+ * Session data validator utilities
  * Provides safe access to session workflow state
  */
 
@@ -76,7 +76,7 @@ export function getSessionBuildResult(session: Session): DockerBuildResult | nul
  * @returns True if analysis is complete
  */
 export function hasAnalysisCompleted(session: Session): boolean {
-  return session.workflow_state?.completed_steps.includes('analyze_repository') || false;
+  return session.workflow_state?.completed_steps?.includes('analyze_repository') ?? false;
 }
 
 /**
@@ -85,7 +85,7 @@ export function hasAnalysisCompleted(session: Session): boolean {
  * @returns True if build is complete
  */
 export function hasBuildCompleted(session: Session): boolean {
-  return session.workflow_state?.completed_steps.includes('build_image') || false;
+  return session.workflow_state?.completed_steps?.includes('build_image') ?? false;
 }
 
 /**

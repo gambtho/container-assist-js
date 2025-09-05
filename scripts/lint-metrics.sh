@@ -21,13 +21,13 @@ echo ""
 echo "📋 ESLint Analysis"
 echo "────────────────────"
 
-# Run lint and capture output
-npm run lint > reports/current-lint-output.txt 2>&1 || true
+# Run lint and capture output in a variable
+LINT_OUTPUT=$(npm run lint 2>&1 || true)
 
 # Count warnings and errors more precisely from the summary line
-if [ -f "reports/current-lint-output.txt" ]; then
+if [ -n "$LINT_OUTPUT" ]; then
     # Parse the final summary line like "✖ 794 problems (1 error, 793 warnings)"
-    SUMMARY_LINE=$(grep -E "problems.*error.*warning" reports/current-lint-output.txt | tail -1 2>/dev/null || echo "")
+    SUMMARY_LINE=$(echo "$LINT_OUTPUT" | grep -E "problems.*error.*warning" | tail -1 2>/dev/null || echo "")
     if [ -n "$SUMMARY_LINE" ]; then
         TOTAL_ERRORS=$(echo "$SUMMARY_LINE" | sed -n 's/.*(\([0-9]\+\) error.*/\1/p' 2>/dev/null || echo "0")
         TOTAL_WARNINGS=$(echo "$SUMMARY_LINE" | sed -n 's/.*, \([0-9]\+\) warning.*/\1/p' 2>/dev/null || echo "0")
@@ -40,8 +40,8 @@ if [ -f "reports/current-lint-output.txt" ]; then
         fi
     else
         # Fallback to counting individual lines
-        TOTAL_WARNINGS=$(grep -c "warning" reports/current-lint-output.txt 2>/dev/null || echo "0")
-        TOTAL_ERRORS=$(grep -c "error" reports/current-lint-output.txt 2>/dev/null || echo "0")
+        TOTAL_WARNINGS=$(echo "$LINT_OUTPUT" | grep -c "warning" 2>/dev/null || echo "0")
+        TOTAL_ERRORS=$(echo "$LINT_OUTPUT" | grep -c "error" 2>/dev/null || echo "0")
     fi
 else
     TOTAL_WARNINGS=0
@@ -59,19 +59,19 @@ echo "Total errors: $TOTAL_ERRORS"
 echo ""
 
 echo "=== Top 10 Warning Types ==="
-if [ -f "reports/current-lint-output.txt" ]; then
+if [ -n "$LINT_OUTPUT" ]; then
     # Extract and categorize warning types from ESLint rule names
-    grep "warning" reports/current-lint-output.txt 2>/dev/null | \
+    echo "$LINT_OUTPUT" | grep "warning" 2>/dev/null | \
         grep -o "@typescript-eslint/[a-zA-Z0-9-]*" | \
         sed 's/@typescript-eslint\///' | \
         sort | uniq -c | sort -rn | head -10 | \
         awk '{printf "%5d  %s\n", $1, $2}' || \
-    grep "warning" reports/current-lint-output.txt 2>/dev/null | \
+    echo "$LINT_OUTPUT" | grep "warning" 2>/dev/null | \
         sed -n 's/.*warning[[:space:]]*\([^[:space:]]*\).*/\1/p' | \
         sort | uniq -c | sort -rn | head -10 | \
         awk '{printf "%5d  %s\n", $1, $2}' || echo "No warnings found in lint output"
 else
-    echo "No lint output file found"
+    echo "No lint output captured"
 fi
 echo ""
 

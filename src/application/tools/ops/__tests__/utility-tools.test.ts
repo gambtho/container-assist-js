@@ -70,7 +70,7 @@ describe('utility tools', () => {
         expect(result).toMatchObject({
           success: true,
           message: 'pong: ping',
-          timestamp: expect.any(String),
+          timestamp: expect.any(String) as string,
           server: {
             name: 'container-kit-mcp',
             version: '2.0.0',
@@ -146,8 +146,8 @@ describe('utility tools', () => {
         expect(result.server).toMatchObject({
           name: 'container-kit-mcp',
           version: '2.0.0',
-          uptime: expect.any(Number),
-          pid: expect.any(Number),
+          uptime: expect.any(Number) as number,
+          pid: expect.any(Number) as number,
         });
 
         expect(result.server.uptime).toBeGreaterThan(0);
@@ -251,13 +251,13 @@ describe('utility tools', () => {
         expect(result).toMatchObject({
           success: true,
           version: '2.0.0',
-          uptime: expect.any(Number),
+          uptime: expect.any(Number) as number,
           memory: {
-            used: expect.any(Number),
-            total: expect.any(Number),
+            used: expect.any(Number) as number,
+            total: expect.any(Number) as number,
           },
-          sessions: expect.any(Number),
-          tools: expect.any(Number),
+          sessions: expect.any(Number) as number,
+          tools: expect.any(Number) as number,
         });
 
         expect(result.uptime).toBeGreaterThan(0);
@@ -293,7 +293,8 @@ describe('utility tools', () => {
           getActiveCount: jest.fn().mockResolvedValue(42),
         };
 
-        mockContext.sessionService = mockSessionService as any;
+        mockContext.sessionService =
+          mockSessionService as unknown as typeof mockContext.sessionService;
 
         const input: ServerStatusInputType = {};
 
@@ -318,7 +319,8 @@ describe('utility tools', () => {
           getActiveCount: jest.fn().mockRejectedValue(new Error('Session service error')),
         };
 
-        mockContext.sessionService = mockSessionService as any;
+        mockContext.sessionService =
+          mockSessionService as unknown as typeof mockContext.sessionService;
 
         const input: ServerStatusInputType = {};
 
@@ -326,7 +328,7 @@ describe('utility tools', () => {
 
         expect(result.sessions).toBe(0);
         expect(mockLogger.warn).toHaveBeenCalledWith(
-          { error: expect.any(Error) },
+          { error: expect.any(Error) as Error },
           'Failed to get session count',
         );
       });
@@ -364,20 +366,15 @@ describe('utility tools', () => {
         expect(result.tools).toBe(2);
       });
 
-      it('should fallback to tool registry for tool count', async () => {
-        const mockToolRegistry = {
-          getToolCount: jest.fn().mockReturnValue(15),
-        };
-
+      it('should fallback to getRegisteredTools for tool count', async () => {
         mockContext.server = {}; // Server without listTools
-        mockContext.toolRegistry = mockToolRegistry as any;
 
         const input: ServerStatusInputType = {};
 
         const result = await serverStatusTool.handler(input, mockContext);
 
-        expect(result.tools).toBe(15);
-        expect(mockToolRegistry.getToolCount).toHaveBeenCalled();
+        // Should get count from the registry; avoid hardcoded totals
+        expect(result.tools).toBeGreaterThan(0);
       });
 
       it('should handle tool counting errors', async () => {
@@ -393,20 +390,21 @@ describe('utility tools', () => {
 
         expect(result.tools).toBe(0);
         expect(mockLogger.warn).toHaveBeenCalledWith(
-          { error: expect.any(Error) },
+          { error: expect.any(Error) as Error },
           'Failed to get dynamic tool count, defaulting to 0',
         );
       });
 
-      it('should handle missing server and tool registry', async () => {
+      it('should handle missing server', async () => {
         mockContext.server = undefined;
-        mockContext.toolRegistry = undefined;
 
         const input: ServerStatusInputType = {};
 
         const result = await serverStatusTool.handler(input, mockContext);
 
-        expect(result.tools).toBe(0);
+        // Should get count from the registry when server is missing
+        expect(typeof result.tools).toBe('number');
+        expect(result.tools).toBeGreaterThan(0);
       });
     });
 
@@ -465,7 +463,7 @@ describe('utility tools', () => {
         );
 
         expect(mockLogger.error).toHaveBeenCalledWith(
-          { error: expect.any(Error) },
+          { error: expect.any(Error) as Error },
           'Error collecting server status',
         );
       });
@@ -491,8 +489,8 @@ describe('utility tools', () => {
 
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.objectContaining({
-            uptime: expect.any(Number),
-            sessions: expect.any(Number),
+            uptime: expect.any(Number) as number,
+            sessions: expect.any(Number) as number,
             memoryUsed: expect.any(Number),
           }),
           'Server status compiled',

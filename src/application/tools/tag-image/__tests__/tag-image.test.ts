@@ -367,13 +367,13 @@ describe('tag-image tool', () => {
 
       const _result = await tagImageHandler.handler(input, mockContext);
 
-      expect(mockContext.sessionService?.updateAtomic).toHaveBeenCalledWith(
-        'test-session-123',
-        expect.any(Function),
-      );
+      const sessionService = mockContext.sessionService as any;
+      const updateAtomicMock = sessionService.updateAtomic;
+      expect(updateAtomicMock).toHaveBeenCalledWith('test-session-123', expect.any(Function));
 
       // Verify the session update includes updated tags
-      const updateFunction = jest.mocked(mockContext.sessionService!.updateAtomic).mock.calls[0][1];
+      const mockCalls = updateAtomicMock.mock.calls;
+      const updateFunction = mockCalls[0]![1] as (session: any) => any;
       const updatedSession = updateFunction(mockSession);
 
       expect(updatedSession.workflow_state.build_result.tags).toEqual(['test-app:v1.0.0']);
@@ -389,7 +389,10 @@ describe('tag-image tool', () => {
 
       await tagImageHandler.handler(input, mockContext);
 
-      const updateFunction = jest.mocked(mockContext.sessionService!.updateAtomic).mock.calls[0][1];
+      const sessionService2 = mockContext.sessionService as any;
+      const updateAtomicMock2 = sessionService2.updateAtomic;
+      const mockCalls2 = updateAtomicMock2.mock.calls;
+      const updateFunction = mockCalls2[0]![1] as (session: any) => any;
       const updatedSession = updateFunction(mockSession);
 
       const buildResult = updatedSession.workflow_state.build_result;

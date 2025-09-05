@@ -4,6 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import path from 'node:path';
+import type { Dirent } from 'node:fs';
 
 // Set up mocks before any imports for ESM compatibility
 jest.unstable_mockModule('node:fs', () => ({
@@ -24,6 +25,7 @@ const fs = await import('node:fs');
 import type { AnalyzeRepositoryParams, AnalysisResult } from '../../schemas';
 import { createMockToolContext, createSampleProject } from '../../__tests__/shared/test-utils';
 import { createMockAIService } from '../../__tests__/shared/ai-mocks';
+import { Success } from '../../../../domain/types/result';
 
 const mockFs = fs.promises as jest.Mocked<typeof fs.promises>;
 
@@ -488,12 +490,14 @@ describe('analyze-repo tool', () => {
       mockFs.readdir.mockImplementation((dirPath) => {
         const pathStr = String(dirPath);
         if (pathStr.includes('k8s')) {
-          return Promise.resolve([{ name: 'deployment.yaml', isDirectory: () => false }] as any);
+          return Promise.resolve([
+            { name: 'deployment.yaml', isDirectory: () => false, isFile: () => true },
+          ] as Dirent[]);
         }
         return Promise.resolve([
-          { name: 'package.json', isDirectory: () => false },
-          { name: 'k8s', isDirectory: () => true },
-        ] as any);
+          { name: 'package.json', isDirectory: () => false, isFile: () => true },
+          { name: 'k8s', isDirectory: () => true, isFile: () => false },
+        ] as Dirent[]);
       });
 
       const input: AnalyzeRepositoryParams = {
@@ -523,21 +527,23 @@ describe('analyze-repo tool', () => {
       mockContext.aiService = mockAIService;
 
       // Mock AI service response
-      mockAIService.generate.mockResolvedValue({
-        data: JSON.stringify({
-          insights: 'This is a Node.js Express application',
-          optimizations: ['Use multi-stage builds', 'Optimize layer caching'],
-          security: ['Update dependencies', 'Use non-root user'],
-          baseImage: 'node:16-alpine',
-          buildStrategy: 'multi-stage',
-        }),
-        metadata: {
+      mockAIService.generateStructured.mockResolvedValue(
+        Success({
+          content: {
+            insights: 'This is a Node.js Express application',
+            optimizations: ['Use multi-stage builds', 'Optimize layer caching'],
+            security: ['Update dependencies', 'Use non-root user'],
+            baseImage: 'node:16-alpine',
+            buildStrategy: 'multi-stage',
+          },
           model: 'claude-3-opus',
-          tokensUsed: 150,
-          fromCache: false,
-          durationMs: 1200,
-        },
-      });
+          usage: {
+            promptTokens: 100,
+            completionTokens: 50,
+            totalTokens: 150,
+          },
+        }),
+      );
 
       const input: AnalyzeRepositoryParams = {
         repoPath: './test-app',
@@ -562,7 +568,7 @@ describe('analyze-repo tool', () => {
       mockContext.aiService = mockAIService;
 
       // Mock AI service failure
-      mockAIService.generate.mockRejectedValue(new Error('AI service unavailable'));
+      mockAIService.generateStructured.mockRejectedValue(new Error('AI service unavailable'));
 
       const input: AnalyzeRepositoryParams = {
         repoPath: './test-app',
@@ -582,15 +588,22 @@ describe('analyze-repo tool', () => {
       const mockAIService = createMockAIService();
       mockContext.aiService = mockAIService;
 
-      mockAIService.generate.mockResolvedValue({
-        data: JSON.stringify({
-          insights: 'Detailed analysis',
-          optimizations: ['optimization1', 'optimization2'],
-          security: ['security1', 'security2'],
-          baseImage: 'node:18-alpine',
+      mockAIService.generateStructured.mockResolvedValue(
+        Success({
+          content: {
+            insights: 'Detailed analysis',
+            optimizations: ['optimization1', 'optimization2'],
+            security: ['security1', 'security2'],
+            baseImage: 'node:18-alpine',
+          },
+          model: 'claude-3-opus',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
         }),
-        metadata: { tokensUsed: 100 },
-      });
+      );
 
       const input: AnalyzeRepositoryParams = {
         repoPath: './test-app',
@@ -606,10 +619,15 @@ describe('analyze-repo tool', () => {
 
   describe('Session management', () => {
     it('should create new session when none provided', async () => {
-      mockContext.sessionService = {
+      const mockSessionService = {
         create: jest.fn().mockResolvedValue({ id: 'new-session-123' }),
         updateAtomic: jest.fn().mockResolvedValue(undefined),
-      };
+        get: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue(undefined),
+        delete: jest.fn().mockResolvedValue(undefined),
+        initialize: jest.fn().mockResolvedValue(undefined),
+      } as typeof mockContext.sessionService;
+      mockContext.sessionService = mockSessionService;
 
       const input: AnalyzeRepositoryParams = {
         repoPath: './test-app',
@@ -618,7 +636,8 @@ describe('analyze-repo tool', () => {
       const result = await analyzeRepositoryHandler.handler(input, mockContext);
 
       expect(result.sessionId).toBe('new-session-123');
-      expect(mockContext.sessionService.create).toHaveBeenCalledWith({
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(mockSessionService.create).toHaveBeenCalledWith({
         projectName: 'test-app',
         metadata: {
           repoPath: './test-app',
@@ -651,6 +670,7 @@ describe('analyze-repo tool', () => {
 
       const _result = await analyzeRepositoryHandler.handler(input, mockContext);
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockContext.sessionService.updateAtomic).toHaveBeenCalledWith(
         'test-session',
         expect.any(Function),
@@ -792,7 +812,7 @@ describe('analyze-repo tool', () => {
         'pom.xml': '<project><modelVersion>4.0.0</modelVersion></project>',
       });
 
-      mockFs.readdir.mockResolvedValue([{ name: 'pom.xml', isDirectory: () => false }] as any);
+      mockFs.readdir.mockResolvedValue([{ name: 'pom.xml', isDirectory: () => false } as Dirent]);
 
       const input: AnalyzeRepositoryParams = {
         repoPath: './maven-app',
@@ -915,7 +935,7 @@ describe('analyze-repo tool', () => {
 
     it('should limit file reading for large projects', async () => {
       // Setup large project structure
-      const largeProjectFiles: any = {};
+      const largeProjectFiles: Record<string, string> = {};
       for (let i = 0; i < 1000; i++) {
         largeProjectFiles[`file${i}.js`] = `// File ${i}`;
       }

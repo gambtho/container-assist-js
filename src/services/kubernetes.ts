@@ -87,6 +87,45 @@ export class KubernetesService {
   async createNamespace(name: string): Promise<void> {
     return this.client.createNamespace(name);
   }
+
+  /**
+   * Deploy application to cluster (matches interface requirement)
+   */
+  async deploy(manifests: unknown[]): Promise<{ success: boolean; resources: unknown[] }> {
+    const k8sManifests = manifests as K8sManifest[];
+    const result = await this.deployManifests(k8sManifests);
+    return {
+      success: result.success,
+      resources: result.resources,
+    };
+  }
+
+  /**
+   * Generate Kubernetes manifests from application spec
+   */
+  generateManifests(spec: unknown): Promise<unknown[]> {
+    // Basic implementation - just return empty array
+    // Full implementation would require manifest generation logic
+    this.logger.debug({ spec }, 'Generating manifests (stub)');
+    return Promise.resolve([]);
+  }
+
+  /**
+   * Verify deployment status
+   */
+  async verifyDeployment(options: { namespace: string; name: string }): Promise<unknown> {
+    const status = await this.getServiceStatus(options.name, options.namespace);
+    return status;
+  }
+
+  /**
+   * Prepare cluster (create namespaces, etc.)
+   */
+  async prepareCluster(options: { namespace?: string }): Promise<void> {
+    if (options.namespace) {
+      await this.createNamespace(options.namespace);
+    }
+  }
 }
 
 // Re-export types for convenience

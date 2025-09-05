@@ -43,8 +43,8 @@ describe('prepare-cluster tool', () => {
         },
       });
 
-      const mockGet = mockContext.sessionService!.get;
-      mockGet.mockResolvedValue(session);
+      const sessionService = mockContext.sessionService as any;
+      sessionService.get.mockResolvedValue(session);
 
       const input: PrepareClusterInputType = {
         sessionId: 'test-session',
@@ -57,7 +57,8 @@ describe('prepare-cluster tool', () => {
         sessionId: 'test-session',
       });
 
-      const mockUpdateAtomic = mockContext.sessionService!.updateAtomic;
+      const sessionService = mockContext.sessionService as any;
+      const mockUpdateAtomic = sessionService.updateAtomic;
       expect(mockUpdateAtomic).toHaveBeenCalledWith(
         'test-session',
         expect.any(Function) as SessionUpdater,
@@ -72,8 +73,8 @@ describe('prepare-cluster tool', () => {
       });
 
       const updateAtomicMock = jest.fn<SessionService['updateAtomic']>();
-      const mockGet = mockContext.sessionService!.get;
-      mockGet.mockResolvedValue(session);
+      const sessionService = mockContext.sessionService as any;
+      sessionService.get.mockResolvedValue(session);
       mockContext.sessionService!.updateAtomic = updateAtomicMock;
 
       const input: PrepareClusterInputType = {
@@ -109,8 +110,8 @@ describe('prepare-cluster tool', () => {
           workflow_state: { analysis_result: { language: 'javascript' } },
         });
 
-        const mockGet = mockContext.sessionService!.get;
-        mockGet.mockResolvedValue(session);
+        const sessionService = mockContext.sessionService as any;
+        sessionService.get.mockResolvedValue(session);
 
         const input: PrepareClusterInputType = { sessionId };
         const result = await prepareClusterHandler.handler(input, mockContext);
@@ -138,8 +139,8 @@ describe('prepare-cluster tool', () => {
     });
 
     it('should fail when session is not found', async () => {
-      const mockGet = mockContext.sessionService!.get;
-      mockGet.mockResolvedValue(null);
+      const sessionService = mockContext.sessionService as any;
+      sessionService.get.mockResolvedValue(null);
 
       const input: PrepareClusterInputType = {
         sessionId: 'nonexistent-session',
@@ -154,8 +155,8 @@ describe('prepare-cluster tool', () => {
     });
 
     it('should handle session service get errors', async () => {
-      const mockGet = mockContext.sessionService!.get;
-      mockGet.mockRejectedValue(new Error('Database connection failed'));
+      const sessionService = mockContext.sessionService as any;
+      sessionService.get.mockRejectedValue(new Error('Database connection failed'));
 
       const input: PrepareClusterInputType = {
         sessionId: 'error-session',
@@ -168,9 +169,10 @@ describe('prepare-cluster tool', () => {
 
     it('should handle session service updateAtomic errors', async () => {
       const session = createMockSession();
-      const mockGet = mockContext.sessionService!.get;
-      mockGet.mockResolvedValue(session);
-      const mockUpdateAtomic = mockContext.sessionService!.updateAtomic;
+      const sessionService = mockContext.sessionService as any;
+      sessionService.get.mockResolvedValue(session);
+      const sessionService = mockContext.sessionService as any;
+      const mockUpdateAtomic = sessionService.updateAtomic;
       mockUpdateAtomic.mockRejectedValue(new Error('Session update failed'));
 
       const input: PrepareClusterInputType = {
@@ -598,7 +600,8 @@ describe('prepare-cluster tool', () => {
 
       // Verify that existing workflow state is preserved
       const mockFunction3 = expect.any(Function) as jest.Mock;
-      expect(mockContext.sessionService!.updateAtomic).toHaveBeenCalledWith(
+      const sessionService = mockContext.sessionService as any;
+      expect(sessionService.updateAtomic).toHaveBeenCalledWith(
         'workflow-continuation-test',
         mockFunction3,
       );
@@ -637,7 +640,8 @@ describe('prepare-cluster tool', () => {
 
     it('should handle session with undefined workflow state', async () => {
       const session = createMockSession();
-      delete (session as any).workflow_state;
+      const sessionWithoutWorkflowState = { ...session } as typeof session;
+      delete sessionWithoutWorkflowState.workflow_state;
 
       const updateAtomicMock = jest.fn();
       mockContext.sessionService!.get = jest.fn().mockResolvedValue(session);
