@@ -1,0 +1,5 @@
+src/domain/types/index.ts:19 - Result
+src/domain/types/index.ts:34 - SampleResult
+src/config/config.ts:262 - validateConfiguration
+src/config/index.ts:13 - createConfigurationForEnv
+src/application/interfaces.ts:37 - HealthStatus

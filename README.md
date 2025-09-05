@@ -187,10 +187,13 @@ await server.start();
 src/
 ├── config/          # Single source of truth for configuration
 ├── domain/          # Pure types only (no business logic!)
-├── infrastructure/  # External adapters (docker, k8s, ai, core)
+├── infrastructure/  # External adapters (docker, k8s, ai, core) - 100% clean!
 ├── application/     # Business logic (tools, workflow, factories)
 └── platform/        # Entry points (bin, server)
 apps/                # CLI entry points
+dist/                # Built output (ESM modules)
+reports/             # Quality metrics and baselines
+scripts/             # Build and validation scripts
 ```
 
 ## Example Usage
@@ -284,14 +287,12 @@ sudo usermod -aG docker $USER
 
 ## Documentation
 
-- [User Setup Guide](docs/user/SETUP_GUIDE.md)
-
 ## Development
 
 ### Commands
 
 ```bash
-# Build and Development (Ultra-Fast with tsup)
+# Build and Development (Ultra-Fast with tsdown)
 npm run build          # Fast development build (90ms)
 npm run build:prod     # Minified production build (710ms)
 npm run build:watch    # Live rebuild on changes
@@ -313,7 +314,7 @@ npm run test:coverage  # Coverage report
 
 ### Code Standards
 
-- **Build System**: Ultra-fast tsup (esbuild-based) - 10-100x faster than tsc
+- **Build System**: Ultra-fast tsdown (rolldown-based) - 10-100x faster than tsc
 - **TypeScript**: Strict mode with ES2022 modules and native ESM support
 - **Imports**: Relative paths only (no path aliases, no import extension hacks)
 - **Architecture**: Clean separation between layers with strict boundaries

@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🛡️ Running pre-commit quality gates..."
+
+# Run lint-staged for incremental checks
+npx lint-staged
+
+# Run quality gates
+./scripts/quality-gates.sh
+
+echo "✅ Pre-commit checks passed!"

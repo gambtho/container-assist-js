@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "description": "Quality gate configuration for containerization-assist-js",
+  "gates": {
+    "lint": {
+      "maxWarnings": "baseline",
+      "failOnIncrease": true,
+      "baselineFile": "reports/baseline-count.txt",
+      "allowedIncrease": 0,
+      "description": "ESLint warning ratcheting system"
+    },
+    "deadcode": {
+      "maxUnused": "baseline", 
+      "failOnIncrease": true,
+      "baselineFile": "reports/deadcode-baseline.txt",
+      "allowedIncrease": 0,
+      "description": "Unused export tracking system"
+    },
+    "build": {
+      "maxTimeMs": 5000,
+      "failOnRegression": false,
+      "regressionThresholdMs": 1000,
+      "description": "Build performance monitoring"
+    },
+    "typescript": {
+      "maxErrors": 0,
+      "failOnAnyError": true,
+      "description": "TypeScript compilation requirements"
+    },
+    "tests": {
+      "minCoveragePercent": 0,
+      "failOnTestFailure": true,
+      "requiredTestTypes": ["unit"],
+      "description": "Test execution and coverage requirements"
+    }
+  },
+  "reporting": {
+    "showTopWarningTypes": 10,
+    "showTopDeadcodeFiles": 5,
+    "includeBuildTiming": true,
+    "includeProgressMetrics": true
+  }
+}
