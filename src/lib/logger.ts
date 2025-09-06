@@ -105,3 +105,35 @@ export function createTimer(
 /**
  * Helper to create a logger for a specific tool
  */
+
+/**
+ * Log a sampling event with structured data
+ */
+export function logSamplingEvent(
+  logger: pino.Logger,
+  event: string,
+  data: Record<string, unknown>,
+): void {
+  logger.info({
+    event_type: 'sampling',
+    event_name: event,
+    ...data,
+  }, `Sampling: ${event}`);
+}
+
+/**
+ * Log an orchestrator event with structured data
+ */
+export function logOrchestratorEvent(
+  logger: pino.Logger,
+  phase: string,
+  event: 'start' | 'end' | 'failure' | 'attempt' | 'patches_applied' | 'scan_result' | 'success' | 'max_attempts' | 'no_improvement',
+  data?: Record<string, unknown>,
+): void {
+  logger.info({
+    event_type: 'orchestrator',
+    phase,
+    event,
+    ...data,
+  }, `Orchestrator: ${phase} ${event}`);
+}

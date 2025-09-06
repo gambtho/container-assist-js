@@ -1,7 +1,7 @@
 /**
  * Resource Management Tests for MCP Inspector
- * Team Gamma - Testing Infrastructure
- * Tests Team Alpha's resource management system via MCP resources
+ * MCP Inspector Testing Infrastructure
+ * Tests resource management system via MCP resources
  */
 
 import { TestCase, MCPTestRunner } from '../../infrastructure/test-runner.js';

@@ -1,44 +1,67 @@
 /**
- * Generate Dockerfile Tool - Flat Architecture
- *
- * Generates optimized Dockerfiles based on repository analysis
- * Follows architectural requirement: only imports from src/lib/
+ * Generate optimized Dockerfiles based on repository analysis
  */
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../lib/session';
-import { createAIService, type AIResult } from '../lib/ai';
+import { createAIService } from '../lib/ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
 
+/**
+ * Configuration for Dockerfile generation
+ */
 export interface GenerateDockerfileConfig {
+  /** Session identifier for storing results */
   sessionId: string;
+  /** Custom base image (defaults to language-specific recommendation) */
   baseImage?: string;
+  /** Runtime image for multi-stage builds */
   runtimeImage?: string;
+  /** Enable build optimizations */
   optimization?: boolean;
+  /** Use multi-stage build pattern */
   multistage?: boolean;
+  /** Apply security hardening practices */
   securityHardening?: boolean;
+  /** Include health check configuration */
   includeHealthcheck?: boolean;
+  /** Custom Dockerfile instructions to include */
   customInstructions?: string;
+  /** Optimize for smaller image size */
   optimizeSize?: boolean;
+  /** Additional RUN commands to execute */
   customCommands?: string[];
 }
 
+/**
+ * Result of Dockerfile generation operation
+ */
 export interface GenerateDockerfileResult {
-  success: boolean;
+  /** Whether the generation was successful */
+  ok: boolean;
+  /** Session identifier */
   sessionId: string;
+  /** Generated Dockerfile content */
   content: string;
+  /** File path where Dockerfile was written */
   path: string;
+  /** Base image used in the Dockerfile */
   baseImage: string;
+  /** Whether optimization was enabled */
   optimization: boolean;
+  /** Whether multi-stage build was used */
   multistage: boolean;
+  /** Optional warnings about the generated Dockerfile */
   warnings?: string[];
 }
 
 /**
  * Get recommended base image for a language
+ * @param language - Programming language detected in repository
+ * @returns Recommended Docker base image
  */
 function getRecommendedBaseImage(language: string): string {
   const recommendations: Record<string, string> = {
@@ -57,6 +80,9 @@ function getRecommendedBaseImage(language: string): string {
 
 /**
  * Get build commands for different languages
+ * @param analysis - Repository analysis data
+ * @param stage - Build stage type
+ * @returns Docker commands for building the application
  */
 function getBuildCommands(
   analysis: { language?: string; build_system?: { type?: string } },
@@ -105,12 +131,13 @@ function getBuildCommands(
     }
   }
 
-  // Generic fallback
   return 'COPY --chown=appuser:appuser . .\n';
 }
 
 /**
  * Get start command for different languages/frameworks
+ * @param analysis - Repository analysis with language and framework info
+ * @returns Docker CMD instruction
  */
 function getStartCommand(analysis: { language?: string; framework?: string }): string {
   const lang = analysis.language;
@@ -140,6 +167,9 @@ function getStartCommand(analysis: { language?: string; framework?: string }): s
 
 /**
  * Generate optimized Dockerfile based on analysis and options
+ * @param analysis - Repository analysis containing language, framework, dependencies
+ * @param options - Generation options including multi-stage and security settings
+ * @returns Complete Dockerfile content as string
  */
 function generateOptimizedDockerfile(
   analysis: {
@@ -160,8 +190,8 @@ function generateOptimizedDockerfile(
 
 `;
 
+  // Use multi-stage build for projects with many dependencies to reduce final image size
   if (options.multistage && deps.length > 5) {
-    // Use explicit runtimeImage if provided, otherwise reuse the exact baseImage
     const runtimeImage = options.runtimeImage ?? baseImage;
 
     dockerfile += `# Build stage
@@ -236,7 +266,10 @@ ${options.customInstructions}
 }
 
 /**
- * Generate Dockerfile
+ * Generate optimized Dockerfile based on repository analysis
+ * @param config - Generation configuration with optimization options
+ * @param logger - Logger instance for debug and info output
+ * @returns Promise resolving to Result with generated Dockerfile content and metadata
  */
 export async function generateDockerfile(
   config: GenerateDockerfileConfig,
@@ -252,15 +285,8 @@ export async function generateDockerfile(
     // Create lib instances
     const sessionManager = createSessionManager(logger);
 
-    // Fallback mock function for testing scenarios
-    const mockAIFunction = async (_request: unknown): Promise<AIResult> => ({
-      success: true as const,
-      text: 'Mock AI response',
-      tokenCount: 10,
-      model: 'mock',
-    });
-    // Will be used when actual AI functionality is integrated
-    const aiService = createAIService(mockAIFunction, logger);
+    // Create AI service
+    const aiService = createAIService(logger);
 
     // Get session
     const session = await sessionManager.get(sessionId);
@@ -288,25 +314,44 @@ export async function generateDockerfile(
     // Generate Dockerfile content
     const dockerfileContent = generateOptimizedDockerfile(analysisResult, config);
 
-    // Use AI to enhance the Dockerfile (when available)
+    // Prepare structured context for MCP host AI (when available)
     const processedContent = dockerfileContent;
     try {
-      const aiResponse = await aiService.generateDockerfile({
-        language: analysisResult.language,
-        framework: analysisResult.framework,
-        dependencies: analysisResult.dependencies,
-        ports: analysisResult.ports,
-        optimization,
-        multistage,
+      const aiResponse = await aiService.generate({
+        prompt: `Generate optimized Dockerfile for ${analysisResult.language} project with ${analysisResult.framework || 'no framework'}`,
+        context: {
+          language: analysisResult.language,
+          framework: analysisResult.framework,
+          dependencies: analysisResult.dependencies,
+          ports: analysisResult.ports,
+          optimization,
+          multistage,
+          baseImage: config.baseImage ?? getRecommendedBaseImage(analysisResult.language ?? 'unknown'),
+          generatedContent: dockerfileContent,
+        },
       });
 
-      if (aiResponse.success) {
-        // For now, we use the generated content
-        // In production, AI would provide enhanced content
-        logger.debug('AI enhancement would be applied here');
+      if (aiResponse.ok) {
+        logger.debug({
+          contextSize: aiResponse.value.metadata.contextSize,
+          hasGuidance: aiResponse.value.metadata.guidance,
+          hasTemplate: aiResponse.value.metadata.template,
+        }, 'Context prepared for MCP host AI');
+
+        // Store the context in workflow state for MCP host to access
+        const currentWorkflowState = session.workflow_state as WorkflowState | undefined;
+        const updatedContext = updateWorkflowState(currentWorkflowState, {
+          metadata: {
+            ...(currentWorkflowState?.metadata ?? {}),
+            ai_context: aiResponse.value.context,
+          },
+        });
+        await sessionManager.update(sessionId, {
+          workflow_state: updatedContext,
+        });
       }
     } catch (error) {
-      logger.debug({ error }, 'AI enhancement skipped');
+      logger.debug({ error }, 'AI context preparation skipped');
     }
 
     // Determine output path
@@ -354,7 +399,7 @@ export async function generateDockerfile(
     logger.info({ path: dockerfilePath }, 'Dockerfile generation completed');
 
     return Success({
-      success: true,
+      ok: true,
       sessionId,
       content: processedContent,
       path: dockerfilePath,

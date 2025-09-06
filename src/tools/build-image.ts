@@ -1,8 +1,5 @@
 /**
- * Build Image Tool - Flat Architecture
- *
- * Builds Docker images from Dockerfiles
- * Follows architectural requirement: only imports from src/lib/
+ * Builds Docker images from Dockerfiles with comprehensive logging and error handling
  */
 
 import path from 'node:path';
@@ -117,7 +114,10 @@ function analyzeBuildSecurity(dockerfile: string, buildArgs: Record<string, stri
 }
 
 /**
- * Build Docker image
+ * Build Docker image from Dockerfile with specified configuration
+ * @param config - Build configuration including session ID, context, tags, etc.
+ * @param logger - Logger instance for debug and info output
+ * @returns Promise resolving to Result with build details or failure message
  */
 export async function buildImage(
   config: BuildImageConfig,
@@ -146,7 +146,7 @@ export async function buildImage(
 
     // Create lib instances
     const sessionManager = createSessionManager(logger);
-    const dockerClient = createDockerClient(null, null, logger);
+    const dockerClient = createDockerClient(logger);
 
     // Get session
     const session = await sessionManager.get(sessionId);
@@ -159,7 +159,8 @@ export async function buildImage(
     let dockerfilePath = path.resolve(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
-    const generatedPath = session.workflow_state?.dockerfile_result?.path;
+    const sessionState = session;
+    const generatedPath = sessionState.dockerfile_result?.path;
 
     if (!(await fileExists(dockerfilePath))) {
       // If the specified Dockerfile doesn't exist, check for generated one
@@ -168,7 +169,7 @@ export async function buildImage(
         logger.info({ generatedPath, originalPath: dockerfile }, 'Using generated Dockerfile');
       } else {
         // Check if we have Dockerfile content in session
-        const dockerfileContent = session.workflow_state?.dockerfile_result?.content;
+        const dockerfileContent = sessionState.dockerfile_result?.content;
         if (dockerfileContent) {
           // Write the Dockerfile content to generated file
           dockerfilePath = path.join(repoPath, 'Dockerfile.generated');
@@ -204,26 +205,26 @@ export async function buildImage(
     };
 
     // Build the image
-    const buildResult = await dockerClient.build(buildOptions);
+    const buildResult = await dockerClient.buildImage(buildOptions);
 
-    if (!buildResult.success) {
+    if (!buildResult.ok) {
       return Failure(buildResult.error ?? 'Build failed');
     }
 
     const buildTime = Date.now() - startTime;
 
     // Update session with build result
-    const currentState = session.workflow_state as WorkflowState | undefined;
+    const currentState = session as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState, {
       build_result: {
         success: true,
-        imageId: buildResult.imageId ?? '',
-        tags: buildResult.tags,
-        size: buildResult.size,
+        imageId: buildResult.value.imageId ?? '',
+        tags: buildResult.value.tags,
+        size: buildResult.value.size ?? 0,
         metadata: {
-          layers: buildResult.layers,
+          layers: buildResult.value.layers,
           buildTime,
-          logs: buildResult.logs,
+          logs: buildResult.value.logs,
           securityWarnings,
         },
       },
@@ -234,18 +235,18 @@ export async function buildImage(
       workflow_state: updatedWorkflowState,
     });
 
-    timer.end({ imageId: buildResult.imageId, buildTime });
-    logger.info({ imageId: buildResult.imageId, buildTime }, 'Docker image build completed');
+    timer.end({ imageId: buildResult.value.imageId, buildTime });
+    logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');
 
     return Success({
       success: true,
       sessionId,
-      imageId: buildResult.imageId,
-      tags: buildResult.tags,
-      size: buildResult.size ?? 0,
-      ...(buildResult.layers !== undefined && { layers: buildResult.layers }),
+      imageId: buildResult.value.imageId,
+      tags: buildResult.value.tags,
+      size: buildResult.value.size ?? 0,
+      ...(buildResult.value.layers !== undefined && { layers: buildResult.value.layers }),
       buildTime,
-      logs: buildResult.logs,
+      logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
     });
   } catch (error) {
@@ -257,14 +258,9 @@ export async function buildImage(
 }
 
 /**
- * Factory function for creating build-image tool instances
+ * Build image tool instance
  */
-export function createBuildImageTool(logger: Logger): {
-  name: string;
-  execute: (config: BuildImageConfig) => Promise<Result<BuildImageResult>>;
-} {
-  return {
-    name: 'build-image',
-    execute: (config: BuildImageConfig) => buildImage(config, logger),
-  };
-}
+export const buildImageTool = {
+  name: 'build-image',
+  execute: (config: BuildImageConfig, logger: Logger) => buildImage(config, logger),
+};

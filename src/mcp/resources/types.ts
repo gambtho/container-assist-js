@@ -9,37 +9,6 @@ export interface Resource {
   metadata?: Record<string, unknown>;
 }
 
-export interface ResourceManager {
-  /**
-   * Publish content to a resource URI with optional TTL
-   */
-  publish(uri: string, content: unknown, ttl?: number): Promise<Result<string>>;
-
-  /**
-   * Read content from a resource URI
-   */
-  read(uri: string): Promise<Result<Resource | null>>;
-
-  /**
-   * Invalidate resources matching a pattern
-   */
-  invalidate(pattern: string): Promise<Result<void>>;
-
-  /**
-   * List all resource URIs matching a pattern
-   */
-  list(pattern: string): Promise<Result<string[]>>;
-
-  /**
-   * Cleanup expired resources
-   */
-  cleanup(): Promise<Result<void>>;
-
-  /**
-   * Get resource metadata without content
-   */
-  getMetadata(uri: string): Promise<Result<Omit<Resource, 'content'> | null>>;
-}
 
 export interface ResourceCache {
   set(key: string, value: unknown, ttl?: number): Promise<Result<void>>;

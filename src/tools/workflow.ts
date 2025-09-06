@@ -28,7 +28,7 @@ export interface WorkflowConfig {
 }
 
 export interface WorkflowResult {
-  success: boolean;
+  ok: boolean;
   sessionId: string;
   workflowId: string;
   status: 'started' | 'completed' | 'failed' | 'already_running';
@@ -146,7 +146,7 @@ async function executeStep(
   sessionId: string,
   config: WorkflowConfig,
   logger: Logger,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string }> {
   const timer = createTimer(logger, `workflow-step-${step}`);
 
   try {
@@ -162,12 +162,12 @@ async function executeStep(
     }
 
     timer.end({ step });
-    return { success: true };
+    return { ok: true };
   } catch (error) {
     timer.error(error);
     logger.error({ step, error }, `Workflow step failed: ${step}`);
     return {
-      success: false,
+      ok: false,
       error: error instanceof Error ? error.message : String(error),
     };
   }
@@ -190,15 +190,7 @@ async function workflow(config: WorkflowConfig, logger: Logger): Promise<Result<
     if (!sessionId) {
       // Create new session
       sessionId = `session-${Date.now()}`;
-      await sessionManager.create({
-        id: sessionId,
-        repo_path: repoPath,
-        metadata: {
-          workflowType,
-          automated,
-          startedAt,
-        },
-      });
+      await sessionManager.create(sessionId);
     }
 
     // Get session to check if workflow is already running
@@ -211,7 +203,7 @@ async function workflow(config: WorkflowConfig, logger: Logger): Promise<Result<
     const workflowState = session.workflow_state as any;
     if (workflowState?.status === 'running') {
       return Success({
-        success: false,
+        ok: false,
         sessionId,
         workflowId: workflowState.workflowId ?? `workflow-${sessionId}`,
         status: 'already_running',
@@ -274,7 +266,7 @@ async function workflow(config: WorkflowConfig, logger: Logger): Promise<Result<
       // Execute step
       const result = await executeStep(step, sessionId, config, logger);
 
-      if (result.success) {
+      if (result.ok) {
         completedSteps.push(step);
       } else {
         failedSteps.push(step);
@@ -325,6 +317,7 @@ async function workflow(config: WorkflowConfig, logger: Logger): Promise<Result<
     );
 
     return Success({
+      ok: !workflowFailed,
       success: !workflowFailed,
       sessionId,
       workflowId,

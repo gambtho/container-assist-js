@@ -1,6 +1,5 @@
 /**
  * Core types for the containerization assist system
- * Consolidated from legacy domain/types structure
  */
 
 /**

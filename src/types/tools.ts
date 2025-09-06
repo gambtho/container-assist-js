@@ -1,116 +1,50 @@
 /**
- * Unified tool type definitions for the containerization assist MCP server
- * Consolidates tool interfaces from scattered locations into a single source of truth
+ * Simple Tool Types - De-Enterprise Refactoring
+ *
+ * Replaces complex Zod schemas and interfaces with simple TypeScript types
  */
 
-import { z } from 'zod';
 import type { Logger } from 'pino';
-import type { EventEmitter } from 'events';
 
-// Base input schemas
-export const SessionIdInput = z.object({
-  sessionId: z.string().min(1, 'Session ID is required'),
-});
+// Simple parameter types
+export type SessionIdParams = {
+  sessionId: string;
+};
 
-// Tool-specific input schemas
-export const TagImageInput = SessionIdInput.extend({
-  tag: z.string().min(1, 'Tag is required'),
-});
+export type TagImageParams = {
+  sessionId: string;
+  tag: string;
+};
 
-export const PushImageInput = SessionIdInput.extend({
-  registry: z.string().optional(),
-});
+export type PushImageParams = {
+  sessionId: string;
+  registry?: string;
+};
 
-export const ScanImageInput = SessionIdInput;
+export type ScanImageParams = {
+  sessionId: string;
+};
 
-// Parameter types
-export type SessionIdParams = z.infer<typeof SessionIdInput>;
-export type TagImageParams = z.infer<typeof TagImageInput>;
-export type PushImageParams = z.infer<typeof PushImageInput>;
-export type ScanImageParams = z.infer<typeof ScanImageInput>;
-
-/**
- * MCP SDK compatible tool context
- * Provides all necessary dependencies for tool execution
- */
-export interface ToolContext {
-  // MCP-specific
-  server: unknown; // Server type not exported from SDK
-  progressToken?: string;
-
-  // Core services
+// Simple tool context
+export type ToolContext = {
   logger: Logger;
-
-  // Event handling
-  eventPublisher: EventEmitter;
-  progressEmitter: EventEmitter;
-
-  // Configuration and control
-  config: unknown;
+  sessionId: string;
   signal?: AbortSignal;
-  sessionId?: string;
+};
 
-  // Performance monitoring
-  logPerformanceMetrics?: (operation: string, duration: number, metadata?: unknown) => void;
-}
-
-/**
- * MCP SDK compatible tool handler
- */
-export interface ToolHandler<TInput, TOutput> {
-  (params: TInput, context: ToolContext): Promise<TOutput>;
-}
-
-/**
- * Tool categories for organization and filtering
- */
-export type ToolCategory =
-  | 'workflow'
-  | 'orchestration'
-  | 'utility'
-  | 'analysis'
-  | 'generation'
-  | 'docker'
-  | 'kubernetes'
-  | 'optimization';
-
-/**
- * MCP SDK compatible tool descriptor
- * Defines the interface for all tools in the system
- */
-export interface ToolDescriptor<TInput = unknown, TOutput = unknown> {
+// Simple tool types
+export type Tool = {
   name: string;
-  description: string;
-  category: ToolCategory;
-  inputSchema:
-    | z.ZodType<TInput>
-    | z.ZodEffects<z.ZodTypeAny, TInput, unknown>
-    | z.ZodObject<z.ZodRawShape>;
-  outputSchema:
-    | z.ZodType<TOutput>
-    | z.ZodEffects<z.ZodTypeAny, TOutput, unknown>
-    | z.ZodObject<z.ZodRawShape>;
-  handler: ToolHandler<TInput, TOutput>;
-  chainHint?: {
-    nextTool: string;
-    reason: string;
-    paramMapper?: (output: TOutput) => Record<string, unknown>;
-  };
-  timeout?: number;
-}
+  execute: (params: Record<string, unknown>) => Promise<unknown>;
+};
 
-/**
- * MCP Tool Call Request
- */
-export interface MCPToolCallRequest {
+// Essential MCP types only
+export type MCPToolCallRequest = {
   name: string;
   arguments?: Record<string, unknown>;
-}
+};
 
-/**
- * MCP Tool Call Response
- */
-export interface MCPToolCallResponse {
+export type MCPToolCallResponse = {
   content: Array<{
     type: 'text' | 'resource';
     text?: string;
@@ -121,37 +55,10 @@ export interface MCPToolCallResponse {
     };
   }>;
   isError?: boolean;
-}
+};
 
-/**
- * Progress update for tool execution
- */
-export interface ToolProgress {
-  toolName: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
-  progress?: number;
-  message?: string;
-  error?: Error;
-  startedAt?: Date;
-  completedAt?: Date;
-}
-
-/**
- * Tool execution result with standard structure
- */
-export interface ToolResult<T = unknown> {
+export type ToolResult<T = unknown> = {
   success: boolean;
   data?: T;
   error?: string;
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Tool registration interface for MCP server
- */
-export interface ToolRegistry {
-  register<TInput, TOutput>(tool: ToolDescriptor<TInput, TOutput>): void;
-  get(name: string): ToolDescriptor | undefined;
-  list(): ToolDescriptor[];
-  categories(): ToolCategory[];
-}
+};

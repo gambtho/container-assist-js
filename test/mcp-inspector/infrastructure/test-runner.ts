@@ -1,6 +1,6 @@
 /**
  * MCP Inspector Test Runner Framework
- * Team Gamma - Testing Infrastructure
+ * MCP Inspector Testing Infrastructure
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -38,7 +38,10 @@ export type TestCategory =
   | 'sampling-validation'
   | 'integration-flows'
   | 'load-testing'
-  | 'performance-benchmarks';
+  | 'performance-benchmarks'
+  | 'orchestrator'
+  | 'remediation'
+  | 'edge-cases';
 
 export interface TestFilter {
   categories?: TestCategory[];

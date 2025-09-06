@@ -1,435 +1,115 @@
 /**
- * Docker Client Wrapper
- *
- * Provides a simplified, clean interface for Docker operations
- * Wraps the existing Docker infrastructure with consistent error handling and logging
+ * Docker client for containerization operations
  */
 
-import { createTimer, type Logger } from './logger';
+import Docker from 'dockerode';
+import type { Logger } from 'pino';
+import { Success, Failure, type Result } from '../types/core/index.js';
 import type {
   DockerBuildOptions,
   DockerBuildResult,
-  DockerScanResult,
-  DockerImage,
-  DockerPushResult,
-  DockerTagResult,
-  DockerRegistryConfig,
-  DockerContainer,
-  ScanOptions,
-  DockerClient as IDockerClient,
 } from '../types/docker';
 
-/**
- * Docker client wrapper implementation
- */
-class DockerClientWrapper implements IDockerClient {
-  private logger: Logger;
-
-  constructor(
-    private dockerClient: any, // Will be the actual dockerode instance
-    private scannerService: any, // Will be the scanner service
-    logger: Logger,
-  ) {
-    this.logger = logger.child({ component: 'docker-client' });
-  }
-
-  /**
-   * Build a Docker image
-   */
-  async build(options: DockerBuildOptions): Promise<DockerBuildResult> {
-    const timer = createTimer(this.logger, 'docker-build');
-
-    try {
-      this.logger.info(
-        {
-          context: options.context,
-          tags: options.tags,
-          platform: options.platform,
-          noCache: options.noCache,
-        },
-        'Building Docker image',
-      );
-
-      // Use the existing docker client build functionality
-      const result = await this.dockerClient.build(options);
-
-      timer.end({
-        imageId: result.imageId,
-        size: result.size,
-        layers: result.layers,
-      });
-
-      return result;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      timer.error(error);
-
-      return {
-        imageId: '',
-        tags: options.tags ?? [],
-        size: 0,
-        logs: [],
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-
-  /**
-   * Get image information
-   */
-  async getImage(id: string): Promise<DockerImage | null> {
-    try {
-      this.logger.debug({ imageId: id }, 'Getting image information');
-
-      const image = await this.dockerClient.getImage(id);
-      if (!image) {
-        return null;
-      }
-
-      const inspect = await image.inspect();
-
-      return {
-        id: inspect.Id,
-        repository: inspect.RepoTags?.[0]?.split(':')[0] || '',
-        tag: inspect.RepoTags?.[0]?.split(':')[1] || 'latest',
-        digest: inspect.RepoDigests?.[0] || undefined,
-        size: inspect.Size,
-        created: inspect.Created,
-        labels: inspect.Config?.Labels || {},
-        repoTags: inspect.RepoTags || [],
-        repoDigests: inspect.RepoDigests || [],
-        architecture: inspect.Architecture,
-        os: inspect.Os,
-        config: {
-          env: inspect.Config?.Env || [],
-          cmd: inspect.Config?.Cmd || [],
-          entrypoint: inspect.Config?.Entrypoint || [],
-          workingDir: inspect.Config?.WorkingDir,
-          user: inspect.Config?.User,
-          exposedPorts: inspect.Config?.ExposedPorts || {},
-        },
-      };
-    } catch (err) {
-      this.logger.warn({ imageId: id, error: err }, 'Failed to get image information');
-      return null;
-    }
-  }
-
-  /**
-   * List images
-   */
-  async listImages(
-    options: { all?: boolean; filters?: Record<string, string[]> } = {},
-  ): Promise<DockerImage[]> {
-    try {
-      this.logger.debug({ options }, 'Listing images');
-
-      const images = await this.dockerClient.listImages({
-        all: options.all ?? false,
-        filters: options.filters ?? {},
-      });
-
-      const result: DockerImage[] = [];
-
-      for (const imageInfo of images) {
-        const image = await this.getImage(imageInfo.Id);
-        if (image) {
-          result.push(image);
-        }
-      }
-
-      return result;
-    } catch (err) {
-      this.logger.error({ error: err }, 'Failed to list images');
-      return [];
-    }
-  }
-
-  /**
-   * Remove an image
-   */
-  async removeImage(id: string, options: { force?: boolean } = {}): Promise<void> {
-    try {
-      this.logger.info({ imageId: id, force: options.force }, 'Removing image');
-
-      const image = this.dockerClient.getImage(id);
-      await image.remove({ force: options.force ?? false });
-
-      this.logger.info({ imageId: id }, 'Image removed successfully');
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      this.logger.error({ imageId: id, error: error.message }, 'Failed to remove image');
-      throw error;
-    }
-  }
-
-  /**
-   * Tag an image
-   */
-  async tagImage(sourceImage: string, targetTag: string): Promise<DockerTagResult> {
-    const timer = createTimer(this.logger, 'docker-tag');
-
-    try {
-      this.logger.info({ sourceImage, targetTag }, 'Tagging image');
-
-      const image = this.dockerClient.getImage(sourceImage);
-      const [repository, tag] = targetTag.split(':');
-
-      await image.tag({
-        repo: repository,
-        tag: tag ?? 'latest',
-      });
-
-      timer.end({ targetTag });
-
-      return {
-        sourceImage,
-        targetTag,
-        success: true,
-      };
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      timer.error(error);
-
-      return {
-        sourceImage,
-        targetTag,
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-
-  /**
-   * Push an image to registry
-   */
-  async push(image: string, options: DockerRegistryConfig = {}): Promise<DockerPushResult> {
-    const timer = createTimer(this.logger, 'docker-push');
-
-    try {
-      this.logger.info({ image, registry: options.url }, 'Pushing image');
-
-      const imageObj = this.dockerClient.getImage(image);
-
-      // Configure authentication if provided
-      const authconfig =
-        options.username && options.password
-          ? {
-              username: options.username,
-              password: options.password,
-              email: options.email,
-              serveraddress: options.serveraddress ?? options.url,
-            }
-          : undefined;
-
-      const stream = await imageObj.push({ authconfig });
-
-      // Wait for push to complete and extract digest
-      let digest = '';
-      await new Promise<void>((resolve, reject) => {
-        this.dockerClient.modem.followProgress(stream, (err: any, res: any) => {
-          if (err) reject(err);
-          else {
-            // Extract digest from push result
-            const digestResult = res.find((r: any) => r.aux?.Digest);
-            if (digestResult) {
-              digest = digestResult.aux.Digest;
-            }
-            resolve();
-          }
-        });
-      });
-
-      const [repository, tag] = image.split(':');
-      timer.end({ digest });
-
-      return {
-        registry: options.url ?? 'docker.io',
-        repository: repository ?? '',
-        tag: tag ?? 'latest',
-        digest,
-        success: true,
-      };
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      timer.error(error);
-
-      return {
-        registry: options.url ?? 'docker.io',
-        repository: image.split(':')[0] ?? '',
-        tag: image.split(':')[1] ?? 'latest',
-        digest: '',
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-
-  /**
-   * Pull an image from registry
-   */
-  async pull(image: string, options: DockerRegistryConfig = {}): Promise<void> {
-    const timer = createTimer(this.logger, 'docker-pull');
-
-    try {
-      this.logger.info({ image, registry: options.url }, 'Pulling image');
-
-      const authconfig =
-        options.username && options.password
-          ? {
-              username: options.username,
-              password: options.password,
-              email: options.email,
-              serveraddress: options.serveraddress ?? options.url,
-            }
-          : undefined;
-
-      const stream = await this.dockerClient.pull(image, { authconfig });
-
-      await new Promise<void>((resolve, reject) => {
-        this.dockerClient.modem.followProgress(stream, (err: any) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
-      timer.end();
-      this.logger.info({ image }, 'Image pulled successfully');
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      timer.error(error);
-      throw error;
-    }
-  }
-
-  /**
-   * List containers
-   */
-  async listContainers(
-    options: { all?: boolean; filters?: Record<string, string[]> } = {},
-  ): Promise<DockerContainer[]> {
-    try {
-      this.logger.debug({ options }, 'Listing containers');
-
-      const containers = await this.dockerClient.listContainers({
-        all: options.all ?? false,
-        filters: options.filters ?? {},
-      });
-
-      return containers.map(
-        (container: any): DockerContainer => ({
-          id: container.Id,
-          name: container.Names?.[0]?.replace(/^\//, '') || '',
-          image: container.Image,
-          status: container.Status,
-          state: container.State,
-          ports:
-            container.Ports?.map((port: any) => ({
-              privatePort: port.PrivatePort,
-              publicPort: port.PublicPort,
-              type: port.Type,
-            })) || [],
-          labels: container.Labels || {},
-          created: new Date(container.Created * 1000).toISOString(),
-          command: container.Command,
-          mounts:
-            container.Mounts?.map((mount: any) => ({
-              type: mount.Type,
-              source: mount.Source,
-              destination: mount.Destination,
-              mode: mount.Mode,
-              rw: mount.RW,
-            })) || [],
-        }),
-      );
-    } catch (err) {
-      this.logger.error({ error: err }, 'Failed to list containers');
-      return [];
-    }
-  }
-
-  /**
-   * Scan an image for security vulnerabilities
-   */
-  async scan(image: string, options: ScanOptions = {}): Promise<DockerScanResult> {
-    const timer = createTimer(this.logger, 'docker-scan');
-
-    try {
-      this.logger.info(
-        {
-          image,
-          scanner: options.scanner ?? 'trivy',
-          severityThreshold: options.severityThreshold,
-        },
-        'Scanning image for vulnerabilities',
-      );
-
-      // Use the existing scanner service
-      const result = await this.scannerService.scan(image, options);
-
-      timer.end({
-        vulnerabilityCount: result.summary?.total || 0,
-        criticalCount: result.summary?.critical || 0,
-      });
-
-      return result;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      timer.error(error);
-
-      return {
-        vulnerabilities: [],
-        summary: {
-          critical: 0,
-          high: 0,
-          medium: 0,
-          low: 0,
-          total: 0,
-        },
-        scanner: options.scanner ?? 'trivy',
-      };
-    }
-  }
-
-  /**
-   * Check Docker daemon connectivity
-   */
-  async ping(): Promise<boolean> {
-    try {
-      await this.dockerClient.ping();
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Get Docker version information
-   */
-  async version(): Promise<{ version: string; apiVersion: string }> {
-    try {
-      const version = await this.dockerClient.version();
-      return {
-        version: version.Version || 'unknown',
-        apiVersion: version.ApiVersion || 'unknown',
-      };
-    } catch {
-      return {
-        version: 'unknown',
-        apiVersion: 'unknown',
-      };
-    }
-  }
+interface DockerClient {
+  buildImage: (options: DockerBuildOptions) => Promise<Result<DockerBuildResult>>;
+  getImage: (id: string) => Promise<Result<any>>;
+  tagImage: (imageId: string, repository: string, tag: string) => Promise<Result<void>>;
+  pushImage: (repository: string, tag: string) => Promise<Result<void>>;
 }
 
 /**
- * Create a Docker client instance
+ * Create a Docker client with core operations
+ * @param logger - Logger instance for debug output
+ * @returns DockerClient with build, get, tag, and push operations
  */
-export function createDockerClient(
-  dockerClient: any,
-  scannerService: any,
-  logger: Logger,
-): IDockerClient {
-  return new DockerClientWrapper(dockerClient, scannerService, logger);
-}
+export const createDockerClient = (logger: Logger): DockerClient => {
+  const docker = new Docker();
+
+  return {
+    async buildImage(options: DockerBuildOptions): Promise<Result<DockerBuildResult>> {
+      try {
+        const stream = await docker.buildImage(options.context, {
+          t: Array.isArray(options.tags) ? options.tags[0] : options.tags,
+          dockerfile: options.dockerfile,
+          buildargs: options.buildArgs,
+        });
+
+        const result = await new Promise<any>((resolve, reject) => {
+          docker.modem.followProgress(stream as any,
+            (err: any, res: any) => err ? reject(err) : resolve(res),
+            (event: any) => logger.debug(event, 'Docker build progress'),
+          );
+        });
+
+        const buildResult: DockerBuildResult = {
+          imageId: result[result.length - 1]?.aux?.ID || '',
+          tags: options.tags || [],
+          size: 0, // Would need additional inspection to get size
+          logs: [],
+          success: true,
+        };
+
+        return Success(buildResult);
+      } catch (error) {
+        const errorMessage = `Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        logger.error({ error: errorMessage, options }, 'Docker build failed');
+
+        return Failure(errorMessage);
+      }
+    },
+
+    async getImage(id: string): Promise<Result<any>> {
+      try {
+        const image = docker.getImage(id);
+        const inspect = await image.inspect();
+
+        const imageInfo = {
+          id: inspect.Id,
+          repository: inspect.RepoTags?.[0]?.split(':')[0] || '',
+          tag: inspect.RepoTags?.[0]?.split(':')[1] || 'latest',
+          size: inspect.Size,
+          created: inspect.Created,
+          labels: inspect.Config?.Labels || {},
+        };
+
+        return Success(imageInfo);
+      } catch (error) {
+        const errorMessage = `Failed to get image: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        return Failure(errorMessage);
+      }
+    },
+
+    async tagImage(imageId: string, repository: string, tag: string): Promise<Result<void>> {
+      try {
+        const image = docker.getImage(imageId);
+        await image.tag({ repo: repository, tag });
+
+        logger.info({ imageId, repository, tag }, 'Image tagged successfully');
+        return Success(undefined);
+      } catch (error) {
+        const errorMessage = `Failed to tag image: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        return Failure(errorMessage);
+      }
+    },
+
+    async pushImage(repository: string, tag: string): Promise<Result<void>> {
+      try {
+        const image = docker.getImage(`${repository}:${tag}`);
+        const stream = await image.push({});
+
+        await new Promise<void>((resolve, reject) => {
+          docker.modem.followProgress(stream as any,
+            (err: any) => err ? reject(err) : resolve(),
+            (event: any) => logger.debug(event, 'Docker push progress'),
+          );
+        });
+
+        logger.info({ repository, tag }, 'Image pushed successfully');
+        return Success(undefined);
+      } catch (error) {
+        const errorMessage = `Failed to push image: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        return Failure(errorMessage);
+      }
+    },
+  };
+};

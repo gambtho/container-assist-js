@@ -32,9 +32,12 @@ export class McpProgressNotifier implements ProgressNotifier {
         token: progress.token,
         type: 'progress',
         value: progress.value,
-        message: progress.message,
         timestamp: new Date(),
       };
+
+      if (progress.message !== undefined) {
+        event.message = progress.message;
+      }
 
       this.eventEmitter.emit('progress', event);
 

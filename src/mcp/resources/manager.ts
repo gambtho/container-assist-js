@@ -1,10 +1,10 @@
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../../domain/types/result.js';
-import type { Resource, ResourceManager, ResourceCache } from './types.js';
+import { Result, Success, Failure } from '../../types/core.js';
+import type { Resource, ResourceCache } from './types.js';
 import { UriParser } from './uri-schemes.js';
 import { MemoryResourceCache } from './cache.js';
 
-export class McpResourceManager implements ResourceManager {
+export class McpResourceManager {
   private readonly cache: ResourceCache;
   private readonly logger: Logger;
 
@@ -28,7 +28,7 @@ export class McpResourceManager implements ResourceManager {
     try {
       // Validate URI format
       const parseResult = UriParser.parse(uri);
-      if (!parseResult.success) {
+      if (!parseResult.ok) {
         return Failure(`Invalid URI: ${parseResult.error}`);
       }
 
@@ -52,16 +52,19 @@ export class McpResourceManager implements ResourceManager {
         content,
         mimeType,
         createdAt: now,
-        expiresAt: effectiveTtl > 0 ? new Date(now.getTime() + effectiveTtl) : undefined,
         metadata: {
           size: contentSize,
-          scheme: parseResult.data.scheme,
+          scheme: parseResult.value.scheme,
         },
       };
 
+      if (effectiveTtl > 0) {
+        resource.expiresAt = new Date(now.getTime() + effectiveTtl);
+      }
+
       // Store in cache
       const cacheResult = await this.cache.set(uri, resource, effectiveTtl);
-      if (!cacheResult.success) {
+      if (!cacheResult.ok) {
         return Failure(`Failed to cache resource: ${cacheResult.error}`);
       }
 
@@ -79,7 +82,7 @@ export class McpResourceManager implements ResourceManager {
       return Success(uri);
     } catch (error) {
       this.logger.error({ error, uri }, 'Failed to publish resource');
-      return Failure(`Failed to publish resource: ${error.message}`);
+      return Failure(`Failed to publish resource: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -87,22 +90,22 @@ export class McpResourceManager implements ResourceManager {
     try {
       // Validate URI format
       const parseResult = UriParser.parse(uri);
-      if (!parseResult.success) {
+      if (!parseResult.ok) {
         return Failure(`Invalid URI: ${parseResult.error}`);
       }
 
       // Get from cache
       const cacheResult = await this.cache.get(uri);
-      if (!cacheResult.success) {
+      if (!cacheResult.ok) {
         return Failure(`Failed to read from cache: ${cacheResult.error}`);
       }
 
-      if (!cacheResult.data) {
+      if (!cacheResult.value) {
         this.logger.debug({ uri }, 'Resource not found');
         return Success(null);
       }
 
-      const resource = cacheResult.data as Resource;
+      const resource = cacheResult.value as Resource;
 
       // Check expiration
       if (resource.expiresAt && new Date() > resource.expiresAt) {
@@ -115,7 +118,7 @@ export class McpResourceManager implements ResourceManager {
       return Success(resource);
     } catch (error) {
       this.logger.error({ error, uri }, 'Failed to read resource');
-      return Failure(`Failed to read resource: ${error.message}`);
+      return Failure(`Failed to read resource: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -124,15 +127,15 @@ export class McpResourceManager implements ResourceManager {
       // For now, we need to get all keys and match against pattern
       // This is inefficient but works for the initial implementation
       const listResult = await this.list('*');
-      if (!listResult.success) {
+      if (!listResult.ok) {
         return Failure(`Failed to list resources for invalidation: ${listResult.error}`);
       }
 
       let invalidatedCount = 0;
-      for (const uri of listResult.data) {
+      for (const uri of listResult.value) {
         if (UriParser.matches(uri, pattern)) {
           const deleteResult = await this.cache.delete(uri);
-          if (deleteResult.success && deleteResult.data) {
+          if (deleteResult.ok && deleteResult.value) {
             invalidatedCount++;
           }
         }
@@ -142,7 +145,7 @@ export class McpResourceManager implements ResourceManager {
       return Success(undefined);
     } catch (error) {
       this.logger.error({ error, pattern }, 'Failed to invalidate resources');
-      return Failure(`Failed to invalidate resources: ${error.message}`);
+      return Failure(`Failed to invalidate resources: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -152,14 +155,14 @@ export class McpResourceManager implements ResourceManager {
       // In a production implementation, this would be more efficient
       const uris: string[] = [];
 
-      // This is a simplified implementation - in practice we'd need better key iteration
+      // This is a basic implementation - in practice we'd need better key iteration
       // For now, we'll return an empty array and log a warning
       this.logger.warn({ pattern }, 'List operation not fully implemented - returning empty array');
 
       return Success(uris);
     } catch (error) {
       this.logger.error({ error, pattern }, 'Failed to list resources');
-      return Failure(`Failed to list resources: ${error.message}`);
+      return Failure(`Failed to list resources: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -169,36 +172,36 @@ export class McpResourceManager implements ResourceManager {
       if (this.cache instanceof MemoryResourceCache) {
         // Access private cleanup method through type assertion
         const cleanupResult = await (this.cache as any).cleanupExpired();
-        if (!cleanupResult.success) {
+        if (!cleanupResult.ok) {
           return Failure(`Cleanup failed: ${cleanupResult.error}`);
         }
 
-        this.logger.info({ cleanedCount: cleanupResult.data }, 'Resource cleanup completed');
+        this.logger.info({ cleanedCount: cleanupResult.value }, 'Resource cleanup completed');
       }
 
       return Success(undefined);
     } catch (error) {
       this.logger.error({ error }, 'Failed to cleanup resources');
-      return Failure(`Failed to cleanup resources: ${error.message}`);
+      return Failure(`Failed to cleanup resources: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   async getMetadata(uri: string): Promise<Result<Omit<Resource, 'content'> | null>> {
     try {
       const readResult = await this.read(uri);
-      if (!readResult.success) {
+      if (!readResult.ok) {
         return Failure(readResult.error);
       }
 
-      if (!readResult.data) {
+      if (!readResult.value) {
         return Success(null);
       }
 
-      const { content: _content, ...metadata } = readResult.data;
+      const { content: _content, ...metadata } = readResult.value;
       return Success(metadata);
     } catch (error) {
       this.logger.error({ error, uri }, 'Failed to get resource metadata');
-      return Failure(`Failed to get resource metadata: ${error.message}`);
+      return Failure(`Failed to get resource metadata: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

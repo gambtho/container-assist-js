@@ -1,19 +1,15 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { DockerfileGenerator, DockerfileContext } from '../../../src/workflows/sampling/dockerfile/generators.js';
-import { GenerationContext } from '../../../src/lib/sampling.js';
+import { createDockerfileSampler, DockerfileContext } from '../../../src/workflows/dockerfile-sampling.js';
 import { createMockLogger } from '../../helpers/mock-logger.js';
 
-describe('DockerfileGenerator', () => {
-  let generator: DockerfileGenerator;
+describe('Dockerfile Generation (Functional)', () => {
+  let dockerfileSampler: any;
   let mockLogger: any;
   let baseContext: DockerfileContext;
 
   beforeEach(() => {
-    // Set up mocks for testing
-    process.env.USE_MOCKS = 'true';
-    
     mockLogger = createMockLogger();
-    generator = new DockerfileGenerator(mockLogger);
+    dockerfileSampler = createDockerfileSampler(mockLogger);
     
     baseContext = {
       sessionId: 'test-session-123',
@@ -26,7 +22,7 @@ describe('DockerfileGenerator', () => {
 
   describe('generate', () => {
     it('generates the requested number of candidates', async () => {
-      const result = await generator.generate(baseContext, 3);
+      const result = await dockerfileSampler.generateMultipleDockerfiles(baseContext, 3);
       
       expect(result.success).toBe(true);
       if (result.success) {

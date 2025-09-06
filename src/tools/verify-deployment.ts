@@ -142,7 +142,7 @@ export async function verifyDeployment(
 
     // Create lib instances
     const sessionManager = createSessionManager(logger);
-    const k8sClient = createKubernetesClient(null, logger);
+    const k8sClient = createKubernetesClient(logger);
 
     // Get session
     const session = await sessionManager.get(sessionId);
@@ -214,12 +214,13 @@ export async function verifyDeployment(
           : 'unknown';
 
     // Update session with verification results
+    const sessionState = session;
     const updatedWorkflowState: WorkflowState = {
-      ...session.workflow_state,
-      completed_steps: [...(session.workflow_state?.completed_steps || []), 'verify-deployment'],
-      errors: session.workflow_state?.errors || {},
+      ...sessionState,
+      completed_steps: [...(sessionState.completed_steps || []), 'verify-deployment'],
+      errors: sessionState.errors || {},
       metadata: {
-        ...(session.workflow_state?.metadata || {}),
+        ...(sessionState.metadata || {}),
         verification_result: {
           namespace,
           deploymentName,
@@ -246,9 +247,7 @@ export async function verifyDeployment(
       },
     };
 
-    await sessionManager.update(sessionId, {
-      workflow_state: updatedWorkflowState,
-    });
+    await sessionManager.update(sessionId, updatedWorkflowState);
 
     timer.end({ deploymentName, ready: health.ready });
     logger.info(
@@ -302,14 +301,9 @@ export async function verifyDeployment(
 }
 
 /**
- * Factory function for creating verify-deployment tool instances
+ * Verify deployment tool instance
  */
-export function createVerifyDeploymentTool(logger: Logger): {
-  name: string;
-  execute: (config: VerifyDeploymentConfig) => Promise<Result<VerifyDeploymentResult>>;
-} {
-  return {
-    name: 'verify-deployment',
-    execute: (config: VerifyDeploymentConfig) => verifyDeployment(config, logger),
-  };
-}
+export const verifyDeploymentTool = {
+  name: 'verify-deployment',
+  execute: (config: VerifyDeploymentConfig, logger: Logger) => verifyDeployment(config, logger),
+};

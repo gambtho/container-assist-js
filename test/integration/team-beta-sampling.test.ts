@@ -6,8 +6,6 @@ describe('Team Beta Sampling Integration', () => {
   let mockLogger: any;
 
   beforeEach(() => {
-    // Enable mocks for integration testing
-    process.env.USE_MOCKS = 'true';
     mockLogger = createMockLogger();
   });
 

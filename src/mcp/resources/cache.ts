@@ -38,8 +38,11 @@ export class MemoryResourceCache implements ResourceCache {
       const entry: CacheEntry = {
         value,
         createdAt: now,
-        expiresAt: effectiveTtl > 0 ? now + effectiveTtl : undefined,
       };
+
+      if (effectiveTtl > 0) {
+        entry.expiresAt = now + effectiveTtl;
+      }
 
       this.cache.set(key, entry);
 
@@ -56,7 +59,7 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(undefined);
     } catch (error) {
       this.logger.error({ error, key }, 'Failed to set cache entry');
-      return Failure(`Failed to set cache entry: ${error.message}`);
+      return Failure(`Failed to set cache entry: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -80,7 +83,7 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(entry.value);
     } catch (error) {
       this.logger.error({ error, key }, 'Failed to get cache entry');
-      return Failure(`Failed to get cache entry: ${error.message}`);
+      return Failure(`Failed to get cache entry: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -91,7 +94,7 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(deleted);
     } catch (error) {
       this.logger.error({ error, key }, 'Failed to delete cache entry');
-      return Failure(`Failed to delete cache entry: ${error.message}`);
+      return Failure(`Failed to delete cache entry: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -103,7 +106,7 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(undefined);
     } catch (error) {
       this.logger.error({ error }, 'Failed to clear cache');
-      return Failure(`Failed to clear cache: ${error.message}`);
+      return Failure(`Failed to clear cache: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -124,7 +127,7 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(true);
     } catch (error) {
       this.logger.error({ error, key }, 'Failed to check cache entry existence');
-      return Failure(`Failed to check cache entry existence: ${error.message}`);
+      return Failure(`Failed to check cache entry existence: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -143,7 +146,7 @@ export class MemoryResourceCache implements ResourceCache {
 
     return {
       size: this.cache.size,
-      hitRate: 0, // TODO: Implement hit rate tracking
+      hitRate: 0,
       memoryUsage: totalSize,
     };
   }
@@ -170,7 +173,7 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(cleanedCount);
     } catch (error) {
       this.logger.error({ error }, 'Failed to cleanup expired entries');
-      return Failure(`Failed to cleanup expired entries: ${error.message}`);
+      return Failure(`Failed to cleanup expired entries: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -180,7 +183,7 @@ export class MemoryResourceCache implements ResourceCache {
   destroy(): void {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
-      this.cleanupInterval = undefined;
+      delete (this as any).cleanupInterval;
     }
     this.cache.clear();
     this.logger.debug('Cache destroyed');

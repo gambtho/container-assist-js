@@ -1,4 +1,4 @@
-import { Result, Success, Failure } from '../../src/domain/types/result.js';
+import { Result, Success, Failure } from '../../src/types/core.js';
 import type { Resource, ResourceManager } from '../../src/mcp/resources/types.js';
 import { UriParser } from '../../src/mcp/resources/uri-schemes.js';
 
@@ -35,7 +35,7 @@ export class MockResourceManager implements ResourceManager {
     try {
       // Validate URI
       const parseResult = UriParser.parse(uri);
-      if (!parseResult.success) {
+      if (!parseResult.ok) {
         return Failure(`Invalid URI: ${parseResult.error}`);
       }
 
@@ -57,7 +57,7 @@ export class MockResourceManager implements ResourceManager {
         expiresAt: effectiveTtl > 0 ? new Date(now.getTime() + effectiveTtl) : undefined,
         metadata: {
           size: contentSize,
-          scheme: parseResult.data.scheme,
+          scheme: parseResult.value.scheme,
           mock: true,
         },
       };

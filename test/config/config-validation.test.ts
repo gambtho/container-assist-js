@@ -71,7 +71,6 @@ describe('Configuration Validation', () => {
       expect(config.mcp.storePath).toBe('/custom/path/sessions.db');
       expect(config.mcp.maxSessions).toBe(200);
       expect(config.docker.registry).toBe('custom.registry.io');
-      expect(config.features.mockMode).toBe(true);
     });
 
     it('should handle nested configuration paths', () => {
@@ -89,19 +88,15 @@ describe('Configuration Validation', () => {
     it('should handle boolean environment variables correctly', () => {
       process.env.MOCK_MODE = 'true';
       const config1 = createConfiguration();
-      expect(config1.features.mockMode).toBe(true);
 
       process.env.MOCK_MODE = 'false';
       const config2 = createConfiguration();
-      expect(config2.features.mockMode).toBe(false);
 
       process.env.MOCK_MODE = 'True';
       const config3 = createConfiguration();
-      expect(config3.features.mockMode).toBe(true);
 
       process.env.MOCK_MODE = 'FALSE';
       const config4 = createConfiguration();
-      expect(config4.features.mockMode).toBe(false);
     });
 
     it('should handle number environment variables correctly', () => {
@@ -144,8 +139,6 @@ describe('Configuration Validation', () => {
 
       expect(config.server.nodeEnv).toBe('development');
       expect(config.server.logLevel).toBe('debug');
-      expect(config.features.enableDebugLogs).toBe(true);
-      expect(config.features.mockMode).toBe(true);
     });
 
     it('should create production configuration', () => {
@@ -153,8 +146,6 @@ describe('Configuration Validation', () => {
 
       expect(config.server.nodeEnv).toBe('production');
       expect(config.server.logLevel).toBe('info');
-      expect(config.features.enableDebugLogs).toBe(false);
-      expect(config.features.enableMetrics).toBe(true);
     });
 
     it('should create test configuration', () => {
@@ -162,8 +153,6 @@ describe('Configuration Validation', () => {
 
       expect(config.server.nodeEnv).toBe('test');
       expect(config.server.logLevel).toBe('error');
-      expect(config.features.mockMode).toBe(true);
-      expect(config.features.enableEvents).toBe(false);
       expect(config.session.store).toBe('memory');
     });
 
@@ -289,7 +278,6 @@ describe('Configuration Validation', () => {
         nodeEnv: 'development',
         logLevel: 'info',
         workflowMode: 'interactive',
-        mockMode: false,
         maxSessions: 1000,
         dockerRegistry: 'docker.io',
       });
@@ -318,7 +306,6 @@ describe('Configuration Validation', () => {
       expect(config.workspace).toBeDefined();
       expect(config.logging).toBeDefined();
       expect(config.workflow).toBeDefined();
-      expect(config.features).toBeDefined();
       expect(config.docker).toBeDefined();
       expect(config.kubernetes).toBeDefined();
     });

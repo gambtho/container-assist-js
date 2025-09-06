@@ -1,5 +1,5 @@
 /**
- * Tests for consolidated test utilities
+ * Tests for test utilities
  */
 
 import { 
@@ -12,7 +12,7 @@ import {
   waitFor
 } from '../../utils/test-helpers';
 
-describe('Consolidated Test Utilities', () => {
+describe('Test Utilities', () => {
   describe('createMockLogger', () => {
     it('should create a mock logger with all required methods', () => {
       const logger = createMockLogger();

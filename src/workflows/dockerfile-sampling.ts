@@ -1,13 +1,23 @@
 import { Result, Success, Failure } from '../types/core.js';
 import type { Logger } from 'pino';
-import { ScoredCandidate, SamplingConfig } from '../lib/sampling.js';
-import { BaseSamplingOrchestrator, HighestScoreWinnerSelector } from './sampling/base.js';
-import { DockerfileGenerator, DockerfileContext } from './sampling/dockerfile/generators.js';
+import { ScoredCandidate, SamplingConfig, GenerationContext, Candidate } from '../lib/sampling.js';
 import {
-  DockerfileScorer,
-  ProductionDockerfileScorer,
-  DevelopmentDockerfileScorer,
-} from './sampling/dockerfile/scorers.js';
+  runSampling,
+  runSamplingForTopN,
+  GeneratorFunction,
+  ScorerFunction,
+  scoreCanidates,
+  calculateFinalScore,
+  createCandidateId,
+} from './functional-sampling.js';
+// Define DockerfileContext locally since we deleted the generators
+export interface DockerfileContext {
+  sessionId: string;
+  repoPath?: string;
+  requirements?: Record<string, unknown>;
+  constraints?: Record<string, unknown>;
+  previousAttempts?: string[];
+}
 
 export interface DockerfileSamplingOptions {
   environment?: 'production' | 'development' | 'test';
@@ -16,181 +26,394 @@ export interface DockerfileSamplingOptions {
   enableValidation?: boolean;
 }
 
-export class DockerfileSamplingOrchestrator extends BaseSamplingOrchestrator<string> {
-  constructor(
-    logger: Logger,
-    options: DockerfileSamplingOptions = {},
-    config: Partial<SamplingConfig> = {},
-  ) {
-    const generator = new DockerfileGenerator(logger);
-    const scorer = DockerfileSamplingOrchestrator.createScorer(logger, options);
-    const selector = new HighestScoreWinnerSelector<string>();
+/**
+ * Simple scoring weights by environment
+ */
+const ENVIRONMENT_WEIGHTS = {
+  production: {
+    security: 0.4,
+    performance: 0.3,
+    standards: 0.2,
+    maintainability: 0.1,
+  },
+  development: {
+    maintainability: 0.4,
+    standards: 0.3,
+    performance: 0.2,
+    security: 0.1,
+  },
+  test: {
+    standards: 0.4,
+    maintainability: 0.3,
+    security: 0.2,
+    performance: 0.1,
+  },
+};
 
-    const mergedConfig: Partial<SamplingConfig> = {
-      maxCandidates: options.maxCandidates || 3,
-      validation: {
-        enabled: options.enableValidation ?? true,
-        failFast: false,
-      },
-      ...config,
-    };
+/**
+ * Simple Dockerfile generator function
+ */
+const generateDockerfileCandidates: GeneratorFunction<string> = async (
+  context: GenerationContext,
+  count: number,
+  logger: Logger,
+): Promise<Result<Candidate<string>[]>> => {
+  try {
+    const candidates: Candidate<string>[] = [];
 
-    super(logger, generator, scorer, selector, mergedConfig);
-  }
+    // Simple generation strategies
+    const strategies = ['alpine-minimal', 'alpine-multistage', 'ubuntu-standard'];
 
-  private static createScorer(
-    logger: Logger,
-    options: DockerfileSamplingOptions,
-  ): DockerfileScorer | ProductionDockerfileScorer | DevelopmentDockerfileScorer {
-    const environment = options.environment || 'production';
+    for (let i = 0; i < Math.min(count, strategies.length); i++) {
+      const strategy = strategies[i % strategies.length] ?? 'alpine-minimal';
+      const candidateId = createCandidateId(strategy, context);
 
-    switch (environment) {
-      case 'production': {
-        const prodScorer = new ProductionDockerfileScorer(logger);
-        if (options.customWeights) {
-          prodScorer.updateWeights(options.customWeights);
-        }
-        return prodScorer;
-      }
+      // Simple Dockerfile generation based on strategy
+      const dockerfile = generateDockerfileContent(strategy, context as DockerfileContext);
 
-      case 'development': {
-        const devScorer = new DevelopmentDockerfileScorer(logger);
-        if (options.customWeights) {
-          devScorer.updateWeights(options.customWeights);
-        }
-        return devScorer;
-      }
-
-      case 'test':
-      default: {
-        const defaultScorer = new DockerfileScorer(logger);
-        if (options.customWeights) {
-          defaultScorer.updateWeights(options.customWeights);
-        }
-        return defaultScorer;
-      }
-    }
-  }
-
-  async generateBestDockerfile(
-    context: DockerfileContext,
-  ): Promise<Result<ScoredCandidate<string>>> {
-    this.logger.info({ sessionId: context.sessionId }, 'Starting Dockerfile sampling');
-
-    const result = await this.sample(context);
-
-    if (result.success) {
-      this.logger.info(
-        {
-          sessionId: context.sessionId,
-          winnerId: result.data.id,
-          winnerScore: result.data.score,
-          strategy: result.data.metadata.strategy,
-        },
-        'Dockerfile sampling completed successfully',
-      );
-    } else {
-      this.logger.error(
-        {
-          sessionId: context.sessionId,
-          error: result.error,
-        },
-        'Dockerfile sampling failed',
-      );
-    }
-
-    return result;
-  }
-
-  async generateMultipleDockerfiles(
-    context: DockerfileContext,
-    count: number,
-  ): Promise<Result<ScoredCandidate<string>[]>> {
-    this.logger.info(
-      { sessionId: context.sessionId, count },
-      'Starting multiple Dockerfile sampling',
-    );
-
-    const result = await this.sampleMultiple(context, count);
-
-    if (result.success) {
-      this.logger.info(
-        {
-          sessionId: context.sessionId,
-          generatedCount: result.data.length,
-          topScore: result.data[0]?.score,
-        },
-        'Multiple Dockerfile sampling completed successfully',
-      );
-    } else {
-      this.logger.error(
-        {
-          sessionId: context.sessionId,
-          error: result.error,
-        },
-        'Multiple Dockerfile sampling failed',
-      );
-    }
-
-    return result;
-  }
-
-  // Convenience method for validating a specific Dockerfile
-  async validateDockerfile(dockerfile: string): Promise<Result<boolean>> {
-    try {
-      // Create a temporary candidate for validation
-      const tempCandidate = {
-        id: 'temp-validation',
+      candidates.push({
+        id: candidateId,
         content: dockerfile,
         metadata: {
-          strategy: 'validation',
-          source: 'user-provided',
-          confidence: 1.0,
+          strategy: strategy || 'unknown',
+          confidence: 0.8,
+          source: 'simple-generator',
         },
         generatedAt: new Date(),
-      };
-
-      return await this.generator.validate(tempCandidate);
-    } catch (error) {
-      return Failure(
-        `Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      });
     }
-  }
 
-  // Method to score a user-provided Dockerfile
-  async scoreDockerfile(dockerfile: string): Promise<Result<ScoredCandidate<string>>> {
+    logger.debug({ candidatesGenerated: candidates.length }, 'Generated Dockerfile candidates');
+    return Success(candidates);
+  } catch (error) {
+    return Failure(`Generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
+/**
+ * Simple Dockerfile scorer function
+ */
+const scoreDockerfileCandidates: ScorerFunction<string> = async (
+  candidates: Candidate<string>[],
+  weights: Record<string, number>,
+  logger: Logger,
+): Promise<Result<ScoredCandidate<string>[]>> => {
+  const scoringFunction = async (candidate: Candidate<string>): Promise<Result<ScoredCandidate<string>>> => {
     try {
-      const tempCandidate = {
-        id: 'temp-scoring',
-        content: dockerfile,
-        metadata: {
-          strategy: 'user-provided',
-          source: 'scoring-request',
-          confidence: 1.0,
-        },
-        generatedAt: new Date(),
+      // Simple scoring based on content analysis
+      const dockerfile = candidate.content;
+      const scoreBreakdown = {
+        security: scoreDockerfileSecurity(dockerfile),
+        performance: scoreDockerfilePerformance(dockerfile),
+        standards: scoreDockerfileStandards(dockerfile),
+        maintainability: scoreDockerfileMaintainability(dockerfile),
       };
 
-      const scoreResult = await this.scorer.score([tempCandidate]);
-      if (!scoreResult.success) {
-        return Failure(scoreResult.error);
-      }
+      const finalScore = calculateFinalScore(scoreBreakdown, weights);
 
-      return Success(scoreResult.data[0]);
+      const scored: ScoredCandidate<string> = {
+        ...candidate,
+        score: finalScore,
+        scoreBreakdown,
+        rank: 0, // Will be set by scoring function
+      };
+
+      return Success(scored);
     } catch (error) {
       return Failure(`Scoring failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  };
+
+  return scoreCanidates(candidates, scoringFunction, logger);
+};
+
+/**
+ * Generate simple Dockerfile content based on strategy
+ */
+function generateDockerfileContent(strategy: string, _context: DockerfileContext): string {
+  const baseImageMap = {
+    'alpine-minimal': 'node:18-alpine',
+    'alpine-multistage': 'node:18-alpine',
+    'ubuntu-standard': 'node:18',
+  };
+
+  const baseImage = baseImageMap[strategy as keyof typeof baseImageMap] || 'node:18-alpine';
+
+  if (strategy === 'alpine-multistage') {
+    return `# Multi-stage Dockerfile
+FROM ${baseImage} AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+
+FROM ${baseImage}
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY . .
+EXPOSE 3000
+CMD ["npm", "start"]`;
   }
+
+  return `FROM ${baseImage}
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+EXPOSE 3000
+CMD ["npm", "start"]`;
 }
 
-// Factory function for easy instantiation
+/**
+ * Simple scoring functions
+ */
+function scoreDockerfileSecurity(dockerfile: string): number {
+  let score = 0.5; // Base score
+
+  if (dockerfile.includes('USER ') && !dockerfile.includes('USER root')) score += 0.3;
+  if (dockerfile.includes('alpine')) score += 0.2;
+  if (!dockerfile.includes('rm -rf')) score += 0.1;
+
+  return Math.min(score, 1.0);
+}
+
+function scoreDockerfilePerformance(dockerfile: string): number {
+  let score = 0.5;
+
+  if (dockerfile.includes('FROM') && dockerfile.split('FROM').length > 2) score += 0.2; // Multi-stage
+  if (dockerfile.includes('npm ci')) score += 0.2;
+  if (dockerfile.includes('alpine')) score += 0.1;
+
+  return Math.min(score, 1.0);
+}
+
+function scoreDockerfileStandards(dockerfile: string): number {
+  let score = 0.5;
+
+  if (dockerfile.includes('WORKDIR')) score += 0.2;
+  if (dockerfile.includes('COPY package')) score += 0.2;
+  if (dockerfile.includes('EXPOSE')) score += 0.1;
+
+  return Math.min(score, 1.0);
+}
+
+function scoreDockerfileMaintainability(dockerfile: string): number {
+  let score = 0.5;
+
+  if (dockerfile.includes('#')) score += 0.2; // Has comments
+  if (dockerfile.split('\n').length < 15) score += 0.2; // Not too long
+  if (!dockerfile.includes('&&')) score += 0.1; // Simple commands
+
+  return Math.min(score, 1.0);
+}
+
+/**
+ * Simple function to generate the best Dockerfile
+ */
+export const generateBestDockerfile = async (
+  context: DockerfileContext,
+  options: DockerfileSamplingOptions = {},
+  logger: Logger,
+): Promise<Result<ScoredCandidate<string>>> => {
+  const environment = options.environment || 'production';
+  const weights = { ...ENVIRONMENT_WEIGHTS[environment], ...options.customWeights };
+  const config: Partial<SamplingConfig> = {
+    maxCandidates: options.maxCandidates || 3,
+  };
+
+  logger.info({ sessionId: context.sessionId }, 'Starting Dockerfile sampling');
+
+  const result = await runSampling(
+    context,
+    generateDockerfileCandidates,
+    scoreDockerfileCandidates,
+    weights,
+    logger,
+    config,
+  );
+
+  if (result.ok) {
+    logger.info(
+      {
+        sessionId: context.sessionId,
+        winnerId: result.value.id,
+        winnerScore: result.value.score,
+        strategy: result.value.metadata.strategy,
+      },
+      'Dockerfile sampling completed successfully',
+    );
+  } else {
+    logger.error(
+      {
+        sessionId: context.sessionId,
+        error: result.error,
+      },
+      'Dockerfile sampling failed',
+    );
+  }
+
+  return result;
+};
+
+/**
+ * Simple function to generate multiple Dockerfiles
+ */
+export const generateMultipleDockerfiles = async (
+  context: DockerfileContext,
+  count: number,
+  options: DockerfileSamplingOptions = {},
+  logger: Logger,
+): Promise<Result<ScoredCandidate<string>[]>> => {
+  const environment = options.environment || 'production';
+  const weights = { ...ENVIRONMENT_WEIGHTS[environment], ...options.customWeights };
+  const config: Partial<SamplingConfig> = {
+    maxCandidates: options.maxCandidates || 3,
+  };
+
+  logger.info(
+    { sessionId: context.sessionId, count },
+    'Starting multiple Dockerfile sampling',
+  );
+
+  const result = await runSamplingForTopN(
+    context,
+    generateDockerfileCandidates,
+    scoreDockerfileCandidates,
+    weights,
+    count,
+    logger,
+    config,
+  );
+
+  if (result.ok) {
+    logger.info(
+      {
+        sessionId: context.sessionId,
+        generatedCount: result.value.length,
+        topScore: result.value[0]?.score,
+      },
+      'Multiple Dockerfile sampling completed successfully',
+    );
+  } else {
+    logger.error(
+      {
+        sessionId: context.sessionId,
+        error: result.error,
+      },
+      'Multiple Dockerfile sampling failed',
+    );
+  }
+
+  return result;
+};
+
+/**
+ * Simple validation function for Dockerfiles
+ */
+export const validateDockerfile = async (
+  dockerfile: string,
+  _logger: Logger,
+): Promise<Result<boolean>> => {
+  try {
+    // Simple validation: check for required instructions
+    const required = ['FROM', 'WORKDIR'];
+    const missing = required.filter(instruction => !dockerfile.includes(instruction));
+
+    if (missing.length > 0) {
+      return Failure(`Missing required instructions: ${missing.join(', ')}`);
+    }
+
+    return Success(true);
+  } catch (error) {
+    return Failure(
+      `Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+  }
+};
+
+/**
+ * Simple scoring function for user-provided Dockerfiles
+ */
+export const scoreDockerfile = async (
+  dockerfile: string,
+  options: DockerfileSamplingOptions = {},
+  logger: Logger,
+): Promise<Result<ScoredCandidate<string>>> => {
+  try {
+    const tempCandidate: Candidate<string> = {
+      id: 'temp-scoring',
+      content: dockerfile,
+      metadata: {
+        strategy: 'user-provided',
+        source: 'scoring-request',
+        confidence: 1.0,
+      },
+      generatedAt: new Date(),
+    };
+
+    const environment = options.environment || 'production';
+    const weights = { ...ENVIRONMENT_WEIGHTS[environment], ...options.customWeights };
+
+    const scoreResult = await scoreDockerfileCandidates([tempCandidate], weights, logger);
+    if (!scoreResult.ok) {
+      return Failure(scoreResult.error);
+    }
+
+    const firstResult = scoreResult.value[0];
+    if (!firstResult) {
+      return Failure('No scoring result available');
+    }
+
+    return Success(firstResult);
+  } catch (error) {
+    return Failure(`Scoring failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
+/**
+ * Backward compatibility: create a simple sampler object
+ */
 export const createDockerfileSampler = (
   logger: Logger,
   options: DockerfileSamplingOptions = {},
-): DockerfileSamplingOrchestrator => {
-  return new DockerfileSamplingOrchestrator(logger, options);
+) => {
+  return {
+    async generateBestDockerfile(context: DockerfileContext) {
+      return generateBestDockerfile(context, options, logger);
+    },
+    async generateMultipleDockerfiles(context: DockerfileContext, count: number) {
+      return generateMultipleDockerfiles(context, count, options, logger);
+    },
+    async validateDockerfile(dockerfile: string) {
+      return validateDockerfile(dockerfile, logger);
+    },
+    async scoreDockerfile(dockerfile: string) {
+      return scoreDockerfile(dockerfile, options, logger);
+    },
+  };
 };
 
-// Type exports for external use
-export type { DockerfileContext, DockerfileSamplingOptions };
+// Export the simple orchestrator type
+export class DockerfileSamplingOrchestrator {
+  constructor(
+    private logger: Logger,
+    private options: DockerfileSamplingOptions = {},
+  ) {}
+
+  async generateBestDockerfile(context: DockerfileContext) {
+    return generateBestDockerfile(context, this.options, this.logger);
+  }
+
+  async generateMultipleDockerfiles(context: DockerfileContext, count: number) {
+    return generateMultipleDockerfiles(context, count, this.options, this.logger);
+  }
+
+  async validateDockerfile(dockerfile: string) {
+    return validateDockerfile(dockerfile, this.logger);
+  }
+
+  async scoreDockerfile(dockerfile: string) {
+    return scoreDockerfile(dockerfile, this.options, this.logger);
+  }
+}
+
+// DockerfileContext is already exported above

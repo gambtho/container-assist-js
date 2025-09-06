@@ -243,31 +243,20 @@ describe('Dependency Configuration Validation', () => {
     expect(configStructure.session).toBeDefined();
     expect(configStructure.docker).toBeDefined();
     expect(configStructure.kubernetes).toBeDefined();
-    expect(configStructure.features).toBeDefined();
-    
     expect(typeof configStructure.session.ttl).toBe('number');
-    expect(typeof configStructure.features.mockMode).toBe('boolean');
   });
 
   test('should validate environment-specific configuration', () => {
     const testConfig = {
       nodeEnv: 'test',
-      logLevel: 'error',
-      features: {
-        mockMode: true
-      }
+      logLevel: 'error'
     };
 
     const productionConfig = {
       nodeEnv: 'production',
-      logLevel: 'info',
-      features: {
-        mockMode: false
-      }
+      logLevel: 'info'
     };
 
-    expect(testConfig.features.mockMode).toBe(true);
-    expect(productionConfig.features.mockMode).toBe(false);
     expect(testConfig.logLevel).toBe('error');
     expect(productionConfig.logLevel).toBe('info');
   });

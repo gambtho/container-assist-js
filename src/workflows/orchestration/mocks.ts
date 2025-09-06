@@ -1,43 +1,68 @@
 // Mock implementations for independent development
-// These will be replaced with real implementations from other teams
+// These will be replaced with real implementations
 
 import { Result, Success } from '../../types/core.js';
 import type { Logger } from 'pino';
-import {
-  ResourceManager,
-  ProgressNotifier,
-  CandidateGenerator,
-  CandidateScorer,
-  WinnerSelector,
+import type {
   EnhancedTool,
   ToolResult,
   Candidate,
   ScoredCandidate,
   GenerationContext,
 } from './types.js';
+import type { Resource } from '../../mcp/resources/types.js';
+import type { ProgressNotifier } from '../../mcp/events/types.js';
+import type {
+  CandidateGenerator,
+  CandidateScorer,
+  WinnerSelector,
+} from '../../lib/sampling.js';
 
-// Mock Resource Manager (Team Alpha dependency)
-export const createMockResourceManager = (logger: Logger): ResourceManager => ({
-  async publish(uri: string, _content: unknown, ttl?: number): Promise<string> {
+// Mock Resource Manager (MCP dependency) - implements interface methods only
+export const createMockResourceManager = (logger: Logger) => ({
+  async publish(uri: string, _content: unknown, ttl?: number): Promise<Result<string>> {
     logger.debug({ uri, ttl }, 'Mock: Publishing resource');
-    return uri;
+    return Success(uri);
   },
 
-  async read(uri: string): Promise<unknown> {
+  async read(uri: string): Promise<Result<Resource | null>> {
     logger.debug({ uri }, 'Mock: Reading resource');
-    return { mockContent: `Content for ${uri}`, timestamp: new Date() };
+    const resource: Resource = {
+      uri,
+      content: { mockContent: `Content for ${uri}`, timestamp: new Date() },
+      mimeType: 'application/json',
+      createdAt: new Date(),
+    };
+    return Success(resource);
   },
 
-  async invalidate(pattern: string): Promise<void> {
+  async invalidate(pattern: string): Promise<Result<void>> {
     logger.debug({ pattern }, 'Mock: Invalidating resources');
+    return Success(undefined);
   },
 
-  async cleanup(olderThan: Date): Promise<void> {
-    logger.debug({ olderThan }, 'Mock: Cleaning up old resources');
+  async list(pattern: string): Promise<Result<string[]>> {
+    logger.debug({ pattern }, 'Mock: Listing resources');
+    return Success([`resource://mock/${pattern}/1`, `resource://mock/${pattern}/2`]);
+  },
+
+  async cleanup(): Promise<Result<void>> {
+    logger.debug('Mock: Cleaning up old resources');
+    return Success(undefined);
+  },
+
+  async getMetadata(uri: string): Promise<Result<Omit<Resource, 'content'> | null>> {
+    logger.debug({ uri }, 'Mock: Getting resource metadata');
+    const metadata = {
+      uri,
+      mimeType: 'application/json',
+      createdAt: new Date(),
+    };
+    return Success(metadata);
   },
 });
 
-// Mock Progress Notifier (Team Alpha dependency)
+// Mock Progress Notifier (MCP dependency)
 export const createMockProgressNotifier = (logger: Logger): ProgressNotifier => ({
   notifyProgress(progress: { token: string; value: number; message?: string }): void {
     logger.info({
@@ -47,20 +72,32 @@ export const createMockProgressNotifier = (logger: Logger): ProgressNotifier => 
     }, 'Mock: Progress notification');
   },
 
-  notifyComplete(token: string): void {
+  notifyComplete(token: string, _result?: unknown): void {
     logger.info({ token }, 'Mock: Progress complete');
   },
 
   notifyError(token: string, error: string): void {
     logger.error({ token, error }, 'Mock: Progress error');
   },
+
+  subscribe(_callback: (event: any) => void): () => void {
+    logger.debug('Mock: Progress subscription created');
+    return () => logger.debug('Mock: Progress subscription removed');
+  },
+
+  generateToken(): string {
+    return `mock-token-${Date.now()}`;
+  },
 });
 
-// Mock Dockerfile Candidate Generator (Team Beta dependency)
+// Mock Dockerfile Candidate Generator (sampling dependency)
 export const createMockDockerfileCandidateGenerator = (
   logger: Logger,
 ): CandidateGenerator<string> => ({
-  async generate(context: GenerationContext, count = 3): Promise<Candidate<string>[]> {
+  name: 'mock-dockerfile-generator',
+  supportedTypes: ['dockerfile'],
+
+  async generate(context: GenerationContext, count = 3): Promise<Result<Candidate<string>[]>> {
     logger.debug({ context, count }, 'Mock: Generating Dockerfile candidates');
 
     const candidates: Candidate<string>[] = [];
@@ -79,24 +116,31 @@ CMD ["npm", "start"]
 # Strategy: ${i === 0 ? 'security-optimized' : i === 1 ? 'performance-optimized' : 'development-friendly'}`,
         metadata: {
           strategy: i === 0 ? 'security-optimized' : i === 1 ? 'performance-optimized' : 'development-friendly',
-          baseImage: 'node:18-alpine',
-          stages: i === 1 ? 2 : 1,
-          estimatedSize: `${150 + i * 50}MB`,
+          source: 'mock-generator',
+          confidence: 0.8,
+          estimatedSize: 150 + i * 50,
         },
         generatedAt: new Date(),
       });
     }
 
-    return candidates;
+    return Success(candidates);
+  },
+
+  async validate(_candidate: Candidate<string>): Promise<Result<boolean>> {
+    return Success(true);
   },
 });
 
-// Mock Candidate Scorer (Team Beta dependency)
+// Mock Candidate Scorer (sampling dependency)
 export const createMockCandidateScorer = <T>(logger: Logger): CandidateScorer<T> => ({
-  async score(candidates: Candidate<T>[]): Promise<ScoredCandidate<T>[]> {
+  name: 'mock-scorer',
+  weights: { security: 0.4, performance: 0.3, standards: 0.2, maintainability: 0.1 },
+
+  async score(candidates: Candidate<T>[]): Promise<Result<ScoredCandidate<T>[]>> {
     logger.debug({ candidateCount: candidates.length }, 'Mock: Scoring candidates');
 
-    return candidates.map((candidate, index) => {
+    const scoredCandidates = candidates.map((candidate, index) => {
       const baseScore = 70 + (index * 10) + Math.random() * 10;
       const scoreBreakdown = {
         security: Math.max(0, baseScore - 10 + Math.random() * 20),
@@ -109,6 +153,7 @@ export const createMockCandidateScorer = <T>(logger: Logger): CandidateScorer<T>
         ...candidate,
         score: Math.min(100, Object.values(scoreBreakdown).reduce((a, b) => a + b, 0) / 4),
         scoreBreakdown,
+        rank: index,
         rationale: `Mock scoring: Strategy ${candidate.metadata?.strategy} selected based on ${
           scoreBreakdown.security > 80 ? 'security excellence' :
           scoreBreakdown.performance > 80 ? 'performance optimization' :
@@ -116,12 +161,21 @@ export const createMockCandidateScorer = <T>(logger: Logger): CandidateScorer<T>
         }`,
       };
     });
+
+    return Success(scoredCandidates);
+  },
+
+  updateWeights(newWeights: Record<string, number>): void {
+    logger.debug({ newWeights }, 'Mock: Updating scoring weights');
+    Object.assign(this.weights, newWeights);
   },
 });
 
-// Mock Winner Selector (Team Beta dependency)
+// Mock Winner Selector (sampling dependency)
 export const createMockWinnerSelector = <T>(logger: Logger): WinnerSelector<T> => ({
-  select(scored: ScoredCandidate<T>[]): ScoredCandidate<T> {
+  strategy: 'highest-score',
+
+  select(scored: ScoredCandidate<T>[]): Result<ScoredCandidate<T>> {
     const winner = scored.reduce((best, current) =>
       current.score > best.score ? current : best,
     );
@@ -132,11 +186,18 @@ export const createMockWinnerSelector = <T>(logger: Logger): WinnerSelector<T> =
       totalCandidates: scored.length,
     }, 'Mock: Selected winner');
 
-    return winner;
+    return Success(winner);
+  },
+
+  selectTop(scored: ScoredCandidate<T>[], count: number): Result<ScoredCandidate<T>[]> {
+    const sorted = scored.sort((a, b) => b.score - a.score);
+    const top = sorted.slice(0, count);
+    logger.debug({ count, selected: top.length }, 'Mock: Selected top candidates');
+    return Success(top);
   },
 });
 
-// Mock Enhanced Tools (Team Delta dependency)
+// Mock Enhanced Tools (workflow dependency)
 export const createMockEnhancedTools = (logger: Logger): Record<string, EnhancedTool> => ({
   analyze_repository: {
     name: 'analyze_repository',
@@ -380,7 +441,7 @@ export const createMockRemediationTool = (logger: Logger): EnhancedTool => ({
     await new Promise(resolve => setTimeout(resolve, 4000));
 
     return Success({
-      success: true,
+      ok: true,
       content: {
         remediatedDockerfile: 'resource://remediation/dockerfile',
         changesApplied: [
@@ -403,4 +464,3 @@ export const createMockRemediationTool = (logger: Logger): EnhancedTool => ({
   },
 });
 
-export const USE_MOCKS = process.env.NODE_ENV === 'development' || process.env.USE_MOCKS === 'true';

@@ -1,4 +1,4 @@
-import { Result, Success, Failure } from '../../domain/types/result.js';
+import { Result, Success, Failure } from '../../types/core.js';
 import type { ParsedUri, UriScheme } from './types.js';
 
 export class UriParser {
@@ -18,14 +18,22 @@ export class UriParser {
         query[key] = value;
       });
 
-      return Success({
+      const result: ParsedUri = {
         scheme: url.protocol.slice(0, -1) as UriScheme,
         path: url.pathname,
-        query: Object.keys(query).length > 0 ? query : undefined,
-        fragment: url.hash ? url.hash.slice(1) : undefined,
-      });
+      };
+
+      if (Object.keys(query).length > 0) {
+        result.query = query;
+      }
+
+      if (url.hash) {
+        result.fragment = url.hash.slice(1);
+      }
+
+      return Success(result);
     } catch (error) {
-      return Failure(`Failed to parse URI: ${error.message}`);
+      return Failure(`Failed to parse URI: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

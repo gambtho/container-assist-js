@@ -164,17 +164,7 @@ function validateDockerSocket(options: any): { dockerSocket: string; warnings: s
   return { dockerSocket, warnings };
 }
 
-// Enhanced file operations with proper error handling (utility for future use)
-// function safeFileOperation<T>(operation: () => T, fallback: T, context: string): T {
-//   try {
-//     return operation();
-//   } catch (error) {
-//     getLogger().warn({ error, context }, `File operation failed: ${context}`);
-//     return fallback;
-//   }
-// }
 
-// Enhanced error guidance in CLI
 function provideContextualGuidance(error: Error, options: any): void {
   console.error(`\n🔍 Error: ${error.message}`);
 
@@ -332,7 +322,7 @@ async function main(): Promise<void> {
     const config = createConfig();
 
     // Log configuration summary in development mode
-    logConfigSummaryIfDev(config);
+    logConfigSummaryIfDev();
 
     if (options.validate) {
       console.error('🔍 Validating Containerization Assist MCP configuration...\n');

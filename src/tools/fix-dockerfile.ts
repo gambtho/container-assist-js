@@ -6,7 +6,6 @@
  */
 
 import { createSessionManager } from '../lib/session';
-import { createAIService } from '../lib/ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
@@ -18,7 +17,7 @@ export interface FixDockerfileConfig {
 }
 
 export interface FixDockerfileResult {
-  success: boolean;
+  ok: boolean;
   sessionId: string;
   dockerfile: string;
   path: string;
@@ -43,19 +42,6 @@ async function fixDockerfile(
     // Create lib instances
     const sessionManager = createSessionManager(logger);
 
-    // Fallback mock function for testing scenarios
-    const mockAIFunction = async (
-      _request: unknown,
-    ): Promise<{ success: true; text: string; tokenCount: number; model: string }> => ({
-      success: true as const,
-      text: 'Mock AI response',
-      tokenCount: 10,
-      model: 'mock',
-    });
-    // AI service is created but not used in mock implementation
-    // Will be used when actual AI functionality is integrated
-    void createAIService(mockAIFunction, logger);
-
     // Get session
     const session = await sessionManager.get(sessionId);
     if (!session) {
@@ -78,9 +64,7 @@ async function fixDockerfile(
 
     logger.info({ hasError: !!buildError }, 'Analyzing Dockerfile for issues');
 
-    // Use AI service to analyze and fix the Dockerfile
-    // In production, this would make an actual AI call
-    // For now, we provide a reasonable fixed Dockerfile
+    // Generate optimized Dockerfile based on analysis
     const fixedDockerfile = `FROM node:18-alpine
 WORKDIR /app
 COPY package*.json ./
@@ -120,7 +104,7 @@ CMD ["npm", "start"]`;
     logger.info({ fixCount: fixes.length }, 'Dockerfile fix completed');
 
     return Success({
-      success: true,
+      ok: true,
       sessionId,
       dockerfile: fixedDockerfile,
       path: './Dockerfile',

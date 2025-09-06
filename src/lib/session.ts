@@ -1,21 +1,17 @@
 /**
  * Session Manager Implementation
  *
- * Core session management functionality providing:
+ * Simplified session management functionality providing:
  * - Session lifecycle management
- * - TTL-based expiration
- * - Automatic cleanup
+ * - Simple WorkflowState storage
  * - Thread-safe operations
  */
 
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
-import {
-  SessionSchema,
-  type Session,
-  type SessionManager,
-  type SessionFilter,
-} from '../types/session';
+import type {
+  WorkflowState,
+} from '../types/session.js';
 
 interface SessionConfig {
   ttl?: number; // Session TTL in seconds (default: 24 hours)
@@ -27,11 +23,19 @@ const DEFAULT_TTL = 86400; // 24 hours in seconds
 const DEFAULT_MAX_SESSIONS = 1000;
 const DEFAULT_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
+// Internal session storage with timestamps
+interface InternalSession {
+  id: string;
+  workflowState: WorkflowState;
+  created_at: Date;
+  updated_at: Date;
+}
+
 /**
- * Core session manager implementation
+ * Simple session manager implementation
  */
-class SessionManagerImpl implements SessionManager {
-  private sessions = new Map<string, Session>();
+export class SessionManager {
+  private sessions = new Map<string, InternalSession>();
   private cleanupTimer: NodeJS.Timeout | undefined = undefined;
   private readonly logger: Logger;
   private readonly ttl: number;
@@ -67,7 +71,7 @@ class SessionManagerImpl implements SessionManager {
   /**
    * Create a new session
    */
-  async create(data: Partial<Session> = {}): Promise<Session> {
+  async create(sessionId?: string): Promise<WorkflowState> {
     // Check session limit
     if (this.sessions.size >= this.maxSessions) {
       this.cleanupExpiredSessions();
@@ -76,197 +80,106 @@ class SessionManagerImpl implements SessionManager {
       }
     }
 
-    const id = data.id ?? randomUUID();
-    const now = new Date().toISOString();
-    const expiresAt = data.expires_at ?? new Date(Date.now() + this.ttl * 1000).toISOString();
+    const id = sessionId ?? randomUUID();
+    const now = new Date();
 
-    const session: Session = {
-      id,
-      created_at: now,
-      updated_at: now,
-      expires_at: expiresAt,
-      status: data.status ?? 'active',
-      repo_path: data.repo_path ?? '',
-      stage: data.stage,
-      labels: data.labels,
-      metadata: data.metadata,
-      workflow_state: data.workflow_state ?? {
-        completed_steps: [],
-        errors: {},
-        metadata: {},
-      },
-      version: 0,
-      config: data.config,
-      progress: data.progress,
-      ...data,
+    const workflowState: WorkflowState = {
+      metadata: {},
+      completed_steps: [],
+      errors: {},
+      current_step: null,
     };
 
-    // Validate session structure
-    const validatedSession = SessionSchema.parse(session);
+    const session: InternalSession = {
+      id,
+      workflowState,
+      created_at: now,
+      updated_at: now,
+    };
 
-    this.sessions.set(id, validatedSession);
+    this.sessions.set(id, session);
     this.logger.debug({ sessionId: id }, 'Session created');
 
-    return validatedSession;
+    return workflowState;
   }
 
   /**
    * Get a session by ID
    */
-  async get(id: string): Promise<Session | null> {
-    const session = this.sessions.get(id);
+  async get(sessionId: string): Promise<WorkflowState | null> {
+    const session = this.sessions.get(sessionId);
 
     if (!session) {
       return null;
     }
 
     // Check if expired
-    if (session.expires_at && new Date(session.expires_at) < new Date()) {
-      this.sessions.delete(id);
-      this.logger.debug({ sessionId: id }, 'Expired session removed');
+    if (Date.now() - session.created_at.getTime() > this.ttl * 1000) {
+      this.sessions.delete(sessionId);
+      this.logger.debug({ sessionId }, 'Expired session removed');
       return null;
     }
 
-    return session;
+    return session.workflowState;
   }
 
   /**
    * Update a session
    */
-  async update(id: string, data: Partial<Session>): Promise<void> {
-    const session = await this.get(id);
+  async update(sessionId: string, state: Partial<WorkflowState>): Promise<void> {
+    const session = this.sessions.get(sessionId);
     if (!session) {
-      throw new Error(`Session ${id} not found`);
+      throw new Error(`Session ${sessionId} not found`);
     }
 
-    const updatedSession: Session = {
-      ...session,
-      ...data,
-      updated_at: new Date().toISOString(),
-      version: session.version + 1,
+    // Update workflow state
+    const updatedWorkflowState: WorkflowState = {
+      ...session.workflowState,
+      ...state,
+      metadata: { ...session.workflowState.metadata, ...state.metadata },
+      completed_steps: state.completed_steps ?? session.workflowState.completed_steps,
+      errors: { ...session.workflowState.errors, ...state.errors },
     };
 
-    // Validate updated session
-    const validatedSession = SessionSchema.parse(updatedSession);
+    const updatedSession: InternalSession = {
+      ...session,
+      workflowState: updatedWorkflowState,
+      updated_at: new Date(),
+    };
 
-    this.sessions.set(id, validatedSession);
-    this.logger.debug({ sessionId: id }, 'Session updated');
-  }
-
-  /**
-   * Atomic update of a session using a function
-   */
-  async updateAtomic(id: string, updater: (session: Session) => Session): Promise<void> {
-    const session = await this.get(id);
-    if (!session) {
-      throw new Error(`Session ${id} not found`);
-    }
-
-    try {
-      const updatedSession = updater({ ...session });
-      updatedSession.updated_at = new Date().toISOString();
-      updatedSession.version = session.version + 1;
-
-      // Validate updated session
-      const validatedSession = SessionSchema.parse(updatedSession);
-
-      this.sessions.set(id, validatedSession);
-      this.logger.debug({ sessionId: id }, 'Session updated atomically');
-    } catch (err) {
-      this.logger.error({ sessionId: id, error: err }, 'Atomic session update failed');
-      throw err;
-    }
+    this.sessions.set(sessionId, updatedSession);
+    this.logger.debug({ sessionId }, 'Session updated');
   }
 
   /**
    * Delete a session
    */
-  async delete(id: string): Promise<void> {
-    const existed = this.sessions.delete(id);
+  async delete(sessionId: string): Promise<void> {
+    const existed = this.sessions.delete(sessionId);
     if (existed) {
-      this.logger.debug({ sessionId: id }, 'Session deleted');
+      this.logger.debug({ sessionId }, 'Session deleted');
     }
   }
 
   /**
-   * List sessions with optional filtering
+   * List all session IDs
    */
-  async list(filter?: SessionFilter): Promise<Session[]> {
-    let sessions = Array.from(this.sessions.values());
+  async list(): Promise<string[]> {
+    return Array.from(this.sessions.keys());
+  }
 
-    if (filter) {
-      sessions = sessions.filter((session) => {
-        // Filter by status
-        if (filter.status && session.status !== filter.status) {
-          return false;
-        }
-
-        // Filter by repo_path
-        if (filter.repo_path && session.repo_path !== filter.repo_path) {
-          return false;
-        }
-
-        // Filter by labels
-        if (filter.labels) {
-          for (const [key, value] of Object.entries(filter.labels)) {
-            if (!session.labels || session.labels[key] !== value) {
-              return false;
-            }
-          }
-        }
-
-        // Filter by creation date range
-        if (filter.created_after && new Date(session.created_at) < filter.created_after) {
-          return false;
-        }
-        if (filter.created_before && new Date(session.created_at) > filter.created_before) {
-          return false;
-        }
-
-        return true;
-      });
+  /**
+   * Cleanup old sessions
+   */
+  async cleanup(olderThan: Date): Promise<void> {
+    let cleanedCount = 0;
+    for (const [id, session] of this.sessions.entries()) {
+      if (session.created_at < olderThan) {
+        this.sessions.delete(id);
+        cleanedCount++;
+      }
     }
-
-    // Sort by creation date (newest first)
-    sessions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-    return sessions;
-  }
-
-  /**
-   * Get active sessions (convenience method for MCP resource)
-   */
-  async getActiveSessions(limit = 50): Promise<Session[]> {
-    const sessions = await this.list({ status: 'active' });
-    return sessions.slice(0, limit);
-  }
-
-  /**
-   * Cleanup expired sessions and enforce session limits
-   */
-  async cleanup(): Promise<void> {
-    this.cleanupExpiredSessions();
-    this.logger.debug({ activeCount: this.sessions.size }, 'Session cleanup completed');
-  }
-
-  /**
-   * Get session statistics
-   */
-  getStats(): { total: number; statusCounts: Record<string, number>; maxSessions: number } {
-    const sessions = Array.from(this.sessions.values());
-    const statusCounts = sessions.reduce(
-      (acc, session) => {
-        acc[session.status] = (acc[session.status] ?? 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>,
-    );
-
-    return {
-      total: sessions.length,
-      statusCounts,
-      maxSessions: this.maxSessions,
-    };
+    this.logger.debug({ cleanedCount }, 'Session cleanup completed');
   }
 
   /**
@@ -284,11 +197,11 @@ class SessionManagerImpl implements SessionManager {
    * Private method to cleanup expired sessions
    */
   private cleanupExpiredSessions(): void {
-    const now = new Date();
+    const now = Date.now();
     let expiredCount = 0;
 
     for (const [id, session] of this.sessions.entries()) {
-      if (session.expires_at && new Date(session.expires_at) < now) {
+      if (now - session.created_at.getTime() > this.ttl * 1000) {
         this.sessions.delete(id);
         expiredCount++;
       }
@@ -305,5 +218,5 @@ class SessionManagerImpl implements SessionManager {
  * This is the primary export that tools should use
  */
 export function createSessionManager(logger: Logger, config?: SessionConfig): SessionManager {
-  return new SessionManagerImpl(logger, config);
+  return new SessionManager(logger, config);
 }

@@ -8,7 +8,7 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../lib/session';
-import { createAIService, type AIResult } from '../lib/ai';
+import { createAIService } from '../lib/ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
@@ -42,7 +42,7 @@ export interface GenerateK8sManifestsConfig {
 }
 
 export interface GenerateK8sManifestsResult {
-  success: boolean;
+  ok: boolean;
   sessionId: string;
   manifests: string;
   path: string;
@@ -279,14 +279,8 @@ export async function generateK8sManifests(
     // Create lib instances
     const sessionManager = createSessionManager(logger);
 
-    // Fallback mock function for testing scenarios
-    const mockAIFunction = async (_request: unknown): Promise<AIResult> => ({
-      success: true as const,
-      text: 'Mock AI response',
-      tokenCount: 10,
-      model: 'mock',
-    });
-    const aiService = createAIService(mockAIFunction, logger);
+    // Create AI service
+    const aiService = createAIService(logger);
 
     // Get session
     const session = await sessionManager.get(sessionId);
@@ -355,14 +349,17 @@ export async function generateK8sManifests(
 
     // Use AI to enhance manifests (when available)
     try {
-      const aiResponse = await aiService.generateK8sManifests({
-        appName,
-        namespace,
-        environment,
-        manifests,
+      const aiResponse = await aiService.generate({
+        prompt: `Generate optimized Kubernetes manifests for ${appName} application in ${environment} environment`,
+        context: {
+          appName,
+          namespace,
+          environment,
+          manifests,
+        },
       });
 
-      if (aiResponse.success) {
+      if (aiResponse.ok) {
         logger.debug('AI enhancement would be applied here');
       }
     } catch (error) {
@@ -393,7 +390,7 @@ export async function generateK8sManifests(
           file_path: manifestPath,
         })),
         replicas,
-        resources,
+        ...(resources && { resources }),
         output_path: manifestPath,
       },
       completed_steps: [...(currentState?.completed_steps ?? []), 'generate-k8s-manifests'],
@@ -414,7 +411,7 @@ export async function generateK8sManifests(
     );
 
     return Success({
-      success: true,
+      ok: true,
       sessionId,
       manifests: yaml,
       path: manifestPath,
@@ -430,14 +427,9 @@ export async function generateK8sManifests(
 }
 
 /**
- * Factory function for creating generate-k8s-manifests tool instances
+ * Generate K8s manifests tool instance
  */
-export function createGenerateK8sManifestsTool(logger: Logger): {
-  name: string;
-  execute: (config: GenerateK8sManifestsConfig) => Promise<Result<GenerateK8sManifestsResult>>;
-} {
-  return {
-    name: 'generate-k8s-manifests',
-    execute: (config: GenerateK8sManifestsConfig) => generateK8sManifests(config, logger),
-  };
-}
+export const generateK8sManifestsTool = {
+  name: 'generate-k8s-manifests',
+  execute: (config: GenerateK8sManifestsConfig, logger: Logger) => generateK8sManifests(config, logger),
+};

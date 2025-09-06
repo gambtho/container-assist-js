@@ -6,7 +6,6 @@
  */
 
 import { createSessionManager } from '../lib/session';
-import { createAIService } from '../lib/ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
@@ -73,19 +72,6 @@ async function resolveBaseImages(
 
     // Create lib instances
     const sessionManager = createSessionManager(logger);
-
-    // Fallback mock function for testing scenarios
-    const mockAIFunction = async (
-      _request: unknown,
-    ): Promise<{ success: true; text: string; tokenCount: number; model: string }> => ({
-      success: true as const,
-      text: 'Mock AI response',
-      tokenCount: 10,
-      model: 'mock',
-    });
-    // AI service is created but not used in mock implementation
-    // Will be used when actual AI functionality is integrated
-    void createAIService(mockAIFunction, logger);
 
     // Get session
     const session = await sessionManager.get(sessionId);

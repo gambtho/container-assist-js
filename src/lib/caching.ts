@@ -1,7 +1,5 @@
 import { Result, Success, Failure } from '../types/core.js';
 import type { Logger } from 'pino';
-// Direct integration with Team Alpha's resource management
-import { getTeamAlphaIntegration, ResourceManager } from '../infrastructure/team-alpha-integration.js';
 
 // Enhanced caching interfaces for sampling
 export interface CacheEntry<T> {
@@ -233,7 +231,7 @@ export class SamplingCache {
 
   // Content-addressable caching for deterministic results
   generateContentHash(content: unknown): string {
-    const contentStr = JSON.stringify(content, Object.keys(content).sort());
+    const contentStr = JSON.stringify(content, Object.keys(content as object).sort());
 
     // Simple hash function (in production, use crypto.createHash)
     let hash = 0;
@@ -272,10 +270,10 @@ export class SamplingCache {
   }>): Promise<Result<void>> {
     try {
       const results = await Promise.all(
-        entries.map(entry => this.set(entry.key, entry.data, entry.options)),
+        entries.map(entry => this.set(entry.key, (entry as any).value || (entry as any).data, entry.options)),
       );
 
-      const failures = results.filter(r => !r.success);
+      const failures = results.filter(r => !r.ok);
       if (failures.length > 0) {
         return Failure(`Batch set had ${failures.length} failures`);
       }
@@ -293,8 +291,8 @@ export class SamplingCache {
 
       for (const key of keys) {
         const result = await this.get<T>(key);
-        if (result.success && result.data !== null) {
-          results.set(key, result.data);
+        if (result.ok && result.value !== null) {
+          results.set(key, result.value);
         }
       }
 
@@ -371,123 +369,32 @@ export class SamplingCache {
   }
 }
 
-// Factory for creating sampling-specific caches
-export class SamplingCacheFactory {
-  private static instances = new Map<string, SamplingCache>();
+// Simple cache management - no factory pattern
+const cacheInstances = new Map<string, SamplingCache>();
 
-  static createCache(
-    name: string,
-    logger: Logger,
-    config: Partial<CacheConfig> = {},
-  ): SamplingCache {
-    if (this.instances.has(name)) {
-      return this.instances.get(name)!;
-    }
-
-    const cache = new SamplingCache(logger, config);
-    this.instances.set(name, cache);
-
-    logger.info({ name, config }, 'Created sampling cache');
-    return cache;
-  }
-
-  static getCache(name: string): SamplingCache | null {
-    return this.instances.get(name) || null;
-  }
-
-  static destroyCache(name: string): boolean {
-    const cache = this.instances.get(name);
-    if (cache) {
-      cache.destroy();
-      this.instances.delete(name);
-      return true;
-    }
-    return false;
-  }
-
-  static destroyAllCaches(): void {
-    for (const [name, cache] of this.instances.entries()) {
-      cache.destroy();
-    }
-    this.instances.clear();
-  }
-
-  static getCacheNames(): string[] {
-    return Array.from(this.instances.keys());
-  }
-}
-
-// Cache-aware wrapper for resource management
-export class CachedResourceManager implements ResourceManager {
-  private cache: SamplingCache;
-  private fallbackResourceManager: ResourceManager;
-  private logger: Logger;
-
-  constructor(logger: Logger, cacheConfig: Partial<CacheConfig> = {}) {
-    this.logger = logger;
-    this.cache = new SamplingCache(logger, cacheConfig);
-    
-    // Use Team Alpha's resource manager as fallback
-    const teamAlphaIntegration = getTeamAlphaIntegration(logger);
-    this.fallbackResourceManager = teamAlphaIntegration.getResourceManager();
-  }
-
-  async set(uri: string, content: unknown, ttl?: number): Promise<void> {
-    // Set in both cache and fallback storage
-    const cacheResult = await this.cache.set(uri, content, { ttl });
-    if (!cacheResult.success) {
-      this.logger.warn({ uri, error: cacheResult.error }, 'Cache set failed, using fallback');
-    }
-
-    // Always set in fallback for persistence
-    await this.fallbackResourceManager.set(uri, content, ttl);
-  }
-
-  async get(uri: string): Promise<unknown | null> {
-    // Try cache first
-    const cacheResult = await this.cache.get(uri);
-    if (cacheResult.success && cacheResult.data !== null) {
-      return cacheResult.data;
-    }
-
-    // Fallback to resource manager
-    const fallbackData = await this.fallbackResourceManager.get(uri);
-
-    // Populate cache for future requests
-    if (fallbackData !== null) {
-      await this.cache.set(uri, fallbackData);
-    }
-
-    return fallbackData;
-  }
-
-  async invalidate(pattern: string): Promise<void> {
-    await this.cache.invalidate(pattern);
-    await this.fallbackResourceManager.invalidate(pattern);
-  }
-
-  async clear(): Promise<void> {
-    await this.cache.clear();
-    await this.fallbackResourceManager.clear();
-  }
-
-  getStats(): CacheStats {
-    return this.cache.getStats();
-  }
-
-  destroy(): void {
-    this.cache.destroy();
-  }
-}
-
-// Utility functions
-export const createCachedResourceManager = (
+export const getSamplingCache = (
+  name: string,
   logger: Logger,
-  cacheConfig: Partial<CacheConfig> = {},
-): CachedResourceManager => {
-  return new CachedResourceManager(logger, cacheConfig);
+  config: Partial<CacheConfig> = {},
+): SamplingCache => {
+  if (cacheInstances.has(name)) {
+    return cacheInstances.get(name)!;
+  }
+
+  const cache = new SamplingCache(logger, config);
+  cacheInstances.set(name, cache);
+  logger.debug({ name }, 'Created sampling cache');
+  return cache;
 };
 
+export const destroyAllCaches = (): void => {
+  for (const cache of cacheInstances.values()) {
+    cache.destroy();
+  }
+  cacheInstances.clear();
+};
+
+// Direct resource management utility functions
 export const createSamplingCache = (
   logger: Logger,
   config: Partial<CacheConfig> = {},
@@ -495,9 +402,51 @@ export const createSamplingCache = (
   return new SamplingCache(logger, config);
 };
 
-// Type exports
-export type {
-  CacheEntry,
-  CacheStats,
-  CacheConfig,
+// Global cache instance for resource management
+let globalSamplingCache: SamplingCache | null = null;
+
+const getGlobalCache = (logger?: Logger): SamplingCache => {
+  if (!globalSamplingCache) {
+    if (!logger) {
+      throw new Error('Logger required for global cache initialization');
+    }
+    globalSamplingCache = new SamplingCache(logger);
+  }
+  return globalSamplingCache;
 };
+
+// Utility functions for simple resource management
+export const setResource = async (uri: string, content: unknown, ttl?: number, logger?: Logger): Promise<void> => {
+  const cache = getGlobalCache(logger);
+  const result = await cache.set(uri, content, ttl !== undefined ? { ttl } : {});
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+};
+
+export const getResource = async (uri: string, logger?: Logger): Promise<unknown> => {
+  const cache = getGlobalCache(logger);
+  const result = await cache.get(uri);
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  return result.value;
+};
+
+export const invalidatePattern = async (pattern: string, logger?: Logger): Promise<void> => {
+  const cache = getGlobalCache(logger);
+  const result = await cache.invalidate(pattern);
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+};
+
+export const clearAll = async (logger?: Logger): Promise<void> => {
+  const cache = getGlobalCache(logger);
+  const result = await cache.clear();
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+};
+
+// Type exports - already exported as interfaces above

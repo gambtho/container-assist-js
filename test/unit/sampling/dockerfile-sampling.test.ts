@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { DockerfileSamplingOrchestrator, createDockerfileSampler } from '../../../src/workflows/dockerfile-sampling.js';
-import { DockerfileContext } from '../../../src/workflows/sampling/dockerfile/generators.js';
+import { DockerfileSamplingOrchestrator, createDockerfileSampler, DockerfileContext } from '../../../src/workflows/dockerfile-sampling.js';
 import { createMockLogger } from '../../helpers/mock-logger.js';
 
 describe('DockerfileSamplingOrchestrator', () => {
@@ -9,9 +8,6 @@ describe('DockerfileSamplingOrchestrator', () => {
   let baseContext: DockerfileContext;
 
   beforeEach(() => {
-    // Enable mocks for testing
-    process.env.USE_MOCKS = 'true';
-    
     mockLogger = createMockLogger();
     orchestrator = new DockerfileSamplingOrchestrator(mockLogger);
     

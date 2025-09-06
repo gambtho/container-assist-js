@@ -26,14 +26,6 @@ export interface SessionConfig {
   cleanupInterval: number;
 }
 
-// Feature Flags - Frequently used (5 references)
-export interface FeatureFlags {
-  mockMode: boolean;
-  enableMetrics: boolean;
-  enableEvents: boolean;
-  enableDebugLogs: boolean;
-  nonInteractive: boolean;
-}
 
 // Docker Configuration - Essential for containerization
 export interface DockerConfig {
@@ -77,7 +69,6 @@ export interface McpConfig {
 export interface CoreConfig {
   server: ServerConfig;
   session: SessionConfig;
-  features: FeatureFlags;
   docker: DockerConfig;
   kubernetes: KubernetesConfig;
   workflow: WorkflowConfig;

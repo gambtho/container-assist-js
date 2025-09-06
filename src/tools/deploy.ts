@@ -113,7 +113,7 @@ export async function deployApplication(
 
     // Create lib instances
     const sessionManager = createSessionManager(logger);
-    const k8sClient = createKubernetesClient(null, logger);
+    const k8sClient = createKubernetesClient(logger);
 
     // Get session
     const session = await sessionManager.get(sessionId);
@@ -153,7 +153,10 @@ export async function deployApplication(
             metadata?: { name?: string; namespace?: string };
           };
           // In production, use actual K8s client to apply manifest
-          await k8sClient.apply(manifest);
+          const applyResult = await k8sClient.applyManifest(manifest, namespace);
+          if (!applyResult.ok) {
+            throw new Error(applyResult.error || 'Failed to apply manifest');
+          }
 
           deployedResources.push({
             kind: manifestObj.kind ?? 'unknown',
@@ -203,10 +206,10 @@ export async function deployApplication(
       const startTime = Date.now();
       while (Date.now() - startTime < timeout * 1000) {
         // Check deployment status
-        const status = await k8sClient.getDeploymentStatus(namespace, deploymentName);
-        if (status?.ready) {
+        const statusResult = await k8sClient.getDeploymentStatus(namespace, deploymentName);
+        if (statusResult.ok && statusResult.value.ready) {
           ready = true;
-          readyReplicas = status.readyReplicas || 0;
+          readyReplicas = statusResult.value.readyReplicas || 0;
           break;
         }
         // Wait a bit before checking again
@@ -311,14 +314,9 @@ export async function deployApplication(
 }
 
 /**
- * Factory function for creating deploy-application tool instances
+ * Deploy application tool instance
  */
-export function createDeployApplicationTool(logger: Logger): {
-  name: string;
-  execute: (config: DeployApplicationConfig) => Promise<Result<DeployApplicationResult>>;
-} {
-  return {
-    name: 'deploy',
-    execute: (config: DeployApplicationConfig) => deployApplication(config, logger),
-  };
-}
+export const deployApplicationTool = {
+  name: 'deploy',
+  execute: (config: DeployApplicationConfig, logger: Logger) => deployApplication(config, logger),
+};

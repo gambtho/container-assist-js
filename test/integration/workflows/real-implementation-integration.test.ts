@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 import { pino } from 'pino'
 import { WorkflowCoordinator } from '../../../src/workflows/orchestration/coordinator.js'
-import { createRealResourceManager, createRealProgressNotifier } from '../../../src/workflows/orchestration/real-implementations.js'
+import { createRealResourceManager, createRealProgressNotifier } from '../../../src/workflows/orchestration/production-dependencies.js'
 
 describe('Real Implementation Integration Tests', () => {
   let coordinator: WorkflowCoordinator

@@ -1,6 +1,6 @@
 /**
  * Load Testing and Concurrent Operations Tests
- * Team Gamma - Testing Infrastructure
+ * MCP Inspector Testing Infrastructure
  * Tests system behavior under concurrent load
  */
 
@@ -155,7 +155,6 @@ export const createLoadTestingTests = (testRunner: MCPTestRunner): TestCase[] =>
               }
             });
 
-            // Measure memory every few iterations
             if (i % 5 === 0) {
               global.gc?.();
               const currentMemory = process.memoryUsage().heapUsed;

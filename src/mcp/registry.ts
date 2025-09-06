@@ -1,8 +1,8 @@
 /**
  * MCP Tool Registry - Registers and manages all available tools and workflows
  *
- * This registry consolidates all 14 tools from src/tools/ and provides
- * a unified interface for the MCP server to access them.
+ * This registry manages all 14 tools from src/tools/ and provides
+ * an interface for the MCP server to access them.
  */
 
 import type { Logger } from 'pino';
@@ -11,18 +11,18 @@ import type { Result } from '../types/core/index';
 
 // Import tool creators from flat tools structure
 import { createAnalyzeRepoTool } from '../tools/analyze-repo';
-import { createBuildImageTool } from '../tools/build-image';
-import { createDeployApplicationTool } from '../tools/deploy';
+import { buildImageTool } from '../tools/build-image';
+import { deployApplicationTool } from '../tools/deploy';
 import { createFixDockerfileTool } from '../tools/fix-dockerfile';
 import { createGenerateDockerfileTool } from '../tools/generate-dockerfile';
-import { createGenerateK8sManifestsTool } from '../tools/generate-k8s-manifests';
+import { generateK8sManifestsTool } from '../tools/generate-k8s-manifests';
 import { createOpsTool } from '../tools/ops';
 import { createPrepareClusterTool } from '../tools/prepare-cluster';
 import { createPushTool } from '../tools/push';
 import { createResolveBaseImagesTool } from '../tools/resolve-base-images';
 import { createScanTool } from '../tools/scan';
 import { createTagTool } from '../tools/tag';
-import { createVerifyDeploymentTool } from '../tools/verify-deployment';
+import { verifyDeploymentTool } from '../tools/verify-deployment';
 import { createWorkflowTool } from '../tools/workflow';
 
 // Import workflows
@@ -244,18 +244,18 @@ class MCPToolRegistry implements ToolRegistry, WorkflowRegistry {
     // Create and register tools with full MCPTool interface
     const toolCreators = [
       createAnalyzeRepoTool,
-      createBuildImageTool,
-      createDeployApplicationTool,
+      () => buildImageTool, // Direct object, wrapped in function for compatibility
+      () => deployApplicationTool, // Direct object, wrapped in function for compatibility
       createFixDockerfileTool,
       createGenerateDockerfileTool,
-      createGenerateK8sManifestsTool,
+      () => generateK8sManifestsTool, // Direct object, wrapped in function for compatibility
       createOpsTool,
       createPrepareClusterTool,
       createPushTool,
       createResolveBaseImagesTool,
       createScanTool,
       createTagTool,
-      createVerifyDeploymentTool,
+      () => verifyDeploymentTool, // Direct object, wrapped in function for compatibility
       createWorkflowTool,
     ];
 
@@ -461,6 +461,11 @@ class MCPToolRegistry implements ToolRegistry, WorkflowRegistry {
  */
 let registryInstance: MCPToolRegistry | undefined;
 
+/**
+ * Get the singleton MCP tool registry instance
+ * @param logger - Optional logger for registry operations
+ * @returns The MCP tool registry instance
+ */
 export function getMCPRegistry(logger?: Logger): MCPToolRegistry {
   if (!registryInstance) {
     registryInstance = new MCPToolRegistry(logger);

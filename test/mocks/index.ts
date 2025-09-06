@@ -9,7 +9,7 @@
  * Usage:
  * - Use createMCPInfrastructure() for real implementations
  * - Use createMockMCPInfrastructure() for mocks/testing
- * - Environment variable USE_MOCKS=true switches to mocks automatically
+ * - Automatically uses mocks in test environment (NODE_ENV=test)
  */
 
 import pino from 'pino';
@@ -121,7 +121,13 @@ export function createMockMCPInfrastructure(preset: 'fast' | 'development' | 'mi
 }
 
 /**
- * Smart factory that uses real or mock implementations based on environment
+ * Smart factory that uses real or mock implementations based on explicit mode or environment
+ * 
+ * @param configOverrides - Optional configuration overrides for real implementations
+ * @param forceMode - Explicit mode selection: 'real' or 'mock'
+ *                   - 'real': Always use real implementations
+ *                   - 'mock': Always use mock implementations  
+ *                   - undefined: Auto-detect based on NODE_ENV (test = mocks, others = real)
  */
 export function createInfrastructure(
   configOverrides?: Partial<MCPConfig>,
@@ -131,9 +137,8 @@ export function createInfrastructure(
   resourceManager: ResourceManager | any;
   progressNotifier: ProgressNotifier | any;
 } {
-  // Determine whether to use mocks
+  // Determine whether to use mocks based on explicit mode or test environment
   const useMocks = forceMode === 'mock' || 
-                  (forceMode !== 'real' && process.env.USE_MOCKS === 'true') ||
                   (forceMode !== 'real' && process.env.NODE_ENV === 'test');
 
   if (useMocks) {

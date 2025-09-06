@@ -1,11 +1,10 @@
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../domain/types/result.js';
-import type { ResourceManager } from '../mcp/resources/types.js';
+import { Result, Success, Failure } from '../types/core.js';
+import type { McpResourceManager } from '../mcp/resources/manager.js';
 import type { ProgressNotifier } from '../mcp/events/types.js';
 
 /**
- * Shared utilities and helpers for all MCP teams
- * These utilities provide common functionality that all teams can use
+ * Shared utilities and helpers for MCP operations
  */
 
 /**
@@ -41,7 +40,7 @@ export class ResourceValidator {
 
       return Success(undefined);
     } catch (error) {
-      return Failure(`Invalid URI format: ${error.message}`);
+      return Failure(`Invalid URI format: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -69,7 +68,7 @@ export class ResourceValidator {
       JSON.stringify(content);
       return Success(undefined);
     } catch (error) {
-      return Failure(`Content is not JSON serializable: ${error.message}`);
+      return Failure(`Content is not JSON serializable: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
@@ -168,7 +167,7 @@ export class ErrorUtils {
   /**
    * Create a standardized error result
    */
-  static createError(message: string, code?: string, details?: Record<string, unknown>): Result<never> {
+  static createError(message: string, code?: string, _details?: Record<string, unknown>): Result<never> {
     const errorMessage = code ? `[${code}] ${message}` : message;
     return Failure(errorMessage);
   }
@@ -185,7 +184,7 @@ export class ErrorUtils {
       const result = await operation();
       return Success(result);
     } catch (error) {
-      const fullMessage = `${errorMessage}: ${error.message}`;
+      const fullMessage = `${errorMessage}: ${error instanceof Error ? error.message : String(error)}`;
       if (logger) {
         logger.error({ error, originalMessage: errorMessage }, 'Safe execution failed');
       }
@@ -226,7 +225,7 @@ export class ErrorUtils {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const result = await operation();
-        if (result.success) {
+        if (result.ok) {
           if (attempt > 1 && logger) {
             logger.info({ attempt, maxAttempts }, 'Operation succeeded after retry');
           }
@@ -257,7 +256,7 @@ export class ResourceUtils {
    * Publish content with automatic size validation
    */
   static async publishWithValidation(
-    resourceManager: ResourceManager,
+    resourceManager: McpResourceManager,
     uri: string,
     content: unknown,
     maxSize: number,
@@ -266,28 +265,28 @@ export class ResourceUtils {
   ): Promise<Result<string>> {
     // Validate URI
     const uriValidation = ResourceValidator.validateUri(uri);
-    if (!uriValidation.success) {
+    if (!uriValidation.ok) {
       return uriValidation;
     }
 
     // Validate size
     const sizeValidation = ResourceValidator.validateSize(content, maxSize);
-    if (!sizeValidation.success) {
+    if (!sizeValidation.ok) {
       return sizeValidation;
     }
 
     // Validate JSON serializable
     const serializableValidation = ResourceValidator.validateJsonSerializable(content);
-    if (!serializableValidation.success) {
+    if (!serializableValidation.ok) {
       return serializableValidation;
     }
 
     // Publish
     const result = await resourceManager.publish(uri, content, ttl);
-    if (result.success && logger) {
+    if (result.ok && logger) {
       logger.info({
         uri,
-        size: sizeValidation.data,
+        size: sizeValidation.value,
         ttl,
       }, 'Resource published with validation');
     }
@@ -299,18 +298,18 @@ export class ResourceUtils {
    * Read resource with error handling
    */
   static async safeRead(
-    resourceManager: ResourceManager,
+    resourceManager: McpResourceManager,
     uri: string,
     logger?: Logger,
   ): Promise<Result<unknown>> {
     try {
       const result = await resourceManager.read(uri);
 
-      if (!result.success) {
+      if (!result.ok) {
         return result;
       }
 
-      if (!result.data) {
+      if (!result.value) {
         return Failure(`Resource not found: ${uri}`);
       }
 
@@ -318,7 +317,7 @@ export class ResourceUtils {
         logger.debug({ uri }, 'Resource read successfully');
       }
 
-      return Success(result.data.content);
+      return Success(result.value.content);
     } catch (error) {
       const errorMessage = ErrorUtils.extractErrorMessage(error);
       if (logger) {
@@ -416,9 +415,9 @@ export class ConfigUtils {
     for (const key in override) {
       if (override[key] !== undefined) {
         if (typeof override[key] === 'object' && override[key] !== null && !Array.isArray(override[key])) {
-          result[key] = this.deepMerge(result[key] || {}, override[key]);
+          result[key] = this.deepMerge(result[key] || {} as any, override[key] as any) as T[Extract<keyof T, string>];
         } else {
-          result[key] = override[key];
+          result[key] = override[key] as T[Extract<keyof T, string>];
         }
       }
     }
@@ -473,7 +472,7 @@ export class ConfigUtils {
 }
 
 /**
- * Common utility functions used across all teams
+ * Common utility functions for MCP operations
  */
 export const SharedUtilities = {
   ResourceValidator,

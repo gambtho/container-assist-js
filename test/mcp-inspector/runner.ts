@@ -1,20 +1,28 @@
 #!/usr/bin/env tsx
 /**
  * MCP Inspector Test Suite Runner
- * Team Gamma - Testing Infrastructure
+ * MCP Inspector Testing Infrastructure
  */
 
 import { MCPTestRunner } from './infrastructure/test-runner.js';
 import { createBasicToolTests } from './suites/tool-validation/basic-tool-tests.js';
+import { createComprehensiveToolTests } from './suites/tool-validation/comprehensive-tool-tests.js';
+import { createErrorHandlingTests } from './suites/edge-cases/error-handling-tests.js';
 import { createSamplingValidationTests } from './suites/sampling-validation/sampling-tests.js';
 import { createResourceManagementTests } from './suites/resource-management/resource-tests.js';
 import { createLoadTestingTests } from './suites/load-testing/concurrent-tests.js';
+import { createIntegrationFlowTests } from './suites/integration-flows/workflow-tests.js';
+import { createOrchestratorEventTests } from './suites/orchestrator/event-flow-tests.js';
+import { createPhaseGateTests } from './suites/orchestrator/phase-gate-tests.js';
+import { createSamplingDecisionTests } from './suites/sampling/decision-tests.js';
+import { createArtifactTests } from './suites/resources/artifact-tests.js';
+import { createRemediationTests } from './suites/remediation/loop-tests.js';
 
 async function main() {
   console.log('🧪 MCP Inspector Test Suite - Team Gamma');
   console.log('==========================================\n');
 
-  const testRunner = new MCPTestRunner('./scripts/mcp-start-mock.sh');
+  const testRunner = new MCPTestRunner('./scripts/mcp-start.sh');
 
   try {
     console.log('🔌 Initializing MCP client connection...');
@@ -23,9 +31,17 @@ async function main() {
 
     // Register all test suites
     const basicTests = createBasicToolTests(testRunner);
+    const comprehensiveTests = createComprehensiveToolTests(testRunner);
+    const errorHandlingTests = createErrorHandlingTests(testRunner);
     const samplingTests = createSamplingValidationTests(testRunner);
     const resourceTests = createResourceManagementTests(testRunner);
     const loadTests = createLoadTestingTests(testRunner);
+    const integrationTests = createIntegrationFlowTests(testRunner);
+    const orchestratorEventTests = createOrchestratorEventTests(testRunner);
+    const phaseGateTests = createPhaseGateTests(testRunner);
+    const samplingDecisionTests = createSamplingDecisionTests(testRunner);
+    const artifactTests = createArtifactTests(testRunner);
+    const remediationTests = createRemediationTests(testRunner);
 
     // Register tests based on category filter
     const categoryArg = args.find(arg => arg.startsWith('--category='));
@@ -37,7 +53,10 @@ async function main() {
       console.log(`🎯 Filtering tests for category: ${category}\n`);
       switch (category) {
         case 'tool-validation':
-          testsToRegister = basicTests;
+          testsToRegister = [...basicTests, ...comprehensiveTests, ...errorHandlingTests];
+          break;
+        case 'edge-cases':
+          testsToRegister = errorHandlingTests;
           break;
         case 'sampling-validation':
           testsToRegister = samplingTests;
@@ -48,12 +67,24 @@ async function main() {
         case 'load-testing':
           testsToRegister = loadTests;
           break;
+        case 'integration-flows':
+          testsToRegister = integrationTests;
+          break;
+        case 'orchestrator':
+          testsToRegister = [...orchestratorEventTests, ...phaseGateTests];
+          break;
+        case 'gates':
+          testsToRegister = phaseGateTests;
+          break;
+        case 'remediation':
+          testsToRegister = remediationTests;
+          break;
         default:
           console.log(`❌ Unknown category: ${category}`);
           process.exit(1);
       }
     } else {
-      testsToRegister = [...basicTests, ...samplingTests, ...resourceTests, ...loadTests];
+      testsToRegister = [...basicTests, ...comprehensiveTests, ...errorHandlingTests, ...samplingTests, ...resourceTests, ...loadTests, ...integrationTests, ...orchestratorEventTests, ...phaseGateTests, ...samplingDecisionTests, ...artifactTests, ...remediationTests];
     }
 
     testsToRegister.forEach(test => testRunner.register(test));
@@ -111,11 +142,15 @@ Options:
   --parallel           Run tests in parallel (for load testing)
 
 Categories:
-  - tool-validation     Basic tool functionality tests
-  - sampling-validation Sampling algorithm tests (Team Beta integration)
-  - resource-management Resource system tests (Team Alpha integration)
+  - tool-validation     Basic tool functionality tests (includes edge cases)
+  - edge-cases          Error handling and edge case tests
+  - sampling-validation Sampling algorithm tests
+  - resource-management Resource system tests
   - load-testing        Concurrent operation tests
-  - integration-flows   End-to-end workflow tests (future)
+  - integration-flows   End-to-end workflow tests
+  - orchestrator        Orchestrator event and phase tests
+  - gates               Phase gate validation tests
+  - remediation         Remediation loop and healing tests
 
 Examples:
   tsx test/mcp-inspector/runner.ts

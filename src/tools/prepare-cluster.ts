@@ -156,7 +156,7 @@ export async function prepareCluster(
 
     // Create lib instances
     const sessionManager = createSessionManager(logger);
-    const k8sClient = createKubernetesClient(null, logger);
+    const k8sClient = createKubernetesClient(logger);
 
     // Get session
     const session = await sessionManager.get(sessionId);
@@ -212,18 +212,13 @@ export async function prepareCluster(
     const clusterReady = checks.connectivity && checks.permissions && checks.namespaceExists;
 
     // Update session with cluster preparation status
+    const sessionState = session;
     const updatedWorkflowState: WorkflowState = {
-      ...session.workflow_state,
-      cluster_result: {
-        cluster_name: cluster,
-        context: cluster,
-        kubernetes_version: '1.28',
-        namespaces_created: checks.namespaceExists ? [] : [namespace],
-      },
-      completed_steps: [...(session.workflow_state?.completed_steps || []), 'prepare-cluster'],
-      errors: session.workflow_state?.errors || {},
+      ...sessionState,
+      completed_steps: [...(sessionState.completed_steps || []), 'prepare-cluster'],
+      errors: sessionState.errors || {},
       metadata: {
-        ...(session.workflow_state?.metadata || {}),
+        ...(sessionState.metadata || {}),
         cluster_preparation: {
           cluster,
           namespace,
@@ -231,12 +226,16 @@ export async function prepareCluster(
           checks,
           warnings,
         },
+        cluster_result: {
+          cluster_name: cluster,
+          context: cluster,
+          kubernetes_version: '1.28',
+          namespaces_created: checks.namespaceExists ? [] : [namespace],
+        },
       },
     };
 
-    await sessionManager.update(sessionId, {
-      workflow_state: updatedWorkflowState,
-    });
+    await sessionManager.update(sessionId, updatedWorkflowState);
 
     timer.end({ clusterReady });
     logger.info({ clusterReady, checks }, 'Cluster preparation completed');

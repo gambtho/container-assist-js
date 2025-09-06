@@ -436,7 +436,6 @@ describe('Week 5: Comprehensive Integration Testing', () => {
         // Service operations
         await components.services.toolRegistry.execute('ping', { message: `memory-${i}` });
         
-        // Periodically check memory (every 100 iterations)
         if (i % 100 === 99) {
           const currentMemory = process.memoryUsage();
           const memoryGrowth = (currentMemory.heapUsed - initialMemory.heapUsed) / (1024 * 1024);

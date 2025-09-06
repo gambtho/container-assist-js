@@ -269,7 +269,6 @@ describe('WorkflowCoordinator Integration Tests', () => {
       
       const artifacts = result.value.finalArtifacts
       
-      // Should have artifacts from various stages
       const artifactNames = Object.keys(artifacts)
       expect(artifactNames.length).toBeGreaterThan(0)
       
@@ -297,18 +296,15 @@ describe('WorkflowCoordinator Integration Tests', () => {
       expect(metrics.totalDuration).toBeGreaterThan(0)
       expect(metrics.stageDurations).toBeDefined()
       
-      // Should have timing for each completed stage
       const stageDurations = metrics.stageDurations
       const stages = Object.keys(stageDurations)
       
       expect(stages.length).toBeGreaterThan(0)
       
-      // All stage durations should be positive
       stages.forEach(stage => {
         expect(stageDurations[stage as WorkflowStage]).toBeGreaterThan(0)
       })
       
-      // Total duration should be at least the sum of stage durations
       const stageSum = Object.values(stageDurations).reduce((sum, duration) => sum + duration, 0)
       expect(metrics.totalDuration).toBeGreaterThanOrEqual(stageSum)
     }, 25000)

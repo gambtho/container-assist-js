@@ -7,11 +7,21 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from 'pino';
 import { createLogger } from '../lib/logger';
 import { createSessionManager } from '../lib/session';
 import { getMCPRegistry } from './registry';
+import { McpResourceManager } from './resources/manager.js';
+import { EnhancedResourceManager } from './resources/enhanced-resource-manager.js';
+import { PromptTemplatesManager } from '../application/tools/enhanced/prompt-templates.js';
 // Workflows are registered via the registry
 // Workflows are now registered via the registry
 import type { MCPServer as IMCPServer, MCPServerOptions, MCPRequest, MCPResponse } from './types';
@@ -27,12 +37,28 @@ export class ContainerizationMCPServer implements IMCPServer {
   private logger: Logger;
   private registry: ReturnType<typeof getMCPRegistry>;
   private _sessionManager: ReturnType<typeof createSessionManager>; // For future session-aware tool execution
+  private resourceManager: EnhancedResourceManager;
+  private promptTemplates: PromptTemplatesManager;
   private isRunning: boolean = false;
 
   constructor(logger?: Logger, options: MCPServerOptions = {}) {
     this.logger = logger ?? createLogger({ name: 'mcp-server' });
     this.registry = getMCPRegistry(this.logger);
     this._sessionManager = createSessionManager(this.logger);
+
+    // Initialize resource management
+    const baseResourceManager = new McpResourceManager(
+      {
+        defaultTtl: 300000, // 5 minutes
+        maxResourceSize: 10 * 1024 * 1024, // 10MB
+        cacheConfig: { defaultTtl: 300000 },
+      },
+      this.logger,
+    );
+    this.resourceManager = new EnhancedResourceManager(baseResourceManager, this.logger);
+
+    // Initialize prompt templates
+    this.promptTemplates = new PromptTemplatesManager(this.logger);
 
     // Initialize MCP server
     this.server = new Server(
@@ -43,6 +69,12 @@ export class ContainerizationMCPServer implements IMCPServer {
       {
         capabilities: options.capabilities ?? {
           tools: {
+            listChanged: true,
+          },
+          resources: {
+            listChanged: true,
+          },
+          prompts: {
             listChanged: true,
           },
         },
@@ -204,6 +236,111 @@ export class ContainerizationMCPServer implements IMCPServer {
       }
     });
 
+    // Handle resource listing requests
+    this.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+      this.logger.debug('Received resources/list request');
+
+      try {
+        const category = request.params?.cursor as any; // Optional category filter
+        const listResult = await this.resourceManager.listResources(category);
+
+        if (!listResult.ok) {
+          this.logger.error({ error: listResult.error }, 'Failed to list resources');
+          return {
+            resources: [],
+            nextCursor: undefined,
+          };
+        }
+
+        this.logger.info({ count: listResult.value.resources.length }, 'Returning resource list');
+        return listResult.value;
+      } catch (error) {
+        this.logger.error({ error }, 'Resource listing failed');
+        return {
+          resources: [],
+          nextCursor: undefined,
+        };
+      }
+    });
+
+    // Handle resource reading requests
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const { uri } = request.params;
+      this.logger.info({ uri }, 'Received resource read request');
+
+      try {
+        const readResult = await this.resourceManager.readResource(uri);
+
+        if (!readResult.ok) {
+          this.logger.error({ uri, error: readResult.error }, 'Failed to read resource');
+          throw new Error(readResult.error);
+        }
+
+        this.logger.debug({ uri, contentCount: readResult.value.contents.length }, 'Resource read successful');
+        return readResult.value;
+      } catch (error) {
+        this.logger.error({ uri, error }, 'Resource reading failed');
+        throw error;
+      }
+    });
+
+    // Handle prompt listing requests
+    this.server.setRequestHandler(ListPromptsRequestSchema, async (request) => {
+      this.logger.debug('Received prompts/list request');
+
+      try {
+        const category = request.params?.cursor as string; // Optional category filter
+        const listResult = await this.promptTemplates.listPrompts(category);
+
+        if (!listResult.ok) {
+          this.logger.error({ error: listResult.error }, 'Failed to list prompts');
+          return {
+            prompts: [],
+            nextCursor: undefined,
+          };
+        }
+
+        this.logger.info({ count: listResult.value.prompts.length }, 'Returning prompt list');
+        return listResult.value;
+      } catch (error) {
+        this.logger.error({ error }, 'Prompt listing failed');
+        return {
+          prompts: [],
+          nextCursor: undefined,
+        };
+      }
+    });
+
+    // Handle prompt get requests
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const { name, arguments: promptArgs = {} } = request.params;
+      this.logger.info({ name, args: promptArgs }, 'Received prompt get request');
+
+      try {
+        // Extract context from arguments if provided
+        const context = promptArgs && Object.keys(promptArgs).length > 0 ? {
+          repositoryPath: promptArgs.repositoryPath as string,
+          language: promptArgs.language as string,
+          framework: promptArgs.framework as string,
+          securityLevel: promptArgs.securityLevel as 'basic' | 'enhanced' | 'strict',
+          environment: promptArgs.environment as 'development' | 'staging' | 'production',
+        } : undefined;
+
+        const getResult = await this.promptTemplates.getPrompt(name, context);
+
+        if (!getResult.ok) {
+          this.logger.error({ name, error: getResult.error }, 'Failed to get prompt');
+          throw new Error(getResult.error);
+        }
+
+        this.logger.debug({ name, argumentCount: Array.isArray(getResult.value.arguments) ? getResult.value.arguments.length : 0 }, 'Prompt retrieved');
+        return getResult.value;
+      } catch (error) {
+        this.logger.error({ name, error }, 'Prompt get failed');
+        throw error;
+      }
+    });
+
     this.logger.info('MCP request handlers configured');
   }
 
@@ -268,7 +405,7 @@ export class ContainerizationMCPServer implements IMCPServer {
     this.logger.debug({ request }, 'Handling raw MCP request');
 
     try {
-      // This is a simplified handler for testing
+      // This is a basic handler for testing
       // The actual MCP protocol handling is done by the SDK
 
       if (request.method === 'tools/list') {
@@ -335,12 +472,30 @@ export class ContainerizationMCPServer implements IMCPServer {
   /**
    * Get server status
    */
-  getStatus(): { running: boolean; tools: number; workflows: number } {
+  getStatus(): { running: boolean; tools: number; workflows: number; resources: number; prompts: number } {
     const stats = this.registry.getStats();
+    const resourceStats = this.resourceManager.getStats();
+    const promptStats = this.promptTemplates.getStats();
     return {
       running: this.isRunning,
       tools: stats.tools,
       workflows: stats.workflows,
+      resources: resourceStats.total,
+      prompts: promptStats.total,
     };
+  }
+
+  /**
+   * Get the enhanced resource manager
+   */
+  getResourceManager(): EnhancedResourceManager {
+    return this.resourceManager;
+  }
+
+  /**
+   * Get the prompt templates manager
+   */
+  getPromptTemplatesManager(): PromptTemplatesManager {
+    return this.promptTemplates;
   }
 }

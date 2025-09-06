@@ -88,6 +88,15 @@ export default {
     // Helper imports
     '^\\.\/helper\\.js$': './helper.ts',
     '^\\.\\.\/helper\\.js$': '../helper.ts',
+    
+    // MCP resources - map .js imports to .ts files (specific patterns)
+    '^\\.\\.\/\\.\\.\/src\/mcp\/resources\/(.*)\\.js$': '<rootDir>/src/mcp/resources/$1.ts',
+    '^\\.\\.\/\\.\\.\/src\/mcp\/events\/(.*)\\.js$': '<rootDir>/src/mcp/events/$1.ts',
+    '^\\.\\.\/\\.\\.\/\\.\\.\/src\/workflows\/(.*)\\.js$': '<rootDir>/src/workflows/$1.ts',
+    '^\\.\\.\/\\.\\.\/types\/core\\.js$': '<rootDir>/src/types/core.ts',
+    '^\\.\/types\\.js$': '<rootDir>/src/mcp/resources/types.ts',
+    '^\\.\/uri-schemes\\.js$': '<rootDir>/src/mcp/resources/uri-schemes.ts',
+    '^\\.\/cache\\.js$': '<rootDir>/src/mcp/resources/cache.ts',
   },
   roots: ['<rootDir>/src', '<rootDir>/test'],
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],

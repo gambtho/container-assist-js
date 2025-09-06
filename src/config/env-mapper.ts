@@ -50,13 +50,6 @@ export function mapEnvironmentToConfig(): Partial<CoreConfig> {
         : 300000,
     },
 
-    features: {
-      mockMode: process.env.MOCK_MODE?.toLowerCase() === 'true',
-      enableMetrics: process.env.ENABLE_METRICS !== 'false', // default true
-      enableEvents: process.env.ENABLE_EVENTS !== 'false', // default true
-      enableDebugLogs: process.env.ENABLE_DEBUG_LOGS === 'true',
-      nonInteractive: process.env.NON_INTERACTIVE === 'true',
-    },
 
     docker: {
       socketPath: process.env.DOCKER_HOST ?? '/var/run/docker.sock',

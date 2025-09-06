@@ -39,7 +39,7 @@ export async function tagImage(
 
     // Create lib instances
     const sessionManager = createSessionManager(logger);
-    const dockerClient = createDockerClient(null, null, logger);
+    const dockerClient = createDockerClient(logger);
 
     // Get session using lib session manager
     const session = await sessionManager.get(sessionId);
@@ -47,7 +47,8 @@ export async function tagImage(
       return Failure('Session not found');
     }
 
-    const buildResult = session.workflow_state?.build_result;
+    const sessionState = session;
+    const buildResult = sessionState.build_result;
 
     if (!buildResult?.imageId) {
       return Failure('No built image found in session - run build_image first');
@@ -56,8 +57,17 @@ export async function tagImage(
     const source = buildResult.imageId;
 
     // Tag image using lib docker client
-    const tagResult = await dockerClient.tagImage(source, tag);
-    if (!tagResult.success) {
+    // Parse repository and tag from the tag parameter
+    const parts = tag.split(':');
+    const repository = parts[0];
+    const tagName = parts[1] || 'latest';
+
+    if (!repository) {
+      return Failure('Invalid tag format');
+    }
+
+    const tagResult = await dockerClient.tagImage(source, repository, tagName);
+    if (!tagResult.ok) {
       return Failure(`Failed to tag image: ${tagResult.error ?? 'Unknown error'}`);
     }
 

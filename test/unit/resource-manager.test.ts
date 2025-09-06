@@ -37,8 +37,8 @@ describe('McpResourceManager', () => {
 
       const result = await resourceManager.publish(uri, content);
 
-      expect(result.success).toBe(true);
-      expect(result.data).toBe(uri);
+      expect(result.ok).toBe(true);
+      expect(result.value).toBe(uri);
     });
 
     it('should reject invalid URI format', async () => {
@@ -47,7 +47,7 @@ describe('McpResourceManager', () => {
 
       const result = await resourceManager.publish(uri, content);
 
-      expect(result.success).toBe(false);
+      expect(result.ok).toBe(false);
       expect(result.error).toContain('Invalid URI');
     });
 
@@ -57,7 +57,7 @@ describe('McpResourceManager', () => {
 
       const result = await resourceManager.publish(uri, content);
 
-      expect(result.success).toBe(false);
+      expect(result.ok).toBe(false);
       expect(result.error).toContain('Resource too large');
     });
 
@@ -88,10 +88,10 @@ describe('McpResourceManager', () => {
       await resourceManager.publish(uri, content);
       const result = await resourceManager.read(uri);
 
-      expect(result.success).toBe(true);
-      expect(result.data).toBeDefined();
-      expect(result.data!.content).toEqual(content);
-      expect(result.data!.uri).toBe(uri);
+      expect(result.ok).toBe(true);
+      expect(result.value).toBeDefined();
+      expect(result.value!.content).toEqual(content);
+      expect(result.value!.uri).toBe(uri);
     });
 
     it('should return null for non-existent resource', async () => {
@@ -99,8 +99,8 @@ describe('McpResourceManager', () => {
 
       const result = await resourceManager.read(uri);
 
-      expect(result.success).toBe(true);
-      expect(result.data).toBeNull();
+      expect(result.ok).toBe(true);
+      expect(result.value).toBeNull();
     });
 
     it('should handle expired resources', async () => {
@@ -115,8 +115,8 @@ describe('McpResourceManager', () => {
 
       const result = await resourceManager.read(uri);
 
-      expect(result.success).toBe(true);
-      expect(result.data).toBeNull();
+      expect(result.ok).toBe(true);
+      expect(result.value).toBeNull();
     });
   });
 
@@ -128,12 +128,12 @@ describe('McpResourceManager', () => {
       await resourceManager.publish(uri, content);
       const result = await resourceManager.getMetadata(uri);
 
-      expect(result.success).toBe(true);
-      expect(result.data).toBeDefined();
-      expect(result.data!.uri).toBe(uri);
-      expect(result.data!.mimeType).toBe('application/json');
-      expect(result.data!.createdAt).toBeInstanceOf(Date);
-      expect('content' in result.data!).toBe(false);
+      expect(result.ok).toBe(true);
+      expect(result.value).toBeDefined();
+      expect(result.value!.uri).toBe(uri);
+      expect(result.value!.mimeType).toBe('application/json');
+      expect(result.value!.createdAt).toBeInstanceOf(Date);
+      expect('content' in result.value!).toBe(false);
     });
   });
 
@@ -149,7 +149,7 @@ describe('McpResourceManager', () => {
       await new Promise(resolve => setTimeout(resolve, 50));
 
       const cleanupResult = await resourceManager.cleanup();
-      expect(cleanupResult.success).toBe(true);
+      expect(cleanupResult.ok).toBe(true);
 
       // Check that expired resource is gone
       const read1 = await resourceManager.read(uri1);
@@ -168,18 +168,18 @@ describe('UriParser', () => {
       const uri = 'mcp://path/to/resource?param=value#fragment';
       const result = UriParser.parse(uri);
 
-      expect(result.success).toBe(true);
-      expect(result.data!.scheme).toBe('mcp');
-      expect(result.data!.path).toBe('/path/to/resource');
-      expect(result.data!.query).toEqual({ param: 'value' });
-      expect(result.data!.fragment).toBe('fragment');
+      expect(result.ok).toBe(true);
+      expect(result.value!.scheme).toBe('mcp');
+      expect(result.value!.path).toBe('/path/to/resource');
+      expect(result.value!.query).toEqual({ param: 'value' });
+      expect(result.value!.fragment).toBe('fragment');
     });
 
     it('should reject invalid schemes', () => {
       const uri = 'http://invalid/scheme';
       const result = UriParser.parse(uri);
 
-      expect(result.success).toBe(false);
+      expect(result.ok).toBe(false);
       expect(result.error).toContain('Invalid URI scheme');
     });
 
@@ -187,11 +187,11 @@ describe('UriParser', () => {
       const uri = 'cache://simple/path';
       const result = UriParser.parse(uri);
 
-      expect(result.success).toBe(true);
-      expect(result.data!.scheme).toBe('cache');
-      expect(result.data!.path).toBe('/simple/path');
-      expect(result.data!.query).toBeUndefined();
-      expect(result.data!.fragment).toBeUndefined();
+      expect(result.ok).toBe(true);
+      expect(result.value!.scheme).toBe('cache');
+      expect(result.value!.path).toBe('/simple/path');
+      expect(result.value!.query).toBeUndefined();
+      expect(result.value!.fragment).toBeUndefined();
     });
   });
 

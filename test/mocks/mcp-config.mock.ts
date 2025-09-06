@@ -282,9 +282,8 @@ export const getTeamAlphaConfig = (): MCPConfig => createMockConfig('development
 });
 
 export const getTeamBetaConfig = (): MCPConfig => createMockConfig('development', {
-  // Focus on sampling
   sampling: { maxCandidates: 7, defaultCandidates: 4 },
-  resources: { cacheTTL: 300000 }, // Shorter cache for rapid iteration
+  resources: { cacheTTL: 300000 },
 });
 
 export const getTeamGammaConfig = (): MCPConfig => createMockConfig('development', {

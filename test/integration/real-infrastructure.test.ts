@@ -39,46 +39,29 @@ describe('Real MCP Infrastructure Integration', () => {
   });
 
   describe('createInfrastructure with environment detection', () => {
-    it('should use real implementations by default', () => {
-      // Save original env
-      const originalEnv = process.env.USE_MOCKS;
+    it('should use real implementations when explicitly requested', () => {
+      const infra = createInfrastructure(undefined, 'real');
       
-      try {
-        delete process.env.USE_MOCKS;
-        
-        const infra = createInfrastructure();
-        
-        // Should be real implementations
-        expect(infra.resourceManager.constructor.name).toBe('McpResourceManager');
-        expect(infra.progressNotifier.constructor.name).toBe('McpProgressNotifier');
-      } finally {
-        // Restore env
-        if (originalEnv !== undefined) {
-          process.env.USE_MOCKS = originalEnv;
-        }
-      }
+      // Should be real implementations
+      expect(infra.resourceManager.constructor.name).toBe('McpResourceManager');
+      expect(infra.progressNotifier.constructor.name).toBe('McpProgressNotifier');
     });
 
-    it('should use mocks when USE_MOCKS=true', () => {
-      // Save original env
-      const originalEnv = process.env.USE_MOCKS;
+    it('should use mocks when explicitly requested', () => {
+      const infra = createInfrastructure(undefined, 'mock');
       
-      try {
-        process.env.USE_MOCKS = 'true';
-        
-        const infra = createInfrastructure();
-        
-        // Should be mock implementations
-        expect(infra.resourceManager.constructor.name).toBe('MockResourceManager');
-        expect(infra.progressNotifier.constructor.name).toBe('MockProgressNotifier');
-      } finally {
-        // Restore env
-        if (originalEnv !== undefined) {
-          process.env.USE_MOCKS = originalEnv;
-        } else {
-          delete process.env.USE_MOCKS;
-        }
-      }
+      // Should be mock implementations
+      expect(infra.resourceManager.constructor.name).toBe('MockResourceManager');
+      expect(infra.progressNotifier.constructor.name).toBe('MockProgressNotifier');
+    });
+
+    it('should use mocks in test environment by default', () => {
+      // In test environment (NODE_ENV=test), should automatically use mocks
+      const infra = createInfrastructure();
+      
+      // Should be mock implementations since we're in test environment
+      expect(infra.resourceManager.constructor.name).toBe('MockResourceManager');
+      expect(infra.progressNotifier.constructor.name).toBe('MockProgressNotifier');
     });
 
     it('should respect forceMode parameter', () => {

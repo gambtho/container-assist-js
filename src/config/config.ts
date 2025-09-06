@@ -1,8 +1,5 @@
 /**
- * Simplified Configuration System
- *
- * Uses the new split configuration approach with core + advanced configs.
- * Much simpler and more maintainable than the previous approach.
+ * Application configuration with environment overrides
  */
 
 import type { ApplicationConfig } from './types';
@@ -10,11 +7,10 @@ import { mapEnvironmentToConfig } from './env-mapper';
 
 /**
  * Create default configuration with sensible defaults
- * Uses the new core + advanced structure
+ * @returns ApplicationConfig with default values for all sections
  */
 function createDefaultConfig(): ApplicationConfig {
   return {
-    // Core configuration (always present)
     server: {
       nodeEnv: 'development',
       logLevel: 'info',
@@ -28,13 +24,6 @@ function createDefaultConfig(): ApplicationConfig {
       persistencePath: './data/sessions.db',
       persistenceInterval: 60000, // 1min
       cleanupInterval: 300000, // 5min
-    },
-    features: {
-      mockMode: false,
-      enableMetrics: true,
-      enableEvents: true,
-      enableDebugLogs: false,
-      nonInteractive: false,
     },
     docker: {
       socketPath: '/var/run/docker.sock',
@@ -60,7 +49,6 @@ function createDefaultConfig(): ApplicationConfig {
       parallelSteps: false,
     },
 
-    // Advanced configuration (optional - only add when needed)
     mcp: {
       storePath: './data/sessions.db',
       sessionTTL: '24h',
@@ -87,6 +75,7 @@ function createDefaultConfig(): ApplicationConfig {
 
 /**
  * Create configuration with environment overrides
+ * @returns ApplicationConfig with environment variable overrides applied
  */
 export function createConfiguration(): ApplicationConfig {
   // Start with defaults
@@ -99,10 +88,8 @@ export function createConfiguration(): ApplicationConfig {
   return {
     ...defaults,
     ...envOverrides,
-    // Deep merge for nested objects
     server: { ...defaults.server, ...envOverrides.server },
     session: { ...defaults.session, ...envOverrides.session },
-    features: { ...defaults.features, ...envOverrides.features },
     docker: { ...defaults.docker, ...envOverrides.docker },
     kubernetes: { ...defaults.kubernetes, ...envOverrides.kubernetes },
     workflow: { ...defaults.workflow, ...envOverrides.workflow },
@@ -112,6 +99,8 @@ export function createConfiguration(): ApplicationConfig {
 
 /**
  * Create configuration for specific environment
+ * @param nodeEnv - Target environment
+ * @returns ApplicationConfig optimized for the specified environment
  */
 export function createConfigurationForEnv(
   nodeEnv: 'development' | 'production' | 'test',
@@ -119,22 +108,15 @@ export function createConfigurationForEnv(
   const config = createConfiguration();
   config.server.nodeEnv = nodeEnv;
 
-  // Apply environment-specific settings
   switch (nodeEnv) {
     case 'development':
       config.server.logLevel = 'debug';
-      config.features.enableDebugLogs = true;
-      config.features.mockMode = true;
       break;
     case 'production':
       config.server.logLevel = 'info';
-      config.features.enableDebugLogs = false;
-      config.features.enableMetrics = true;
       break;
     case 'test':
       config.server.logLevel = 'error';
-      config.features.mockMode = true;
-      config.features.enableEvents = false;
       config.session.store = 'memory';
       break;
   }
@@ -144,13 +126,14 @@ export function createConfigurationForEnv(
 
 /**
  * Get configuration summary for logging
+ * @param config - Application configuration
+ * @returns Summary object with key configuration values
  */
 export function getConfigurationSummary(config: ApplicationConfig): Record<string, unknown> {
   return {
     nodeEnv: config.server.nodeEnv,
     logLevel: config.server.logLevel,
     workflowMode: config.workflow.mode,
-    mockMode: config.features.mockMode,
     maxSessions: config.session.maxSessions,
     dockerRegistry: config.docker.registry,
   };

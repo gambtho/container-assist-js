@@ -75,6 +75,7 @@ export interface ScoringCriteria {
   bestPractices: number;
   maintenance: number;
   performance: number;
+  [key: string]: number; // Allow index signature for compatibility
 }
 
 export const DEFAULT_SCORING_WEIGHTS: ScoringCriteria = {

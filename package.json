@@ -73,7 +73,12 @@
     "test:mcp:resources": "tsx test/mcp-inspector/runner.ts --category=resource-management",
     "test:mcp:load": "tsx test/mcp-inspector/runner.ts --category=load-testing",
     "test:mcp:performance": "tsx test/mcp-inspector/runner.ts --category=load-testing",
-    "test:mcp:integration": "echo 'Integration tests not yet implemented'",
+    "test:mcp:edge-cases": "tsx test/mcp-inspector/runner.ts --category=edge-cases",
+    "test:mcp:integration": "tsx test/mcp-inspector/runner.ts --category=integration-flows",
+    "test:mcp:orchestrator": "tsx test/mcp-inspector/runner.ts --category=orchestrator",
+    "test:mcp:gates": "tsx test/mcp-inspector/runner.ts --category=gates",
+    "test:mcp:remediation": "tsx test/mcp-inspector/runner.ts --category=remediation",
+    "test:mcp:all": "npm run test:mcp",
     "test:mcp:watch": "tsx watch test/mcp-inspector/runner.ts"
   },
   "dependencies": {

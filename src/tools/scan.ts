@@ -49,7 +49,7 @@ export async function scanImage(
 
     // Create lib instances
     const sessionManager = createSessionManager(logger);
-    const securityScanner = createSecurityScanner(null, { scanner }, logger);
+    const securityScanner = createSecurityScanner(logger, scanner);
 
     // Get session using lib session manager
     const session = await sessionManager.get(sessionId);
@@ -71,10 +71,41 @@ export async function scanImage(
     logger.info({ imageId, scanner }, 'Scanning image for vulnerabilities');
 
     // Scan image using security scanner
-    const scanResult: DockerScanResult = await securityScanner.scanImage(imageId, {
-      scanner,
-      severityThreshold: severityThreshold.toUpperCase() as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
-    });
+    const scanResultWrapper = await securityScanner.scanImage(imageId);
+
+    if (!scanResultWrapper.ok) {
+      return Failure(`Scan failed: ${scanResultWrapper.error || 'Unknown error'}`);
+    }
+
+    const scanResult = scanResultWrapper.value;
+
+    // Convert ScanResult to DockerScanResult
+    const dockerScanResult: DockerScanResult = {
+      vulnerabilities: scanResult.vulnerabilities.map(v => {
+        const vuln: any = {
+          id: v.id,
+          severity: v.severity as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
+          package: v.package,
+          version: v.version,
+          description: v.description,
+        };
+        if (v.fixedVersion) {
+          vuln.fixedVersion = v.fixedVersion;
+        }
+        return vuln;
+      }),
+      summary: {
+        critical: scanResult.criticalCount,
+        high: scanResult.highCount,
+        medium: scanResult.mediumCount,
+        low: scanResult.lowCount,
+        total: scanResult.totalVulnerabilities,
+      },
+      scanTime: scanResult.scanDate.toISOString(),
+      metadata: {
+        image: scanResult.imageId,
+      },
+    };
 
     // Determine if scan passed based on threshold
     const thresholdMap = {
@@ -88,8 +119,15 @@ export async function scanImage(
     let vulnerabilityCount = 0;
 
     for (const severity of failingSeverities) {
-      vulnerabilityCount +=
-        (scanResult.summary as Record<string, number> | null | undefined)?.[severity] ?? 0;
+      if (severity === 'critical') {
+        vulnerabilityCount += scanResult.criticalCount;
+      } else if (severity === 'high') {
+        vulnerabilityCount += scanResult.highCount;
+      } else if (severity === 'medium') {
+        vulnerabilityCount += scanResult.mediumCount;
+      } else if (severity === 'low') {
+        vulnerabilityCount += scanResult.lowCount;
+      }
     }
 
     const passed = vulnerabilityCount === 0;
@@ -99,23 +137,19 @@ export async function scanImage(
     const updatedWorkflowState = updateWorkflowState(currentState, {
       scan_result: {
         success: passed,
-        vulnerabilities: scanResult.vulnerabilities?.map((v) => ({
-          id: (v as { id?: string; cve?: string }).id ?? (v as { cve?: string }).cve ?? 'unknown',
-          severity: ((v as { severity?: string }).severity ?? 'LOW') as
-            | 'LOW'
-            | 'MEDIUM'
-            | 'HIGH'
-            | 'CRITICAL',
-          package: (v as { package?: string }).package ?? 'unknown',
-          version: (v as { version?: string }).version ?? 'unknown',
-          description: (v as { description?: string }).description ?? '',
-          fixedVersion: (v as { fixedVersion?: string }).fixedVersion,
+        vulnerabilities: dockerScanResult.vulnerabilities?.map((v) => ({
+          id: v.id ?? 'unknown',
+          severity: v.severity as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
+          package: v.package ?? 'unknown',
+          version: v.version ?? 'unknown',
+          description: v.description ?? '',
+          ...(v.fixedVersion && { fixedVersion: v.fixedVersion }),
         })),
-        summary: scanResult.summary,
+        summary: dockerScanResult.summary,
       },
       metadata: {
         ...currentState?.metadata,
-        scanTime: scanResult.scanTime ?? new Date().toISOString(),
+        scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
         scanner,
         scanPassed: passed,
       },
@@ -127,16 +161,16 @@ export async function scanImage(
     });
 
     timer.end({
-      vulnerabilities: scanResult.summary?.total ?? 0,
-      critical: scanResult.summary?.critical ?? 0,
-      high: scanResult.summary?.high ?? 0,
+      vulnerabilities: scanResult.totalVulnerabilities,
+      critical: scanResult.criticalCount,
+      high: scanResult.highCount,
       passed,
     });
 
     logger.info(
       {
         imageId,
-        vulnerabilities: scanResult.summary,
+        vulnerabilities: scanResult.totalVulnerabilities,
         passed,
       },
       'Image scan completed',
@@ -146,14 +180,14 @@ export async function scanImage(
       success: true,
       sessionId,
       vulnerabilities: {
-        critical: scanResult.summary?.critical ?? 0,
-        high: scanResult.summary?.high ?? 0,
-        medium: scanResult.summary?.medium ?? 0,
-        low: scanResult.summary?.low ?? 0,
-        unknown: scanResult.summary?.unknown ?? 0,
-        total: scanResult.summary?.total ?? 0,
+        critical: dockerScanResult.summary?.critical ?? 0,
+        high: dockerScanResult.summary?.high ?? 0,
+        medium: dockerScanResult.summary?.medium ?? 0,
+        low: dockerScanResult.summary?.low ?? 0,
+        unknown: dockerScanResult.summary?.unknown ?? 0,
+        total: dockerScanResult.summary?.total ?? 0,
       },
-      scanTime: scanResult.scanTime ?? new Date().toISOString(),
+      scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
       passed,
     });
   } catch (error) {

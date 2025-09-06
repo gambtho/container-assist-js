@@ -1,16 +1,18 @@
 /**
- * AI Service Wrapper
+ * AI Service - MCP-Native Context Provider
  *
- * Provides a simplified, clean interface for AI operations
- * Wraps the existing AI infrastructure with consistent error handling and logging
+ * Instead of generating AI responses directly, this service formats context
+ * for the MCP host AI client to use when generating responses.
+ * This follows the MCP pattern where the host AI provides intelligence.
  */
 
-import { createTimer, type Logger } from './logger';
+import type { Logger } from 'pino';
+import { Success, Failure, type Result } from '../types/core/index.js';
 
 /**
- * AI request configuration
+ * AI request configuration for context generation
  */
-interface AIRequest {
+export interface AIRequest {
   prompt: string;
   maxTokens?: number;
   temperature?: number;
@@ -20,305 +22,140 @@ interface AIRequest {
 }
 
 /**
- * AI response result
+ * MCP-native AI response containing structured context instead of generated text
  */
-export type AIResult =
-  | { success: true; text: string; tokenCount?: number; model?: string; stopReason?: string }
-  | { success: false; error: string; code?: string; details?: Record<string, unknown> };
-
-/**
- * Structured AI request for specific tasks
- */
-interface StructuredAIRequest extends AIRequest {
-  task: 'dockerfile' | 'analysis' | 'k8s' | 'fix' | 'optimization';
-  data?: Record<string, unknown>;
-  schema?: Record<string, unknown>;
+export interface AIResponse {
+  /** Structured context for the MCP host AI to use */
+  context: {
+    /** The original prompt for context */
+    prompt: string;
+    /** Structured context data */
+    data: Record<string, unknown>;
+    /** Suggested approach or guidelines */
+    guidance?: string;
+    /** Template or pattern to follow */
+    template?: string;
+  };
+  /** Metadata about the context preparation */
+  metadata: {
+    contextSize: number;
+    dataFields: string[];
+    guidance: boolean;
+    template: boolean;
+  };
 }
 
 /**
- * AI service interface for lib layer
+ * Create an AI service that provides structured context for MCP host AI
  */
 interface AIService {
-  /**
-   * Generate text using AI
-   */
-  generate(request: AIRequest): Promise<AIResult>;
-
-  /**
-   * Generate structured content for specific tasks
-   */
-  generateStructured(request: StructuredAIRequest): Promise<AIResult>;
-
-  /**
-   * Validate content using AI
-   */
-  validate(content: string, criteria: string[]): Promise<{ valid: boolean; issues: string[] }>;
-
-  /**
-   * Generate Dockerfile content
-   */
-  generateDockerfile(analysis: Record<string, unknown>): Promise<AIResult>;
-
-  /**
-   * Generate Kubernetes manifests
-   */
-  generateK8sManifests(config: Record<string, unknown>): Promise<AIResult>;
-
-  /**
-   * Analyze repository structure
-   */
-  analyzeRepository(projectPath: string, files: string[]): Promise<AIResult>;
-
-  /**
-   * Fix Dockerfile issues
-   */
-  fixDockerfile(dockerfile: string, issues: string[]): Promise<AIResult>;
-
-  /**
-   * Check service health
-   */
-  ping(): Promise<boolean>;
+  generate: (request: AIRequest) => Promise<Result<AIResponse>>;
+  ping: () => Promise<Result<boolean>>;
 }
 
-/**
- * AI service implementation wrapping infrastructure layer
- */
-class AIServiceWrapper implements AIService {
-  private logger: Logger;
-
-  constructor(
-    private sampleFunction: (request: any) => Promise<AIResult>,
-    logger: Logger,
-  ) {
-    this.logger = logger.child({ component: 'ai-service' });
-  }
-
-  /**
-   * Generate text using AI
-   */
-  async generate(request: AIRequest): Promise<AIResult> {
-    const timer = createTimer(this.logger, 'ai-generate');
-
-    try {
-      this.logger.debug(
-        {
-          model: request.model,
-          maxTokens: request.maxTokens,
+export const createAIService = (logger: Logger, _apiKey?: string): AIService => {
+  return {
+    /**
+     * Generate structured context for MCP host AI to use
+     */
+    async generate(request: AIRequest): Promise<Result<AIResponse>> {
+      try {
+        logger.debug({
           promptLength: request.prompt.length,
-        },
-        'Generating AI response',
-      );
+          contextFields: Object.keys(request.context || {}),
+        }, 'Preparing context for MCP host AI');
 
-      const result = await this.sampleFunction(request);
+        // Determine context type and create appropriate guidance
+        const contextData = request.context || {};
+        let guidance = '';
+        let template = '';
 
-      if (result.success) {
-        timer.end({
-          tokenCount: result.tokenCount,
-          model: result.model,
-          responseLength: result.text.length,
-        });
-      } else {
-        timer.error(new Error(result.error), {
-          code: result.code,
-          details: result.details,
-        });
+        // Dockerfile generation context
+        if (request.prompt.toLowerCase().includes('dockerfile')) {
+          guidance = 'Generate an optimized Dockerfile following security best practices, using multi-stage builds when appropriate, and creating non-root users';
+          template = `FROM {baseImage}
+WORKDIR /app
+RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser
+{buildCommands}
+{healthCheck}
+USER appuser
+{startCommand}`;
+        }
+
+        // Kubernetes manifest generation context
+        else if (request.prompt.toLowerCase().includes('kubernetes') || request.prompt.toLowerCase().includes('k8s')) {
+          guidance = 'Generate Kubernetes manifests following best practices with proper resource limits, security contexts, and deployment strategies';
+          template = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {appName}
+spec:
+  replicas: {replicas}
+  selector:
+    matchLabels:
+      app: {appName}
+  template:
+    metadata:
+      labels:
+        app: {appName}
+    spec:
+      containers:
+      - name: {containerName}
+        image: {imageName}
+        resources:
+          limits:
+            memory: {memoryLimit}
+            cpu: {cpuLimit}`;
+        }
+
+        // Code analysis context
+        else if (request.prompt.toLowerCase().includes('analyze') || request.prompt.toLowerCase().includes('repository')) {
+          guidance = 'Analyze the repository structure, identify the primary language and framework, detect dependencies, and suggest appropriate containerization strategies';
+        }
+
+        // Create structured response for MCP host AI
+        const response: AIResponse = {
+          context: {
+            prompt: request.prompt,
+            data: contextData,
+            ...(guidance && { guidance }),
+            ...(template && { template }),
+          },
+          metadata: {
+            contextSize: JSON.stringify(contextData).length,
+            dataFields: Object.keys(contextData),
+            guidance: !!guidance,
+            template: !!template,
+          },
+        };
+
+        logger.info({
+          contextSize: response.metadata.contextSize,
+          dataFields: response.metadata.dataFields.length,
+          hasGuidance: response.metadata.guidance,
+          hasTemplate: response.metadata.template,
+        }, 'Context prepared for MCP host AI');
+
+        return Success(response);
+      } catch (error) {
+        const errorMessage = `Context preparation failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        logger.error({ error: errorMessage, request }, 'Context preparation failed');
+
+        return Failure(errorMessage);
       }
+    },
 
-      return result;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      timer.error(error);
-
-      this.logger.error({ error: error.message, stack: error.stack }, 'AI generation failed');
-      return {
-        success: false,
-        error: error.message,
-        code: 'AI_GENERATION_ERROR',
-        details: { originalError: err },
-      };
-    }
-  }
-
-  /**
-   * Generate structured content for specific tasks
-   */
-  async generateStructured(request: StructuredAIRequest): Promise<AIResult> {
-    const structuredPrompt = this.buildStructuredPrompt(request);
-
-    return this.generate({
-      ...request,
-      prompt: structuredPrompt,
-    });
-  }
-
-  /**
-   * Validate content using AI
-   */
-  async validate(
-    content: string,
-    criteria: string[],
-  ): Promise<{ valid: boolean; issues: string[] }> {
-    const prompt = this.buildValidationPrompt(content, criteria);
-
-    const result = await this.generate({
-      prompt,
-      maxTokens: 1000,
-      temperature: 0.1, // Lower temperature for validation consistency
-    });
-
-    if (!result.success) {
-      return { valid: false, issues: [`Validation failed: ${result.error}`] };
-    }
-
-    return this.parseValidationResponse(result.text);
-  }
-
-  /**
-   * Generate Dockerfile content
-   */
-  async generateDockerfile(analysis: Record<string, unknown>): Promise<AIResult> {
-    return this.generateStructured({
-      task: 'dockerfile',
-      prompt: 'Generate an optimized Dockerfile based on the repository analysis.',
-      data: analysis,
-      maxTokens: 2000,
-      temperature: 0.3,
-    });
-  }
-
-  /**
-   * Generate Kubernetes manifests
-   */
-  async generateK8sManifests(config: Record<string, unknown>): Promise<AIResult> {
-    return this.generateStructured({
-      task: 'k8s',
-      prompt: 'Generate Kubernetes deployment manifests based on the application configuration.',
-      data: config,
-      maxTokens: 3000,
-      temperature: 0.2,
-    });
-  }
-
-  /**
-   * Analyze repository structure
-   */
-  async analyzeRepository(projectPath: string, files: string[]): Promise<AIResult> {
-    return this.generateStructured({
-      task: 'analysis',
-      prompt:
-        'Analyze the repository structure and identify the technology stack, dependencies, and containerization requirements.',
-      data: { projectPath, files: files.slice(0, 50) }, // Limit files to avoid token limits
-      maxTokens: 2000,
-      temperature: 0.1,
-    });
-  }
-
-  /**
-   * Fix Dockerfile issues
-   */
-  async fixDockerfile(dockerfile: string, issues: string[]): Promise<AIResult> {
-    return this.generateStructured({
-      task: 'fix',
-      prompt: 'Fix the identified issues in the Dockerfile while maintaining its functionality.',
-      data: { dockerfile, issues },
-      maxTokens: 2000,
-      temperature: 0.2,
-    });
-  }
-
-  /**
-   * Check service health
-   */
-  async ping(): Promise<boolean> {
-    try {
-      const result = await this.generate({
-        prompt: 'Respond with "pong" if you can process this request.',
-        maxTokens: 10,
-        timeout: 5000,
-      });
-
-      return result.success && result.text.toLowerCase().includes('pong');
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Build structured prompt for specific tasks
-   */
-  private buildStructuredPrompt(request: StructuredAIRequest): string {
-    const basePrompt = request.prompt;
-    const taskContext = this.getTaskContext(request.task);
-    const dataContext = request.data ? `\n\nData:\n${JSON.stringify(request.data, null, 2)}` : '';
-    const schemaContext = request.schema
-      ? `\n\nExpected Schema:\n${JSON.stringify(request.schema, null, 2)}`
-      : '';
-
-    return `${taskContext}\n\n${basePrompt}${dataContext}${schemaContext}`;
-  }
-
-  /**
-   * Get task-specific context
-   */
-  private getTaskContext(task: StructuredAIRequest['task']): string {
-    const contexts = {
-      dockerfile:
-        'You are an expert in Docker and containerization. Generate secure, optimized Dockerfiles following best practices.',
-      analysis:
-        'You are a software architecture analyst. Analyze codebases to identify technologies, dependencies, and containerization needs.',
-      k8s: 'You are a Kubernetes expert. Generate production-ready manifests with proper resource management and security.',
-      fix: 'You are a Docker expert specializing in troubleshooting and optimization. Fix issues while preserving functionality.',
-      optimization:
-        'You are a performance optimization expert. Improve configurations for better performance and efficiency.',
-    };
-
-    return contexts[task] || 'You are an AI assistant helping with containerization tasks.';
-  }
-
-  /**
-   * Build validation prompt
-   */
-  private buildValidationPrompt(content: string, criteria: string[]): string {
-    return `Please validate the following content against these criteria:
-${criteria.map((c) => `- ${c}`).join('\n')}
-
-Content to validate:
-${content}
-
-Respond with a JSON object containing:
-- "valid": boolean indicating if content meets all criteria
-- "issues": array of strings describing any problems found
-
-Response:`;
-  }
-
-  /**
-   * Parse validation response
-   */
-  private parseValidationResponse(response: string): { valid: boolean; issues: string[] } {
-    try {
-      const cleaned = response.trim().replace(/```json\n?|\n?```/g, '');
-      const parsed = JSON.parse(cleaned);
-
-      return {
-        valid: Boolean(parsed.valid),
-        issues: Array.isArray(parsed.issues) ? parsed.issues : [],
-      };
-    } catch {
-      return {
-        valid: false,
-        issues: ['Failed to parse validation response'],
-      };
-    }
-  }
-}
-
-/**
- * Create an AI service instance
- */
-export function createAIService(
-  sampleFunction: (request: any) => Promise<AIResult>,
-  logger: Logger,
-): AIService {
-  return new AIServiceWrapper(sampleFunction, logger);
-}
+    /**
+     * Check context service availability
+     */
+    async ping(): Promise<Result<boolean>> {
+      try {
+        logger.debug('Context service available');
+        return Success(true);
+      } catch (error) {
+        const errorMessage = `Context service check failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        return Failure(errorMessage);
+      }
+    },
+  };
+};

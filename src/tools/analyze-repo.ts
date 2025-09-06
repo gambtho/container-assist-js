@@ -11,7 +11,7 @@ import { createSessionManager } from '../lib/session';
 import { createAIService } from '../lib/ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
-import { updateWorkflowState } from '../types/workflow-state';
+import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
 
 export interface AnalyzeRepoConfig {
   sessionId: string;
@@ -21,7 +21,7 @@ export interface AnalyzeRepoConfig {
 }
 
 export interface AnalyzeRepoResult {
-  success: boolean;
+  ok: boolean;
   sessionId: string;
   language: string;
   languageVersion?: string;
@@ -401,37 +401,14 @@ export async function analyzeRepo(
     // Create lib instances
     const sessionManager = createSessionManager(logger);
 
-    // Fallback mock function for testing scenarios
-    const mockAIFunction = async (
-      _request: unknown,
-    ): Promise<{ success: true; text: string; tokenCount: number; model: string }> => ({
-      success: true as const,
-      text: JSON.stringify({
-        insights: 'Repository appears to be well-structured',
-        optimizations: ['Consider using multi-stage builds', 'Add health checks'],
-        security: ['Run as non-root user', 'Use minimal base images'],
-        baseImage: 'node:18-alpine',
-        buildStrategy: 'multi-stage',
-      }),
-      tokenCount: 100,
-      model: 'mock',
-    });
-    // Will be used when actual AI functionality is integrated
-    const aiService = createAIService(mockAIFunction, logger);
+    // Create AI service
+    const aiService = createAIService(logger);
 
     // Get or create session
     const session = await sessionManager.get(sessionId);
     if (!session) {
       // Create new session
-      await sessionManager.create({
-        id: sessionId,
-        repo_path: repoPath,
-        metadata: {
-          projectName: path.basename(repoPath),
-          analysisDepth: depth,
-          includeTests,
-        },
-      });
+      await sessionManager.create(sessionId);
     }
 
     // Perform analysis
@@ -455,9 +432,9 @@ export async function analyzeRepo(
         },
       });
 
-      if (aiResponse.success) {
-        const parsed = JSON.parse(aiResponse.text) as { insights?: string };
-        aiInsights = parsed.insights;
+      if (aiResponse.ok) {
+        // Extract insights from the structured context
+        aiInsights = aiResponse.value.context.guidance || 'Analysis completed using AI context preparation';
       }
     } catch (error) {
       logger.debug({ error }, 'AI analysis skipped');
@@ -478,7 +455,7 @@ export async function analyzeRepo(
       : undefined;
 
     const result: AnalyzeRepoResult = {
-      success: true,
+      ok: true,
       sessionId,
       language: languageInfo.language,
       ...(languageInfo.version !== undefined && { languageVersion: languageInfo.version }),
@@ -505,23 +482,23 @@ export async function analyzeRepo(
     };
 
     // Update session with analysis result
-    const currentState = session?.workflow_state;
+    const currentState = session as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState, {
       analysis_result: {
         language: languageInfo.language,
-        language_version: languageInfo.version,
-        framework: frameworkInfo?.framework,
-        framework_version: frameworkInfo?.version,
-        build_system: buildSystem
-          ? {
-              type: buildSystem.type,
-              build_file: buildSystem.buildFile,
-              build_command: buildSystem.buildCommand,
-            }
-          : undefined,
+        ...(languageInfo.version && { language_version: languageInfo.version }),
+        ...(frameworkInfo?.framework && { framework: frameworkInfo.framework }),
+        ...(frameworkInfo?.version && { framework_version: frameworkInfo.version }),
+        ...(buildSystem && {
+          build_system: {
+            type: buildSystem.type,
+            build_file: buildSystem.buildFile,
+            ...(buildSystem.buildCommand && { build_command: buildSystem.buildCommand }),
+          },
+        }),
         dependencies: dependencies.map((d) => ({
           name: d.name,
-          version: d.version,
+          ...(d.version && { version: d.version }),
           type:
             d.type === 'production'
               ? ('runtime' as const)
@@ -541,9 +518,7 @@ export async function analyzeRepo(
       completed_steps: [...(currentState?.completed_steps ?? []), 'analyze-repo'],
     });
 
-    await sessionManager.update(sessionId, {
-      workflow_state: updatedWorkflowState,
-    });
+    await sessionManager.update(sessionId, updatedWorkflowState);
 
     timer.end({ language: languageInfo.language });
     logger.info({ language: languageInfo.language }, 'Repository analysis completed');

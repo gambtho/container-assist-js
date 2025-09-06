@@ -146,7 +146,6 @@ export class PerformanceMonitor {
       const measurement = await this.measure(operationName, operation);
       measurements.push(measurement.duration);
       
-      // Small delay between iterations
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
