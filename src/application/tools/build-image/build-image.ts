@@ -74,7 +74,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
         throw new ValidationError('Session service not available', ['sessionService']);
       }
 
-      const sessionResult = await sessionService.get(sessionId);
+      const sessionResult = sessionService.get(sessionId);
       if (!sessionResult) {
         throw new NotFoundError('Session not found', 'session', sessionId);
       }
@@ -201,7 +201,7 @@ const buildImageHandler: ToolDescriptor<BuildInput, BuildOutput> = {
       const baseImage = baseImageMatch ? baseImageMatch[1] : 'unknown';
 
       // Update session with build result
-      await sessionService.updateAtomic(sessionId, (session: Session) => ({
+      sessionService.updateAtomic(sessionId, (session: Session) => ({
         ...session,
         workflow_state: {
           ...session.workflow_state,

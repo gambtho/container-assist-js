@@ -23,7 +23,7 @@ export const RepoPathInput = z.object({
 });
 
 export const AnalyzeRepositoryInput = RepoPathInput.extend({
-  sessionId: z.string().optional(),
+  sessionId: z.string().min(1, 'Session ID is required'),
   depth: z.number().min(1).max(10).default(3),
   includeTests: z.boolean().default(false),
 });

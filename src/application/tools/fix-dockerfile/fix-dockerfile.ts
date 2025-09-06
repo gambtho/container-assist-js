@@ -44,9 +44,10 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileParams, Dockerfil
         );
 
         // Get session and fix dockerfile
-        type SessionService = { get: (id: string) => Promise<unknown> };
-        const sessionResult = await (context.sessionService as SessionService).get(input.sessionId);
-        const session = sessionResult;
+        if (!context.sessionService) {
+          throw new Error('Session service not available');
+        }
+        const session = context.sessionService.get(input.sessionId);
         if (!session) {
           throw new SessionNotFoundError(input.sessionId);
         }
@@ -54,13 +55,13 @@ export const fixDockerfileHandler: ToolDescriptor<FixDockerfileParams, Dockerfil
         const fixedDockerfile =
           'FROM node:16-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nEXPOSE 3000\nCMD ["npm", "start"]';
 
-        return {
+        return Promise.resolve({
           success: true,
           sessionId: input.sessionId,
           dockerfile: fixedDockerfile,
           path: './Dockerfile',
           validation: ['Fixed successfully'],
-        };
+        });
       },
       {
         maxAttempts: 2,

@@ -4,11 +4,11 @@
  */
 
 import { z } from 'zod';
-import { SessionService } from '../../session/manager';
 import { WorkflowManager } from '../../workflow/manager';
 import { Session } from '../../../domain/types/index';
 import { getWorkflowSteps } from '../../workflow/configs';
 import type { Logger } from 'pino';
+import { SessionService } from '../../../services/session';
 
 interface WorkflowError {
   step: string;
@@ -173,7 +173,7 @@ export async function workflowStatusHandler(
     // Get session
     let session: Session;
     try {
-      session = await sessionService.getSession(input.session_id);
+      session = sessionService.getSession(input.session_id);
     } catch (error) {
       logger.warn('Session not found');
       return createErrorResponse(input.session_id, 'Session not found');
@@ -298,7 +298,7 @@ export async function workflowStatusHandler(
 
     logger.debug('Workflow status retrieved');
 
-    return response;
+    return Promise.resolve(response);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 

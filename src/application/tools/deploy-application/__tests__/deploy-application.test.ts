@@ -958,13 +958,10 @@ describe('deploy-application tool', () => {
         },
       });
 
-      (mockContext.sessionService as jest.Mocked<SessionService>).get = jest
-        .fn<SessionService['get']>()
-        .mockResolvedValue(session);
       (mockContext.sessionService as jest.Mocked<SessionService>).updateAtomic = jest
         .fn<SessionService['updateAtomic']>()
         .mockImplementation((id, updateFn) => {
-          return Promise.resolve(updateFn(session));
+          updateFn(session);
         });
 
       const input: DeployInput = {

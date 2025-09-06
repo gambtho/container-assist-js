@@ -71,7 +71,7 @@ export class SimplifiedResourceManager {
       },
       () => {
         try {
-          const sessions = this.sessionService.list({ status: 'active' });
+          const sessions = this.sessionService.list().filter((s) => s.status === 'active');
 
           if (!sessions || sessions.length === 0) {
             return {
@@ -156,7 +156,7 @@ export class SimplifiedResourceManager {
       },
       () => {
         try {
-          const sessions = this.sessionService.list({ limit: 20 });
+          const sessions = this.sessionService.list();
 
           if (!sessions) {
             throw new Error('Failed to retrieve workflow history');
@@ -222,7 +222,7 @@ export class SimplifiedResourceManager {
       },
       () => {
         try {
-          const sessions = this.sessionService.list({ status: 'active' });
+          const sessions = this.sessionService.list().filter((s) => s.status === 'active');
           return {
             contents: [
               {

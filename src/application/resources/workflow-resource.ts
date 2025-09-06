@@ -55,9 +55,7 @@ export class WorkflowResourceProvider {
         handler: () => {
           try {
             // Get the most recent active session
-            const sessions = this.sessionService.list({
-              status: 'active',
-            });
+            const sessions = this.sessionService.list().filter((s) => s.status === 'active');
 
             if (sessions == null || sessions.length === 0) {
               return {
@@ -151,9 +149,7 @@ export class WorkflowResourceProvider {
         mimeType: 'application/json',
         handler: () => {
           try {
-            const sessions = this.sessionService.list({
-              limit: 20,
-            });
+            const sessions = this.sessionService.list().slice(0, 20);
 
             if (sessions == null) {
               throw new Error('Failed to retrieve workflow history');
@@ -227,7 +223,7 @@ export class WorkflowResourceProvider {
         mimeType: 'application/json',
         handler: () => {
           try {
-            const sessions = this.sessionService.list({});
+            const sessions = this.sessionService.list();
 
             if (sessions == null) {
               throw new Error('Failed to retrieve workflow statistics');

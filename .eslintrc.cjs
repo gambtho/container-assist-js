@@ -90,7 +90,8 @@ module.exports = {
     '*.js',
     '*.cjs',
     'coverage',
-    'docs'
+    'docs',
+    '*.json'
   ],
   env: {
     node: true,

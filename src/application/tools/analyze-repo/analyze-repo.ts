@@ -51,11 +51,6 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
     const progressEmitter = contextServices.progressEmitter;
 
     // Type definitions for context services
-    type SessionService = {
-      create: (params: { projectName: string; metadata: unknown }) => Promise<{ id: string }>;
-      updateAtomic: (id: string, updater: (session: Session) => Session) => Promise<void>;
-    };
-
     type ProgressEmitter = {
       emit: (progress: {
         sessionId: string;
@@ -89,21 +84,22 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
         );
       }
 
-      // Create or get session
+      // Create session using the provided sessionId
       let sessionId = inputSessionId;
-      if ((sessionId == null || sessionId === '') && sessionService != null) {
+      if (sessionId != null && sessionId !== '' && sessionService != null) {
         try {
-          const sessionResult = await (sessionService as unknown as SessionService).create({
-            projectName: path.basename(repoPath),
+          const sessionResult = sessionService.create({
+            id: sessionId, // Use the specific sessionId from input
+            repo_path: repoPath,
             metadata: {
-              repoPath,
+              projectName: path.basename(repoPath),
               analysisDepth: depth,
               includeTests,
             },
           });
           sessionId = sessionResult.id;
         } catch (error) {
-          logger.warn({ error }, 'Failed to create session for repo analysis');
+          logger.warn({ error, sessionId }, 'Failed to create session for repo analysis');
           // Continue without session
         }
       }
@@ -252,46 +248,43 @@ const analyzeRepositoryHandler: ToolDescriptor<AnalyzeInput, AnalyzeOutput> = {
 
       // Store analysis in session
       if (sessionService != null && sessionId != null && sessionId !== '') {
-        await (sessionService as unknown as SessionService).updateAtomic(
-          sessionId,
-          (currentSession: Session) => ({
-            ...currentSession,
-            workflow_state: {
-              ...currentSession.workflow_state,
-              analysis_result: {
-                language: languageInfo.language,
-                language_version: languageInfo?.version,
-                framework: frameworkInfo?.framework,
-                framework_version: frameworkInfo?.version,
-                build_system: buildSystem
-                  ? {
-                      type: buildSystem.type,
-                      build_file: buildSystem.build_file,
-                      build_command: buildSystem.build_command,
-                    }
-                  : undefined,
-                dependencies: dependencies.map((dep) => ({
-                  name: dep.name,
-                  version: dep.version,
-                  type: dep.type,
-                })),
-                has_tests: dependencies.some((dep) => dep.type === 'test'),
-                ports,
-                env_variables: {}, // Add if available
-                docker_compose_exists: dockerInfo.hasDockerCompose ?? false,
-                recommendations: {
-                  baseImage: recommendations.baseImage,
-                  buildStrategy: recommendations.buildStrategy,
-                  securityNotes: recommendations.securityNotes ?? [],
-                },
+        sessionService.updateAtomic(sessionId, (currentSession: Session) => ({
+          ...currentSession,
+          workflow_state: {
+            ...currentSession.workflow_state,
+            analysis_result: {
+              language: languageInfo.language,
+              language_version: languageInfo?.version,
+              framework: frameworkInfo?.framework,
+              framework_version: frameworkInfo?.version,
+              build_system: buildSystem
+                ? {
+                    type: buildSystem.type,
+                    build_file: buildSystem.build_file,
+                    build_command: buildSystem.build_command,
+                  }
+                : undefined,
+              dependencies: dependencies.map((dep) => ({
+                name: dep.name,
+                version: dep.version,
+                type: dep.type,
+              })),
+              has_tests: dependencies.some((dep) => dep.type === 'test'),
+              ports,
+              env_variables: {}, // Add if available
+              docker_compose_exists: dockerInfo.hasDockerCompose ?? false,
+              recommendations: {
+                baseImage: recommendations.baseImage,
+                buildStrategy: recommendations.buildStrategy,
+                securityNotes: recommendations.securityNotes ?? [],
               },
-              completed_steps: [
-                ...(currentSession.workflow_state?.completed_steps ?? []),
-                'analyze_repository',
-              ],
             },
-          }),
-        );
+            completed_steps: [
+              ...(currentSession.workflow_state?.completed_steps ?? []),
+              'analyze_repository',
+            ],
+          },
+        }));
       }
 
       // Emit completion

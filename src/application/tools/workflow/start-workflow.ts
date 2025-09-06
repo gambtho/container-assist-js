@@ -5,7 +5,6 @@
 
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
-import { SessionService } from '../../session/manager';
 import {
   WorkflowOrchestrator,
   WorkflowExecutionResult,
@@ -17,6 +16,7 @@ import { runContainerizationWorkflow } from '../../workflow/containerization';
 import type { Logger } from 'pino';
 import type { ProgressCallback } from '../../workflow/types';
 import type { Session } from '../../../domain/types/index';
+import { SessionService } from '../../../services/session';
 
 export interface StartWorkflowInput {
   repo_path?: string;
@@ -165,15 +165,15 @@ export async function startWorkflowHandler(
 
     if (validated.session_id) {
       try {
-        await sessionService.getSession(sessionId);
+        sessionService.getSession(sessionId);
       } catch (error) {
-        await createNewSession(sessionService, sessionId, validated, logger);
+        createNewSession(sessionService, sessionId, validated, logger);
       }
     } else {
-      await createNewSession(sessionService, sessionId, validated, logger);
+      createNewSession(sessionService, sessionId, validated, logger);
     }
 
-    await sessionService.updateSession(sessionId, {
+    sessionService.updateSession(sessionId, {
       status: 'active',
       stage: 'workflow_initializing',
       metadata: {
@@ -187,7 +187,7 @@ export async function startWorkflowHandler(
       },
     });
 
-    await sessionService.updateWorkflowState(sessionId, {
+    sessionService.updateWorkflowState(sessionId, {
       metadata: {
         workflow_type: validated.workflow_type,
         registry_url: validated.options?.registry_url,
@@ -318,7 +318,7 @@ export async function startWorkflowHandler(
     const sessionId = input.session_id ?? 'unknown';
     if (sessionId !== 'unknown') {
       try {
-        await sessionService.updateSession(sessionId, {
+        sessionService.updateSession(sessionId, {
           status: 'failed',
           stage: 'workflow_failed',
         });
@@ -439,7 +439,7 @@ async function validateInput(
 /**
  * Create a new session
  */
-async function createNewSession(
+function createNewSession(
   sessionService: SessionService,
   sessionId: string,
   validated: {
@@ -450,12 +450,13 @@ async function createNewSession(
     options: NonNullable<StartWorkflowInput['options']>;
   },
   logger: Logger,
-): Promise<Session> {
+): Session {
   try {
-    const session = await sessionService.createSession(validated.repo_path, {
+    const session = sessionService.create({
       id: sessionId,
       status: 'pending',
       stage: 'initializing',
+      repo_path: validated.repo_path,
       metadata: {
         workflow_type: validated.workflow_type,
         repo_path: validated.repo_path,

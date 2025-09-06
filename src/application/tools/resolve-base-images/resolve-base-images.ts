@@ -40,7 +40,7 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
             throw new Error('Session service not available');
           }
 
-          const session = await context.sessionService.get(input.session_id);
+          const session = context.sessionService.get(input.session_id);
           if (!session) {
             throw new Error('Session not found');
           }
@@ -102,7 +102,7 @@ const resolveBaseImagesHandler: ToolDescriptor<BaseImageResolutionInput, BaseIma
 
           // Store recommendation in session for dockerfile generation
           try {
-            await context.sessionService.updateAtomic(input.session_id, (session: any) => ({
+            context.sessionService.updateAtomic(input.session_id, (session: any) => ({
               ...session,
               workflow_state: {
                 ...session.workflow_state,

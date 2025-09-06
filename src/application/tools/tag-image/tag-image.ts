@@ -54,7 +54,7 @@ const tagImageHandler: ToolDescriptor<TagInput, TagOutput> = {
         throw new DomainError(ErrorCode.VALIDATION_ERROR, 'Session service not available');
       }
 
-      const session = await sessionService.get(sessionId);
+      const session = sessionService.get(sessionId);
       if (!session) {
         throw new DomainError(ErrorCode.SessionNotFound, 'Session not found');
       }
@@ -74,7 +74,7 @@ const tagImageHandler: ToolDescriptor<TagInput, TagOutput> = {
       }
 
       // Update session with tag information
-      await sessionService.updateAtomic(sessionId, (session: Session) => ({
+      sessionService.updateAtomic(sessionId, (session: Session) => ({
         ...session,
         workflow_state: {
           ...session.workflow_state,

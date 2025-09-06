@@ -5,58 +5,51 @@
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
 import type { Session, WorkflowState } from '../domain/types/index';
-import type { SessionFilter } from '../domain/types/session-store';
 import { SessionStore } from '../infrastructure/session-store';
 import type { SessionService as ISessionService } from '../application/services/interfaces';
 
 export interface SessionConfig {
-  storeType?: 'memory' | 'file';
-  storePath?: string;
-  ttl?: number; // Session TTL in seconds
+  ttl?: number; // Session TTL in seconds (default: 24 hours)
+  maxSessions?: number; // Max concurrent sessions (default: 1000)
 }
 
-const DEFAULT_TTL = 86400; // 24 hours
-
-/**
- * Create a session service instance
- */
-export async function createSessionService(
-  config: SessionConfig,
-  logger: Logger,
-): Promise<SessionService> {
-  const service = new SessionService(config, logger);
-  await service.initialize();
-  return service;
-}
+const DEFAULT_TTL = 86400; // 24 hours in seconds
+const DEFAULT_MAX_SESSIONS = 1000;
 
 export class SessionService implements ISessionService {
   private store: SessionStore;
   private logger: Logger;
   private ttl: number;
 
-  constructor(config: SessionConfig, logger: Logger) {
+  constructor(config: SessionConfig = {}, logger: Logger) {
     this.logger = logger.child({ service: 'session' });
     this.ttl = config.ttl ?? DEFAULT_TTL;
 
     this.store = new SessionStore(this.logger, {
       defaultTtlMs: this.ttl * 1000,
-      maxSessions: 1000,
+      maxSessions: config.maxSessions ?? DEFAULT_MAX_SESSIONS,
     });
   }
 
-  async initialize(): Promise<void> {
-    // SessionStore doesn't have initialize method - it's ready to use
-    await Promise.resolve(); // Satisfy async requirement
+  initialize(): void {
     this.logger.info('Session service initialized');
   }
 
-  async create(data: Partial<Session>): Promise<Session> {
+  close(): void {
+    this.store.close();
+    this.logger.info('Session service closed');
+  }
+
+  // Core CRUD operations
+  create(data: Partial<Session> = {}): Session {
     const id = data.id ?? randomUUID();
     const now = new Date().toISOString();
+    const expiresAt = data.expires_at ?? new Date(Date.now() + this.ttl * 1000).toISOString();
+
     const session: Session = {
       id,
-      version: data.version ?? 1,
-      status: data.status ?? 'pending',
+      version: 1,
+      status: data.status ?? 'active',
       repo_path: data.repo_path ?? '',
       workflow_state: data.workflow_state ?? {
         completed_steps: [],
@@ -66,40 +59,46 @@ export class SessionService implements ISessionService {
       },
       created_at: now,
       updated_at: now,
+      expires_at: expiresAt,
       ...data,
     };
 
     this.store.set(id, session);
     this.logger.info({ sessionId: id }, 'Session created');
-    await Promise.resolve(); // Make method truly async
     return session;
   }
 
-  async get(id: string): Promise<Session | null> {
-    await Promise.resolve(); // Make method truly async
-    const session = this.store.get(id);
-    return session;
+  get(sessionId: string): Session | null {
+    return this.store.get(sessionId);
   }
 
-  async update(id: string, updates: Partial<Session>): Promise<void> {
-    const currentSession = this.store.get(id);
-    if (!currentSession) {
-      throw new Error('Session not found');
+  update(sessionId: string, data: Partial<Session>): void {
+    const current = this.store.get(sessionId);
+    if (!current) {
+      throw new Error(`Session ${sessionId} not found`);
     }
 
     const updated: Session = {
-      ...currentSession,
-      ...updates,
+      ...current,
+      ...data,
       updated_at: new Date().toISOString(),
     };
 
-    this.store.set(id, updated);
-    this.logger.info({ sessionId: id }, 'Session updated');
-    await Promise.resolve(); // Make method truly async
+    this.store.set(sessionId, updated);
+    this.logger.debug({ sessionId }, 'Session updated');
+  }
+
+  delete(sessionId: string): void {
+    this.store.delete(sessionId);
+    this.logger.info({ sessionId }, 'Session deleted');
+  }
+
+  updateAtomic(sessionId: string, updater: (session: Session) => Session): void {
+    this.store.updateAtomic(sessionId, updater);
   }
 
   updateWorkflowState(id: string, state: Partial<WorkflowState>): Session {
-    const updatedSession = this.store.update(id, (session) => ({
+    const updated = this.store.update(id, (session) => ({
       workflow_state: {
         ...session.workflow_state,
         ...state,
@@ -107,32 +106,72 @@ export class SessionService implements ISessionService {
       updated_at: new Date().toISOString(),
     }));
 
-    if (!updatedSession) {
-      throw new Error('Session not found');
+    if (!updated) {
+      throw new Error(`Session ${id} not found`);
     }
 
-    this.logger.info({ sessionId: id }, 'Workflow state updated');
-    return updatedSession;
+    this.logger.debug({ sessionId: id }, 'Workflow state updated');
+    return updated;
   }
 
-  async delete(id: string): Promise<void> {
-    this.store.delete(id);
-    this.logger.info({ sessionId: id }, 'Session deleted');
-    await Promise.resolve(); // Make method truly async
+  // Additional methods for compatibility with WorkflowOrchestrator
+  getSession(id: string): Session {
+    const session = this.get(id);
+    if (!session) {
+      throw new Error(`Session ${id} not found`);
+    }
+    return session;
   }
 
-  list(filter?: SessionFilter): Session[] {
-    const sessions = this.store.list(filter ?? {});
-    return sessions;
+  updateSession(id: string, updates: Partial<Session>): Session {
+    this.update(id, updates);
+    return this.getSession(id);
+  }
+
+  setCurrentStep(id: string, step: string | null): Session {
+    const session = this.getSession(id);
+    const updatedState = {
+      ...session.workflow_state,
+      current_step: step,
+    };
+    return this.updateWorkflowState(id, updatedState);
+  }
+
+  markStepCompleted(id: string, step: string): Session {
+    const session = this.getSession(id);
+    const completedSteps = session.workflow_state?.completed_steps || [];
+    if (!completedSteps.includes(step)) {
+      completedSteps.push(step);
+    }
+    const updatedState = {
+      ...session.workflow_state,
+      completed_steps: completedSteps,
+    };
+    return this.updateWorkflowState(id, updatedState);
+  }
+
+  addStepError(id: string, step: string, error: Error | string): Session {
+    const session = this.getSession(id);
+    const errors = session.workflow_state?.errors || {};
+    errors[step] = error instanceof Error ? error.message : error;
+    const updatedState = {
+      ...session.workflow_state,
+      errors,
+    };
+    return this.updateWorkflowState(id, updatedState);
+  }
+
+  // Utility methods
+  list(): Session[] {
+    return this.store.list();
   }
 
   cleanup(): number {
     const cutoff = Date.now() - this.ttl * 1000;
     const cutoffDate = new Date(cutoff).toISOString();
-
     const sessions = this.store.list({});
-
     let deleted = 0;
+
     for (const session of sessions) {
       if (session.updated_at < cutoffDate) {
         try {
@@ -147,35 +186,21 @@ export class SessionService implements ISessionService {
       }
     }
 
-    this.logger.info({ deleted }, 'Session cleanup completed');
+    if (deleted > 0) {
+      this.logger.info({ count: deleted }, 'Cleaned up expired sessions');
+    }
+
     return deleted;
   }
 
-  // Additional methods needed by resource providers
-  async updateAtomic(id: string, updater: (session: Session) => Session): Promise<void> {
-    this.store.updateAtomic(id, updater);
-    await Promise.resolve(); // Make method truly async
-  }
-
-  query(params: SessionFilter): Session[] {
-    return this.list(params);
-  }
-
-  close(): void {
-    this.store.close();
-    this.logger.info('Session service closed');
+  getActiveCount(): number {
+    return this.store.list({ status: 'active' }).length;
   }
 }
 
-// Export a singleton getter for convenience
-let _sessionService: SessionService | undefined;
-
-export async function getSessionService(
-  config: SessionConfig,
-  logger: Logger,
-): Promise<SessionService> {
-  if (!_sessionService) {
-    _sessionService = await createSessionService(config, logger);
-  }
-  return _sessionService;
+// Factory function for easier setup
+export function createSessionService(config: SessionConfig = {}, logger: Logger): SessionService {
+  const service = new SessionService(config, logger);
+  service.initialize();
+  return service;
 }
