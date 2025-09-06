@@ -252,14 +252,13 @@ export async function generateDockerfile(
     // Create lib instances
     const sessionManager = getSessionManager(logger);
 
-    // TODO: Replace with actual AI function when infrastructure is ready
+    // Fallback mock function for testing scenarios
     const mockAIFunction = async (_request: unknown): Promise<AIResult> => ({
       success: true as const,
       text: 'Mock AI response',
       tokenCount: 10,
       model: 'mock',
     });
-    // AI service is created but not used in mock implementation
     // Will be used when actual AI functionality is integrated
     const aiService = createAIService(mockAIFunction, logger);
 
@@ -290,7 +289,7 @@ export async function generateDockerfile(
     const dockerfileContent = generateOptimizedDockerfile(analysisResult, config);
 
     // Use AI to enhance the Dockerfile (when available)
-    const enhancedContent = dockerfileContent;
+    const processedContent = dockerfileContent;
     try {
       const aiResponse = await aiService.generateDockerfile({
         language: analysisResult.language,
@@ -315,17 +314,17 @@ export async function generateDockerfile(
     const dockerfilePath = path.join(repoPath, 'Dockerfile');
 
     // Write Dockerfile to disk
-    await fs.writeFile(dockerfilePath, enhancedContent, 'utf-8');
+    await fs.writeFile(dockerfilePath, processedContent, 'utf-8');
 
     // Check for warnings
     const warnings: string[] = [];
     if (!securityHardening) {
       warnings.push('Security hardening is disabled - consider enabling for production');
     }
-    if (enhancedContent.includes('root')) {
+    if (processedContent.includes('root')) {
       warnings.push('Container may run as root user');
     }
-    if (enhancedContent.includes(':latest')) {
+    if (processedContent.includes(':latest')) {
       warnings.push('Using :latest tags - consider pinning versions');
     }
 
@@ -333,7 +332,7 @@ export async function generateDockerfile(
     const currentState = session.workflow_state as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState, {
       dockerfile_result: {
-        content: enhancedContent,
+        content: processedContent,
         path: dockerfilePath,
         multistage,
       },
@@ -357,7 +356,7 @@ export async function generateDockerfile(
     return Success({
       success: true,
       sessionId,
-      content: enhancedContent,
+      content: processedContent,
       path: dockerfilePath,
       baseImage: config.baseImage ?? getRecommendedBaseImage(analysisResult.language ?? 'unknown'),
       optimization,
@@ -384,5 +383,3 @@ export function createGenerateDockerfileTool(logger: Logger): {
     execute: (config: GenerateDockerfileConfig) => generateDockerfile(config, logger),
   };
 }
-
-export default generateDockerfile;

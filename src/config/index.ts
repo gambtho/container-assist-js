@@ -6,7 +6,7 @@
 export type { ApplicationConfig } from './types';
 
 // Export essential configuration functions only
-export { createConfiguration, createConfigurationForEnv } from './config';
+export { createConfiguration } from './config';
 
 // Import configuration
 import { createConfiguration, getConfigurationSummary } from './config';
@@ -57,13 +57,6 @@ export function logConfigSummaryIfDev(configInstance: ApplicationConfig): void {
 }
 
 /**
- * Reset lazy-loaded configuration instance
- */
-export function resetConfig(): void {
-  _config = undefined;
-}
-
-/**
  * Create test configuration with test-specific defaults
  */
 export function createTestConfig(): ApplicationConfig {
@@ -75,61 +68,3 @@ export function createTestConfig(): ApplicationConfig {
   config.session.store = 'memory';
   return config;
 }
-
-/**
- * Create minimal configuration (currently same as test)
- */
-export function createMinimalConfig(): ApplicationConfig {
-  return createTestConfig();
-}
-
-/**
- * Get configuration summary
- */
-export function getConfigSummary(config: ApplicationConfig): object {
-  return getConfigurationSummary(config);
-}
-
-/**
- * Configuration helper utilities
- */
-export const ConfigHelpers = {
-  isProduction(config: ApplicationConfig): boolean {
-    return config.server.nodeEnv === 'production';
-  },
-
-  isDevelopment(config: ApplicationConfig): boolean {
-    return config.server.nodeEnv === 'development';
-  },
-
-  isTest(config: ApplicationConfig): boolean {
-    return config.server.nodeEnv === 'test';
-  },
-
-  hasAI(config: ApplicationConfig): boolean {
-    return (
-      config.features.aiEnabled && (config.aiServices.ai.apiKey !== '' || config.features.mockMode)
-    );
-  },
-
-  parseTTL(ttl: string): number {
-    const match = ttl.match(/^(\d+)([hms])$/);
-    if (!match) {
-      throw new Error(`Invalid TTL format: ${ttl}`);
-    }
-
-    const [, amount, unit] = match;
-    const value = parseInt(amount ?? '0', 10);
-
-    switch (unit) {
-      case 'h':
-        return value * 3600000; // hours to milliseconds
-      case 'm':
-        return value * 60000; // minutes to milliseconds
-      case 's':
-        return value * 1000; // seconds to milliseconds
-      default:
-        throw new Error(`Invalid TTL format: ${ttl}`);
-    }
-  },
-};

@@ -1,12 +1,11 @@
 /**
- * Unified Session Manager - Single Source of Truth
+ * Session Manager Implementation
  *
- * Consolidates functionality from:
- * - src/services/session.ts (main service)
- * - src/infrastructure/session-store.ts (storage layer)
- * - src/application/resources/session-resource.ts (MCP resource)
- *
- * Provides a simplified, clean interface for all session operations
+ * Core session management functionality providing:
+ * - Session lifecycle management
+ * - TTL-based expiration
+ * - Automatic cleanup
+ * - Thread-safe operations
  */
 
 import { randomUUID } from 'node:crypto';
@@ -29,10 +28,9 @@ const DEFAULT_MAX_SESSIONS = 1000;
 const DEFAULT_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Unified session manager implementation
- * Provides all session functionality in a single, clean interface
+ * Core session manager implementation
  */
-export class UnifiedSessionManager implements SessionManager {
+export class SessionManagerImpl implements SessionManager {
   private sessions = new Map<string, Session>();
   private cleanupTimer: NodeJS.Timeout | undefined = undefined;
   private readonly logger: Logger;
@@ -307,7 +305,7 @@ export class UnifiedSessionManager implements SessionManager {
  * This is the primary export that tools should use
  */
 export function createSessionManager(logger: Logger, config?: SessionConfig): SessionManager {
-  return new UnifiedSessionManager(logger, config);
+  return new SessionManagerImpl(logger, config);
 }
 
 /**

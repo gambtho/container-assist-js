@@ -406,5 +406,3 @@ export function createWorkflowTool(logger: Logger): {
     getStatus: (sessionId: string) => getWorkflowStatus(sessionId, logger),
   };
 }
-
-export default workflow;

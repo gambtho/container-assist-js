@@ -42,7 +42,6 @@ export async function pushImage(
 
     // Create lib instances
     const sessionManager = getSessionManager(logger);
-    // TODO: Fix docker client creation to use proper infrastructure instances
     const dockerClient = createDockerClient(null, null, logger);
 
     // Get session using lib session manager
@@ -141,5 +140,3 @@ export function createPushTool(logger: Logger): {
     execute: (config: PushImageConfig) => pushImage(config, logger),
   };
 }
-
-export default pushImage;

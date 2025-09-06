@@ -278,5 +278,3 @@ export function createPrepareClusterTool(logger: Logger): {
     execute: (config: PrepareClusterConfig) => prepareCluster(config, logger),
   };
 }
-
-export default prepareCluster;

@@ -46,7 +46,7 @@ export interface ToolContext {
   progressEmitter: EventEmitter;
 
   // Configuration and control
-  config: unknown; // Will be typed more specifically later
+  config: unknown;
   signal?: AbortSignal;
   sessionId?: string;
 

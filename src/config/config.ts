@@ -229,59 +229,6 @@ export function createConfiguration(): ApplicationConfig {
 }
 
 /**
- * Create configuration for specific environment
- */
-export function createConfigurationForEnv(
-  env: 'development' | 'production' | 'test',
-): ApplicationConfig {
-  const config = createConfiguration();
-  config.server.nodeEnv = env;
-
-  // Environment-specific adjustments
-  if (env === 'production') {
-    config.server.logLevel = 'info';
-    config.features.enableDebugLogs = false;
-    config.features.enableMetrics = true;
-  } else if (env === 'development') {
-    config.server.logLevel = 'debug';
-    config.features.enableDebugLogs = true;
-    config.features.mockMode = true;
-  } else if (env === 'test') {
-    config.server.logLevel = 'error';
-    config.features.mockMode = true;
-    config.features.enableEvents = false;
-    config.session.store = 'memory';
-  }
-
-  return config;
-}
-
-/**
- * Validate configuration (simple checks)
- */
-export function validateConfiguration(config: ApplicationConfig): {
-  valid: boolean;
-  errors: string[];
-} {
-  const errors: string[] = [];
-
-  // Basic validation
-  if (!['development', 'production', 'test'].includes(config.server.nodeEnv)) {
-    errors.push('Invalid NODE_ENV');
-  }
-
-  if (!['error', 'warn', 'info', 'debug', 'trace'].includes(config.server.logLevel)) {
-    errors.push('Invalid LOG_LEVEL');
-  }
-
-  if (config.server.port !== undefined && (config.server.port < 1 || config.server.port > 65535)) {
-    errors.push('Invalid server port');
-  }
-
-  return { valid: errors.length === 0, errors };
-}
-
-/**
  * Get configuration summary for logging
  */
 export function getConfigurationSummary(config: ApplicationConfig): Record<string, unknown> {

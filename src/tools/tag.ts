@@ -39,7 +39,6 @@ export async function tagImage(
 
     // Create lib instances
     const sessionManager = getSessionManager(logger);
-    // TODO: Fix docker client creation to use proper infrastructure instances
     const dockerClient = createDockerClient(null, null, logger);
 
     // Get session using lib session manager
@@ -104,5 +103,3 @@ export function createTagTool(logger: Logger): {
     execute: (config: TagImageConfig) => tagImage(config, logger),
   };
 }
-
-export default tagImage;

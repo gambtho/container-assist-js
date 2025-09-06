@@ -143,11 +143,11 @@ export class AIServiceWrapper implements AIService {
    * Generate structured content for specific tasks
    */
   async generateStructured(request: StructuredAIRequest): Promise<AIResult> {
-    const enhancedPrompt = this.buildStructuredPrompt(request);
+    const structuredPrompt = this.buildStructuredPrompt(request);
 
     return this.generate({
       ...request,
-      prompt: enhancedPrompt,
+      prompt: structuredPrompt,
     });
   }
 

@@ -213,5 +213,3 @@ export function createOpsTool(logger: Logger): {
     execute: (config: OpsConfig) => ops(config, logger),
   };
 }
-
-export default ops;

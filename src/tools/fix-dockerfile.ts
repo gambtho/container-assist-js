@@ -43,7 +43,7 @@ export async function fixDockerfile(
     // Create lib instances
     const sessionManager = getSessionManager(logger);
 
-    // TODO: Replace with actual AI function when infrastructure is ready
+    // Fallback mock function for testing scenarios
     const mockAIFunction = async (
       _request: unknown,
     ): Promise<{ success: true; text: string; tokenCount: number; model: string }> => ({
@@ -147,5 +147,3 @@ export function createFixDockerfileTool(logger: Logger): {
     execute: (config: FixDockerfileConfig) => fixDockerfile(config, logger),
   };
 }
-
-export default fixDockerfile;

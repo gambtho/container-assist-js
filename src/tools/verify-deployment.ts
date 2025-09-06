@@ -313,5 +313,3 @@ export function createVerifyDeploymentTool(logger: Logger): {
     execute: (config: VerifyDeploymentConfig) => verifyDeployment(config, logger),
   };
 }
-
-export default verifyDeployment;

@@ -6,8 +6,7 @@
 
 import { z } from 'zod';
 
-// Import Docker types from the unified docker types (will be created next)
-// For now, we'll define the schemas inline and later import from docker.ts
+// Session types and utilities for managing containerization workflows
 
 /**
  * Analysis result schema for repository analysis

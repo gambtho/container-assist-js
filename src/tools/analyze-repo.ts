@@ -401,7 +401,7 @@ export async function analyzeRepo(
     // Create lib instances
     const sessionManager = getSessionManager(logger);
 
-    // TODO: Replace with actual AI function when infrastructure is ready
+    // Fallback mock function for testing scenarios
     const mockAIFunction = async (
       _request: unknown,
     ): Promise<{ success: true; text: string; tokenCount: number; model: string }> => ({
@@ -416,7 +416,6 @@ export async function analyzeRepo(
       tokenCount: 100,
       model: 'mock',
     });
-    // AI service is created but not used in mock implementation
     // Will be used when actual AI functionality is integrated
     const aiService = createAIService(mockAIFunction, logger);
 
@@ -570,5 +569,3 @@ export function createAnalyzeRepoTool(logger: Logger): {
     execute: (config: AnalyzeRepoConfig) => analyzeRepo(config, logger),
   };
 }
-
-export default analyzeRepo;

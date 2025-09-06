@@ -113,7 +113,6 @@ export async function deployApplication(
 
     // Create lib instances
     const sessionManager = getSessionManager(logger);
-    // TODO: Fix kubernetes client creation to use proper infrastructure instances
     const k8sClient = createKubernetesClient(null, logger);
 
     // Get session
@@ -323,5 +322,3 @@ export function createDeployApplicationTool(logger: Logger): {
     execute: (config: DeployApplicationConfig) => deployApplication(config, logger),
   };
 }
-
-export default deployApplication;

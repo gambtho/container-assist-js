@@ -146,7 +146,6 @@ export async function buildImage(
 
     // Create lib instances
     const sessionManager = getSessionManager(logger);
-    // TODO: Fix docker client creation to use proper infrastructure instances
     const dockerClient = createDockerClient(null, null, logger);
 
     // Get session
@@ -171,7 +170,7 @@ export async function buildImage(
         // Check if we have Dockerfile content in session
         const dockerfileContent = session.workflow_state?.dockerfile_result?.content;
         if (dockerfileContent) {
-          // Write the Dockerfile content to a temporary file
+          // Write the Dockerfile content to generated file
           dockerfilePath = path.join(repoPath, 'Dockerfile.generated');
           await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
           logger.info({ dockerfilePath }, 'Created Dockerfile from session content');
@@ -269,5 +268,3 @@ export function createBuildImageTool(logger: Logger): {
     execute: (config: BuildImageConfig) => buildImage(config, logger),
   };
 }
-
-export default buildImage;

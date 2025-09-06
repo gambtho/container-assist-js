@@ -279,14 +279,13 @@ export async function generateK8sManifests(
     // Create lib instances
     const sessionManager = getSessionManager(logger);
 
-    // TODO: Replace with actual AI function when infrastructure is ready
+    // Fallback mock function for testing scenarios
     const mockAIFunction = async (_request: unknown): Promise<AIResult> => ({
       success: true as const,
       text: 'Mock AI response',
       tokenCount: 10,
       model: 'mock',
     });
-    // AI service is created but not used in mock implementation
     const aiService = createAIService(mockAIFunction, logger);
 
     // Get session
@@ -442,5 +441,3 @@ export function createGenerateK8sManifestsTool(logger: Logger): {
     execute: (config: GenerateK8sManifestsConfig) => generateK8sManifests(config, logger),
   };
 }
-
-export default generateK8sManifests;

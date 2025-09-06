@@ -176,5 +176,3 @@ export function createScanTool(logger: Logger): {
     execute: (config: ScanImageConfig) => scanImage(config, logger),
   };
 }
-
-export default scanImage;
