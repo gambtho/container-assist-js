@@ -89,16 +89,11 @@ describe('Configuration Types', () => {
     });
 
     it('should enforce SamplerMode type constraints', () => {
-      const config = createConfiguration();
-      
-      // Valid values
       const validModes: SamplerMode[] = ['auto', 'mock', 'real'];
       validModes.forEach(mode => {
         expect(typeof mode).toBe('string');
         expect(['auto', 'mock', 'real']).toContain(mode);
       });
-
-      expect(['auto', 'mock', 'real']).toContain(config.aiServices.sampler.mode);
     });
   });
 
@@ -130,51 +125,22 @@ describe('Configuration Types', () => {
         maxSessions: expect.any(Number),
       });
 
-      // Infrastructure configuration
-      expect(config.infrastructure).toMatchObject({
-        docker: expect.any(Object),
-        kubernetes: expect.any(Object),
-        scanning: expect.any(Object),
-        build: expect.any(Object),
-        java: expect.any(Object),
-      });
+      // Infrastructure configuration is optional in simplified config
+      expect(config.infrastructure).toBeUndefined();
     });
 
     it('should have correct Docker configuration structure', () => {
       const config = createConfiguration();
       
-      expect(config.infrastructure.docker).toMatchObject({
+      // Docker config is in core config, not infrastructure
+      expect(config.docker).toMatchObject({
         socketPath: expect.any(String),
         registry: expect.any(String),
-        host: expect.any(String),
-        port: expect.any(Number),
         timeout: expect.any(Number),
-        apiVersion: expect.any(String),
+        buildArgs: expect.any(Object),
       });
     });
 
-    it('should have correct AI services configuration structure', () => {
-      const config = createConfiguration();
-      
-      expect(config.aiServices.ai).toMatchObject({
-        apiKey: expect.any(String),
-        model: expect.any(String),
-        baseUrl: expect.any(String),
-        timeout: expect.any(Number),
-        retryAttempts: expect.any(Number),
-        retryDelayMs: expect.any(Number),
-        temperature: expect.any(Number),
-        maxTokens: expect.any(Number),
-      });
-
-      expect(config.aiServices.sampler).toMatchObject({
-        mode: expect.any(String),
-        templateDir: expect.any(String),
-        cacheEnabled: expect.any(Boolean),
-        retryAttempts: expect.any(Number),
-        retryDelayMs: expect.any(Number),
-      });
-    });
   });
 
   describe('Configuration Factory Functions', () => {
@@ -201,8 +167,8 @@ describe('Configuration Types', () => {
       resetConfig();
       
       expect(config.server.nodeEnv).toBe('test');
-      expect(config.mcp.maxSessions).toBe(100);
-      expect(config.infrastructure.docker.registry).toBe('docker.io');
+      expect(config.mcp.maxSessions).toBe(1000);
+      expect(config.docker.registry).toBe('docker.io');
     });
 
     it('should config proxy allow setting values', () => {
@@ -250,8 +216,8 @@ describe('Configuration Types', () => {
         logLevel: 'error',
         workflowMode: 'interactive',
         mockMode: false,
-        aiEnabled: true,
-        maxSessions: 100,
+        aiEnabled: false,
+        maxSessions: 1000,
         dockerRegistry: 'docker.io',
       });
     });
@@ -261,6 +227,7 @@ describe('Configuration Types', () => {
     describe('logConfigSummaryIfDev', () => {
       it('should log summary in development with debug logs enabled', () => {
         const config = createConfigurationForEnv('development');
+        config.server.logLevel = 'debug';
         config.features.enableDebugLogs = true;
 
         logConfigSummaryIfDev(config);
@@ -329,13 +296,8 @@ describe('Configuration Types', () => {
     it('should hasAI check AI availability', () => {
       const config = createConfiguration();
       
-      // AI enabled and has API key
+      // AI enabled and mock mode enabled
       config.features.aiEnabled = true;
-      config.aiServices.ai.apiKey = 'test-key';
-      expect(ConfigHelpers.hasAI(config)).toBe(true);
-
-      // AI enabled but no API key, mock mode enabled
-      config.aiServices.ai.apiKey = '';
       config.features.mockMode = true;
       expect(ConfigHelpers.hasAI(config)).toBe(true);
 
@@ -343,9 +305,8 @@ describe('Configuration Types', () => {
       config.features.aiEnabled = false;
       expect(ConfigHelpers.hasAI(config)).toBe(false);
 
-      // AI enabled, no API key, no mock mode - reset first
+      // AI enabled but no mock mode
       config.features.aiEnabled = true;
-      config.aiServices.ai.apiKey = '';
       config.features.mockMode = false;
       expect(ConfigHelpers.hasAI(config)).toBe(false);
     });
@@ -391,15 +352,14 @@ describe('Configuration Types', () => {
       
       expect(config.server.port).toBeDefined();
       expect(config.server.host).toBeDefined();
-      expect(config.server.shutdownTimeout).toBeUndefined();
     });
 
     it('should handle optional docker properties', () => {
       const config = createConfiguration();
       
-      expect(config.infrastructure.docker.host).toBeDefined();
-      expect(config.infrastructure.docker.port).toBeDefined();
-      expect(config.infrastructure.docker.buildArgs === undefined || typeof config.infrastructure.docker.buildArgs === 'object').toBe(true);
+      expect(config.docker.host).toBeDefined();
+      expect(config.docker.port).toBeDefined();
+      expect(config.docker.buildArgs === undefined || typeof config.docker.buildArgs === 'object').toBe(true);
     });
 
     it('should handle optional workspace properties', () => {
@@ -421,28 +381,25 @@ describe('Configuration Types', () => {
 
       expect(config.server.nodeEnv).toBe('production');
       expect(config.server.logLevel).toBe('warn');
-      expect(config.infrastructure.docker.registry).toBe('prod.registry.io');
+      expect(config.docker.registry).toBe('prod.registry.io');
       
       // Other values should remain default
       expect(config.server.port).toBe(3000);
-      expect(config.mcp.maxSessions).toBe(100);
+      expect(config.mcp.maxSessions).toBe(1000);
     });
 
     it('should handle complex nested property overrides', () => {
-      process.env.DOCKER_SOCKET = '/custom/socket';
-      process.env.K8S_NAMESPACE = 'production';
-      process.env.AI_MODEL = 'gpt-4';
+      process.env.DOCKER_HOST = '/custom/socket';
+      process.env.KUBE_NAMESPACE = 'production';
 
       const config = createConfiguration();
 
-      expect(config.infrastructure.docker.socketPath).toBe('/custom/socket');
-      expect(config.infrastructure.kubernetes.namespace).toBe('production');
-      expect(config.aiServices.ai.model).toBe('gpt-4');
+      expect(config.docker.socketPath).toBe('/custom/socket');
+      expect(config.kubernetes.namespace).toBe('production');
 
       // Other nested properties should remain default
-      expect(config.infrastructure.docker.registry).toBe('docker.io');
-      expect(config.infrastructure.kubernetes.timeout).toBe(300000);
-      expect(config.aiServices.ai.timeout).toBe(30000);
+      expect(config.docker.registry).toBe('docker.io');
+      expect(config.kubernetes.timeout).toBe(30000);
     });
   });
 });

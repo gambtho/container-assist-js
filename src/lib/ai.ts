@@ -10,7 +10,7 @@ import { createTimer, type Logger } from './logger';
 /**
  * AI request configuration
  */
-export interface AIRequest {
+interface AIRequest {
   prompt: string;
   maxTokens?: number;
   temperature?: number;
@@ -29,7 +29,7 @@ export type AIResult =
 /**
  * Structured AI request for specific tasks
  */
-export interface StructuredAIRequest extends AIRequest {
+interface StructuredAIRequest extends AIRequest {
   task: 'dockerfile' | 'analysis' | 'k8s' | 'fix' | 'optimization';
   data?: Record<string, unknown>;
   schema?: Record<string, unknown>;
@@ -38,7 +38,7 @@ export interface StructuredAIRequest extends AIRequest {
 /**
  * AI service interface for lib layer
  */
-export interface AIService {
+interface AIService {
   /**
    * Generate text using AI
    */
@@ -83,7 +83,7 @@ export interface AIService {
 /**
  * AI service implementation wrapping infrastructure layer
  */
-export class AIServiceWrapper implements AIService {
+class AIServiceWrapper implements AIService {
   private logger: Logger;
 
   constructor(
@@ -321,62 +321,4 @@ export function createAIService(
   logger: Logger,
 ): AIService {
   return new AIServiceWrapper(sampleFunction, logger);
-}
-
-/**
- * Mock AI service for testing
- */
-export class MockAIService implements AIService {
-  async generate(request: AIRequest): Promise<AIResult> {
-    return {
-      success: true,
-      text: `Mock response for: ${request.prompt.substring(0, 50)}...`,
-      tokenCount: 100,
-      model: 'mock-model',
-    };
-  }
-
-  async generateStructured(request: StructuredAIRequest): Promise<AIResult> {
-    return this.generate(request);
-  }
-
-  async validate(): Promise<{ valid: boolean; issues: string[] }> {
-    return { valid: true, issues: [] };
-  }
-
-  async generateDockerfile(): Promise<AIResult> {
-    return {
-      success: true,
-      text: 'FROM node:18\nWORKDIR /app\nCOPY . .\nRUN npm install\nCMD ["npm", "start"]',
-      tokenCount: 50,
-    };
-  }
-
-  async generateK8sManifests(): Promise<AIResult> {
-    return {
-      success: true,
-      text: 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: mock-app',
-      tokenCount: 100,
-    };
-  }
-
-  async analyzeRepository(): Promise<AIResult> {
-    return {
-      success: true,
-      text: '{"language": "javascript", "framework": "node.js", "hasPackageJson": true}',
-      tokenCount: 75,
-    };
-  }
-
-  async fixDockerfile(): Promise<AIResult> {
-    return {
-      success: true,
-      text: 'FROM node:18-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\nCMD ["npm", "start"]',
-      tokenCount: 60,
-    };
-  }
-
-  async ping(): Promise<boolean> {
-    return true;
-  }
 }

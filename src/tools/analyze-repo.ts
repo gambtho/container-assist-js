@@ -7,7 +7,7 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { getSessionManager } from '../lib/session';
+import { createSessionManager } from '../lib/session';
 import { createAIService } from '../lib/ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
@@ -399,7 +399,7 @@ export async function analyzeRepo(
     }
 
     // Create lib instances
-    const sessionManager = getSessionManager(logger);
+    const sessionManager = createSessionManager(logger);
 
     // Fallback mock function for testing scenarios
     const mockAIFunction = async (

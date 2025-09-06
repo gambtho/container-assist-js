@@ -5,7 +5,7 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { getSessionManager } from '../lib/session';
+import { createSessionManager } from '../lib/session';
 import { createDockerClient } from '../lib/docker';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
@@ -41,7 +41,7 @@ export async function pushImage(
     logger.info({ sessionId, registry }, 'Starting image push');
 
     // Create lib instances
-    const sessionManager = getSessionManager(logger);
+    const sessionManager = createSessionManager(logger);
     const dockerClient = createDockerClient(null, null, logger);
 
     // Get session using lib session manager

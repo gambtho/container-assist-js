@@ -5,12 +5,12 @@
  * Wraps the existing Kubernetes infrastructure with consistent error handling
  */
 
-import { createTimer, type Logger } from './logger.js';
+import { createTimer, type Logger } from './logger';
 
 /**
  * Kubernetes client interface
  */
-export interface KubernetesClient {
+interface KubernetesClient {
   /**
    * Apply a Kubernetes manifest
    */
@@ -47,7 +47,7 @@ export interface KubernetesClient {
 /**
  * Mock Kubernetes client for migration
  */
-export class MockKubernetesClient implements KubernetesClient {
+class MockKubernetesClient implements KubernetesClient {
   private logger: Logger;
 
   constructor(logger: Logger) {
@@ -115,7 +115,7 @@ export class MockKubernetesClient implements KubernetesClient {
 /**
  * Kubernetes client wrapper
  */
-export class KubernetesClientWrapper implements KubernetesClient {
+class KubernetesClientWrapper implements KubernetesClient {
   private logger: Logger;
 
   constructor(
@@ -222,5 +222,3 @@ export function createKubernetesClient(k8sClient: any, logger: Logger): Kubernet
   // Return mock client if no real client available
   return new MockKubernetesClient(logger);
 }
-
-export default createKubernetesClient;

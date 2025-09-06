@@ -9,19 +9,19 @@
  * 5. Verify deployment health
  */
 
-import { prepareCluster } from '../tools/prepare-cluster.js';
-import { generateK8sManifests } from '../tools/generate-k8s-manifests.js';
-import { pushImage } from '../tools/push.js';
-import { deployApplication } from '../tools/deploy.js';
-import { verifyDeployment } from '../tools/verify-deployment.js';
-import { getSessionManager } from '../lib/session.js';
-import { createTimer, createLogger, type Logger } from '../lib/logger.js';
+import { prepareCluster } from '../tools/prepare-cluster';
+import { generateK8sManifests } from '../tools/generate-k8s-manifests';
+import { pushImage } from '../tools/push';
+import { deployApplication } from '../tools/deploy';
+import { verifyDeployment } from '../tools/verify-deployment';
+import { createSessionManager } from '../lib/session';
+import { createTimer, createLogger, type Logger } from '../lib/logger';
 import type {
   DeploymentWorkflowParams,
   DeploymentWorkflowResult,
   WorkflowStep,
   WorkflowContext,
-} from './types.js';
+} from './types';
 
 /**
  * Run the complete deployment workflow
@@ -32,7 +32,7 @@ export async function runDeploymentWorkflow(
 ): Promise<DeploymentWorkflowResult> {
   const logger = providedLogger || createLogger({ name: 'deployment-workflow' });
   const timer = createTimer(logger, 'deployment-workflow');
-  const sessionManager = getSessionManager(logger);
+  const sessionManager = createSessionManager(logger);
   const { sessionId, imageId, clusterConfig, deploymentOptions } = params;
 
   // Initialize workflow context

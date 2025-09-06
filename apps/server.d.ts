@@ -1,4 +1,3 @@
-// Removed ToolRegistry - using native registration
 import type { Services } from '../src/services/index.js';
 import { type ApplicationConfig } from '../src/config/index.js';
 

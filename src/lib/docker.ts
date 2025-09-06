@@ -22,7 +22,7 @@ import type {
 /**
  * Docker client wrapper implementation
  */
-export class DockerClientWrapper implements IDockerClient {
+class DockerClientWrapper implements IDockerClient {
   private logger: Logger;
 
   constructor(
@@ -432,98 +432,4 @@ export function createDockerClient(
   logger: Logger,
 ): IDockerClient {
   return new DockerClientWrapper(dockerClient, scannerService, logger);
-}
-
-/**
- * Mock Docker client for testing
- */
-export class MockDockerClient implements IDockerClient {
-  async build(options: DockerBuildOptions): Promise<DockerBuildResult> {
-    return {
-      imageId: 'sha256:mock-image-id',
-      tags: options.tags ?? ['mock:latest'],
-      size: 100 * 1024 * 1024, // 100MB
-      logs: [
-        'Step 1/3 : FROM node:18',
-        'Step 2/3 : COPY . .',
-        'Step 3/3 : CMD ["node", "index.js"]',
-      ],
-      success: true,
-    };
-  }
-
-  async getImage(): Promise<DockerImage | null> {
-    return {
-      id: 'sha256:mock-image-id',
-      repository: 'mock',
-      tag: 'latest',
-      size: 100 * 1024 * 1024,
-      created: new Date().toISOString(),
-      labels: {},
-      repoTags: ['mock:latest'],
-      architecture: 'amd64',
-      os: 'linux',
-    };
-  }
-
-  async listImages(): Promise<DockerImage[]> {
-    const image = await this.getImage();
-    return image ? [image] : [];
-  }
-
-  async removeImage(): Promise<void> {
-    // Mock implementation
-  }
-
-  async tagImage(sourceImage: string, targetTag: string): Promise<DockerTagResult> {
-    return {
-      sourceImage,
-      targetTag,
-      success: true,
-    };
-  }
-
-  async push(image: string): Promise<DockerPushResult> {
-    const [repository, tag] = image.split(':');
-    return {
-      registry: 'docker.io',
-      repository: repository ?? '',
-      tag: tag ?? 'latest',
-      digest: 'sha256:mock-digest',
-      success: true,
-    };
-  }
-
-  async pull(): Promise<void> {
-    // Mock implementation
-  }
-
-  async listContainers(): Promise<DockerContainer[]> {
-    return [];
-  }
-
-  async scan(): Promise<DockerScanResult> {
-    return {
-      vulnerabilities: [],
-      summary: {
-        critical: 0,
-        high: 0,
-        medium: 0,
-        low: 0,
-        total: 0,
-      },
-      scanner: 'trivy',
-    };
-  }
-
-  async ping(): Promise<boolean> {
-    return true;
-  }
-
-  async version(): Promise<{ version: string; apiVersion: string }> {
-    return {
-      version: '20.10.0',
-      apiVersion: '1.41',
-    };
-  }
 }

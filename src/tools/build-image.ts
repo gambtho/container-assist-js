@@ -7,7 +7,7 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { getSessionManager } from '../lib/session';
+import { createSessionManager } from '../lib/session';
 import { createDockerClient } from '../lib/docker';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
@@ -145,7 +145,7 @@ export async function buildImage(
     const startTime = Date.now();
 
     // Create lib instances
-    const sessionManager = getSessionManager(logger);
+    const sessionManager = createSessionManager(logger);
     const dockerClient = createDockerClient(null, null, logger);
 
     // Get session

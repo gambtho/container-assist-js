@@ -5,7 +5,7 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { getSessionManager } from '../lib/session';
+import { createSessionManager } from '../lib/session';
 import { createKubernetesClient } from '../lib/kubernetes';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
@@ -155,7 +155,7 @@ export async function prepareCluster(
     logger.info({ sessionId, cluster, namespace }, 'Starting cluster preparation');
 
     // Create lib instances
-    const sessionManager = getSessionManager(logger);
+    const sessionManager = createSessionManager(logger);
     const k8sClient = createKubernetesClient(null, logger);
 
     // Get session

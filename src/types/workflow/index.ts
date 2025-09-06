@@ -6,10 +6,10 @@
  */
 
 // Re-export workflow-related types from consolidated locations
-export type { ProgressUpdate, ProgressEmitter } from '../core.js';
+export type { ProgressUpdate, ProgressEmitter } from '../core';
 export type {
   ContainerizationWorkflowParams,
   ContainerizationWorkflowResult,
   DeploymentWorkflowParams,
   DeploymentWorkflowResult,
-} from '../../workflows/types.js';
+} from '../../workflows/types';

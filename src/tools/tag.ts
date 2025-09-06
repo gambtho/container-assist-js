@@ -5,7 +5,7 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { getSessionManager } from '../lib/session';
+import { createSessionManager } from '../lib/session';
 import { createDockerClient } from '../lib/docker';
 import { createTimer, type Logger } from '../lib/logger';
 import type { TagImageParams } from '../types/tools';
@@ -38,7 +38,7 @@ export async function tagImage(
     logger.info({ sessionId, tag }, 'Starting image tagging');
 
     // Create lib instances
-    const sessionManager = getSessionManager(logger);
+    const sessionManager = createSessionManager(logger);
     const dockerClient = createDockerClient(null, null, logger);
 
     // Get session using lib session manager

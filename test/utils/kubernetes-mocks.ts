@@ -6,11 +6,11 @@
 import { jest } from '@jest/globals';
 import * as k8s from '@kubernetes/client-node';
 import type {
-  K8sManifest,
+  KubernetesManifest as K8sManifest,
   K8sDeploymentOptions,
-  K8sDeploymentResult,
-  K8sServiceStatus,
-} from '../../src/types/index';
+  KubernetesDeploymentResult as K8sDeploymentResult,
+  KubernetesService as K8sServiceStatus,
+} from '../../src/types/k8s';
 
 export interface MockKubeConfig {
   loadFromFile: ReturnType<typeof jest.fn>;

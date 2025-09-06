@@ -203,7 +203,7 @@ async function main(): Promise<void> {
       console.error('🔍 Validating Containerization Assist MCP configuration...\n');
       console.error('📋 Configuration Summary:');
       console.error(`  • Log Level: ${config.server.logLevel}`);
-      console.error(`  • Workspace: ${config.workspace.workspaceDir}`);
+      console.error(`  • Workspace: ${config.workspace?.workspaceDir || process.cwd()}`);
       console.error(`  • Docker Socket: ${process.env.DOCKER_SOCKET || '/var/run/docker.sock'}`);
       console.error(`  • K8s Namespace: ${process.env.K8S_NAMESPACE || 'default'}`);
       console.error(`  • Mock Mode: ${process.env.MOCK_MODE === 'true' ? 'enabled' : 'disabled'}`);
@@ -283,7 +283,7 @@ async function main(): Promise<void> {
       {
         config: {
           logLevel: config.server.logLevel,
-          workspace: config.workspace.workspaceDir,
+          workspace: config.workspace?.workspaceDir || process.cwd(),
           mockMode: options.mock,
           devMode: options.dev,
         },
@@ -295,7 +295,7 @@ async function main(): Promise<void> {
     if (!process.env.MCP_QUIET) {
       console.error('🚀 Starting Containerization Assist MCP Server...');
       console.error(`📦 Version: ${packageJson.version}`);
-      console.error(`🏠 Workspace: ${config.workspace.workspaceDir}`);
+      console.error(`🏠 Workspace: ${config.workspace?.workspaceDir || process.cwd()}`);;
       console.error(`📊 Log Level: ${config.server.logLevel}`);
 
       if (options.mock) {

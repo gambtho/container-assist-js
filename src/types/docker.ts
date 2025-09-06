@@ -104,30 +104,6 @@ export interface DockerScanResult {
 /**
  * Zod schema for Docker scan result validation
  */
-export const DockerScanResultSchema = z.object({
-  success: z.boolean(),
-  vulnerabilities: z
-    .array(
-      z.object({
-        id: z.string(),
-        severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
-        package: z.string(),
-        version: z.string(),
-        description: z.string(),
-        fixedVersion: z.string().optional(),
-      }),
-    )
-    .optional(),
-  summary: z
-    .object({
-      total: z.number(),
-      low: z.number(),
-      medium: z.number(),
-      high: z.number(),
-      critical: z.number(),
-    })
-    .optional(),
-});
 
 /**
  * Docker image information
@@ -173,13 +149,6 @@ export interface DockerPushResult {
 /**
  * Zod schema for Docker push result validation
  */
-export const DockerPushResultSchema = z.object({
-  success: z.boolean(),
-  registry: z.string(),
-  repository: z.string(),
-  tag: z.string(),
-  digest: z.string(),
-});
 
 /**
  * Docker tag result
@@ -194,34 +163,14 @@ export interface DockerTagResult {
 /**
  * Zod schema for Docker tag result validation
  */
-export const DockerTagResultSchema = z.object({
-  success: z.boolean(),
-  sourceImage: z.string(),
-  targetTag: z.string(),
-  error: z.string().optional(),
-});
 
 /**
  * Dockerfile fix information
  */
-export interface DockerfileFix {
-  line: number;
-  original: string;
-  fixed: string;
-  reason: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-}
 
 /**
  * Zod schema for Dockerfile fix validation
  */
-export const DockerfileFixSchema = z.object({
-  line: z.number(),
-  original: z.string(),
-  fixed: z.string(),
-  reason: z.string(),
-  severity: z.enum(['low', 'medium', 'high', 'critical']),
-});
 
 /**
  * Docker registry configuration
@@ -350,15 +299,3 @@ export const BaseImageResolutionInputSchema = z.object({
 
 export type BaseImageRecommendation = z.infer<typeof BaseImageRecommendationSchema>;
 export type BaseImageResolutionInput = z.infer<typeof BaseImageResolutionInputSchema>;
-
-export interface ValidationResult {
-  isValid: boolean;
-  issues: string[];
-  suggestions?: string[];
-}
-
-export interface SuggestedImage {
-  category: string;
-  image: string;
-  notes: string;
-}

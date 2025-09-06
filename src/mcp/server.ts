@@ -9,18 +9,12 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from 'pino';
-import { createLogger } from '../lib/logger.js';
-import { getSessionManager } from '../lib/session.js';
-import { getMCPRegistry } from './registry.js';
+import { createLogger } from '../lib/logger';
+import { createSessionManager } from '../lib/session';
+import { getMCPRegistry } from './registry';
 // Workflows are registered via the registry
-// import { containerizationWorkflow } from '../workflows/containerization.js';
-// import { deploymentWorkflow } from '../workflows/deployment.js';
-import type {
-  MCPServer as IMCPServer,
-  MCPServerOptions,
-  MCPRequest,
-  MCPResponse,
-} from './types.js';
+// Workflows are now registered via the registry
+import type { MCPServer as IMCPServer, MCPServerOptions, MCPRequest, MCPResponse } from './types';
 
 /**
  * Containerization Assist MCP Server
@@ -32,13 +26,13 @@ export class ContainerizationMCPServer implements IMCPServer {
   private transport: StdioServerTransport;
   private logger: Logger;
   private registry: ReturnType<typeof getMCPRegistry>;
-  private _sessionManager: ReturnType<typeof getSessionManager>; // For future session-aware tool execution
+  private _sessionManager: ReturnType<typeof createSessionManager>; // For future session-aware tool execution
   private isRunning: boolean = false;
 
   constructor(logger?: Logger, options: MCPServerOptions = {}) {
     this.logger = logger ?? createLogger({ name: 'mcp-server' });
     this.registry = getMCPRegistry(this.logger);
-    this._sessionManager = getSessionManager(this.logger);
+    this._sessionManager = createSessionManager(this.logger);
 
     // Initialize MCP server
     this.server = new Server(
@@ -366,4 +360,3 @@ export async function startMCPServer(
 /**
  * Export the server class as default
  */
-export default ContainerizationMCPServer;

@@ -17,7 +17,7 @@ import {
   type SessionFilter,
 } from '../types/session';
 
-export interface SessionConfig {
+interface SessionConfig {
   ttl?: number; // Session TTL in seconds (default: 24 hours)
   maxSessions?: number; // Max concurrent sessions (default: 1000)
   cleanupIntervalMs?: number; // Cleanup interval in ms (default: 5 minutes)
@@ -30,7 +30,7 @@ const DEFAULT_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 /**
  * Core session manager implementation
  */
-export class SessionManagerImpl implements SessionManager {
+class SessionManagerImpl implements SessionManager {
   private sessions = new Map<string, Session>();
   private cleanupTimer: NodeJS.Timeout | undefined = undefined;
   private readonly logger: Logger;
@@ -306,17 +306,4 @@ export class SessionManagerImpl implements SessionManager {
  */
 export function createSessionManager(logger: Logger, config?: SessionConfig): SessionManager {
   return new SessionManagerImpl(logger, config);
-}
-
-/**
- * Default session manager instance (singleton pattern)
- * Can be used when a single session manager is sufficient
- */
-let defaultManager: SessionManager | null = null;
-
-export function getSessionManager(logger: Logger, config?: SessionConfig): SessionManager {
-  if (!defaultManager) {
-    defaultManager = createSessionManager(logger, config);
-  }
-  return defaultManager;
 }

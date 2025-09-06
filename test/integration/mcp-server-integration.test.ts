@@ -8,7 +8,7 @@ import { performance } from 'perf_hooks';
 
 // Mock implementations for architecture testing
 interface ArchitectureTestComponents {
-  // Team Alpha - Consolidated Types
+  // Consolidated Types
   domainTypes: {
     Session: any;
     SessionStore: any; 
@@ -20,7 +20,7 @@ interface ArchitectureTestComponents {
     ServiceError: any;
   };
   
-  // Team Bravo - Infrastructure Standardization
+  // Infrastructure Components
   infrastructure: {
     logger: any;
     eventPublisher: any;
@@ -28,7 +28,7 @@ interface ArchitectureTestComponents {
     messaging: any;
   };
   
-  // Team Charlie - Service Layer Organization
+  // Service Layer Components
   services: {
     sessionManager: any;
     workflowManager: any;
@@ -36,7 +36,7 @@ interface ArchitectureTestComponents {
     dependencies: any;
   };
   
-  // Team Delta - Testing Infrastructure
+  // Testing Infrastructure
   testing: {
     jestConfig: any;
     testHelpers: any;
@@ -135,7 +135,7 @@ describe('Week 5: Comprehensive Integration Testing', () => {
   });
 
   describe('Cross-Team Integration Validation', () => {
-    test('should validate Team Alpha type consolidation integration', async () => {
+    test('should validate type consolidation integration', async () => {
       const startTime = performance.now();
       
       // Test consolidated session types integration
@@ -161,7 +161,7 @@ describe('Week 5: Comprehensive Integration Testing', () => {
       expect(duration).toBeLessThan(50); // Should complete quickly
     });
 
-    test('should validate Team Bravo infrastructure standardization integration', async () => {
+    test('should validate infrastructure standardization integration', async () => {
       const startTime = performance.now();
       
       // Test unified logger integration
@@ -191,7 +191,7 @@ describe('Week 5: Comprehensive Integration Testing', () => {
       expect(duration).toBeLessThan(100); // Infrastructure calls should be fast
     });
 
-    test('should validate Team Charlie service layer integration', async () => {
+    test('should validate service layer integration', async () => {
       const startTime = performance.now();
       
       // Test tool registry integration
@@ -220,7 +220,7 @@ describe('Week 5: Comprehensive Integration Testing', () => {
       expect(duration).toBeLessThan(75); // Service operations should be efficient
     });
 
-    test('should validate Team Delta testing infrastructure integration', async () => {
+    test('should validate testing infrastructure integration', async () => {
       const startTime = performance.now();
       
       // Test Jest configuration integration
@@ -249,7 +249,7 @@ describe('Week 5: Comprehensive Integration Testing', () => {
       const startTime = performance.now();
       const sessionId = 'e2e-test-session';
       
-      // 1. Team Alpha: Create session with consolidated types
+      // 1. Create session with consolidated types
       const session = await components.services.sessionManager.createSession({
         repoPath: '/test/e2e-repo',
         metadata: { 
@@ -261,11 +261,11 @@ describe('Week 5: Comprehensive Integration Testing', () => {
       
       expect(session.id).toBeDefined();
       
-      // 2. Team Bravo: Initialize infrastructure services
+      // 2. Initialize infrastructure services
       await components.services.dependencies.initialize();
       expect(components.services.dependencies.initialize).toHaveBeenCalled();
       
-      // 3. Team Charlie: Start workflow using service layer
+      // 3. Start workflow using service layer
       const workflow = await components.services.workflowManager.startWorkflow({
         sessionId: session.id,
         type: 'containerization',
@@ -423,17 +423,17 @@ describe('Week 5: Comprehensive Integration Testing', () => {
       const iterations = 500;
       
       for (let i = 0; i < iterations; i++) {
-        // Team Alpha: Type operations
+        // Type operations
         const session = await components.services.sessionManager.createSession({
           repoPath: `/test/memory-repo-${i}`,
           metadata: { iteration: i }
         });
         
-        // Team Bravo: Infrastructure operations
+        // Infrastructure operations
         components.infrastructure.logger.info(`Memory test iteration ${i}`);
         components.infrastructure.eventPublisher.publish('memory-test', { iteration: i });
         
-        // Team Charlie: Service operations
+        // Service operations
         await components.services.toolRegistry.execute('ping', { message: `memory-${i}` });
         
         // Periodically check memory (every 100 iterations)

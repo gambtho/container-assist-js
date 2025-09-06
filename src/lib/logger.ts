@@ -7,9 +7,7 @@
 
 import pino from 'pino';
 
-// Re-export Pino types directly - no custom Logger interface needed!
 export type { Logger } from 'pino';
-export { pino };
 
 /**
  * Create a Pino logger with sensible defaults for containerization assist
@@ -34,22 +32,12 @@ export function createLogger(options: pino.LoggerOptions = {}): pino.Logger {
   );
 }
 
-/**
- * Get or create a default logger instance (singleton)
- */
-let defaultLogger: pino.Logger | null = null;
-
-export function getLogger(): pino.Logger {
-  if (!defaultLogger) {
-    defaultLogger = createLogger();
-  }
-  return defaultLogger;
-}
+// Singleton pattern removed - use createLogger directly
 
 /**
  * Performance timer utility for measuring operation duration
  */
-export class PerformanceTimer {
+class PerformanceTimer {
   private startTime: number;
   private logger: pino.Logger;
   private operation: string;
@@ -109,35 +97,11 @@ export function createTimer(
 /**
  * Create a child logger with additional context
  */
-export function createChildLogger(logger: pino.Logger, bindings: pino.Bindings): pino.Logger {
-  return logger.child(bindings);
-}
 
 /**
  * Helper to create a logger for a specific component
  */
-export function createComponentLogger(
-  component: string,
-  options?: pino.LoggerOptions,
-): pino.Logger {
-  const logger = createLogger(options);
-  return logger.child({ component });
-}
 
 /**
  * Helper to create a logger for a specific tool
  */
-export function createToolLogger(
-  toolName: string,
-  sessionId?: string,
-  options?: pino.LoggerOptions,
-): pino.Logger {
-  const logger = createLogger(options);
-  const bindings: pino.Bindings = { component: 'tool', tool: toolName };
-
-  if (sessionId) {
-    bindings.sessionId = sessionId;
-  }
-
-  return logger.child(bindings);
-}

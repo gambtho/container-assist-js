@@ -5,13 +5,13 @@ import { existsSync } from 'fs';
 const isTestBuild = process.env.BUILD_TEST_UTILS === 'true';
 
 const mainEntries = {
-  // Main entry point (package.json main/exports ".")
-  'src/index': 'src/index.ts',
+  // Main entry point (package.json main/exports ".") - now points to MCP server
+  'src/mcp/server': 'src/mcp/server.ts',
   // CLI entry point (package.json bin)
   'apps/cli': 'apps/cli.ts',
   // Additional exports from package.json exports (match output paths)
-  'types/index': 'src/types/index.ts',
-  'service/config/config': 'src/config/index.ts'
+  'src/types/core': 'src/types/core.ts',
+  'src/config/types': 'src/config/types.ts'
 };
 
 const testEntries = {

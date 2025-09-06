@@ -9,20 +9,20 @@
  * 5. Tag image appropriately
  */
 
-import { analyzeRepo } from '../tools/analyze-repo.js';
-import { generateDockerfile } from '../tools/generate-dockerfile.js';
-import { buildImage } from '../tools/build-image.js';
-import { scanImage } from '../tools/scan.js';
-import { tagImage } from '../tools/tag.js';
-import { isFail } from '../types/core.js';
-import { getSessionManager } from '../lib/session.js';
-import { createTimer, createLogger, type Logger } from '../lib/logger.js';
+import { analyzeRepo } from '../tools/analyze-repo';
+import { generateDockerfile } from '../tools/generate-dockerfile';
+import { buildImage } from '../tools/build-image';
+import { scanImage } from '../tools/scan';
+import { tagImage } from '../tools/tag';
+import { isFail } from '../types/core';
+import { createSessionManager } from '../lib/session';
+import { createTimer, createLogger, type Logger } from '../lib/logger';
 import type {
   ContainerizationWorkflowParams,
   ContainerizationWorkflowResult,
   WorkflowStep,
   WorkflowContext,
-} from './types.js';
+} from './types';
 
 /**
  * Run the complete containerization workflow
@@ -33,7 +33,7 @@ export async function runContainerizationWorkflow(
 ): Promise<ContainerizationWorkflowResult> {
   const logger = providedLogger || createLogger({ name: 'containerization-workflow' });
   const timer = createTimer(logger, 'containerization-workflow');
-  const sessionManager = getSessionManager(logger);
+  const sessionManager = createSessionManager(logger);
   const { sessionId, projectPath, buildOptions = {}, scanOptions = {} } = params;
 
   // Initialize workflow context

@@ -5,7 +5,7 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { getSessionManager } from '../lib/session';
+import { createSessionManager } from '../lib/session';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
 
@@ -187,7 +187,7 @@ export async function workflow(
     const { repoPath, workflowType = 'full', automated = false, options = {} } = config;
 
     // Create or get session
-    const sessionManager = getSessionManager(logger);
+    const sessionManager = createSessionManager(logger);
     let sessionId = config.sessionId;
 
     if (!sessionId) {
@@ -367,7 +367,7 @@ export async function getWorkflowStatus(
   logger: Logger,
 ): Promise<Result<WorkflowStatusResult>> {
   try {
-    const sessionManager = getSessionManager(logger);
+    const sessionManager = createSessionManager(logger);
     const session = await sessionManager.get(sessionId);
 
     if (!session) {

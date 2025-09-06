@@ -6,30 +6,30 @@
  */
 
 import type { Logger } from 'pino';
-import { createLogger } from '../lib/logger.js';
-import type { Result } from '../types/core/index.js';
+import { createLogger } from '../lib/logger';
+import type { Result } from '../types/core/index';
 
 // Import tool creators from flat tools structure
-import { createAnalyzeRepoTool } from '../tools/analyze-repo.js';
-import { createBuildImageTool } from '../tools/build-image.js';
-import { createDeployApplicationTool } from '../tools/deploy.js';
-import { createFixDockerfileTool } from '../tools/fix-dockerfile.js';
-import { createGenerateDockerfileTool } from '../tools/generate-dockerfile.js';
-import { createGenerateK8sManifestsTool } from '../tools/generate-k8s-manifests.js';
-import { createOpsTool } from '../tools/ops.js';
-import { createPrepareClusterTool } from '../tools/prepare-cluster.js';
-import { createPushTool } from '../tools/push.js';
-import { createResolveBaseImagesTool } from '../tools/resolve-base-images.js';
-import { createScanTool } from '../tools/scan.js';
-import { createTagTool } from '../tools/tag.js';
-import { createVerifyDeploymentTool } from '../tools/verify-deployment.js';
-import { createWorkflowTool } from '../tools/workflow.js';
+import { createAnalyzeRepoTool } from '../tools/analyze-repo';
+import { createBuildImageTool } from '../tools/build-image';
+import { createDeployApplicationTool } from '../tools/deploy';
+import { createFixDockerfileTool } from '../tools/fix-dockerfile';
+import { createGenerateDockerfileTool } from '../tools/generate-dockerfile';
+import { createGenerateK8sManifestsTool } from '../tools/generate-k8s-manifests';
+import { createOpsTool } from '../tools/ops';
+import { createPrepareClusterTool } from '../tools/prepare-cluster';
+import { createPushTool } from '../tools/push';
+import { createResolveBaseImagesTool } from '../tools/resolve-base-images';
+import { createScanTool } from '../tools/scan';
+import { createTagTool } from '../tools/tag';
+import { createVerifyDeploymentTool } from '../tools/verify-deployment';
+import { createWorkflowTool } from '../tools/workflow';
 
 // Import workflows
-import { containerizationWorkflow } from '../workflows/containerization.js';
-import { deploymentWorkflow } from '../workflows/deployment.js';
+import { containerizationWorkflow } from '../workflows/containerization';
+import { deploymentWorkflow } from '../workflows/deployment';
 
-import type { MCPTool, MCPWorkflow, ToolRegistry, WorkflowRegistry } from './types.js';
+import type { MCPTool, MCPWorkflow, ToolRegistry, WorkflowRegistry } from './types';
 
 /**
  * MCP Tool and Workflow Registry implementation
@@ -466,8 +466,4 @@ export function getMCPRegistry(logger?: Logger): MCPToolRegistry {
     registryInstance = new MCPToolRegistry(logger);
   }
   return registryInstance;
-}
-
-export function resetMCPRegistry(): void {
-  registryInstance = undefined;
 }

@@ -11,7 +11,7 @@ import type { DockerScanResult, ScanOptions } from '../types/docker';
 /**
  * Scanner configuration
  */
-export interface ScannerConfig {
+interface ScannerConfig {
   scanner?: 'trivy' | 'grype' | 'snyk';
   timeout?: number;
   cacheDir?: string;
@@ -21,7 +21,7 @@ export interface ScannerConfig {
 /**
  * Security scanner interface for lib layer
  */
-export interface SecurityScanner {
+interface SecurityScanner {
   /**
    * Scan a Docker image for vulnerabilities
    */
@@ -56,7 +56,7 @@ export interface SecurityScanner {
 /**
  * Security scanner wrapper implementation
  */
-export class SecurityScannerWrapper implements SecurityScanner {
+class SecurityScannerWrapper implements SecurityScanner {
   private logger: Logger;
 
   constructor(
@@ -383,61 +383,4 @@ export function createSecurityScanner(
   logger: Logger,
 ): SecurityScanner {
   return new SecurityScannerWrapper(scannerService, config, logger);
-}
-
-/**
- * Mock security scanner for testing
- */
-export class MockSecurityScanner implements SecurityScanner {
-  constructor(private config: ScannerConfig = {}) {}
-
-  async scanImage(image: string): Promise<DockerScanResult> {
-    return {
-      vulnerabilities: [
-        {
-          id: 'CVE-2023-1234',
-          severity: 'MEDIUM',
-          package: 'openssl',
-          version: '1.1.1',
-          fixedVersion: '1.1.1k',
-          description: 'Mock vulnerability for testing',
-        },
-      ],
-      summary: {
-        critical: 0,
-        high: 0,
-        medium: 1,
-        low: 0,
-        total: 1,
-      },
-      scanner: 'trivy',
-      scanTime: new Date().toISOString(),
-      metadata: {
-        image,
-      },
-    };
-  }
-
-  async scanPath(): Promise<DockerScanResult> {
-    return this.scanImage('mock-path');
-  }
-
-  async updateDatabase(): Promise<void> {
-    // Mock implementation
-  }
-
-  async getVersion(): Promise<{ scanner: string; version: string }> {
-    return {
-      scanner: 'trivy',
-      version: '1.0.0',
-    };
-  }
-
-  async ping(): Promise<boolean> {
-    return true;
-  }
-
-  getConfig(): ScannerConfig {
-    return { ...this.config };
-  }
 }

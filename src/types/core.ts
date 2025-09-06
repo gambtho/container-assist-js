@@ -87,22 +87,10 @@ export class DomainError extends Error {
 /**
  * Infrastructure-level errors
  */
-export class InfrastructureError extends DomainError {
-  constructor(code: ErrorCode, message: string, cause?: Error) {
-    super(code, message, cause);
-    this.name = 'InfrastructureError';
-  }
-}
 
 /**
  * Service-level errors
  */
-export class ServiceError extends DomainError {
-  constructor(code: ErrorCode, message: string, cause?: Error) {
-    super(code, message, cause);
-    this.name = 'ServiceError';
-  }
-}
 
 /**
  * Tool error interface for structured error handling

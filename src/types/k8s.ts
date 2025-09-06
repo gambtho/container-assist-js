@@ -28,11 +28,6 @@ export type KubernetesManifest = KubernetesResource;
 /**
  * Collection of Kubernetes manifests
  */
-export interface KubernetesManifestCollection {
-  resources: KubernetesManifest[];
-  namespace?: string;
-  labels?: Record<string, string>;
-}
 
 /**
  * Kubernetes deployment result

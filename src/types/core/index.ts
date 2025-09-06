@@ -6,4 +6,4 @@
  */
 
 // Only export the commonly used types
-export { type Result, Success, Failure, isOk, isFail, ErrorCode } from '../core.js';
+export { type Result, Success, Failure, isOk, isFail, ErrorCode } from '../core';

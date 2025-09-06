@@ -6,21 +6,21 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "main": "./dist/src/index.js",
-  "types": "./dist/src/index.d.ts",
+  "main": "./dist/src/mcp/server.js",
+  "types": "./dist/src/mcp/server.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
-      "import": "./dist/src/index.js",
-      "default": "./dist/src/index.js"
+      "types": "./dist/src/mcp/server.d.ts",
+      "import": "./dist/src/mcp/server.js",
+      "default": "./dist/src/mcp/server.js"
     },
     "./types": {
-      "types": "./dist/types/index.d.ts",
-      "import": "./dist/types/index.js"
+      "types": "./dist/src/types/core.d.ts",
+      "import": "./dist/src/types/core.js"
     },
     "./config": {
-      "types": "./dist/service/config/config.d.ts",
-      "import": "./dist/service/config/config.js"
+      "types": "./dist/src/config/types.d.ts",
+      "import": "./dist/src/config/types.js"
     }
   },
   "bin": {

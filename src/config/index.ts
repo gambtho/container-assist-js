@@ -6,7 +6,26 @@
 export type { ApplicationConfig } from './types';
 
 // Export essential configuration functions only
-export { createConfiguration } from './config';
+export {
+  createConfiguration,
+  createConfigurationForEnv,
+  getConfigurationSummary as getConfigSummary,
+} from './config';
+export { ConfigHelpers } from './validation';
+
+/**
+ * Create minimal test configuration
+ */
+export function createMinimalConfig(): ApplicationConfig {
+  return createTestConfig();
+}
+
+/**
+ * Reset configuration for tests
+ */
+export function resetConfig(): void {
+  _config = undefined;
+}
 
 // Import configuration
 import { createConfiguration, getConfigurationSummary } from './config';

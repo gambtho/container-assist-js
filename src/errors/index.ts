@@ -3,7 +3,7 @@
  * These replace the Result<T> monad pattern with standard TypeScript error handling.
  */
 
-import { ErrorCode } from '../types/core.js';
+import { ErrorCode } from '../types/core';
 
 /**
  * Base error class for all application errors
@@ -94,19 +94,6 @@ export class AIServiceError extends ApplicationError {
 }
 
 /**
- * Error thrown when validation fails
- */
-export class ValidationError extends ApplicationError {
-  constructor(
-    message: string,
-    public readonly fields?: string[],
-    public readonly violations?: Array<{ field: string; message: string }>,
-    context?: Record<string, unknown>,
-  ) {
-    super(message, ErrorCode.ValidationFailed, { ...context, fields, violations });
-    this.name = 'ValidationError';
-  }
-}
 
 /**
  * Error thrown when configuration is invalid
@@ -130,53 +117,6 @@ export class ConfigurationError extends ApplicationError {
 }
 
 /**
- * Error thrown when a workflow operation fails
- */
-export class WorkflowError extends ApplicationError {
-  constructor(
-    message: string,
-    public readonly workflowId?: string | undefined,
-    public readonly step?: string | undefined,
-    public override readonly cause?: Error | undefined,
-    context?: Record<string, unknown> | undefined,
-  ) {
-    super(message, ErrorCode.WorkflowFailed, { ...context, workflowId, step });
-    this.name = 'WorkflowError';
-  }
-}
-
-/**
- * Error thrown when storage operations fail
- */
-export class StorageError extends ApplicationError {
-  constructor(
-    message: string,
-    public readonly key?: string | undefined,
-    public readonly operation?: 'get' | 'set' | 'delete' | 'list' | undefined,
-    public override readonly cause?: Error | undefined,
-    context?: Record<string, unknown> | undefined,
-  ) {
-    super(message, ErrorCode.FileSystemError, { ...context, key, operation });
-    this.name = 'StorageError';
-  }
-}
-
-/**
- * Error thrown when a resource is not found
- */
-export class NotFoundError extends ApplicationError {
-  constructor(
-    message: string,
-    public readonly resourceType?: string,
-    public readonly resourceId?: string,
-    context?: Record<string, unknown>,
-  ) {
-    super(message, ErrorCode.FileNotFound, { ...context, resourceType, resourceId });
-    this.name = 'NotFoundError';
-  }
-}
-
-/**
  * Error thrown when an operation times out
  */
 export class TimeoutError extends ApplicationError {
@@ -189,26 +129,4 @@ export class TimeoutError extends ApplicationError {
     super(message, ErrorCode.TimeoutError, { ...context, timeoutMs, operation });
     this.name = 'TimeoutError';
   }
-}
-
-/**
- * Error thrown when rate limits are exceeded
- */
-export class RateLimitError extends ApplicationError {
-  constructor(
-    message: string,
-    public readonly limit?: number,
-    public readonly resetAt?: Date,
-    context?: Record<string, unknown>,
-  ) {
-    super(message, ErrorCode.InternalError, { ...context, limit, resetAt });
-    this.name = 'RateLimitError';
-  }
-}
-
-/**
- * Type guard to check if an error is an ApplicationError
- */
-export function isApplicationError(error: unknown): error is ApplicationError {
-  return error instanceof ApplicationError;
 }

@@ -2,7 +2,7 @@
  * Workflow type definitions for orchestrating containerization and deployment pipelines
  */
 
-import type { Session } from '../types/session.js';
+import type { Session } from '../types/session';
 
 /**
  * Base workflow parameters shared by all workflows

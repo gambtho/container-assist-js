@@ -5,7 +5,7 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { getSessionManager } from '../lib/session';
+import { createSessionManager } from '../lib/session';
 import { createSecurityScanner } from '../lib/scanner';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
@@ -48,7 +48,7 @@ export async function scanImage(
     logger.info({ sessionId, scanner, severityThreshold }, 'Starting image security scan');
 
     // Create lib instances
-    const sessionManager = getSessionManager(logger);
+    const sessionManager = createSessionManager(logger);
     const securityScanner = createSecurityScanner(null, { scanner }, logger);
 
     // Get session using lib session manager

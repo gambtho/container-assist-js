@@ -24,21 +24,21 @@ module.exports = {
       argsIgnorePattern: '^_',
       varsIgnorePattern: '^_'
     }],
-    '@typescript-eslint/no-explicit-any': 'off', // Temporarily disabled during migration
+    '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/strict-boolean-expressions': 'off',
-    '@typescript-eslint/prefer-nullish-coalescing': 'off', // Temporarily disabled during migration
+    '@typescript-eslint/prefer-nullish-coalescing': 'off',
     '@typescript-eslint/prefer-optional-chain': 'error',
-    '@typescript-eslint/require-await': 'off', // Temporarily disabled during migration
+    '@typescript-eslint/require-await': 'off',
     '@typescript-eslint/no-unnecessary-type-assertion': 'error',
     '@typescript-eslint/no-non-null-assertion': 'off',
     '@typescript-eslint/prefer-as-const': 'error',
     
     // Relax unsafe any operations to warnings
-    '@typescript-eslint/no-unsafe-argument': 'off', // Temporarily disabled during migration
-    '@typescript-eslint/no-unsafe-assignment': 'off', // Temporarily disabled during migration
-    '@typescript-eslint/no-unsafe-call': 'off', // Temporarily disabled during migration
-    '@typescript-eslint/no-unsafe-member-access': 'off', // Temporarily disabled during migration
-    '@typescript-eslint/no-unsafe-return': 'off', // Temporarily disabled during migration
+    '@typescript-eslint/no-unsafe-argument': 'off',
+    '@typescript-eslint/no-unsafe-assignment': 'off',
+    '@typescript-eslint/no-unsafe-call': 'off',
+    '@typescript-eslint/no-unsafe-member-access': 'off',
+    '@typescript-eslint/no-unsafe-return': 'off',
     
     // Import rules (strict ESM patterns)
     'no-duplicate-imports': 'error',
@@ -112,9 +112,8 @@ module.exports = {
       }
     },
     {
-      // Allow 'any' types in lib modules during migration
+      // Allow 'any' types in lib modules
       // These modules wrap external dependencies (dockerode, scanner services, etc)
-      // which will be properly typed in Phase 3
       files: ['src/lib/**/*.ts'],
       rules: {
         '@typescript-eslint/no-explicit-any': 'off',

@@ -4,7 +4,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { Result } from '../types/core/index.js';
+import type { Result } from '../types/core/index';
 
 /**
  * MCP Tool definition
@@ -24,7 +24,6 @@ export interface MCPTool {
 /**
  * Tool creation function signature
  */
-export type ToolCreator = (logger: Logger) => MCPTool;
 
 /**
  * MCP Workflow definition
@@ -103,37 +102,10 @@ export interface MCPResponse {
 /**
  * List tools request/response
  */
-export interface ListToolsRequest {
-  method: 'tools/list';
-}
-
-export interface ListToolsResponse {
-  tools: Array<{
-    name: string;
-    description: string;
-    inputSchema: object;
-  }>;
-}
 
 /**
  * Call tool request/response
  */
-export interface CallToolRequest {
-  method: 'tools/call';
-  params: {
-    name: string;
-    arguments: object;
-  };
-}
-
-export interface CallToolResponse {
-  content: Array<{
-    type: 'text' | 'image' | 'error';
-    text?: string;
-    data?: unknown;
-  }>;
-  isError?: boolean;
-}
 
 /**
  * MCP Server interface

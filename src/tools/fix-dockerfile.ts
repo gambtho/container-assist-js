@@ -5,7 +5,7 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { getSessionManager } from '../lib/session';
+import { createSessionManager } from '../lib/session';
 import { createAIService } from '../lib/ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
@@ -41,7 +41,7 @@ export async function fixDockerfile(
     logger.info({ sessionId }, 'Starting Dockerfile fix');
 
     // Create lib instances
-    const sessionManager = getSessionManager(logger);
+    const sessionManager = createSessionManager(logger);
 
     // Fallback mock function for testing scenarios
     const mockAIFunction = async (
