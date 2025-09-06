@@ -137,33 +137,33 @@ interface MCPConfig { /* 6 team sections */ }
 
 ## ✅ Team Dependencies (UNBLOCKED)
 
-### Team Beta Dependencies (READY ✅)
+### Sampling Workflow Dependencies (READY ✅)
 - ✅ ResourceManager for candidate caching
 - ✅ ProgressNotifier for sampling progress
 - ✅ MCPConfig.sampling section configured
-- ✅ Real implementations available via `TeamInfrastructure.Beta()`
-- ✅ Mock implementations available via `TeamMocks.Beta()`
+- ✅ Real implementations available via `MCPInfrastructure.sampling()`
+- ✅ Mock implementations available via `MockMCPInfrastructure.fast()`
 
-### Team Delta Dependencies (READY ✅)
+### Enhanced Tooling Dependencies (READY ✅)
 - ✅ ResourceManager for tool resource links
 - ✅ ProgressNotifier for tool progress events
 - ✅ MCPConfig.tools section configured
 - ✅ BaseOrchestrator for tool workflows
-- ✅ Real implementations available via `TeamInfrastructure.Delta()`
+- ✅ Real implementations available via `MCPInfrastructure.tooling()`
 
-### Team Gamma Dependencies (READY ✅)
+### Testing Infrastructure Dependencies (READY ✅)
 - ✅ Complete mock suite for testing
 - ✅ MCPConfig.testing section configured
 - ✅ Performance benchmark utilities
 - ✅ Statistics and debugging tools
-- ✅ Real implementations available via `TeamInfrastructure.Gamma()`
+- ✅ Real implementations available via `MCPInfrastructure.testing()`
 
-### Team Epsilon Dependencies (READY ✅)
+### Integration Workflow Dependencies (READY ✅)
 - ✅ BaseOrchestrator for workflow coordination
 - ✅ MCPConfig.integration section configured
 - ✅ All core interfaces for orchestration
 - ✅ End-to-end test utilities
-- ✅ Real implementations available via `TeamInfrastructure.Epsilon()`
+- ✅ Real implementations available via `MCPInfrastructure.integration()`
 
 ## 🔧 Additional Team Alpha Tasks (OPTIONAL)
 

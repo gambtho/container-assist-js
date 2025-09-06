@@ -1,4 +1,4 @@
-import { Result, Success, Failure } from '../../../domain/types/result.js';
+import { Result, Success, Failure } from '../../../types/core.js';
 import type { Logger } from 'pino';
 import { Candidate, GenerationContext } from '../../../lib/sampling.js';
 import { BaseCandidateGenerator } from '../base.js';
@@ -54,21 +54,21 @@ export class K8sManifestGenerator extends BaseCandidateGenerator<K8sManifestSet>
   async generate(context: GenerationContext, count = 3): Promise<Result<Candidate<K8sManifestSet>[]>> {
     try {
       this.logger.debug({ context, count }, 'Generating K8s manifest candidates');
-      
+
       const k8sContext = context as K8sContext;
       const candidates: Candidate<K8sManifestSet>[] = [];
-      
+
       const selectedStrategies = this.selectStrategies(count);
       const progressToken = `k8s-gen-${context.sessionId}`;
       this.notifyProgress(progressToken, 0, 'Starting K8s manifest generation');
 
       for (let i = 0; i < selectedStrategies.length; i++) {
         const strategy = selectedStrategies[i];
-        
+
         try {
           const manifests = await strategy.generateManifests(k8sContext);
           const candidateId = this.createCandidateId(strategy.name, context);
-          
+
           const candidate: Candidate<K8sManifestSet> = {
             id: candidateId,
             content: manifests,
@@ -84,10 +84,10 @@ export class K8sManifestGenerator extends BaseCandidateGenerator<K8sManifestSet>
           };
 
           candidates.push(candidate);
-          
+
           const progress = Math.round(((i + 1) / selectedStrategies.length) * 100);
           this.notifyProgress(progressToken, progress, `Generated candidate ${i + 1}/${selectedStrategies.length}`);
-          
+
         } catch (error) {
           this.logger.warn({ strategy: strategy.name, error }, 'Strategy failed, skipping');
           continue;
@@ -111,7 +111,7 @@ export class K8sManifestGenerator extends BaseCandidateGenerator<K8sManifestSet>
   async validate(candidate: Candidate<K8sManifestSet>): Promise<Result<boolean>> {
     try {
       const manifests = candidate.content;
-      
+
       // Basic validation checks
       const validationChecks = [
         this.hasRequiredDeployment(manifests),
@@ -135,18 +135,18 @@ export class K8sManifestGenerator extends BaseCandidateGenerator<K8sManifestSet>
 
   private hasRequiredDeployment(manifests: K8sManifestSet): boolean {
     const deployment = manifests.deployment as any;
-    return deployment && deployment.apiVersion && deployment.kind && deployment.metadata?.name;
+    return deployment?.apiVersion && deployment.kind && deployment.metadata?.name;
   }
 
   private hasRequiredService(manifests: K8sManifestSet): boolean {
     const service = manifests.service as any;
-    return service && service.apiVersion && service.kind && service.metadata?.name;
+    return service?.apiVersion && service.kind && service.metadata?.name;
   }
 
   private hasValidResourceLimits(manifests: K8sManifestSet): boolean {
     const deployment = manifests.deployment as any;
     const containers = deployment?.spec?.template?.spec?.containers || [];
-    
+
     return containers.every((container: any) => {
       const resources = container.resources;
       return resources && (resources.limits || resources.requests);
@@ -156,9 +156,9 @@ export class K8sManifestGenerator extends BaseCandidateGenerator<K8sManifestSet>
   private hasSecurityContext(manifests: K8sManifestSet): boolean {
     const deployment = manifests.deployment as any;
     const containers = deployment?.spec?.template?.spec?.containers || [];
-    
-    return containers.some((container: any) => 
-      container.securityContext && container.securityContext.runAsNonRoot
+
+    return containers.some((container: any) =>
+      container.securityContext?.runAsNonRoot,
     );
   }
 }

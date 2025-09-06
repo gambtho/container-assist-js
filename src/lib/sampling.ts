@@ -1,4 +1,4 @@
-import { Result } from '../domain/types/result.js';
+import { Result } from '../types/core.js';
 
 // Core sampling types
 export interface Candidate<T> {

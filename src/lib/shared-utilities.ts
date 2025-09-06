@@ -30,15 +30,15 @@ export class ResourceValidator {
     try {
       const url = new URL(uri);
       const validSchemes = ['mcp', 'cache', 'session', 'temp'];
-      
+
       if (!validSchemes.includes(url.protocol.slice(0, -1))) {
         return Failure(`Invalid URI scheme: ${url.protocol}. Must be one of: ${validSchemes.join(', ')}`);
       }
-      
+
       if (!url.pathname || url.pathname === '/') {
         return Failure('URI must have a valid path');
       }
-      
+
       return Success(undefined);
     } catch (error) {
       return Failure(`Invalid URI format: ${error.message}`);
@@ -52,11 +52,11 @@ export class ResourceValidator {
     if (typeof content === 'string') {
       return Buffer.byteLength(content, 'utf8');
     }
-    
+
     if (Buffer.isBuffer(content)) {
       return content.length;
     }
-    
+
     // For objects, stringify and measure
     return Buffer.byteLength(JSON.stringify(content), 'utf8');
   }
@@ -85,18 +85,18 @@ export class ProgressUtils {
     notifier: ProgressNotifier,
     token: string,
     operation: string,
-    logger: Logger
+    logger: Logger,
   ): (progress: number, message?: string) => void {
     return (progress: number, message?: string) => {
       const clampedProgress = Math.max(0, Math.min(100, progress));
       const reportMessage = message ?? `${operation} ${clampedProgress}%`;
-      
+
       notifier.notifyProgress({
         token,
         value: clampedProgress,
-        message: reportMessage
+        message: reportMessage,
       });
-      
+
       logger.debug({ token, progress: clampedProgress, message: reportMessage }, 'Progress reported');
     };
   }
@@ -108,7 +108,7 @@ export class ProgressUtils {
     notifier: ProgressNotifier,
     token: string,
     steps: string[],
-    logger: Logger
+    logger: Logger,
   ): {
     currentStep: number;
     nextStep: (message?: string) => void;
@@ -116,17 +116,17 @@ export class ProgressUtils {
     error: (error: string) => void;
   } {
     let currentStep = 0;
-    
+
     return {
       currentStep,
       nextStep: (message?: string) => {
         if (currentStep < steps.length) {
           const progress = Math.round((currentStep / steps.length) * 100);
           const stepMessage = message ?? `${steps[currentStep]}...`;
-          
+
           notifier.notifyProgress({ token, value: progress, message: stepMessage });
           logger.debug({ token, step: currentStep, message: stepMessage }, 'Step progress');
-          
+
           currentStep++;
         }
       },
@@ -137,7 +137,7 @@ export class ProgressUtils {
       error: (error: string) => {
         notifier.notifyError(token, error);
         logger.error({ token, error, completedSteps: currentStep }, 'Operation failed');
-      }
+      },
     };
   }
 
@@ -148,15 +148,15 @@ export class ProgressUtils {
     if (!token || typeof token !== 'string') {
       return Failure('Progress token must be a non-empty string');
     }
-    
+
     if (token.length < 3) {
       return Failure('Progress token must be at least 3 characters');
     }
-    
+
     if (!/^[a-zA-Z0-9_-]+$/.test(token)) {
       return Failure('Progress token must contain only alphanumeric characters, underscores, and hyphens');
     }
-    
+
     return Success(undefined);
   }
 }
@@ -179,7 +179,7 @@ export class ErrorUtils {
   static async safeExecute<T>(
     operation: () => Promise<T>,
     errorMessage: string,
-    logger?: Logger
+    logger?: Logger,
   ): Promise<Result<T>> {
     try {
       const result = await operation();
@@ -200,15 +200,15 @@ export class ErrorUtils {
     if (error instanceof Error) {
       return error.message;
     }
-    
+
     if (typeof error === 'string') {
       return error;
     }
-    
+
     if (error && typeof error === 'object' && 'message' in error) {
       return String((error as { message: unknown }).message);
     }
-    
+
     return 'Unknown error occurred';
   }
 
@@ -219,10 +219,10 @@ export class ErrorUtils {
     operation: () => Promise<Result<T>>,
     maxAttempts: number,
     delayMs: number = 1000,
-    logger?: Logger
+    logger?: Logger,
   ): Promise<Result<T>> {
     let lastError = '';
-    
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const result = await operation();
@@ -236,7 +236,7 @@ export class ErrorUtils {
       } catch (error) {
         lastError = this.extractErrorMessage(error);
       }
-      
+
       if (attempt < maxAttempts) {
         if (logger) {
           logger.warn({ attempt, maxAttempts, error: lastError }, 'Operation failed, retrying...');
@@ -244,7 +244,7 @@ export class ErrorUtils {
         await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }
-    
+
     return Failure(`Operation failed after ${maxAttempts} attempts. Last error: ${lastError}`);
   }
 }
@@ -262,7 +262,7 @@ export class ResourceUtils {
     content: unknown,
     maxSize: number,
     ttl?: number,
-    logger?: Logger
+    logger?: Logger,
   ): Promise<Result<string>> {
     // Validate URI
     const uriValidation = ResourceValidator.validateUri(uri);
@@ -285,10 +285,10 @@ export class ResourceUtils {
     // Publish
     const result = await resourceManager.publish(uri, content, ttl);
     if (result.success && logger) {
-      logger.info({ 
-        uri, 
-        size: sizeValidation.data, 
-        ttl 
+      logger.info({
+        uri,
+        size: sizeValidation.data,
+        ttl,
       }, 'Resource published with validation');
     }
 
@@ -301,23 +301,23 @@ export class ResourceUtils {
   static async safeRead(
     resourceManager: ResourceManager,
     uri: string,
-    logger?: Logger
+    logger?: Logger,
   ): Promise<Result<unknown>> {
     try {
       const result = await resourceManager.read(uri);
-      
+
       if (!result.success) {
         return result;
       }
-      
+
       if (!result.data) {
         return Failure(`Resource not found: ${uri}`);
       }
-      
+
       if (logger) {
         logger.debug({ uri }, 'Resource read successfully');
       }
-      
+
       return Success(result.data.content);
     } catch (error) {
       const errorMessage = ErrorUtils.extractErrorMessage(error);
@@ -349,13 +349,13 @@ export class LoggingUtils {
   static createOperationLog(
     operation: string,
     token: string,
-    metadata: Record<string, unknown> = {}
+    metadata: Record<string, unknown> = {},
   ): Record<string, unknown> {
     return {
       operation,
       token,
       timestamp: new Date().toISOString(),
-      ...metadata
+      ...metadata,
     };
   }
 
@@ -366,13 +366,13 @@ export class LoggingUtils {
     logger: Logger,
     operation: string,
     startTime: number,
-    metadata: Record<string, unknown> = {}
+    metadata: Record<string, unknown> = {},
   ): void {
     const duration = Date.now() - startTime;
     logger.info({
       operation,
       duration,
-      ...metadata
+      ...metadata,
     }, `Operation ${operation} completed in ${duration}ms`);
   }
 
@@ -383,7 +383,7 @@ export class LoggingUtils {
     operation: () => Promise<T>,
     operationName: string,
     logger: Logger,
-    metadata: Record<string, unknown> = {}
+    metadata: Record<string, unknown> = {},
   ): Promise<T> {
     const startTime = Date.now();
     try {
@@ -396,7 +396,7 @@ export class LoggingUtils {
         operation: operationName,
         duration,
         error: ErrorUtils.extractErrorMessage(error),
-        ...metadata
+        ...metadata,
       }, `Operation ${operationName} failed after ${duration}ms`);
       throw error;
     }
@@ -412,7 +412,7 @@ export class ConfigUtils {
    */
   static deepMerge<T extends Record<string, any>>(base: T, override: Partial<T>): T {
     const result = { ...base };
-    
+
     for (const key in override) {
       if (override[key] !== undefined) {
         if (typeof override[key] === 'object' && override[key] !== null && !Array.isArray(override[key])) {
@@ -422,7 +422,7 @@ export class ConfigUtils {
         }
       }
     }
-    
+
     return result;
   }
 
@@ -432,20 +432,20 @@ export class ConfigUtils {
   static validateRequired<T extends Record<string, any>>(
     config: T,
     requiredKeys: (keyof T)[],
-    configName: string = 'configuration'
+    configName: string = 'configuration',
   ): Result<void> {
     const missing: string[] = [];
-    
+
     for (const key of requiredKeys) {
       if (config[key] === undefined || config[key] === null) {
         missing.push(String(key));
       }
     }
-    
+
     if (missing.length > 0) {
       return Failure(`Missing required ${configName} keys: ${missing.join(', ')}`);
     }
-    
+
     return Success(undefined);
   }
 
@@ -455,11 +455,11 @@ export class ConfigUtils {
   static getNestedValue<T>(
     obj: Record<string, any>,
     path: string,
-    defaultValue?: T
+    defaultValue?: T,
   ): T | undefined {
     const keys = path.split('.');
     let current = obj;
-    
+
     for (const key of keys) {
       if (current && typeof current === 'object' && key in current) {
         current = current[key];
@@ -467,7 +467,7 @@ export class ConfigUtils {
         return defaultValue;
       }
     }
-    
+
     return current as T;
   }
 }
@@ -481,5 +481,5 @@ export const SharedUtilities = {
   ErrorUtils,
   ResourceUtils,
   LoggingUtils,
-  ConfigUtils
+  ConfigUtils,
 } as const;

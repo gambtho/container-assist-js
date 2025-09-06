@@ -17,6 +17,8 @@ import type {
 import { DynamicConfigManager, ConfigHealthChecker } from './config/dynamic-config';
 import { createResourcePublisher } from './utils/resource-integration';
 import { createProgressReporter } from './utils/progress-events';
+import { createTeamAlphaResourcePublisher } from './integrations/team-alpha-integration';
+import { createTeamBetaIntegration } from './integrations/team-beta-integration';
 import { Success, Failure, type Result } from '../../types/core/index';
 
 // Import existing tool functions
@@ -338,9 +340,15 @@ export class EnhancedToolFactoryImpl implements EnhancedToolFactory {
       dynamicConfig?: Record<string, unknown>;
       signal?: AbortSignal;
       timeoutMs?: number;
+      useTeamAlphaIntegration?: boolean;
+      useTeamBetaIntegration?: boolean;
     },
   ): EnhancedToolContext {
-    const resourcePublisher = createResourcePublisher(logger, sessionId);
+    // Create resource publisher - use Team Alpha integration if available
+    const resourcePublisher = options?.useTeamAlphaIntegration
+      ? createTeamAlphaResourcePublisher(logger, sessionId)
+      : createResourcePublisher(logger, sessionId);
+
     const progressReporter = createProgressReporter(
       logger,
       'unknown',
@@ -349,6 +357,11 @@ export class EnhancedToolFactoryImpl implements EnhancedToolFactory {
       options?.mcpProgressToken,
     );
 
+    // Create sampling service - use Team Beta integration if available
+    const samplingService = options?.useTeamBetaIntegration && !options?.samplingService
+      ? createTeamBetaIntegration(logger).createMockSamplingService(sessionId)
+      : options?.samplingService;
+
     return {
       logger,
       sessionId,
@@ -356,7 +369,7 @@ export class EnhancedToolFactoryImpl implements EnhancedToolFactory {
       resourcePublisher,
       mcpServer: undefined, // Will be set by MCP server
       progressToken: options?.mcpProgressToken,
-      samplingService: options?.samplingService,
+      samplingService,
       dynamicConfig: options?.dynamicConfig,
       signal: options?.signal,
       timeoutMs: options?.timeoutMs,
@@ -400,6 +413,7 @@ export class EnhancedToolFactoryImpl implements EnhancedToolFactory {
       mcpProgressToken?: string;
       timeout?: number;
       signal?: AbortSignal;
+      useTeamIntegrations?: boolean;
     },
   ): Promise<Result<any>> {
     const tool = this.tools.get(toolName);
@@ -411,12 +425,8 @@ export class EnhancedToolFactoryImpl implements EnhancedToolFactory {
       mcpProgressToken: options?.mcpProgressToken,
       signal: options?.signal,
       timeoutMs: options?.timeout,
-    } as {
-      mcpProgressToken?: string;
-      samplingService?: any;
-      dynamicConfig?: Record<string, unknown>;
-      signal?: AbortSignal;
-      timeoutMs?: number;
+      useTeamAlphaIntegration: options?.useTeamIntegrations,
+      useTeamBetaIntegration: options?.useTeamIntegrations,
     });
 
     return await tool.execute(params, context);

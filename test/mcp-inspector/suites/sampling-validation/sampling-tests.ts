@@ -1,7 +1,7 @@
 /**
  * Sampling Validation Tests for MCP Inspector
- * Team Gamma - Testing Infrastructure
- * Tests Team Beta's sampling algorithms via MCP tools
+ * MCP Inspector Testing Infrastructure
+ * Tests sampling algorithms via MCP tools
  */
 
 import { TestCase, MCPTestRunner } from '../../infrastructure/test-runner.js';

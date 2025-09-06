@@ -1,6 +1,6 @@
 /**
  * Basic Tool Validation Tests
- * Team Gamma - Testing Infrastructure
+ * MCP Inspector Testing Infrastructure
  */
 
 import { TestCase, MCPTestRunner } from '../../infrastructure/test-runner.js';

@@ -44,13 +44,36 @@ Core testing framework that:
 
 ## Current Test Coverage
 
-### ✅ Working Tests
-1. **ops-status-tool** - Ops tool status operation validation
-2. **analyze-repository-basic** - Repository analysis with test fixture
-3. **tool-response-time-validation** - Performance baseline validation
+### ✅ Working Test Suites
 
-### ⚠️ Known Issues
-1. **ops-ping-responds** - Response format needs adjustment for ping operation
+#### Tool Validation (3/4 tests passing - 75%)
+1. **ops-status-tool** ✅ - Ops tool status operation validation
+2. **analyze-repository-basic** ✅ - Repository analysis with test fixture  
+3. **tool-response-time-validation** ✅ - Performance baseline validation
+4. **ops-ping-responds** ⚠️ - Response format needs adjustment
+
+#### Resource Management (4/5 tests passing - 80%)
+1. **resource-size-limits** ✅ - Validates 5MB resource size limits
+2. **resource-mime-types** ✅ - MIME type validation for resources
+3. **resource-caching-behavior** ✅ - Basic caching validation
+4. **resource-uri-scheme-validation** ✅ - URI scheme format validation
+5. **resource-accessibility** ⚠️ - Resource access validation (tool interface issue)
+
+#### Load Testing (5/5 tests passing - 100%)
+1. **concurrent-tool-calls** ✅ - 10 concurrent operations (7ms)
+2. **concurrent-analysis-operations** ✅ - 5 concurrent analysis (9ms)
+3. **memory-leak-detection** ✅ - 20 iterations memory stability (1017ms)
+4. **stress-test-rapid-requests** ✅ - 50 rapid requests (5ms)
+5. **resource-intensive-load-test** ✅ - 3 heavy operations (1ms)
+
+#### Sampling Validation (1/5 tests passing - 20%)
+1. **sampling-error-handling** ✅ - Error handling validation
+2. **dockerfile-candidate-generation** ⚠️ - Tool interface needs adjustment
+3. **dockerfile-scoring-determinism** ⚠️ - Tool interface needs adjustment  
+4. **sampling-performance-benchmark** ⚠️ - Tool interface needs adjustment
+5. **multi-candidate-validation** ⚠️ - Tool interface needs adjustment
+
+### 📊 Overall Status: 13/19 tests passing (68%)
 
 ## Performance Targets
 

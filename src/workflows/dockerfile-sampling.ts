@@ -1,4 +1,4 @@
-import { Result, Success, Failure } from '../domain/types/result.js';
+import { Result, Success, Failure } from '../types/core.js';
 import type { Logger } from 'pino';
 import { ScoredCandidate, SamplingConfig } from '../lib/sampling.js';
 import { BaseSamplingOrchestrator, HighestScoreWinnerSelector } from './sampling/base.js';

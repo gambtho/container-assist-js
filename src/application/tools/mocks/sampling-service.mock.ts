@@ -93,7 +93,7 @@ export class MockDockerfileCandidateGenerator implements CandidateGenerator<Dock
     for (let i = 0; i < Math.min(count, strategies.length); i++) {
       const strategy = strategies[i];
       if (!strategy) continue;
-      
+
       const candidate = await this.generateDockerfileCandidate(
         strategy,
         language,
@@ -456,7 +456,7 @@ export class MockSamplingService implements SamplingService {
     if (!winner) {
       throw new Error('No candidates available for selection');
     }
-    
+
     this.logger.info(
       {
         winnerId: winner.id,

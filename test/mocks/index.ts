@@ -147,63 +147,43 @@ export function createInfrastructure(
 }
 
 /**
- * Team-specific infrastructure setups (real implementations by default)
+ * MCP infrastructure factory for different use cases
  */
-export const TeamInfrastructure = {
-  Alpha: () => createInfrastructure(),
-  Beta: () => {
-    const infra = createInfrastructure(getTeamBetaConfig());
-    return infra;
-  },
-  Gamma: () => {
-    const infra = createInfrastructure(getTeamGammaConfig());
-    return infra;
-  },
-  Delta: () => {
-    const infra = createInfrastructure(getTeamDeltaConfig());
-    return infra;
-  },
-  Epsilon: () => {
-    const infra = createInfrastructure(getTeamEpsilonConfig());
-    return infra;
-  },
+export const MCPInfrastructure = {
+  /** Standard configuration for general use */
+  standard: () => createInfrastructure(),
+  /** Configuration optimized for sampling workflows */
+  sampling: () => createInfrastructure({
+    sampling: { maxCandidates: 7, defaultCandidates: 4, cacheTTL: 300000 }
+  }),
+  /** Configuration optimized for testing workflows */
+  testing: () => createInfrastructure({
+    testing: { enableInspector: true, benchmarkSamples: 10 }
+  }),
+  /** Configuration optimized for enhanced tooling */
+  tooling: () => createInfrastructure({
+    tools: { enableResourceLinks: true, enableDynamicEnablement: true }
+  }),
+  /** Configuration optimized for integration workflows */
+  integration: () => createInfrastructure({
+    integration: { enableOrchestration: true, maxConcurrentOperations: 5 }
+  }),
 } as const;
 
 /**
- * Team-specific mock setups (for testing only)
- * @deprecated Use TeamInfrastructure for real implementations
+ * Mock MCP infrastructure factory for testing and development
  */
-export const TeamMocks = {
-  Alpha: () => createMockMCPInfrastructure('development'),
-  Beta: () => {
-    const mocks = createMockMCPInfrastructure('development');
-    return {
-      ...mocks,
-      config: getTeamBetaConfig(),
-    };
-  },
-  Gamma: () => {
-    const mocks = createMockMCPInfrastructure('fast'); // Fast for test automation
-    return {
-      ...mocks,
-      config: getTeamGammaConfig(),
-    };
-  },
-  Delta: () => {
-    const mocks = createMockMCPInfrastructure('development');
-    return {
-      ...mocks,
-      config: getTeamDeltaConfig(),
-    };
-  },
-  Epsilon: () => {
-    const mocks = createMockMCPInfrastructure('development');
-    return {
-      ...mocks,
-      config: getTeamEpsilonConfig(),
-    };
-  },
+export const MockMCPInfrastructure = {
+  /** Standard mock setup for development */
+  standard: () => createMockMCPInfrastructure('development'),
+  /** Fast mocks for unit testing */
+  fast: () => createMockMCPInfrastructure('fast'),
+  /** Minimal mocks for basic testing */
+  minimal: () => createMockMCPInfrastructure('minimal'),
+  /** Stress testing mocks with failures */
+  stress: () => createMockMCPInfrastructure('stress'),
 } as const;
+
 
 /**
  * Environment-based mock selection

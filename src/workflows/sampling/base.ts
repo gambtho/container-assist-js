@@ -1,4 +1,4 @@
-import { Result, Success, Failure } from '../../domain/types/result.js';
+import { Result, Success, Failure } from '../../types/core.js';
 import type { Logger } from 'pino';
 import {
   Candidate,
@@ -10,22 +10,22 @@ import {
   SamplingConfig,
   DEFAULT_SAMPLING_CONFIG,
 } from '../../lib/sampling.js';
-import {
-  createResourceManager,
-  createProgressNotifier,
-} from '../../mocks/resource-manager.mock.js';
+import { getTeamAlphaIntegration, ResourceManager, ProgressNotifier } from '../../infrastructure/team-alpha-integration.js';
 
 // Base abstract classes for sampling implementation
 export abstract class BaseCandidateGenerator<T> implements CandidateGenerator<T> {
   protected logger: Logger;
-  protected resourceCache = createResourceManager();
-  protected progressNotifier = createProgressNotifier();
+  protected resourceCache: ResourceManager;
+  protected progressNotifier: ProgressNotifier;
 
   abstract readonly name: string;
   abstract readonly supportedTypes: string[];
 
   constructor(logger: Logger) {
     this.logger = logger;
+    const teamAlphaIntegration = getTeamAlphaIntegration(logger);
+    this.resourceCache = teamAlphaIntegration.getResourceManager();
+    this.progressNotifier = teamAlphaIntegration.getProgressNotifier();
   }
 
   abstract generate(context: GenerationContext, count?: number): Promise<Result<Candidate<T>[]>>;
@@ -160,7 +160,7 @@ export abstract class BaseSamplingOrchestrator<T> {
   protected generator: CandidateGenerator<T>;
   protected scorer: CandidateScorer<T>;
   protected selector: WinnerSelector<T>;
-  protected resourceCache = createResourceManager();
+  protected resourceCache: ResourceManager;
 
   constructor(
     logger: Logger,
@@ -174,6 +174,10 @@ export abstract class BaseSamplingOrchestrator<T> {
     this.scorer = scorer;
     this.selector = selector;
     this.config = { ...DEFAULT_SAMPLING_CONFIG, ...config };
+    
+    // Initialize Team Alpha integration
+    const teamAlphaIntegration = getTeamAlphaIntegration(logger);
+    this.resourceCache = teamAlphaIntegration.getResourceManager();
   }
 
   async sample(context: GenerationContext, count?: number): Promise<Result<ScoredCandidate<T>>> {
@@ -253,7 +257,8 @@ export abstract class BaseSamplingOrchestrator<T> {
   }
 
   private notifyProgress(token: string, value: number, message?: string): void {
-    const progressNotifier = createProgressNotifier();
+    const teamAlphaIntegration = getTeamAlphaIntegration(this.logger);
+    const progressNotifier = teamAlphaIntegration.getProgressNotifier();
     progressNotifier.notifyProgress({
       token,
       value,

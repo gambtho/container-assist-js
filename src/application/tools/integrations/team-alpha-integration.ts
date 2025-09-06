@@ -59,10 +59,11 @@ export class TeamAlphaResourcePublisher implements ResourcePublisher {
 
     // Publish using Team Alpha's resource manager
     const publishResult = await this.resourceManager.publish(uri, data, resourceTTL);
-    
+
     if (!publishResult.ok) {
-      this.logger.error({ error: publishResult.error, uri }, 'Failed to publish resource via Team Alpha');
-      throw new Error(`Resource publishing failed: ${publishResult.error}`);
+      const errorMsg = 'error' in publishResult ? publishResult.error : 'Unknown error';
+      this.logger.error({ error: errorMsg, uri }, 'Failed to publish resource via Team Alpha');
+      throw new Error(`Resource publishing failed: ${errorMsg}`);
     }
 
     this.logger.debug({ uri, size, mimeType, ttl: resourceTTL }, 'Published resource via Team Alpha');
@@ -116,8 +117,9 @@ export class TeamAlphaResourcePublisher implements ResourcePublisher {
     if (pattern) {
       const invalidateResult = await this.resourceManager.invalidate(pattern);
       if (!invalidateResult.ok) {
-        this.logger.error({ error: invalidateResult.error, pattern }, 'Failed to cleanup resources');
-        throw new Error(`Resource cleanup failed: ${invalidateResult.error}`);
+        const errorMsg = 'error' in invalidateResult ? invalidateResult.error : 'Unknown error';
+        this.logger.error({ error: errorMsg, pattern }, 'Failed to cleanup resources');
+        throw new Error(`Resource cleanup failed: ${errorMsg}`);
       }
     } else {
       // Cleanup all session resources
@@ -145,9 +147,10 @@ export class TeamAlphaResourcePublisher implements ResourcePublisher {
    */
   async read(uri: string): Promise<Result<unknown>> {
     const readResult = await this.resourceManager.read(uri);
-    
+
     if (!readResult.ok) {
-      return Failure(`Failed to read resource: ${readResult.error}`);
+      const errorMsg = 'error' in readResult ? readResult.error : 'Unknown error';
+      return Failure(`Failed to read resource: ${errorMsg}`);
     }
 
     if (!readResult.value) {

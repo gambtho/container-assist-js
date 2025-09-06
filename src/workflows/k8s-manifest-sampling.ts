@@ -1,4 +1,4 @@
-import { Result, Success, Failure } from '../domain/types/result.js';
+import { Result, Success, Failure } from '../types/core.js';
 import type { Logger } from 'pino';
 import { ScoredCandidate, SamplingConfig } from '../lib/sampling.js';
 import { BaseSamplingOrchestrator, HighestScoreWinnerSelector } from './sampling/base.js';
@@ -22,12 +22,12 @@ export class K8sManifestSamplingOrchestrator extends BaseSamplingOrchestrator<K8
   constructor(
     logger: Logger,
     options: K8sSamplingOptions = {},
-    config: Partial<SamplingConfig> = {}
+    config: Partial<SamplingConfig> = {},
   ) {
     const generator = new K8sManifestGenerator(logger);
     const scorer = K8sManifestSamplingOrchestrator.createScorer(logger, options);
     const selector = new HighestScoreWinnerSelector<K8sManifestSet>();
-    
+
     const mergedConfig: Partial<SamplingConfig> = {
       maxCandidates: options.maxCandidates || 3,
       validation: {
@@ -42,10 +42,10 @@ export class K8sManifestSamplingOrchestrator extends BaseSamplingOrchestrator<K8
 
   private static createScorer(
     logger: Logger,
-    options: K8sSamplingOptions
+    options: K8sSamplingOptions,
   ): K8sManifestScorer | ProductionK8sScorer | DevelopmentK8sScorer {
     const environment = options.environment || 'production';
-    
+
     switch (environment) {
       case 'production': {
         const prodScorer = new ProductionK8sScorer(logger);
@@ -75,12 +75,12 @@ export class K8sManifestSamplingOrchestrator extends BaseSamplingOrchestrator<K8
   }
 
   async generateBestK8sManifests(
-    context: K8sContext
+    context: K8sContext,
   ): Promise<Result<ScoredCandidate<K8sManifestSet>>> {
     this.logger.info({ sessionId: context.sessionId }, 'Starting K8s manifest sampling');
-    
+
     const result = await this.sample(context);
-    
+
     if (result.success) {
       this.logger.info({
         sessionId: context.sessionId,
@@ -100,15 +100,15 @@ export class K8sManifestSamplingOrchestrator extends BaseSamplingOrchestrator<K8
 
   async generateMultipleK8sManifests(
     context: K8sContext,
-    count: number
+    count: number,
   ): Promise<Result<ScoredCandidate<K8sManifestSet>[]>> {
     this.logger.info(
       { sessionId: context.sessionId, count },
-      'Starting multiple K8s manifest sampling'
+      'Starting multiple K8s manifest sampling',
     );
-    
+
     const result = await this.sampleMultiple(context, count);
-    
+
     if (result.success) {
       this.logger.info({
         sessionId: context.sessionId,
@@ -173,11 +173,11 @@ export class K8sManifestSamplingOrchestrator extends BaseSamplingOrchestrator<K8
   // Generate manifests optimized for specific deployment patterns
   async generateForDeploymentPattern(
     context: K8sContext,
-    pattern: 'stateless' | 'stateful' | 'microservice' | 'high-availability'
+    pattern: 'stateless' | 'stateful' | 'microservice' | 'high-availability',
   ): Promise<Result<ScoredCandidate<K8sManifestSet>>> {
     // Enhance context based on pattern
     const enhancedContext = this.enhanceContextForPattern(context, pattern);
-    
+
     this.logger.info({
       sessionId: context.sessionId,
       pattern,
@@ -194,7 +194,7 @@ export class K8sManifestSamplingOrchestrator extends BaseSamplingOrchestrator<K8
         enhanced.replicas = Math.max(enhanced.replicas || 2, 2);
         enhanced.enableHPA = true;
         break;
-        
+
       case 'stateful':
         enhanced.replicas = Math.max(enhanced.replicas || 3, 3);
         enhanced.persistentVolume = enhanced.persistentVolume || {
@@ -203,14 +203,14 @@ export class K8sManifestSamplingOrchestrator extends BaseSamplingOrchestrator<K8
           accessMode: 'ReadWriteOnce',
         };
         break;
-        
+
       case 'microservice':
         enhanced.replicas = enhanced.replicas || 2;
         enhanced.serviceType = enhanced.serviceType || 'ClusterIP';
         enhanced.cpuRequest = enhanced.cpuRequest || '100m';
         enhanced.memoryRequest = enhanced.memoryRequest || '128Mi';
         break;
-        
+
       case 'high-availability':
         enhanced.replicas = Math.max(enhanced.replicas || 3, 3);
         enhanced.enableHPA = true;
@@ -227,16 +227,16 @@ export class K8sManifestSamplingOrchestrator extends BaseSamplingOrchestrator<K8
   // Utility method to extract specific manifest types
   extractManifestsByType(
     manifests: K8sManifestSet,
-    types: Array<'deployment' | 'service' | 'configMap' | 'ingress' | 'hpa' | 'pvc'>
+    types: Array<'deployment' | 'service' | 'configMap' | 'ingress' | 'hpa' | 'pvc'>,
   ): Partial<K8sManifestSet> {
     const extracted: Partial<K8sManifestSet> = {};
-    
+
     for (const type of types) {
       if (manifests[type]) {
         extracted[type] = manifests[type];
       }
     }
-    
+
     return extracted;
   }
 
@@ -245,19 +245,19 @@ export class K8sManifestSamplingOrchestrator extends BaseSamplingOrchestrator<K8
     try {
       // This would typically use js-yaml library, but for now return JSON representation
       const manifestArray = [];
-      
+
       if (manifests.deployment) manifestArray.push(manifests.deployment);
       if (manifests.service) manifestArray.push(manifests.service);
       if (manifests.configMap) manifestArray.push(manifests.configMap);
       if (manifests.ingress) manifestArray.push(manifests.ingress);
       if (manifests.hpa) manifestArray.push(manifests.hpa);
       if (manifests.pvc) manifestArray.push(manifests.pvc);
-      
+
       // Convert to YAML-like format (simplified)
       const yamlContent = manifestArray
         .map(manifest => JSON.stringify(manifest, null, 2))
         .join('\n---\n');
-      
+
       return Success(yamlContent);
     } catch (error) {
       return Failure(`YAML generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -268,7 +268,7 @@ export class K8sManifestSamplingOrchestrator extends BaseSamplingOrchestrator<K8
 // Factory function for easy instantiation
 export const createK8sSampler = (
   logger: Logger,
-  options: K8sSamplingOptions = {}
+  options: K8sSamplingOptions = {},
 ): K8sManifestSamplingOrchestrator => {
   return new K8sManifestSamplingOrchestrator(logger, options);
 };

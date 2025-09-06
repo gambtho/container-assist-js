@@ -1,4 +1,4 @@
-import { Result, Success, Failure } from '../../../domain/types/result.js';
+import { Result, Success, Failure } from '../../../types/core.js';
 import type { Logger } from 'pino';
 import { Candidate, ScoredCandidate } from '../../../lib/sampling.js';
 import { BaseCandidateScorer } from '../base.js';
@@ -30,11 +30,11 @@ export class K8sManifestScorer extends BaseCandidateScorer<K8sManifestSet> {
   }
 
   protected async scoreCandidate(
-    candidate: Candidate<K8sManifestSet>
+    candidate: Candidate<K8sManifestSet>,
   ): Promise<Result<ScoredCandidate<K8sManifestSet>>> {
     try {
       const manifests = candidate.content;
-      
+
       // Calculate scores for each criterion
       const scoreBreakdown = {
         resourceEfficiency: this.scoreResourceEfficiency(manifests),
@@ -72,17 +72,17 @@ export class K8sManifestScorer extends BaseCandidateScorer<K8sManifestSet> {
     // Check for resource requests and limits
     for (const container of containers) {
       const resources = container.resources || {};
-      
+
       if (resources.requests && resources.limits) {
         score += 15; // Both requests and limits defined
-        
+
         // Check if limits are reasonable (not too high)
         const cpuLimit = this.parseCpuValue(resources.limits.cpu || '1000m');
         const memoryLimit = this.parseMemoryValue(resources.limits.memory || '1Gi');
-        
+
         if (cpuLimit <= 1000) score += 5; // <= 1 CPU
         if (memoryLimit <= 1024) score += 5; // <= 1GB memory
-        
+
       } else if (resources.requests || resources.limits) {
         score += 8; // At least one defined
       }
@@ -124,7 +124,7 @@ export class K8sManifestScorer extends BaseCandidateScorer<K8sManifestSet> {
     // Container security contexts
     for (const container of containers) {
       const securityContext = container.securityContext || {};
-      
+
       if (securityContext.allowPrivilegeEscalation === false) score += 5;
       if (securityContext.readOnlyRootFilesystem) score += 5;
       if (securityContext.runAsNonRoot) score += 5;
@@ -144,16 +144,16 @@ export class K8sManifestScorer extends BaseCandidateScorer<K8sManifestSet> {
     let score = 50; // Base score
 
     const deployment = manifests.deployment as any;
-    
+
     // Check for horizontal scaling setup
     if (manifests.hpa) {
       const hpa = manifests.hpa as any;
       score += 20;
-      
+
       // Check for multiple metrics
       const metrics = hpa.spec?.metrics || [];
       if (metrics.length > 1) score += 10; // CPU + Memory metrics
-      
+
       // Check for scaling behavior configuration
       if (hpa.spec?.behavior) score += 10;
     }
@@ -167,7 +167,7 @@ export class K8sManifestScorer extends BaseCandidateScorer<K8sManifestSet> {
     const affinity = deployment?.spec?.template?.spec?.affinity;
     if (affinity?.podAntiAffinity) {
       score += 15;
-      
+
       // Required anti-affinity is better than preferred
       if (affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution) {
         score += 5;
@@ -178,7 +178,7 @@ export class K8sManifestScorer extends BaseCandidateScorer<K8sManifestSet> {
     const strategy = deployment?.spec?.strategy;
     if (strategy?.type === 'RollingUpdate') {
       score += 5;
-      
+
       // Check for reasonable rolling update parameters
       const rollingUpdate = strategy.rollingUpdate || {};
       if (rollingUpdate.maxUnavailable === 0 || rollingUpdate.maxUnavailable === '0') {
@@ -199,22 +199,22 @@ export class K8sManifestScorer extends BaseCandidateScorer<K8sManifestSet> {
     for (const container of containers) {
       if (container.livenessProbe) {
         score += 15;
-        
+
         // Check for reasonable probe configuration
         const liveness = container.livenessProbe;
         if (liveness.initialDelaySeconds >= 10) score += 3;
         if (liveness.timeoutSeconds <= 10) score += 2;
       }
-      
+
       if (container.readinessProbe) {
         score += 15;
-        
+
         // Check for reasonable probe configuration
         const readiness = container.readinessProbe;
         if (readiness.initialDelaySeconds >= 0) score += 3;
         if (readiness.periodSeconds <= 10) score += 2;
       }
-      
+
       if (container.startupProbe) {
         score += 10; // Startup probe for better handling of slow-starting apps
       }
@@ -343,7 +343,7 @@ export class ProductionK8sScorer extends K8sManifestScorer {
       deploymentSpeed: 0.025,
       maintenance: 0.025,
     };
-    
+
     super(logger, productionWeights);
   }
 }
@@ -361,7 +361,7 @@ export class DevelopmentK8sScorer extends K8sManifestScorer {
       deploymentSpeed: 0.3,
       maintenance: 0.2,
     };
-    
+
     super(logger, developmentWeights);
   }
 }

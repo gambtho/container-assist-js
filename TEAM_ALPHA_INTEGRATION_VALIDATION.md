@@ -13,21 +13,21 @@
 
 **Integration Example (Real Implementation):**
 ```typescript
-import { TeamInfrastructure } from '../test/mocks/index.js';
+import { MCPInfrastructure } from '../test/mocks/index.js';
 
-const { resourceManager, progressNotifier, config } = TeamInfrastructure.Beta();
+const { resourceManager, progressNotifier, config } = MCPInfrastructure.sampling();
 const token = progressNotifier.generateToken('dockerfile_sampling');
 
-// Team Beta uses real Team Alpha infrastructure for candidate sampling
+// Sampling workflows use real MCP infrastructure for candidate caching
 const candidateUri = await resourceManager.publish('mcp://candidates/dockerfile-1', content);
 progressNotifier.notifyProgress({ token, value: 33, message: 'Scoring candidates...' });
 ```
 
 **Testing Example (Mock Implementation):**
 ```typescript
-import { TeamMocks } from '../test/mocks/index.js';
+import { MockMCPInfrastructure } from '../test/mocks/index.js';
 
-const { resourceManager, progressNotifier, config } = TeamMocks.Beta();
+const { resourceManager, progressNotifier, config } = MockMCPInfrastructure.fast();
 // Same interface, but mock implementation for fast testing
 ```
 
@@ -54,9 +54,9 @@ sampling: {
 **Integration Example:**
 ```typescript
 import { BaseOrchestrator } from '../src/workflows/base-orchestrator.js';
-import { TeamMocks } from '../test/mocks/index.js';
+import { MCPInfrastructure } from '../test/mocks/index.js';
 
-const { resourceManager, progressNotifier, config } = TeamMocks.Delta();
+const { resourceManager, progressNotifier, config } = MCPInfrastructure.tooling();
 
 class EnhancedAnalyzeRepository extends BaseOrchestrator {
   protected async executeWorkflow(input, context, tracker, resources) {
@@ -127,9 +127,9 @@ testing: {
 **Integration Example:**
 ```typescript
 import { BaseOrchestrator } from '../src/workflows/base-orchestrator.js';
-import { TeamMocks } from '../test/mocks/index.js';
+import { MCPInfrastructure } from '../test/mocks/index.js';
 
-const { resourceManager, progressNotifier, config } = TeamMocks.Epsilon();
+const { resourceManager, progressNotifier, config } = MCPInfrastructure.integration();
 
 class ContainerizationWorkflow extends BaseOrchestrator {
   protected async executeWorkflow(input, context, tracker, resources) {
@@ -140,9 +140,9 @@ class ContainerizationWorkflow extends BaseOrchestrator {
       .addStep('Vulnerability Scanning', 1)
       .addStep('K8s Deployment', 2);
 
-    // Each step uses Team Alpha's infrastructure
+    // Each step uses MCP infrastructure
     tracker.nextStep('Starting repository analysis...');
-    // ... orchestrate other team's tools
+    // ... orchestrate workflow steps
     
     return Success(workflowResult);
   }

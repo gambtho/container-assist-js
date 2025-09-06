@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { createMCPInfrastructure, createInfrastructure, TeamInfrastructure } from '../mocks/index.js';
+import { createMCPInfrastructure, createInfrastructure, MCPInfrastructure } from '../mocks/index.js';
 
 describe('Real MCP Infrastructure Integration', () => {
   let cleanup: Array<() => void> = [];
@@ -90,21 +90,21 @@ describe('Real MCP Infrastructure Integration', () => {
     });
   });
 
-  describe('TeamInfrastructure', () => {
-    it('should provide team-specific real infrastructure', () => {
-      const betaInfra = TeamInfrastructure.Beta();
-      const deltaInfra = TeamInfrastructure.Delta();
+  describe('MCPInfrastructure', () => {
+    it('should provide use-case-specific real infrastructure', () => {
+      const samplingInfra = MCPInfrastructure.sampling();
+      const toolingInfra = MCPInfrastructure.tooling();
       
       // Should be real implementations
-      expect(betaInfra.resourceManager.constructor.name).toBe('McpResourceManager');
-      expect(betaInfra.progressNotifier.constructor.name).toBe('McpProgressNotifier');
+      expect(samplingInfra.resourceManager.constructor.name).toBe('McpResourceManager');
+      expect(samplingInfra.progressNotifier.constructor.name).toBe('McpProgressNotifier');
       
-      expect(deltaInfra.resourceManager.constructor.name).toBe('McpResourceManager');
-      expect(deltaInfra.progressNotifier.constructor.name).toBe('McpProgressNotifier');
+      expect(toolingInfra.resourceManager.constructor.name).toBe('McpResourceManager');
+      expect(toolingInfra.progressNotifier.constructor.name).toBe('McpProgressNotifier');
       
-      // Should have team-specific configs
-      expect(betaInfra.config.sampling.maxCandidates).toBe(7); // Beta-specific
-      expect(deltaInfra.config.tools.maxToolResponse).toBe(5 * 1024 * 1024); // Delta-specific
+      // Should have use-case-specific configs
+      expect(samplingInfra.config.sampling.maxCandidates).toBe(7); // Sampling-specific
+      expect(toolingInfra.config.tools.enableResourceLinks).toBe(true); // Tooling-specific
     });
   });
 

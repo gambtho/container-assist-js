@@ -1,4 +1,4 @@
-import { Result } from '../../types/core.js'
+import { Result } from '../../types/core.js';
 
 // Core workflow types
 export interface WorkflowConfig {
@@ -6,22 +6,22 @@ export interface WorkflowConfig {
   enableSampling: boolean
   maxCandidates: number // 3-10
   samplingTimeout: number // seconds
-  
+
   // Build preferences
   buildTimeout: number
   enableBuildCache: boolean
   buildArgs: Record<string, string>
-  
+
   // Security preferences
   maxVulnerabilityLevel: 'low' | 'medium' | 'high' | 'critical'
   enableAutoRemediation: boolean
   maxRemediationAttempts: number
-  
+
   // Deployment preferences
   targetEnvironment: 'dev' | 'staging' | 'prod'
   deploymentStrategy: 'rolling' | 'blue-green' | 'canary'
   enableAutoVerification: boolean
-  
+
   // Resource preferences
   keepIntermediateArtifacts: boolean
   resourceTTL: number // seconds
@@ -111,34 +111,51 @@ export type ResourceUri = string
 
 // Progress notification interface (MCP-compatible)
 export interface ProgressNotifier {
-  notifyProgress(progress: { 
+  notifyProgress(progress: {
     token: string
     value: number
-    message?: string 
+    message?: string
   }): void
   notifyComplete(token: string): void
   notifyError(token: string, error: string): void
 }
 
-// Resource management interface (from Team Alpha)
+// Use Team Alpha's ResourceManager interface directly
 export interface ResourceManager {
-  publish(uri: string, content: unknown, ttl?: number): Promise<string>
-  read(uri: string): Promise<unknown>
-  invalidate(pattern: string): Promise<void>
-  cleanup(olderThan: Date): Promise<void>
+  publish(uri: string, content: unknown, ttl?: number): Promise<Result<string>>
+  read(uri: string): Promise<Result<Resource | null>>
+  invalidate(pattern: string): Promise<Result<void>>
+  cleanup(): Promise<Result<void>>
 }
 
-// Sampling interfaces (from Team Beta)
+export interface Resource {
+  uri: string
+  content: unknown
+  mimeType: string
+  createdAt: Date
+  expiresAt?: Date
+  metadata?: Record<string, unknown>
+}
+
+// Use Team Beta's sampling interfaces directly
 export interface CandidateGenerator<T> {
-  generate(context: GenerationContext, count?: number): Promise<Candidate<T>[]>
+  readonly name: string
+  readonly supportedTypes: string[]
+  generate(context: GenerationContext, count?: number): Promise<Result<Candidate<T>[]>>
+  validate(candidate: Candidate<T>): Promise<Result<boolean>>
 }
 
 export interface CandidateScorer<T> {
-  score(candidates: Candidate<T>[]): Promise<ScoredCandidate<T>[]>
+  readonly name: string
+  readonly weights: Record<string, number>
+  score(candidates: Candidate<T>[]): Promise<Result<ScoredCandidate<T>[]>>
+  updateWeights(weights: Record<string, number>): void
 }
 
 export interface WinnerSelector<T> {
-  select(scored: ScoredCandidate<T>[]): ScoredCandidate<T>
+  readonly strategy: string
+  select(scored: ScoredCandidate<T>[]): Result<ScoredCandidate<T>>
+  selectTop(scored: ScoredCandidate<T>[], count: number): Result<ScoredCandidate<T>[]>
 }
 
 export interface Candidate<T> {
@@ -212,8 +229,8 @@ export const DEFAULT_WORKFLOW_CONFIG: WorkflowConfig = {
   deploymentStrategy: 'rolling',
   enableAutoVerification: true,
   keepIntermediateArtifacts: false,
-  resourceTTL: 3600
-}
+  resourceTTL: 3600,
+};
 
 // Stage timeout configurations
 export const STAGE_TIMEOUTS: Record<WorkflowStage, number> = {
@@ -224,53 +241,53 @@ export const STAGE_TIMEOUTS: Record<WorkflowStage, number> = {
   [WorkflowStage.REMEDIATION]: 120,
   [WorkflowStage.K8S_GENERATION]: 60,
   [WorkflowStage.DEPLOYMENT]: 300,
-  [WorkflowStage.VERIFICATION]: 120
-}
+  [WorkflowStage.VERIFICATION]: 120,
+};
 
 // Retry configurations
 export const RETRY_CONFIGS: Record<WorkflowStage, RecoveryAction> = {
   [WorkflowStage.ANALYSIS]: {
     strategy: RecoveryStrategy.RETRY,
     maxAttempts: 2,
-    backoffMs: 5000
+    backoffMs: 5000,
   },
   [WorkflowStage.DOCKERFILE_GENERATION]: {
     strategy: RecoveryStrategy.FALLBACK,
     maxAttempts: 1,
     backoffMs: 0,
-    fallbackTool: 'generate_dockerfile_basic'
+    fallbackTool: 'generate_dockerfile_basic',
   },
   [WorkflowStage.BUILD]: {
     strategy: RecoveryStrategy.RETRY,
     maxAttempts: 2,
-    backoffMs: 10000
+    backoffMs: 10000,
   },
   [WorkflowStage.SCAN]: {
     strategy: RecoveryStrategy.SKIP,
     maxAttempts: 2,
-    backoffMs: 5000
+    backoffMs: 5000,
   },
   [WorkflowStage.REMEDIATION]: {
     strategy: RecoveryStrategy.MANUAL,
     maxAttempts: 2,
     backoffMs: 0,
-    userPrompt: 'Remediation failed. Please review vulnerabilities manually.'
+    userPrompt: 'Remediation failed. Please review vulnerabilities manually.',
   },
   [WorkflowStage.K8S_GENERATION]: {
     strategy: RecoveryStrategy.FALLBACK,
     maxAttempts: 1,
     backoffMs: 0,
-    fallbackTool: 'generate_k8s_manifests_basic'
+    fallbackTool: 'generate_k8s_manifests_basic',
   },
   [WorkflowStage.DEPLOYMENT]: {
     strategy: RecoveryStrategy.RETRY,
     maxAttempts: 1,
-    backoffMs: 30000
+    backoffMs: 30000,
   },
   [WorkflowStage.VERIFICATION]: {
     strategy: RecoveryStrategy.MANUAL,
     maxAttempts: 1,
     backoffMs: 0,
-    userPrompt: 'Verification failed. Please check deployment manually.'
-  }
-}
+    userPrompt: 'Verification failed. Please check deployment manually.',
+  },
+};

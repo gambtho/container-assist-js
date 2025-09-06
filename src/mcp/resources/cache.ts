@@ -1,5 +1,5 @@
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../../domain/types/result.js';
+import { Result, Success, Failure } from '../../types/core.js';
 import type { ResourceCache } from './types.js';
 
 interface CacheEntry {
