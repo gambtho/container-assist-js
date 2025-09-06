@@ -29,7 +29,7 @@ export interface FixDockerfileResult {
 /**
  * Fix Dockerfile issues using AI assistance
  */
-export async function fixDockerfile(
+async function fixDockerfile(
   config: FixDockerfileConfig,
   logger: Logger,
 ): Promise<Result<FixDockerfileResult>> {

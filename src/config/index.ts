@@ -5,30 +5,9 @@
 // Export essential types only
 export type { ApplicationConfig } from './types';
 
-// Export essential configuration functions only
-export {
-  createConfiguration,
-  createConfigurationForEnv,
-  getConfigurationSummary as getConfigSummary,
-} from './config';
-export { ConfigHelpers } from './validation';
-
-/**
- * Create minimal test configuration
- */
-export function createMinimalConfig(): ApplicationConfig {
-  return createTestConfig();
-}
-
-/**
- * Reset configuration for tests
- */
-export function resetConfig(): void {
-  _config = undefined;
-}
-
 // Import configuration
 import { createConfiguration, getConfigurationSummary } from './config';
+import { ConfigHelpers } from './validation';
 import type { ApplicationConfig } from './types';
 
 /**
@@ -87,3 +66,29 @@ export function createTestConfig(): ApplicationConfig {
   config.session.store = 'memory';
   return config;
 }
+
+/**
+ * Reset the configuration instance (for testing)
+ */
+export function resetConfig(): void {
+  _config = undefined;
+}
+
+/**
+ * Create minimal configuration (alias for createTestConfig)
+ */
+export function createMinimalConfig(): ApplicationConfig {
+  return createTestConfig();
+}
+
+/**
+ * Get configuration summary (alias for getConfigurationSummary)
+ */
+export function getConfigSummary(configInstance: ApplicationConfig): Record<string, unknown> {
+  return getConfigurationSummary(configInstance);
+}
+
+/**
+ * Export configuration helpers
+ */
+export { ConfigHelpers };

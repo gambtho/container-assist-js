@@ -64,6 +64,15 @@ export interface WorkflowConfig {
   parallelSteps: boolean;
 }
 
+// MCP Configuration - Moved from advanced to core since tests depend on it
+export interface McpConfig {
+  storePath: string;
+  sessionTTL: string;
+  maxSessions: number;
+  enableMetrics: boolean;
+  enableEvents: boolean;
+}
+
 // Core Application Configuration - Only essential configs
 export interface CoreConfig {
   server: ServerConfig;
@@ -72,4 +81,5 @@ export interface CoreConfig {
   docker: DockerConfig;
   kubernetes: KubernetesConfig;
   workflow: WorkflowConfig;
+  mcp: McpConfig;
 }

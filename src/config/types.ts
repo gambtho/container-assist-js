@@ -17,13 +17,13 @@ import type {
   DockerConfig,
   KubernetesConfig,
   WorkflowConfig,
+  McpConfig,
   CoreConfig,
 } from './core';
 
 // Import advanced (optional) configurations
 import type {
   SamplerMode,
-  McpConfig,
   WorkspaceConfig,
   LoggingConfig,
   ScanningConfig,
@@ -64,7 +64,6 @@ export type {
 // Main Application Configuration - Now much simpler!
 export interface ApplicationConfig extends CoreConfig {
   // Optional advanced configurations
-  mcp?: McpConfig;
   workspace?: WorkspaceConfig;
   logging?: LoggingConfig;
   infrastructure?: InfrastructureConfig;

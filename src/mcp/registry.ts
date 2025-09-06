@@ -35,7 +35,7 @@ import type { MCPTool, MCPWorkflow, ToolRegistry, WorkflowRegistry } from './typ
  * MCP Tool and Workflow Registry implementation
  * Manages all tools and workflows for the MCP server
  */
-export class MCPToolRegistry implements ToolRegistry, WorkflowRegistry {
+class MCPToolRegistry implements ToolRegistry, WorkflowRegistry {
   private tools: Map<string, MCPTool> = new Map();
   private workflows: Map<string, MCPWorkflow> = new Map();
   private logger: Logger;

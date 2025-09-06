@@ -167,7 +167,7 @@ describe('Configuration Types', () => {
       resetConfig();
       
       expect(config.server.nodeEnv).toBe('test');
-      expect(config.mcp.maxSessions).toBe(1000);
+      expect(config.mcp.maxSessions).toBe(100);
       expect(config.docker.registry).toBe('docker.io');
     });
 
@@ -367,7 +367,7 @@ describe('Configuration Types', () => {
       
       // Other values should remain default
       expect(config.server.port).toBe(3000);
-      expect(config.mcp.maxSessions).toBe(1000);
+      expect(config.mcp.maxSessions).toBe(100);
     });
 
     it('should handle complex nested property overrides', () => {

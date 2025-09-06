@@ -176,10 +176,7 @@ async function executeStep(
 /**
  * Start or manage a workflow
  */
-export async function workflow(
-  config: WorkflowConfig,
-  logger: Logger,
-): Promise<Result<WorkflowResult>> {
+async function workflow(config: WorkflowConfig, logger: Logger): Promise<Result<WorkflowResult>> {
   const timer = createTimer(logger, 'workflow');
   const startedAt = new Date().toISOString();
 
@@ -362,7 +359,7 @@ export async function workflow(
 /**
  * Get workflow status
  */
-export async function getWorkflowStatus(
+async function getWorkflowStatus(
   sessionId: string,
   logger: Logger,
 ): Promise<Result<WorkflowStatusResult>> {

@@ -60,7 +60,7 @@ function getSuggestedImages(language: string, _framework?: string): string[] {
 /**
  * Resolve optimal base images for the application
  */
-export async function resolveBaseImages(
+async function resolveBaseImages(
   config: ResolveBaseImagesConfig,
   logger: Logger,
 ): Promise<Result<BaseImageRecommendation>> {

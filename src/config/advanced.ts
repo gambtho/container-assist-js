@@ -3,16 +3,9 @@
  * Optional configurations for specialized features
  */
 
-export type SamplerMode = 'auto' | 'mock' | 'real';
+import type { McpConfig } from './core';
 
-// MCP Protocol Configuration
-export interface McpConfig {
-  storePath: string;
-  sessionTTL: string;
-  maxSessions: number;
-  enableMetrics: boolean;
-  enableEvents: boolean;
-}
+export type SamplerMode = 'auto' | 'mock' | 'real';
 
 // Workspace Configuration
 export interface WorkspaceConfig {

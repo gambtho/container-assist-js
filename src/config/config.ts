@@ -64,7 +64,7 @@ function createDefaultConfig(): ApplicationConfig {
     mcp: {
       storePath: './data/sessions.db',
       sessionTTL: '24h',
-      maxSessions: 1000,
+      maxSessions: 100,
       enableMetrics: true,
       enableEvents: true,
     },
@@ -106,6 +106,7 @@ export function createConfiguration(): ApplicationConfig {
     docker: { ...defaults.docker, ...envOverrides.docker },
     kubernetes: { ...defaults.kubernetes, ...envOverrides.kubernetes },
     workflow: { ...defaults.workflow, ...envOverrides.workflow },
+    mcp: { ...defaults.mcp, ...(envOverrides.mcp || {}) },
   };
 }
 
@@ -117,6 +118,27 @@ export function createConfigurationForEnv(
 ): ApplicationConfig {
   const config = createConfiguration();
   config.server.nodeEnv = nodeEnv;
+
+  // Apply environment-specific settings
+  switch (nodeEnv) {
+    case 'development':
+      config.server.logLevel = 'debug';
+      config.features.enableDebugLogs = true;
+      config.features.mockMode = true;
+      break;
+    case 'production':
+      config.server.logLevel = 'info';
+      config.features.enableDebugLogs = false;
+      config.features.enableMetrics = true;
+      break;
+    case 'test':
+      config.server.logLevel = 'error';
+      config.features.mockMode = true;
+      config.features.enableEvents = false;
+      config.session.store = 'memory';
+      break;
+  }
+
   return config;
 }
 
@@ -130,6 +152,6 @@ export function getConfigurationSummary(config: ApplicationConfig): Record<strin
     workflowMode: config.workflow.mode,
     mockMode: config.features.mockMode,
     maxSessions: config.session.maxSessions,
-    dockerRegistry: config.docker.registry, // Updated to use new structure
+    dockerRegistry: config.docker.registry,
   };
 }

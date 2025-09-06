@@ -10,11 +10,11 @@ import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
 
 // Ping functionality
-export interface PingConfig {
+interface PingConfig {
   message?: string;
 }
 
-export interface PingResult {
+interface PingResult {
   success: boolean;
   message: string;
   timestamp: string;
@@ -34,7 +34,7 @@ export interface PingResult {
 /**
  * Ping operation - test server connectivity
  */
-export async function ping(config: PingConfig, logger: Logger): Promise<Result<PingResult>> {
+async function ping(config: PingConfig, logger: Logger): Promise<Result<PingResult>> {
   const timer = createTimer(logger, 'ops-ping');
 
   try {
@@ -69,11 +69,11 @@ export async function ping(config: PingConfig, logger: Logger): Promise<Result<P
 }
 
 // Server Status functionality
-export interface ServerStatusConfig {
+interface ServerStatusConfig {
   details?: boolean;
 }
 
-export interface ServerStatusResult {
+interface ServerStatusResult {
   success: boolean;
   version: string;
   uptime: number;
@@ -103,7 +103,7 @@ export interface ServerStatusResult {
 /**
  * Get server status
  */
-export async function serverStatus(
+async function serverStatus(
   config: ServerStatusConfig,
   logger: Logger,
 ): Promise<Result<ServerStatusResult>> {
@@ -185,7 +185,7 @@ export type OpsResult = PingResult | ServerStatusResult;
 /**
  * Main ops function that delegates to specific operations
  */
-export async function ops(config: OpsConfig, logger: Logger): Promise<Result<OpsResult>> {
+async function ops(config: OpsConfig, logger: Logger): Promise<Result<OpsResult>> {
   const { operation } = config;
 
   switch (operation) {

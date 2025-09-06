@@ -6,7 +6,7 @@
 
 import type { ApplicationConfig } from './types';
 
-export interface ValidationResult {
+interface ValidationResult {
   isValid: boolean;
   errors: Array<{ path: string; message: string }>;
   warnings: Array<{ path: string; message: string }>;
@@ -28,7 +28,7 @@ export function validateConfig(config: ApplicationConfig): ValidationResult {
     errors.push({ path: 'server.logLevel', message: 'Must be error, warn, info, debug, or trace' });
   }
 
-  if (config.server.port && (config.server.port < 1 ?? config.server.port > 65535)) {
+  if (config.server.port !== undefined && (config.server.port < 1 || config.server.port > 65535)) {
     errors.push({ path: 'server.port', message: 'Must be between 1 and 65535' });
   }
 

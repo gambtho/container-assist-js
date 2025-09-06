@@ -344,19 +344,3 @@ export class ContainerizationMCPServer implements IMCPServer {
     };
   }
 }
-
-/**
- * Factory function to create and start an MCP server
- */
-export async function startMCPServer(
-  logger?: Logger,
-  options?: MCPServerOptions,
-): Promise<ContainerizationMCPServer> {
-  const server = new ContainerizationMCPServer(logger, options);
-  await server.start();
-  return server;
-}
-
-/**
- * Export the server class as default
- */

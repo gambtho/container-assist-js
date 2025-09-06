@@ -11,7 +11,7 @@ import { z } from 'zod';
 /**
  * Analysis result schema for repository analysis
  */
-export const AnalysisResultSchema = z.object({
+const AnalysisResultSchema = z.object({
   language: z.string(),
   language_version: z.string().optional(),
   framework: z.string().optional(),
@@ -55,7 +55,7 @@ export const AnalysisResultSchema = z.object({
 /**
  * Dockerfile generation result schema
  */
-export const DockerfileResultSchema = z.object({
+const DockerfileResultSchema = z.object({
   content: z.string(),
   path: z.string(),
   base_image: z.string().optional(),
@@ -67,7 +67,7 @@ export const DockerfileResultSchema = z.object({
 /**
  * Docker build result schema
  */
-export const DockerBuildResultSchema = z.object({
+const DockerBuildResultSchema = z.object({
   success: z.boolean(),
   imageId: z.string(),
   tags: z.array(z.string()).optional(),
@@ -78,7 +78,7 @@ export const DockerBuildResultSchema = z.object({
 /**
  * Security scan result schema
  */
-export const ScanResultSchema = z.object({
+const ScanResultSchema = z.object({
   success: z.boolean(),
   vulnerabilities: z
     .array(
@@ -106,7 +106,7 @@ export const ScanResultSchema = z.object({
 /**
  * Kubernetes manifest generation result schema
  */
-export const K8sManifestResultSchema = z.object({
+const K8sManifestResultSchema = z.object({
   manifests: z.array(
     z.object({
       kind: z.string(),
@@ -140,7 +140,7 @@ export const K8sManifestResultSchema = z.object({
 /**
  * Deployment result schema
  */
-export const DeploymentResultSchema = z.object({
+const DeploymentResultSchema = z.object({
   namespace: z.string(),
   deployment_name: z.string(),
   service_name: z.string().optional(),

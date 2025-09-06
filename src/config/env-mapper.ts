@@ -8,6 +8,23 @@
 import type { CoreConfig, NodeEnv, LogLevel, WorkflowMode, StoreType } from './core';
 
 /**
+ * Parse integer with default value and error handling
+ */
+function parseIntWithDefault(
+  value: string | undefined,
+  defaultValue: number,
+  envVarName: string,
+): number {
+  if (!value) return defaultValue;
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    console.warn(`Invalid ${envVarName}: '${value}'. Using default: ${defaultValue}`);
+    return defaultValue;
+  }
+  return parsed;
+}
+
+/**
  * Map environment variables to core configuration
  * Only essential environment variables are mapped
  */
@@ -34,7 +51,7 @@ export function mapEnvironmentToConfig(): Partial<CoreConfig> {
     },
 
     features: {
-      mockMode: process.env.MOCK_MODE === 'true',
+      mockMode: process.env.MOCK_MODE?.toLowerCase() === 'true',
       enableMetrics: process.env.ENABLE_METRICS !== 'false', // default true
       enableEvents: process.env.ENABLE_EVENTS !== 'false', // default true
       enableDebugLogs: process.env.ENABLE_DEBUG_LOGS === 'true',
@@ -68,32 +85,13 @@ export function mapEnvironmentToConfig(): Partial<CoreConfig> {
         : 1000,
       parallelSteps: process.env.WORKFLOW_PARALLEL_STEPS === 'true',
     },
-  };
-}
 
-/**
- * Get essential environment variables for validation
- */
-export function getEssentialEnvVars(): Record<string, string | undefined> {
-  return {
-    NODE_ENV: process.env.NODE_ENV,
-    LOG_LEVEL: process.env.LOG_LEVEL,
-    DOCKER_HOST: process.env.DOCKER_HOST,
-    DOCKER_REGISTRY: process.env.DOCKER_REGISTRY,
-    KUBECONFIG: process.env.KUBECONFIG,
-    KUBE_NAMESPACE: process.env.KUBE_NAMESPACE,
-    MOCK_MODE: process.env.MOCK_MODE,
-  };
-}
-
-/**
- * Validate essential environment variables
- */
-export function validateEssentialEnvVars(): { isValid: boolean; missing: string[] } {
-  const missing: string[] = [];
-
-  return {
-    isValid: missing.length === 0,
-    missing,
+    mcp: {
+      storePath: process.env.MCP_STORE_PATH ?? './data/sessions.db',
+      sessionTTL: process.env.SESSION_TTL ?? '24h',
+      maxSessions: parseIntWithDefault(process.env.MAX_SESSIONS, 100, 'MAX_SESSIONS'),
+      enableMetrics: process.env.MCP_ENABLE_METRICS !== 'false',
+      enableEvents: process.env.MCP_ENABLE_EVENTS !== 'false',
+    },
   };
 }

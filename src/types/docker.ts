@@ -4,8 +4,6 @@
  * Provides comprehensive interfaces for Docker operations
  */
 
-import { z } from 'zod';
-
 /**
  * Docker build options
  * Supports all major Docker build features and build tools
@@ -51,17 +49,6 @@ export interface DockerBuildResult {
   method?: string;
   metadata?: Record<string, unknown>;
 }
-
-/**
- * Zod schema for Docker build result validation
- */
-export const DockerBuildResultSchema = z.object({
-  success: z.boolean(),
-  imageId: z.string(),
-  tags: z.array(z.string()).optional(),
-  size: z.number().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-});
 
 /**
  * Docker security scan result
@@ -165,14 +152,6 @@ export interface DockerTagResult {
  */
 
 /**
- * Dockerfile fix information
- */
-
-/**
- * Zod schema for Dockerfile fix validation
- */
-
-/**
  * Docker registry configuration
  */
 export interface DockerRegistryConfig {
@@ -254,48 +233,3 @@ export interface DockerClient {
   ping(): Promise<boolean>;
   version(): Promise<{ version: string; apiVersion: string }>;
 }
-
-// ===== BASE IMAGE RECOMMENDATION TYPES =====
-
-/**
- * Base image recommendation schema for AI-powered base image selection
- */
-export const BaseImageRecommendationSchema = z.object({
-  primary_recommendation: z.object({
-    image: z.string(),
-    reasoning: z.string(),
-    security_notes: z.string(),
-    performance_notes: z.string(),
-    tradeoffs: z.string(),
-  }),
-  alternatives: z.array(
-    z.object({
-      image: z.string(),
-      use_case: z.string(),
-      pros: z.array(z.string()),
-      cons: z.array(z.string()),
-    }),
-  ),
-  security_considerations: z.object({
-    vulnerability_status: z.string(),
-    update_frequency: z.string(),
-    compliance: z.string(),
-  }),
-  optimization_tips: z.array(z.string()),
-  health_check_recommendation: z.object({
-    endpoint: z.string(),
-    command: z.string(),
-  }),
-});
-
-export const BaseImageResolutionInputSchema = z.object({
-  session_id: z.string(),
-  security_level: z.enum(['minimal', 'standard', 'hardened']).optional().default('standard'),
-  performance_priority: z.enum(['size', 'speed', 'memory']).optional().default('size'),
-  target_environment: z.enum(['cloud', 'on-prem', 'edge']).optional().default('cloud'),
-  architectures: z.array(z.string()).optional().default(['amd64']),
-  compliance_requirements: z.string().optional(),
-});
-
-export type BaseImageRecommendation = z.infer<typeof BaseImageRecommendationSchema>;
-export type BaseImageResolutionInput = z.infer<typeof BaseImageResolutionInputSchema>;

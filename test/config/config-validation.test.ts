@@ -8,9 +8,9 @@ import { jest } from '@jest/globals';
 import {
   createConfiguration,
   createConfigurationForEnv,
-  validateConfiguration,
   getConfigurationSummary,
 } from '../../src/config/config';
+import { validateConfig } from '../../src/config/validation';
 import type { ApplicationConfig } from '../../src/config/types';
 
 describe('Configuration Validation', () => {
@@ -25,9 +25,9 @@ describe('Configuration Validation', () => {
     delete process.env.SESSION_TTL;
     delete process.env.MAX_SESSIONS;
     delete process.env.WORKSPACE_DIR;
-    delete process.env.DOCKER_SOCKET;
+    delete process.env.DOCKER_HOST;
     delete process.env.DOCKER_REGISTRY;
-    delete process.env.K8S_NAMESPACE;
+    delete process.env.KUBE_NAMESPACE;
     delete process.env.KUBECONFIG;
     delete process.env.AI_API_KEY;
     delete process.env.AI_MODEL;
@@ -51,9 +51,8 @@ describe('Configuration Validation', () => {
       expect(config.mcp.storePath).toBe('./data/sessions.db');
       expect(config.mcp.sessionTTL).toBe('24h');
       expect(config.mcp.maxSessions).toBe(100);
-      expect(config.infrastructure.docker.socketPath).toBe('/var/run/docker.sock');
-      expect(config.infrastructure.docker.registry).toBe('docker.io');
-      expect(config.aiServices.ai.model).toBe('claude-3-sonnet-20241022');
+      expect(config.docker.socketPath).toBe('/var/run/docker.sock');
+      expect(config.docker.registry).toBe('docker.io');
     });
 
     it('should apply environment variable overrides', () => {
@@ -71,23 +70,20 @@ describe('Configuration Validation', () => {
       expect(config.server.logLevel).toBe('warn');
       expect(config.mcp.storePath).toBe('/custom/path/sessions.db');
       expect(config.mcp.maxSessions).toBe(200);
-      expect(config.infrastructure.docker.registry).toBe('custom.registry.io');
-      expect(config.aiServices.ai.model).toBe('gpt-4');
+      expect(config.docker.registry).toBe('custom.registry.io');
       expect(config.features.mockMode).toBe(true);
     });
 
     it('should handle nested configuration paths', () => {
-      process.env.DOCKER_SOCKET = '/custom/docker.sock';
-      process.env.K8S_NAMESPACE = 'production';
+      process.env.DOCKER_HOST = '/custom/docker.sock';
+      process.env.KUBE_NAMESPACE = 'production';
       process.env.AI_API_KEY = 'test-api-key';
       process.env.AI_BASE_URL = 'https://api.custom.com';
 
       const config = createConfiguration();
 
-      expect(config.infrastructure.docker.socketPath).toBe('/custom/docker.sock');
-      expect(config.infrastructure.kubernetes.namespace).toBe('production');
-      expect(config.aiServices.ai.apiKey).toBe('test-api-key');
-      expect(config.aiServices.ai.baseUrl).toBe('https://api.custom.com');
+      expect(config.docker.socketPath).toBe('/custom/docker.sock');
+      expect(config.kubernetes.namespace).toBe('production');
     });
 
     it('should handle boolean environment variables correctly', () => {
@@ -131,14 +127,14 @@ describe('Configuration Validation', () => {
     });
 
     it('should preserve existing structure when overriding nested values', () => {
-      process.env.DOCKER_SOCKET = '/custom/docker.sock';
+      process.env.DOCKER_HOST = '/custom/docker.sock';
       const config = createConfiguration();
 
       // Check that other Docker config values are preserved
-      expect(config.infrastructure.docker.socketPath).toBe('/custom/docker.sock');
-      expect(config.infrastructure.docker.registry).toBe('docker.io');
-      expect(config.infrastructure.docker.host).toBe('localhost');
-      expect(config.infrastructure.docker.port).toBe(2376);
+      expect(config.docker.socketPath).toBe('/custom/docker.sock');
+      expect(config.docker.registry).toBe('docker.io');
+      expect(config.docker.host).toBe('localhost');
+      expect(config.docker.port).toBe(2375);
     });
   });
 
@@ -179,16 +175,15 @@ describe('Configuration Validation', () => {
 
       expect(config.server.nodeEnv).toBe('production');
       expect(config.mcp.maxSessions).toBe(50);
-      expect(config.aiServices.ai.apiKey).toBe('production-key');
     });
   });
 
-  describe('validateConfiguration', () => {
+  describe('validateConfig', () => {
     it('should validate correct configuration', () => {
       const config = createConfiguration();
-      const result = validateConfiguration(config);
+      const result = validateConfig(config);
 
-      expect(result.valid).toBe(true);
+      expect(result.isValid).toBe(true);
       expect(result.errors).toEqual([]);
     });
 
@@ -196,65 +191,75 @@ describe('Configuration Validation', () => {
       const config = createConfiguration();
       config.server.nodeEnv = 'invalid' as any;
 
-      const result = validateConfiguration(config);
+      const result = validateConfig(config);
 
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Invalid NODE_ENV');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toEqual(expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringContaining('Must be development, production, or test') })
+      ]));
     });
 
     it('should detect invalid LOG_LEVEL', () => {
       const config = createConfiguration();
       config.server.logLevel = 'invalid' as any;
 
-      const result = validateConfiguration(config);
+      const result = validateConfig(config);
 
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Invalid LOG_LEVEL');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toEqual(expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringContaining('Must be error, warn, info, debug, or trace') })
+      ]));
     });
 
     it('should detect invalid server port', () => {
       const config = createConfiguration();
       config.server.port = -1;
 
-      const result = validateConfiguration(config);
+      const result = validateConfig(config);
 
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Invalid server port');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toEqual(expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringContaining('Must be between 1 and 65535') })
+      ]));
 
       config.server.port = 70000;
-      const result2 = validateConfiguration(config);
-      expect(result2.valid).toBe(false);
-      expect(result2.errors).toContain('Invalid server port');
+      const result2 = validateConfig(config);
+      expect(result2.isValid).toBe(false);
+      expect(result2.errors).toEqual(expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringContaining('Must be between 1 and 65535') })
+      ]));
     });
 
     it('should validate port 0 as invalid', () => {
       const config = createConfiguration();
       config.server.port = 0;
 
-      const result = validateConfiguration(config);
+      const result = validateConfig(config);
 
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Invalid server port');
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toEqual(expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringContaining('Must be between 1 and 65535') })
+      ]));
     });
 
     it('should validate valid port ranges', () => {
       const config = createConfiguration();
       config.server.port = 1;
-      expect(validateConfiguration(config).valid).toBe(true);
+      expect(validateConfig(config).isValid).toBe(true);
 
       config.server.port = 65535;
-      expect(validateConfiguration(config).valid).toBe(true);
+      expect(validateConfig(config).isValid).toBe(true);
 
       config.server.port = 8080;
-      expect(validateConfiguration(config).valid).toBe(true);
+      expect(validateConfig(config).isValid).toBe(true);
     });
 
     it('should handle undefined port', () => {
       const config = createConfiguration();
       config.server.port = undefined;
 
-      const result = validateConfiguration(config);
-      expect(result.valid).toBe(true);
+      const result = validateConfig(config);
+      expect(result.isValid).toBe(true);
     });
 
     it('should accumulate multiple validation errors', () => {
@@ -263,13 +268,15 @@ describe('Configuration Validation', () => {
       config.server.logLevel = 'invalid' as any;
       config.server.port = -1;
 
-      const result = validateConfiguration(config);
+      const result = validateConfig(config);
 
-      expect(result.valid).toBe(false);
+      expect(result.isValid).toBe(false);
       expect(result.errors).toHaveLength(3);
-      expect(result.errors).toContain('Invalid NODE_ENV');
-      expect(result.errors).toContain('Invalid LOG_LEVEL');
-      expect(result.errors).toContain('Invalid server port');
+      expect(result.errors).toEqual(expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringContaining('Must be development, production, or test') }),
+        expect.objectContaining({ message: expect.stringContaining('Must be error, warn, info, debug, or trace') }),
+        expect.objectContaining({ message: expect.stringContaining('Must be between 1 and 65535') })
+      ]));
     });
   });
 
@@ -283,14 +290,14 @@ describe('Configuration Validation', () => {
         logLevel: 'info',
         workflowMode: 'interactive',
         mockMode: false,
-        maxSessions: 100,
+        maxSessions: 1000,
         dockerRegistry: 'docker.io',
       });
     });
 
     it('should reflect configuration changes in summary', () => {
       const config = createConfigurationForEnv('production');
-      config.infrastructure.docker.registry = 'custom.registry.io';
+      config.docker.registry = 'custom.registry.io';
       config.session.maxSessions = 500;
 
       const summary = getConfigurationSummary(config);
@@ -309,30 +316,13 @@ describe('Configuration Validation', () => {
       expect(config.mcp).toBeDefined();
       expect(config.session).toBeDefined();
       expect(config.workspace).toBeDefined();
-      expect(config.infrastructure).toBeDefined();
-      expect(config.aiServices).toBeDefined();
       expect(config.logging).toBeDefined();
       expect(config.workflow).toBeDefined();
       expect(config.features).toBeDefined();
+      expect(config.docker).toBeDefined();
+      expect(config.kubernetes).toBeDefined();
     });
 
-    it('should have all required infrastructure subsections', () => {
-      const config = createConfiguration();
-
-      expect(config.infrastructure.docker).toBeDefined();
-      expect(config.infrastructure.kubernetes).toBeDefined();
-      expect(config.infrastructure.scanning).toBeDefined();
-      expect(config.infrastructure.build).toBeDefined();
-      expect(config.infrastructure.java).toBeDefined();
-    });
-
-    it('should have all required AI services subsections', () => {
-      const config = createConfiguration();
-
-      expect(config.aiServices.ai).toBeDefined();
-      expect(config.aiServices.sampler).toBeDefined();
-      expect(config.aiServices.mock).toBeDefined();
-    });
 
     it('should maintain type safety for enum values', () => {
       const config = createConfiguration();
@@ -342,30 +332,25 @@ describe('Configuration Validation', () => {
       expect(['error', 'warn', 'info', 'debug', 'trace']).toContain(config.server.logLevel);
       expect(['interactive', 'auto', 'batch']).toContain(config.workflow.mode);
       expect(['memory', 'file', 'redis']).toContain(config.session.store);
-      expect(['auto', 'mock', 'real']).toContain(config.aiServices.sampler.mode);
     });
   });
 
   describe('Environment Variable Edge Cases', () => {
     it('should handle empty string environment variables', () => {
-      process.env.AI_API_KEY = '';
       process.env.KUBECONFIG = '';
 
       const config = createConfiguration();
 
-      expect(config.aiServices.ai.apiKey).toBe('');
-      expect(config.infrastructure.kubernetes.kubeconfig).toBe('');
+      expect(config.kubernetes.kubeconfig).toBe('');
     });
 
     it('should handle whitespace in environment variables', () => {
       process.env.DOCKER_REGISTRY = '  registry.example.com  ';
-      process.env.AI_MODEL = ' gpt-4 ';
 
       const config = createConfiguration();
 
       // Values should be preserved as-is (no trimming in current implementation)
-      expect(config.infrastructure.docker.registry).toBe('  registry.example.com  ');
-      expect(config.aiServices.ai.model).toBe(' gpt-4 ');
+      expect(config.docker.registry).toBe('  registry.example.com  ');
     });
 
     it('should handle undefined environment variables gracefully', () => {
@@ -373,8 +358,7 @@ describe('Configuration Validation', () => {
       const config = createConfiguration();
 
       // Should use default values
-      expect(config.aiServices.ai.apiKey).toBe('');
-      expect(config.infrastructure.kubernetes.kubeconfig).toBe('');
+      expect(config.kubernetes.kubeconfig).toBe('~/.kube/config');
       expect(config.mcp.storePath).toBe('./data/sessions.db');
     });
   });
@@ -386,11 +370,11 @@ describe('Configuration Validation', () => {
 
       // Modify one config
       config1.server.port = 9999;
-      config1.infrastructure.docker.registry = 'modified.registry.io';
+      config1.docker.registry = 'modified.registry.io';
 
       // Other config should be unchanged
       expect(config2.server.port).toBe(3000);
-      expect(config2.infrastructure.docker.registry).toBe('docker.io');
+      expect(config2.docker.registry).toBe('docker.io');
     });
 
     it('should create deep copies for nested objects', () => {
@@ -398,19 +382,16 @@ describe('Configuration Validation', () => {
       const config2 = createConfiguration();
 
       // Modify nested object properties that exist in base config
-      config1.infrastructure.build.buildArgs = { TEST: 'value' };
-      config1.infrastructure.build.labels = { version: '1.0.0' };
-      config1.infrastructure.docker.host = 'modified-host';
+      config1.docker.buildArgs = { TEST: 'value' };
+      config1.docker.host = 'modified-host';
 
       // Other config's nested objects should be unchanged
-      expect(config2.infrastructure.build.buildArgs).toEqual({});
-      expect(config2.infrastructure.build.labels).toEqual({});
-      expect(config2.infrastructure.docker.host).toBe('localhost');
+      expect(config2.docker.buildArgs).toEqual({});
+      expect(config2.docker.host).toBe('localhost');
       
       // Verify the modifications were applied to config1
-      expect(config1.infrastructure.build.buildArgs).toEqual({ TEST: 'value' });
-      expect(config1.infrastructure.build.labels).toEqual({ version: '1.0.0' });
-      expect(config1.infrastructure.docker.host).toBe('modified-host');
+      expect(config1.docker.buildArgs).toEqual({ TEST: 'value' });
+      expect(config1.docker.host).toBe('modified-host');
     });
   });
 });
