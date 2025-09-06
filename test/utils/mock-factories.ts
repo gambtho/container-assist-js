@@ -528,7 +528,6 @@ export function createMockConfig(overrides?: Partial<ApplicationConfig>): Applic
       skipOptionalSteps: true,
     },
     features: {
-      aiEnabled: false,
       mockMode: true,
       enableMetrics: false,
       enableEvents: false,

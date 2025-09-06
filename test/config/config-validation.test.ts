@@ -283,7 +283,6 @@ describe('Configuration Validation', () => {
         logLevel: 'info',
         workflowMode: 'interactive',
         mockMode: false,
-        aiEnabled: true,
         maxSessions: 100,
         dockerRegistry: 'docker.io',
       });

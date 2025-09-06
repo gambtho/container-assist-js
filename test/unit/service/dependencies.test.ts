@@ -235,7 +235,6 @@ describe('Dependency Configuration Validation', () => {
         namespace: 'default'
       },
       features: {
-        aiEnabled: true,
         mockMode: false
       }
     };
@@ -255,8 +254,7 @@ describe('Dependency Configuration Validation', () => {
       nodeEnv: 'test',
       logLevel: 'error',
       features: {
-        mockMode: true,
-        aiEnabled: false
+        mockMode: true
       }
     };
 
@@ -264,8 +262,7 @@ describe('Dependency Configuration Validation', () => {
       nodeEnv: 'production',
       logLevel: 'info',
       features: {
-        mockMode: false,
-        aiEnabled: true
+        mockMode: false
       }
     };
 

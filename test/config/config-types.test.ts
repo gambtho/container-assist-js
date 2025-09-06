@@ -216,7 +216,6 @@ describe('Configuration Types', () => {
         logLevel: 'error',
         workflowMode: 'interactive',
         mockMode: false,
-        aiEnabled: false,
         maxSessions: 1000,
         dockerRegistry: 'docker.io',
       });
@@ -293,23 +292,6 @@ describe('Configuration Types', () => {
       expect(ConfigHelpers.isTest(devConfig)).toBe(false);
     });
 
-    it('should hasAI check AI availability', () => {
-      const config = createConfiguration();
-      
-      // AI enabled and mock mode enabled
-      config.features.aiEnabled = true;
-      config.features.mockMode = true;
-      expect(ConfigHelpers.hasAI(config)).toBe(true);
-
-      // AI disabled
-      config.features.aiEnabled = false;
-      expect(ConfigHelpers.hasAI(config)).toBe(false);
-
-      // AI enabled but no mock mode
-      config.features.aiEnabled = true;
-      config.features.mockMode = false;
-      expect(ConfigHelpers.hasAI(config)).toBe(false);
-    });
 
     describe('parseTTL', () => {
       it('should parse hours correctly', () => {
