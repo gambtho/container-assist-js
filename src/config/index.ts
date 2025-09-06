@@ -5,11 +5,9 @@
 // Export essential types only
 export type { ApplicationConfig } from './types';
 
-// Export essential configuration functions only
-export { createConfiguration, createConfigurationForEnv } from './config';
-
 // Import configuration
 import { createConfiguration, getConfigurationSummary } from './config';
+import { ConfigHelpers } from './validation';
 import type { ApplicationConfig } from './types';
 
 /**
@@ -57,13 +55,6 @@ export function logConfigSummaryIfDev(configInstance: ApplicationConfig): void {
 }
 
 /**
- * Reset lazy-loaded configuration instance
- */
-export function resetConfig(): void {
-  _config = undefined;
-}
-
-/**
  * Create test configuration with test-specific defaults
  */
 export function createTestConfig(): ApplicationConfig {
@@ -77,59 +68,27 @@ export function createTestConfig(): ApplicationConfig {
 }
 
 /**
- * Create minimal configuration (currently same as test)
+ * Reset the configuration instance (for testing)
+ */
+export function resetConfig(): void {
+  _config = undefined;
+}
+
+/**
+ * Create minimal configuration (alias for createTestConfig)
  */
 export function createMinimalConfig(): ApplicationConfig {
   return createTestConfig();
 }
 
 /**
- * Get configuration summary
+ * Get configuration summary (alias for getConfigurationSummary)
  */
-export function getConfigSummary(config: ApplicationConfig): object {
-  return getConfigurationSummary(config);
+export function getConfigSummary(configInstance: ApplicationConfig): Record<string, unknown> {
+  return getConfigurationSummary(configInstance);
 }
 
 /**
- * Configuration helper utilities
+ * Export configuration helpers
  */
-export const ConfigHelpers = {
-  isProduction(config: ApplicationConfig): boolean {
-    return config.server.nodeEnv === 'production';
-  },
-
-  isDevelopment(config: ApplicationConfig): boolean {
-    return config.server.nodeEnv === 'development';
-  },
-
-  isTest(config: ApplicationConfig): boolean {
-    return config.server.nodeEnv === 'test';
-  },
-
-  hasAI(config: ApplicationConfig): boolean {
-    return (
-      config.features.aiEnabled && (config.aiServices.ai.apiKey !== '' || config.features.mockMode)
-    );
-  },
-
-  parseTTL(ttl: string): number {
-    const match = ttl.match(/^(\d+)([hms])$/);
-    if (!match) {
-      throw new Error(`Invalid TTL format: ${ttl}`);
-    }
-
-    const [, amount, unit] = match;
-    const value = parseInt(amount ?? '0', 10);
-
-    switch (unit) {
-      case 'h':
-        return value * 3600000; // hours to milliseconds
-      case 'm':
-        return value * 60000; // minutes to milliseconds
-      case 's':
-        return value * 1000; // seconds to milliseconds
-      default:
-        throw new Error(`Invalid TTL format: ${ttl}`);
-    }
-  },
-};
+export { ConfigHelpers };

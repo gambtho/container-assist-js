@@ -5,9 +5,9 @@
  */
 
 import { program } from 'commander';
-import { ContainerizationAssistMCPServer } from './server.js';
+import { ContainerizationMCPServer } from '../src/mcp/server.js';
 import { createConfig, logConfigSummaryIfDev } from '../src/config/index.js';
-import { createPinoLogger } from '../src/infrastructure/logger.js';
+import { createLogger } from '../src/lib/logger.js';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
@@ -27,7 +27,7 @@ const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 let _logger: any = null;
 function getLogger() {
   if (!_logger) {
-    _logger = createPinoLogger({ service: 'cli', useStderr: true });
+    _logger = createLogger({ name: 'cli' });
   }
   return _logger;
 }
@@ -36,6 +36,7 @@ program
   .name('containerization-assist-mcp')
   .description('MCP server for AI-powered containerization workflows')
   .version(packageJson.version)
+  .argument('[command]', 'command to run (start)', 'start')
   .option('--config <path>', 'path to configuration file (.env)')
   .option('--log-level <level>', 'logging level: debug, info, warn, error (default: info)', 'info')
   .option('--workspace <path>', 'workspace directory path (default: current directory)', cwd())
@@ -98,6 +99,7 @@ Environment Variables:
 program.parse(argv);
 
 const options = program.opts();
+const command = program.args[0] || 'start';
 const defaultDockerSockets = ['/var/run/docker.sock', '~/.colima/default/docker.socket'];
 
 // Validation function for CLI options
@@ -134,11 +136,14 @@ function validateOptions(opts: any): { valid: boolean; errors: string[] } {
       if (!thisSocket) continue;
       try {
         statSync(thisSocket);
-        console.error(`Using Docker socket: ${thisSocket}`);
+        // Only log to stderr when not in pure MCP mode (e.g., during validation)
+        if (!process.env.MCP_MODE) {
+          console.error(`Using Docker socket: ${thisSocket}`);
+        }
         dockerSocket = thisSocket;
         break;
       } catch (error) {
-        console.error(`Docker socket not found at ${thisSocket}, trying next option...`);
+        // Silent when running as MCP server
       }
     }
     if (!dockerSocket) {
@@ -163,6 +168,14 @@ function validateOptions(opts: any): { valid: boolean; errors: string[] } {
 
 async function main(): Promise<void> {
   try {
+    // Handle the 'start' command (default behavior)
+    if (command !== 'start') {
+      console.error(`❌ Unknown command: ${command}`);
+      console.error('Available commands: start');
+      console.error('\nUse --help for usage information');
+      exit(1);
+    }
+
     // Validate CLI options
     const validation = validateOptions(options);
     if (!validation.valid) {
@@ -190,7 +203,7 @@ async function main(): Promise<void> {
       console.error('🔍 Validating Containerization Assist MCP configuration...\n');
       console.error('📋 Configuration Summary:');
       console.error(`  • Log Level: ${config.server.logLevel}`);
-      console.error(`  • Workspace: ${config.workspace.workspaceDir}`);
+      console.error(`  • Workspace: ${config.workspace?.workspaceDir || process.cwd()}`);
       console.error(`  • Docker Socket: ${process.env.DOCKER_SOCKET || '/var/run/docker.sock'}`);
       console.error(`  • K8s Namespace: ${process.env.K8S_NAMESPACE || 'default'}`);
       console.error(`  • Mock Mode: ${process.env.MOCK_MODE === 'true' ? 'enabled' : 'disabled'}`);
@@ -225,74 +238,52 @@ async function main(): Promise<void> {
       process.exit(0);
     }
 
+    // Set MCP mode to redirect logs to stderr
+    process.env.MCP_MODE = 'true';
+    
     // Create server
-    const server = new ContainerizationAssistMCPServer(config, true);
+    const logger = getLogger();
+    const server = new ContainerizationMCPServer(logger);
 
     if (options.listTools) {
       getLogger().info('Listing available tools');
-      await server.initialize();
+      await server.start();
 
-      const toolList = await server.listTools();
-      console.error('Available tools:');
+      const status = server.getStatus();
+      console.error('Available tools and workflows:');
       console.error('═'.repeat(60));
+      console.error(`\n📊 Registry Status:`);
+      console.error(`  • Tools: ${status.tools}`);
+      console.error(`  • Workflows: ${status.workflows}`);
+      console.error(`  • Server running: ${status.running}`);
 
-      if ('tools' in toolList && Array.isArray(toolList.tools)) {
-        const toolsByCategory = toolList.tools.reduce((acc: Record<string, any[]>, tool: any) => {
-          const category = tool.category || 'utility';
-          if (!acc[category]) acc[category] = [];
-          acc[category]!.push(tool);
-          return acc;
-        }, {});
-
-        for (const [category, tools] of Object.entries(toolsByCategory)) {
-          console.error(`\n📁 ${category.toUpperCase()}`);
-          (tools as Array<{ name: string; description: string }>).forEach((tool) => {
-            console.error(`  • ${tool.name.padEnd(25)} ${tool.description || 'No description'}`);
-          });
-        }
-
-        console.error(`\nTotal: ${toolList.tools.length} tools registered`);
-      } else {
-        console.error('No tools found in registry');
-      }
-
-      await server.shutdown();
+      await server.stop();
       process.exit(0);
     }
 
     if (options.healthCheck) {
       getLogger().info('Performing health check');
-      await server.initialize();
+      await server.start();
 
-      const health = await server.getHealth();
+      const status = server.getStatus();
 
       console.error('🏥 Health Check Results');
       console.error('═'.repeat(40));
-      console.error(`Status: ${health.status === 'healthy' ? '✅ Healthy' : '❌ Unhealthy'}`);
-      console.error(`Uptime: ${Math.floor(health.uptime)}s`);
+      console.error(`Status: ${status.running ? '✅ Healthy' : '❌ Unhealthy'}`);
       console.error('\nServices:');
+      console.error(`  ✅ MCP Server: ${status.running ? 'running' : 'stopped'}`);
+      console.error(`  📊 Tools registered: ${status.tools}`);
+      console.error(`  🔄 Workflows registered: ${status.workflows}`);
 
-      for (const [service, status] of Object.entries(health.services)) {
-        const icon = status ? '✅' : '❌';
-        console.error(`  ${icon} ${service}`);
-      }
-
-      if (health.metrics) {
-        console.error('\nMetrics:');
-        for (const [metric, value] of Object.entries(health.metrics)) {
-          console.error(`  📊 ${metric}: ${String(value)}`);
-        }
-      }
-
-      await server.shutdown();
-      process.exit(health.status === 'healthy' ? 0 : 1);
+      await server.stop();
+      process.exit(status.running ? 0 : 1);
     }
 
     getLogger().info(
       {
         config: {
           logLevel: config.server.logLevel,
-          workspace: config.workspace.workspaceDir,
+          workspace: config.workspace?.workspaceDir || process.cwd(),
           mockMode: options.mock,
           devMode: options.dev,
         },
@@ -300,27 +291,27 @@ async function main(): Promise<void> {
       'Starting Containerization Assist MCP Server',
     );
 
-    console.error('🚀 Starting Containerization Assist MCP Server...');
-    console.error(`📦 Version: ${packageJson.version}`);
-    console.error(`🏠 Workspace: ${config.workspace.workspaceDir}`);
-    console.error(`📊 Log Level: ${config.server.logLevel}`);
+    // Only show startup messages when not in pure MCP mode
+    if (!process.env.MCP_QUIET) {
+      console.error('🚀 Starting Containerization Assist MCP Server...');
+      console.error(`📦 Version: ${packageJson.version}`);
+      console.error(`🏠 Workspace: ${config.workspace?.workspaceDir || process.cwd()}`);;
+      console.error(`📊 Log Level: ${config.server.logLevel}`);
 
-    if (options.mock) {
-      console.error('🤖 Running with mock AI sampler');
-    }
+      if (options.mock) {
+        console.error('🤖 Running with mock AI sampler');
+      }
 
-    if (options.dev) {
-      console.error('🔧 Development mode enabled');
+      if (options.dev) {
+        console.error('🔧 Development mode enabled');
+      }
     }
 
     await server.start();
 
-    if (options.port) {
+    if (options.port && !process.env.MCP_QUIET) {
       console.error('✅ Server started successfully');
       console.error(`🔌 Listening on HTTP port ${options.port}`);
-    } else {
-      console.error('✅ Server started successfully');
-      console.error('🔌 Listening on stdio transport');
     }
 
     const shutdown = async (signal: string): Promise<void> => {
@@ -328,7 +319,7 @@ async function main(): Promise<void> {
       console.error(`\n🛑 Received ${signal}, shutting down gracefully...`);
 
       try {
-        await server.shutdown();
+        await server.stop();
         console.error('✅ Shutdown complete');
         process.exit(0);
       } catch (error) {
