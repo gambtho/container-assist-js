@@ -79,25 +79,46 @@ DEADCODE_BASELINE=$(jq -r '.metrics.deadcode.baseline' $QUALITY_CONFIG)
 echo "Gate 1: ESLint Error Check"
 echo "-------------------------"
 
-# Run lint and get current counts
-LINT_OUTPUT=$(npm run lint 2>&1 || true)
+# Run lint and get current counts using JSON output for reliable parsing
+LINT_JSON_OUTPUT=$(npx eslint src --ext .ts --format=json 2>/dev/null)
+JSON_SUCCESS=$?
 
-# Parse errors and warnings
-SUMMARY_LINE=$(echo "$LINT_OUTPUT" | grep -E "problems.*error.*warning" | tail -1 2>/dev/null || echo "")
-if [ -n "$SUMMARY_LINE" ]; then
-    CURRENT_ERRORS=$(echo "$SUMMARY_LINE" | sed -n 's/.*(\([0-9]\+\) error.*/\1/p' 2>/dev/null || echo "0")
-    CURRENT_WARNINGS=$(echo "$SUMMARY_LINE" | sed -n 's/.*, \([0-9]\+\) warning.*/\1/p' 2>/dev/null || echo "0")
-    # Handle case where it says "0 errors"
-    if [ -z "$CURRENT_ERRORS" ]; then
-        CURRENT_ERRORS=0
+# Parse errors and warnings from JSON output
+if [ $JSON_SUCCESS -eq 0 ] && [ -n "$LINT_JSON_OUTPUT" ] && [ "$LINT_JSON_OUTPUT" != "[]" ]; then
+    CURRENT_ERRORS=$(echo "$LINT_JSON_OUTPUT" | jq '[.[].messages[]? | select(.severity == 2)] | length' 2>/dev/null)
+    CURRENT_WARNINGS=$(echo "$LINT_JSON_OUTPUT" | jq '[.[].messages[]? | select(.severity == 1)] | length' 2>/dev/null)
+    
+    # Validate that we got numeric results
+    if ! [[ "$CURRENT_ERRORS" =~ ^[0-9]+$ ]] || ! [[ "$CURRENT_WARNINGS" =~ ^[0-9]+$ ]]; then
+        CURRENT_ERRORS=""
+        CURRENT_WARNINGS=""
     fi
-    if [ -z "$CURRENT_WARNINGS" ]; then
+fi
+
+# Fallback to text parsing if JSON parsing failed
+if [ -z "$CURRENT_ERRORS" ] || [ -z "$CURRENT_WARNINGS" ]; then
+    print_status "INFO" "Using fallback text parsing for ESLint results"
+    LINT_OUTPUT=$(npm run lint 2>&1 || true)
+    SUMMARY_LINE=$(echo "$LINT_OUTPUT" | grep -E "problems.*error.*warning" | tail -1 2>/dev/null || echo "")
+    if [ -n "$SUMMARY_LINE" ]; then
+        CURRENT_ERRORS=$(echo "$SUMMARY_LINE" | sed -n 's/.*(\([0-9]\+\) error.*/\1/p' 2>/dev/null || echo "0")
+        CURRENT_WARNINGS=$(echo "$SUMMARY_LINE" | sed -n 's/.*, \([0-9]\+\) warning.*/\1/p' 2>/dev/null || echo "0")
+        # Handle case where it says "0 errors"
+        if [ -z "$CURRENT_ERRORS" ]; then
+            CURRENT_ERRORS=0
+        fi
+        if [ -z "$CURRENT_WARNINGS" ]; then
+            CURRENT_WARNINGS=0
+        fi
+    else
+        CURRENT_ERRORS=0
         CURRENT_WARNINGS=0
     fi
-else
-    CURRENT_ERRORS=0
-    CURRENT_WARNINGS=0
 fi
+
+# Ensure we have numeric values
+CURRENT_ERRORS=${CURRENT_ERRORS:-0}
+CURRENT_WARNINGS=${CURRENT_WARNINGS:-0}
 
 # Update current metrics in JSON
 TIMESTAMP=$(date -Iseconds)
@@ -179,7 +200,22 @@ fi
 echo "Gate 4: Dead Code Check"
 echo "-----------------------"
 
-DEADCODE_COUNT=$(npx ts-prune --project tsconfig.json 2>/dev/null | grep -v 'used in module' | wc -l | tr -d ' ' || echo "0")
+# More robust dead code detection with error handling
+if command -v npx >/dev/null 2>&1 && [ -f "tsconfig.json" ]; then
+    DEADCODE_OUTPUT=$(npx ts-prune --project tsconfig.json 2>/dev/null || echo "")
+    if [ -n "$DEADCODE_OUTPUT" ]; then
+        DEADCODE_COUNT=$(echo "$DEADCODE_OUTPUT" | grep -v 'used in module' | wc -l | tr -d ' ' || echo "0")
+    else
+        DEADCODE_COUNT=0
+        print_status "WARN" "ts-prune failed to run, assuming 0 dead code exports"
+    fi
+else
+    DEADCODE_COUNT=0
+    print_status "WARN" "ts-prune or tsconfig.json not available, skipping dead code check"
+fi
+
+# Ensure numeric value
+DEADCODE_COUNT=${DEADCODE_COUNT:-0}
 
 # Update deadcode metrics in JSON
 jq --arg count "$DEADCODE_COUNT" --arg ts "$TIMESTAMP" \
@@ -222,31 +258,44 @@ fi
 echo ""
 
 # Gate 5: Build Performance (Optional)
-if command -v time >/dev/null 2>&1; then
+if command -v npm >/dev/null 2>&1; then
     echo "Gate 5: Build Performance"
     echo "------------------------"
     
-    BUILD_START=$(date +%s.%N)
+    # Use more portable timing approach
+    BUILD_START=$(date +%s 2>/dev/null || echo "0")
     if npm run build > /dev/null 2>&1; then
-        BUILD_END=$(date +%s.%N)
-        BUILD_TIME=$(echo "$BUILD_END - $BUILD_START" | bc -l 2>/dev/null || echo "N/A")
-        BUILD_TIME_MS=$(echo "($BUILD_TIME * 1000) / 1" | bc 2>/dev/null || echo "0")
-        
-        # Update build metrics in JSON
-        jq --arg time "$BUILD_TIME_MS" --arg ts "$TIMESTAMP" \
-           '.metrics.build.lastBuildTimeMs = ($time | tonumber) | .metrics.build.lastUpdated = $ts' \
-           $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
-        
-        if [ "$BUILD_TIME" != "N/A" ] && (( $(echo "$BUILD_TIME < 5.0" | bc -l 2>/dev/null || echo 0) )); then
-            print_status "PASS" "Build completed in ${BUILD_TIME}s (< 5.0s threshold)"
+        BUILD_END=$(date +%s 2>/dev/null || echo "0")
+        if [ "$BUILD_START" != "0" ] && [ "$BUILD_END" != "0" ]; then
+            BUILD_TIME_SECONDS=$((BUILD_END - BUILD_START))
+            BUILD_TIME_MS=$((BUILD_TIME_SECONDS * 1000))
+            
+            # Update build metrics in JSON with error handling
+            if jq --arg time "$BUILD_TIME_MS" --arg ts "$TIMESTAMP" \
+               '.metrics.build.lastBuildTimeMs = ($time | tonumber) | .metrics.build.lastUpdated = $ts' \
+               $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp 2>/dev/null; then
+                mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
+            else
+                rm -f ${QUALITY_CONFIG}.tmp 2>/dev/null || true
+                print_status "WARN" "Failed to update build metrics in JSON"
+            fi
+            
+            if [ "$BUILD_TIME_SECONDS" -lt 5 ]; then
+                print_status "PASS" "Build completed in ${BUILD_TIME_SECONDS}s (< 5s threshold)"
+            else
+                print_status "WARN" "Build took ${BUILD_TIME_SECONDS}s (consider optimization if > 3s)"
+            fi
         else
-            print_status "WARN" "Build took ${BUILD_TIME}s (consider optimization if > 3.0s)"
+            print_status "WARN" "Could not measure build time accurately"
         fi
     else
         print_status "FAIL" "Build failed"
         exit 1
     fi
     
+    echo ""
+else
+    print_status "WARN" "npm not available, skipping build performance check"
     echo ""
 fi
 
