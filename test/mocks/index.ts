@@ -1,15 +1,26 @@
 /**
- * Mock implementations for MCP core infrastructure
+ * MCP infrastructure implementations and mocks
  *
- * These mocks enable other teams to develop independently without
- * waiting for Team Alpha's infrastructure to be complete.
+ * This module provides both real implementations and mocks:
+ * - Real implementations for production use
+ * - Mock implementations for testing and development
+ * - Factory functions for easy switching between real and mock
  *
  * Usage:
- * - Import specific mocks for targeted testing
- * - Use factory functions for consistent mock creation
- * - Configure behavior for different test scenarios
+ * - Use createMCPInfrastructure() for real implementations
+ * - Use createMockMCPInfrastructure() for mocks/testing
+ * - Environment variable USE_MOCKS=true switches to mocks automatically
  */
 
+import pino from 'pino';
+import { loadMCPConfig } from '../../src/config/mcp-config.js';
+import { McpResourceManager } from '../../src/mcp/resources/manager.js';
+import { McpProgressNotifier } from '../../src/mcp/events/emitter.js';
+import type { ResourceManager } from '../../src/mcp/resources/types.js';
+import type { ProgressNotifier } from '../../src/mcp/events/types.js';
+import type { MCPConfig } from '../../src/config/mcp-config.js';
+
+// Export mock implementations for testing
 export {
   MockResourceManager,
   createMockResourceManager,
@@ -35,8 +46,53 @@ export {
 export type { MockConfigPreset } from './mcp-config.mock.js';
 
 /**
- * Complete mock setup for all core MCP infrastructure
- * Useful for integration testing and full workflow simulation
+ * Create real MCP infrastructure with Team Alpha implementations
+ */
+export function createMCPInfrastructure(configOverrides?: Partial<MCPConfig>): {
+  config: MCPConfig;
+  resourceManager: ResourceManager;
+  progressNotifier: ProgressNotifier;
+} {
+  // Load real configuration
+  const configResult = loadMCPConfig();
+  if (!configResult.success) {
+    throw new Error(`Failed to load MCP config: ${configResult.error}`);
+  }
+
+  const config = configOverrides 
+    ? { ...configResult.data, ...configOverrides }
+    : configResult.data;
+
+  // Create logger
+  const logger = pino({ 
+    level: process.env.LOG_LEVEL || 'info',
+    name: 'mcp-infrastructure'
+  });
+
+  // Create real implementations
+  const resourceManager = new McpResourceManager(
+    {
+      defaultTtl: config.resources.defaultTtl,
+      maxResourceSize: config.resources.maxSize,
+      cacheConfig: {
+        defaultTtl: config.resources.defaultTtl
+      }
+    },
+    logger
+  );
+
+  const progressNotifier = new McpProgressNotifier(logger);
+
+  return {
+    config,
+    resourceManager,
+    progressNotifier,
+  };
+}
+
+/**
+ * Complete mock setup for all core MCP infrastructure  
+ * Useful for testing and development
  */
 export function createMockMCPInfrastructure(preset: 'fast' | 'development' | 'minimal' | 'stress' = 'development'): {
   config: any;
@@ -65,7 +121,57 @@ export function createMockMCPInfrastructure(preset: 'fast' | 'development' | 'mi
 }
 
 /**
- * Team-specific mock setups
+ * Smart factory that uses real or mock implementations based on environment
+ */
+export function createInfrastructure(
+  configOverrides?: Partial<MCPConfig>,
+  forceMode?: 'real' | 'mock'
+): {
+  config: MCPConfig | any;
+  resourceManager: ResourceManager | any;
+  progressNotifier: ProgressNotifier | any;
+} {
+  // Determine whether to use mocks
+  const useMocks = forceMode === 'mock' || 
+                  (forceMode !== 'real' && process.env.USE_MOCKS === 'true') ||
+                  (forceMode !== 'real' && process.env.NODE_ENV === 'test');
+
+  if (useMocks) {
+    // Use mocks for testing/development
+    const preset = process.env.NODE_ENV === 'test' ? 'fast' : 'development';
+    return createMockMCPInfrastructure(preset);
+  } else {
+    // Use real implementations
+    return createMCPInfrastructure(configOverrides);
+  }
+}
+
+/**
+ * Team-specific infrastructure setups (real implementations by default)
+ */
+export const TeamInfrastructure = {
+  Alpha: () => createInfrastructure(),
+  Beta: () => {
+    const infra = createInfrastructure(getTeamBetaConfig());
+    return infra;
+  },
+  Gamma: () => {
+    const infra = createInfrastructure(getTeamGammaConfig());
+    return infra;
+  },
+  Delta: () => {
+    const infra = createInfrastructure(getTeamDeltaConfig());
+    return infra;
+  },
+  Epsilon: () => {
+    const infra = createInfrastructure(getTeamEpsilonConfig());
+    return infra;
+  },
+} as const;
+
+/**
+ * Team-specific mock setups (for testing only)
+ * @deprecated Use TeamInfrastructure for real implementations
  */
 export const TeamMocks = {
   Alpha: () => createMockMCPInfrastructure('development'),

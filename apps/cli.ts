@@ -102,6 +102,145 @@ const options = program.opts();
 const command = program.args[0] || 'start';
 const defaultDockerSockets = ['/var/run/docker.sock', '~/.colima/default/docker.socket'];
 
+// Enhanced transport detection and logging
+function getTransportInfo(options: any): { type: 'stdio' | 'http'; details: string } {
+  if (options.port) {
+    return {
+      type: 'http',
+      details: `HTTP server on ${options.host}:${options.port}`
+    };
+  }
+  return {
+    type: 'stdio',
+    details: 'Standard I/O transport (MCP protocol)'
+  };
+}
+
+// Enhanced Docker socket validation
+function validateDockerSocket(options: any): { dockerSocket: string; warnings: string[] } {
+  const warnings: string[] = [];
+  let dockerSocket = "";
+  
+  if (!options.mock) {
+    const allSocketOptions = [
+      options.dockerSocket, 
+      process.env.DOCKER_SOCKET, 
+      ...defaultDockerSockets
+    ].filter(Boolean);
+    
+    for (const thisSocket of allSocketOptions) {
+      if (!thisSocket) continue;
+      
+      try {
+        const stat = statSync(thisSocket);
+        if (!stat.isSocket()) {
+          warnings.push(`${thisSocket} exists but is not a socket`);
+          continue;
+        }
+        
+        // Only log when not in pure MCP mode
+        if (!process.env.MCP_MODE) {
+          console.error(`✅ Using Docker socket: ${thisSocket}`);
+        }
+        dockerSocket = thisSocket;
+        break;
+      } catch (error) {
+        warnings.push(`Cannot access Docker socket: ${thisSocket}`);
+      }
+    }
+    
+    if (!dockerSocket) {
+      return {
+        dockerSocket: "",
+        warnings: [
+          `No valid Docker socket found in: ${allSocketOptions.join(', ')}`,
+          'Docker operations will fail unless --mock mode is used',
+          'Consider: 1) Starting Docker Desktop, 2) Using --mock flag, 3) Specifying --docker-socket <path>'
+        ]
+      };
+    }
+  }
+  
+  return { dockerSocket, warnings };
+}
+
+// Enhanced file operations with proper error handling (utility for future use)
+// function safeFileOperation<T>(operation: () => T, fallback: T, context: string): T {
+//   try {
+//     return operation();
+//   } catch (error) {
+//     getLogger().warn({ error, context }, `File operation failed: ${context}`);
+//     return fallback;
+//   }
+// }
+
+// Enhanced error guidance in CLI
+function provideContextualGuidance(error: Error, options: any): void {
+  console.error(`\n🔍 Error: ${error.message}`);
+
+  // Docker-related guidance
+  if (error.message.includes('Docker') || error.message.includes('ENOENT')) {
+    console.error('\n💡 Docker-related issue detected:');
+    console.error('  • Ensure Docker Desktop/Engine is running');
+    console.error('  • Verify Docker socket access permissions');
+    console.error('  • Check Docker socket path with: docker context ls');
+    console.error('  • Test Docker connection: docker version');
+    console.error('  • Try mock mode for testing: --mock');
+    console.error('  • Specify custom socket: --docker-socket <path>');
+  }
+
+  // Port/networking guidance
+  if (error.message.includes('EADDRINUSE')) {
+    console.error('\n💡 Port conflict detected:');
+    console.error(`  • Port ${options.port} is already in use`);
+    console.error('  • Try a different port: --port <number>');
+    console.error('  • Check what\'s using the port: lsof -i :<port>');
+    console.error('  • Use default stdio transport (no --port flag)');
+  }
+
+  // Permission guidance
+  if (error.message.includes('permission') || error.message.includes('EACCES')) {
+    console.error('\n💡 Permission issue detected:');
+    console.error('  • Check file/directory permissions: ls -la');
+    console.error('  • Verify workspace is accessible: --workspace <path>');
+    console.error('  • Ensure Docker socket permissions (add user to docker group)');
+    console.error('  • Consider running with appropriate permissions');
+  }
+
+  // Configuration guidance
+  if (error.message.includes('config') || error.message.includes('Config')) {
+    console.error('\n💡 Configuration issue:');
+    console.error('  • Copy .env.example to .env: cp .env.example .env');
+    console.error('  • Validate configuration: --validate');
+    console.error('  • Check config file exists: --config <path>');
+    console.error('  • Review configuration docs: docs/CONFIGURATION.md');
+  }
+
+  // Transport-specific guidance
+  if (options.port && !error.message.includes('EADDRINUSE')) {
+    console.error('\n💡 HTTP transport troubleshooting:');
+    console.error('  • HTTP transport is experimental');
+    console.error('  • Consider using default stdio transport');
+    console.error('  • Verify host/port configuration');
+    console.error('  • Check firewall/network settings');
+  }
+
+  console.error('\n🛠️ General troubleshooting steps:');
+  console.error('  1. Run health check: containerization-assist-mcp --health-check');
+  console.error('  2. Validate config: containerization-assist-mcp --validate');
+  console.error('  3. Try mock mode: containerization-assist-mcp --mock');
+  console.error('  4. Enable debug logging: --log-level debug --dev');
+  console.error('  5. Check system requirements: docs/REQUIREMENTS.md');
+  console.error('  6. Review troubleshooting guide: docs/TROUBLESHOOTING.md');
+
+  if (options.dev && error.stack) {
+    console.error(`\n📍 Stack trace (dev mode):`);
+    console.error(error.stack);
+  } else if (!options.dev) {
+    console.error('\n💡 For detailed error information, use --dev flag');
+  }
+}
+
 // Validation function for CLI options
 function validateOptions(opts: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -124,35 +263,31 @@ function validateOptions(opts: any): { valid: boolean; errors: string[] } {
         errors.push(`Workspace path is not a directory: ${opts.workspace}`);
       }
     } catch (error) {
-      errors.push(`Workspace directory does not exist: ${opts.workspace}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (errorMsg.includes('ENOENT')) {
+        errors.push(`Workspace directory does not exist: ${opts.workspace}`);
+      } else if (errorMsg.includes('EACCES')) {
+        errors.push(`Permission denied accessing workspace: ${opts.workspace}`);
+      } else {
+        errors.push(`Cannot access workspace directory: ${opts.workspace} (${errorMsg})`);
+      }
     }
   }
 
-  let dockerSocket = ""
-  // Validate Docker socket path (if not mock mode)
-  if (!opts.mock) {
-    const allSocketOptions = [opts.dockerSocket, process.env.DOCKER_SOCKET, ...defaultDockerSockets]
-    for (const thisSocket of allSocketOptions) {
-      if (!thisSocket) continue;
-      try {
-        statSync(thisSocket);
-        // Only log to stderr when not in pure MCP mode (e.g., during validation)
-        if (!process.env.MCP_MODE) {
-          console.error(`Using Docker socket: ${thisSocket}`);
-        }
-        dockerSocket = thisSocket;
-        break;
-      } catch (error) {
-        // Silent when running as MCP server
+  // Enhanced Docker socket validation
+  const dockerValidation = validateDockerSocket(opts);
+  opts.dockerSocket = dockerValidation.dockerSocket;
+  
+  // Add warnings as non-fatal errors for user awareness
+  if (dockerValidation.warnings.length > 0) {
+    dockerValidation.warnings.forEach(warning => {
+      if (warning.includes('No valid Docker socket')) {
+        errors.push(warning);
+      } else if (!process.env.MCP_MODE) {
+        console.error(`⚠️  ${warning}`);
       }
-    }
-    if (!dockerSocket) {
-      errors.push(
-        `No valid Docker socket found in: ${allSocketOptions.join(', ')}. Try --mock for testing without Docker.`,
-      );
-    }
+    });
   }
-  opts.dockerSocket = dockerSocket;
 
   // Validate config file exists if specified
   if (opts.config) {
@@ -291,12 +426,16 @@ async function main(): Promise<void> {
       'Starting Containerization Assist MCP Server',
     );
 
+    // Get transport information
+    const transport = getTransportInfo(options);
+
     // Only show startup messages when not in pure MCP mode
     if (!process.env.MCP_QUIET) {
       console.error('🚀 Starting Containerization Assist MCP Server...');
       console.error(`📦 Version: ${packageJson.version}`);
-      console.error(`🏠 Workspace: ${config.workspace?.workspaceDir || process.cwd()}`);;
+      console.error(`🏠 Workspace: ${config.workspace?.workspaceDir || process.cwd()}`);
       console.error(`📊 Log Level: ${config.server.logLevel}`);
+      console.error(`🔌 Transport: ${transport.details}`);
 
       if (options.mock) {
         console.error('🤖 Running with mock AI sampler');
@@ -309,21 +448,46 @@ async function main(): Promise<void> {
 
     await server.start();
 
-    if (options.port && !process.env.MCP_QUIET) {
+    // Replace the misleading HTTP-specific message
+    if (!process.env.MCP_QUIET) {
       console.error('✅ Server started successfully');
-      console.error(`🔌 Listening on HTTP port ${options.port}`);
+      
+      if (transport.type === 'http') {
+        console.error(`🔌 Listening on HTTP port ${options.port}`);
+        console.error(`📡 Connect via: http://${options.host}:${options.port}`);
+      } else {
+        console.error('📡 Ready to accept MCP requests via stdio');
+        console.error('💡 Send JSON-RPC messages to stdin for interaction');
+      }
     }
 
+    // Enhanced shutdown handling with timeout
     const shutdown = async (signal: string): Promise<void> => {
-      getLogger().info({ signal }, 'Shutting down');
-      console.error(`\n🛑 Received ${signal}, shutting down gracefully...`);
+      const logger = getLogger();
+      logger.info({ signal }, 'Shutdown initiated');
+      
+      if (!process.env.MCP_QUIET) {
+        console.error(`\n🛑 Received ${signal}, shutting down gracefully...`);
+      }
+
+      // Set a timeout for shutdown
+      const shutdownTimeout = setTimeout(() => {
+        logger.error('Forced shutdown due to timeout');
+        console.error('⚠️ Forced shutdown - some resources may not have cleaned up properly');
+        process.exit(1);
+      }, 10000); // 10 second timeout
 
       try {
         await server.stop();
-        console.error('✅ Shutdown complete');
+        clearTimeout(shutdownTimeout);
+        
+        if (!process.env.MCP_QUIET) {
+          console.error('✅ Shutdown complete');
+        }
         process.exit(0);
       } catch (error) {
-        getLogger().error({ error }, 'Shutdown error');
+        clearTimeout(shutdownTimeout);
+        logger.error({ error }, 'Shutdown error');
         console.error('❌ Shutdown error:', error);
         process.exit(1);
       }
@@ -347,51 +511,7 @@ async function main(): Promise<void> {
     console.error('❌ Server startup failed');
 
     if (error instanceof Error) {
-      console.error(`\n🔍 Error: ${error.message}`);
-
-      // Provide specific troubleshooting guidance
-      if (error.message.includes('Docker') || error.message.includes('ENOENT')) {
-        console.error('\n💡 Docker-related issue detected:');
-        console.error('  • Ensure Docker Desktop is running');
-        console.error('  • Check Docker socket path: --docker-socket <path>');
-        console.error('  • Try mock mode for testing: --mock');
-        console.error('  • Verify Docker installation: docker version');
-      }
-
-      if (error.message.includes('EADDRINUSE')) {
-        console.error('\n💡 Port already in use:');
-        console.error('  • Try a different port: --port <number>');
-        console.error('  • Check running processes: lsof -i :<port>');
-        console.error('  • Use stdio transport (default) instead of HTTP');
-      }
-
-      if (error.message.includes('permission') || error.message.includes('EACCES')) {
-        console.error('\n💡 Permission issue detected:');
-        console.error('  • Check file/directory permissions');
-        console.error('  • Ensure workspace is readable: --workspace <path>');
-        console.error('  • Try running with appropriate permissions');
-      }
-
-      if (error.message.includes('config') || error.message.includes('Config')) {
-        console.error('\n💡 Configuration issue:');
-        console.error('  • Copy .env.example to .env');
-        console.error('  • Validate config: --validate');
-        console.error('  • Check config file path: --config <path>');
-      }
-
-      console.error('\n🛠️ Troubleshooting steps:');
-      console.error('  1. Run health check: containerization-assist-mcp --health-check');
-      console.error('  2. Validate config: containerization-assist-mcp --validate');
-      console.error('  3. Try mock mode: containerization-assist-mcp --mock');
-      console.error('  4. Enable debug logging: --log-level debug');
-      console.error('  5. Check the documentation: docs/TROUBLESHOOTING.md');
-
-      if (error.stack && options.dev) {
-        console.error(`\n📍 Stack trace (dev mode):`);
-        console.error(error.stack);
-      } else if (!options.dev) {
-        console.error('\n💡 For detailed error information, use --dev flag');
-      }
+      provideContextualGuidance(error, options);
     }
 
     exit(1);

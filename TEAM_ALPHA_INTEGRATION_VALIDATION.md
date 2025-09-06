@@ -11,16 +11,24 @@
 - [x] `MCPConfig.sampling` - Configured with scoring weights and limits
 - [x] Mock implementations - `TeamMocks.Beta()` ready
 
-**Integration Example:**
+**Integration Example (Real Implementation):**
+```typescript
+import { TeamInfrastructure } from '../test/mocks/index.js';
+
+const { resourceManager, progressNotifier, config } = TeamInfrastructure.Beta();
+const token = progressNotifier.generateToken('dockerfile_sampling');
+
+// Team Beta uses real Team Alpha infrastructure for candidate sampling
+const candidateUri = await resourceManager.publish('mcp://candidates/dockerfile-1', content);
+progressNotifier.notifyProgress({ token, value: 33, message: 'Scoring candidates...' });
+```
+
+**Testing Example (Mock Implementation):**
 ```typescript
 import { TeamMocks } from '../test/mocks/index.js';
 
 const { resourceManager, progressNotifier, config } = TeamMocks.Beta();
-const token = progressNotifier.generateToken('dockerfile_sampling');
-
-// Team Beta can immediately use these for candidate sampling
-const candidateUri = await resourceManager.publish('mcp://candidates/dockerfile-1', content);
-progressNotifier.notifyProgress({ token, value: 33, message: 'Scoring candidates...' });
+// Same interface, but mock implementation for fast testing
 ```
 
 **Beta-Specific Config Ready:**

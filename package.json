@@ -65,7 +65,16 @@
     "release": "npm run validate && npm run build:prod && npm publish",
     "prepare": "husky install",
     "mcp:inspect": "npx @modelcontextprotocol/inspector ./scripts/mcp-start.sh start",
-    "mcp:inspect:mock": "npx @modelcontextprotocol/inspector ./scripts/mcp-start-mock.sh start"
+    "mcp:inspect:mock": "npx @modelcontextprotocol/inspector ./scripts/mcp-start-mock.sh start",
+    "test:mcp": "tsx test/mcp-inspector/runner.ts",
+    "test:mcp:setup": "echo 'MCP Inspector test framework ready'",
+    "test:mcp:tools": "tsx test/mcp-inspector/runner.ts --category=tool-validation",
+    "test:mcp:sampling": "tsx test/mcp-inspector/runner.ts --category=sampling-validation",
+    "test:mcp:resources": "tsx test/mcp-inspector/runner.ts --category=resource-management",
+    "test:mcp:load": "tsx test/mcp-inspector/runner.ts --category=load-testing",
+    "test:mcp:performance": "tsx test/mcp-inspector/runner.ts --category=load-testing",
+    "test:mcp:integration": "echo 'Integration tests not yet implemented'",
+    "test:mcp:watch": "tsx watch test/mcp-inspector/runner.ts"
   },
   "dependencies": {
     "@kubernetes/client-node": "^1.3.0",
