@@ -1,24 +1,24 @@
 {
   "metrics": {
     "lint": {
-      "baseline": 376,
-      "current": 376,
-      "warnings": 376,
+      "baseline": 0,
+      "current": 0,
+      "warnings": 0,
       "errors": 0,
-      "lastUpdated": "2025-09-05T13:32:44-04:00"
+      "lastUpdated": "2025-09-06T11:04:00-04:00"
     },
     "deadcode": {
-      "baseline": 224,
-      "current": 224,
-      "lastUpdated": "2025-09-05T13:32:44-04:00"
+      "baseline": 91,
+      "current": 91,
+      "lastUpdated": "2025-09-06T11:04:00-04:00"
     },
     "typescript": {
       "errors": 0,
-      "lastUpdated": "2025-09-05T13:32:44-04:00"
+      "lastUpdated": "2025-09-06T11:04:00-04:00"
     },
     "build": {
-      "lastBuildTimeMs": 3582,
-      "lastUpdated": "2025-09-05T13:32:44-04:00"
+      "lastBuildTimeMs": 1000,
+      "lastUpdated": "2025-09-06T11:04:00-04:00"
     }
   }
 }

@@ -10,7 +10,7 @@ const mainEntries = {
   // CLI entry point (package.json bin)
   'apps/cli': 'apps/cli.ts',
   // Additional exports from package.json exports (match output paths)
-  'domain/types/index': 'src/domain/types/index.ts',
+  'types/index': 'src/types/index.ts',
   'service/config/config': 'src/config/index.ts'
 };
 

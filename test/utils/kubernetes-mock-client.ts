@@ -4,7 +4,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../../src/domain/types/result.js';
+import { Result, Success, Failure } from '../../src/types/core.js';
 
 export interface MockDeployment {
   metadata: {

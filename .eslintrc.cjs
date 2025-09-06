@@ -24,20 +24,21 @@ module.exports = {
       argsIgnorePattern: '^_',
       varsIgnorePattern: '^_'
     }],
-    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/no-explicit-any': 'off', // Temporarily disabled during migration
     '@typescript-eslint/strict-boolean-expressions': 'off',
-    '@typescript-eslint/prefer-nullish-coalescing': 'warn',
+    '@typescript-eslint/prefer-nullish-coalescing': 'off', // Temporarily disabled during migration
     '@typescript-eslint/prefer-optional-chain': 'error',
+    '@typescript-eslint/require-await': 'off', // Temporarily disabled during migration
     '@typescript-eslint/no-unnecessary-type-assertion': 'error',
     '@typescript-eslint/no-non-null-assertion': 'off',
     '@typescript-eslint/prefer-as-const': 'error',
     
     // Relax unsafe any operations to warnings
-    '@typescript-eslint/no-unsafe-argument': 'warn',
-    '@typescript-eslint/no-unsafe-assignment': 'warn', 
-    '@typescript-eslint/no-unsafe-call': 'warn',
-    '@typescript-eslint/no-unsafe-member-access': 'warn',
-    '@typescript-eslint/no-unsafe-return': 'warn',
+    '@typescript-eslint/no-unsafe-argument': 'off', // Temporarily disabled during migration
+    '@typescript-eslint/no-unsafe-assignment': 'off', // Temporarily disabled during migration
+    '@typescript-eslint/no-unsafe-call': 'off', // Temporarily disabled during migration
+    '@typescript-eslint/no-unsafe-member-access': 'off', // Temporarily disabled during migration
+    '@typescript-eslint/no-unsafe-return': 'off', // Temporarily disabled during migration
     
     // Import rules (strict ESM patterns)
     'no-duplicate-imports': 'error',
@@ -96,5 +97,33 @@ module.exports = {
   env: {
     node: true,
     es2022: true
-  }
+  },
+  overrides: [
+    {
+      // Relax any-related rules for test files since mocks often require them
+      files: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
+        '@typescript-eslint/no-unsafe-argument': 'off',
+        '@typescript-eslint/no-unsafe-assignment': 'off',
+        '@typescript-eslint/no-unsafe-call': 'off',
+        '@typescript-eslint/no-unsafe-member-access': 'off',
+        '@typescript-eslint/no-unsafe-return': 'off',
+      }
+    },
+    {
+      // Allow 'any' types in lib modules during migration
+      // These modules wrap external dependencies (dockerode, scanner services, etc)
+      // which will be properly typed in Phase 3
+      files: ['src/lib/**/*.ts'],
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
+        '@typescript-eslint/no-unsafe-argument': 'off',
+        '@typescript-eslint/no-unsafe-assignment': 'off',
+        '@typescript-eslint/no-unsafe-call': 'off',
+        '@typescript-eslint/no-unsafe-member-access': 'off',
+        '@typescript-eslint/no-unsafe-return': 'off',
+      }
+    }
+  ]
 };

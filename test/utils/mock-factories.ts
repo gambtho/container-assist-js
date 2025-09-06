@@ -8,10 +8,10 @@ import {
   K8sManifestResult,
   DeploymentResult,
   WorkflowStep,
-} from '../../src/domain/types/session';
+} from '../../src/types/session';
 import { nanoid } from 'nanoid';
-import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../src/domain/types/result';
+import type { Logger } from '../../src/lib/logger';
+import { Success, Failure, type Result } from '../../src/types/core';
 import type { ApplicationConfig } from '../../src/config/types';
 import { jest } from '@jest/globals';
 
@@ -403,19 +403,20 @@ export function createCompletedWorkflowSession(overrides?: Partial<Session>): Se
  * Mock Logger Implementation
  */
 export function createMockLogger(): jest.Mocked<Logger> {
-  return {
+  const mockLogger = {
     debug: jest.fn(),
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
     trace: jest.fn(),
     fatal: jest.fn(),
-    silent: jest.fn(),
-    level: 'info',
-    child: jest.fn().mockReturnThis(),
-    bindings: jest.fn().mockReturnValue({}),
-    version: '1.0.0',
+    child: jest.fn(),
   } as jest.Mocked<Logger>;
+  
+  // Make child return a new mock logger with the same interface
+  mockLogger.child.mockImplementation(() => mockLogger);
+  
+  return mockLogger;
 }
 
 /**

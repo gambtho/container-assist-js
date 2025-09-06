@@ -6,8 +6,8 @@
 import type { Logger } from 'pino';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Result, Success, Failure } from '../../src/domain/types/result';
-import { DockerScanResult } from '../../src/domain/types/docker';
+import { Result, Success, Failure } from '../../src/types/core';
+import { DockerScanResult } from '../../src/types/docker';
 
 const execAsync = promisify(exec);
 

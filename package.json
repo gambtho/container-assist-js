@@ -15,8 +15,8 @@
       "default": "./dist/src/index.js"
     },
     "./types": {
-      "types": "./dist/domain/types/index.d.ts",
-      "import": "./dist/domain/types/index.js"
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.js"
     },
     "./config": {
       "types": "./dist/service/config/config.d.ts",
@@ -63,7 +63,9 @@
     "bundle:check": "npm pack --dry-run",
     "prepublishOnly": "npm run validate && npm run build:prod",
     "release": "npm run validate && npm run build:prod && npm publish",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "mcp:inspect": "npx @modelcontextprotocol/inspector ./scripts/mcp-start.sh start",
+    "mcp:inspect:mock": "npx @modelcontextprotocol/inspector ./scripts/mcp-start-mock.sh start"
   },
   "dependencies": {
     "@kubernetes/client-node": "^1.3.0",

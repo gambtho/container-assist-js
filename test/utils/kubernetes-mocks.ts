@@ -10,7 +10,7 @@ import type {
   K8sDeploymentOptions,
   K8sDeploymentResult,
   K8sServiceStatus,
-} from '../../src/domain/types/index';
+} from '../../src/types/index';
 
 export interface MockKubeConfig {
   loadFromFile: ReturnType<typeof jest.fn>;

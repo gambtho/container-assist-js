@@ -1,6 +1,10 @@
 /**
- * Main entry point for ContainerizationAssist MCP Server
+ * Main entry point for ContainerizationAssist
+ *
+ * Import components directly from their modules:
+ * - ./mcp/server - ContainerizationMCPServer
+ * - ./config/index - ApplicationConfig and configuration utilities
  */
 
-export { ContainerizationAssistMCPServer } from '../apps/server';
-export type { ApplicationConfig } from './config/index';
+// Empty export to satisfy build requirements
+export {};

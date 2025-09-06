@@ -3,7 +3,7 @@
  * These replace the Result<T> monad pattern with standard TypeScript error handling.
  */
 
-import { ErrorCode } from '../domain/types/errors';
+import { ErrorCode } from '../types/core.js';
 
 /**
  * Base error class for all application errors
@@ -83,7 +83,7 @@ export class KubernetesError extends ApplicationError {
 export class AIServiceError extends ApplicationError {
   constructor(
     message: string,
-    code: ErrorCode = ErrorCode.AIGenerationError,
+    code: ErrorCode = ErrorCode.AIServiceError,
     public readonly model?: string | undefined,
     public override readonly cause?: Error | undefined,
     context?: Record<string, unknown> | undefined,
@@ -156,7 +156,7 @@ export class StorageError extends ApplicationError {
     public override readonly cause?: Error | undefined,
     context?: Record<string, unknown> | undefined,
   ) {
-    super(message, ErrorCode.StorageError, { ...context, key, operation });
+    super(message, ErrorCode.FileSystemError, { ...context, key, operation });
     this.name = 'StorageError';
   }
 }
@@ -171,7 +171,7 @@ export class NotFoundError extends ApplicationError {
     public readonly resourceId?: string,
     context?: Record<string, unknown>,
   ) {
-    super(message, ErrorCode.ResourceNotFound, { ...context, resourceType, resourceId });
+    super(message, ErrorCode.FileNotFound, { ...context, resourceType, resourceId });
     this.name = 'NotFoundError';
   }
 }
@@ -186,7 +186,7 @@ export class TimeoutError extends ApplicationError {
     public readonly operation?: string,
     context?: Record<string, unknown>,
   ) {
-    super(message, ErrorCode.ToolTimeout, { ...context, timeoutMs, operation });
+    super(message, ErrorCode.TimeoutError, { ...context, timeoutMs, operation });
     this.name = 'TimeoutError';
   }
 }
@@ -201,7 +201,7 @@ export class RateLimitError extends ApplicationError {
     public readonly resetAt?: Date,
     context?: Record<string, unknown>,
   ) {
-    super(message, ErrorCode.ResourceExhausted, { ...context, limit, resetAt });
+    super(message, ErrorCode.InternalError, { ...context, limit, resetAt });
     this.name = 'RateLimitError';
   }
 }
@@ -229,11 +229,17 @@ export function normalizeError(
     const message = error.message.toLowerCase();
 
     if (message.includes('docker')) {
-      return new DockerError(error.message, ErrorCode.DOCKER_UNKNOWN, undefined, error);
+      return new DockerError(error.message, ErrorCode.DockerError, undefined, error);
     }
 
     if (message.includes('kubernetes') || message.includes('k8s')) {
-      return new KubernetesError(error.message, ErrorCode.K8S_UNKNOWN, undefined, undefined, error);
+      return new KubernetesError(
+        error.message,
+        ErrorCode.KubernetesError,
+        undefined,
+        undefined,
+        error,
+      );
     }
 
     if (message.includes('timeout')) {
