@@ -352,23 +352,20 @@ export class ComprehensiveAnalysisStrategy extends BaseAnalysisStrategy {
     };
   }
 
-  protected identifyStrengths(variant: AnalysisVariant, scores: any): string[] {
+  protected identifyStrengths(variant: AnalysisVariant, _scores: any): string[] {
     const strengths = ['Comprehensive coverage', 'Detailed findings'];
-    if (scores.completeness > 80) strengths.push('Thorough analysis');
     if (variant.insights.keyFindings.length > 5) strengths.push('Rich insights');
     return strengths;
   }
 
-  protected identifyWeaknesses(variant: AnalysisVariant, scores: any): string[] {
+  protected identifyWeaknesses(variant: AnalysisVariant, _scores: any): string[] {
     const weaknesses = [];
-    if (scores.actionability < 70) weaknesses.push('Could be more actionable');
     if (variant.analysisTime > 30000) weaknesses.push('Analysis took significant time');
     return weaknesses;
   }
 
-  protected generateRecommendations(variant: AnalysisVariant, scores: any): string[] {
+  protected generateRecommendations(variant: AnalysisVariant, _scores: any): string[] {
     const recommendations = [];
-    if (scores.actionability < 70) recommendations.push('Focus on actionable insights');
     if (variant.insights.optimizationOpportunities.length < 3)
       recommendations.push('Identify more optimization opportunities');
     return recommendations;
