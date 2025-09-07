@@ -7,8 +7,9 @@
 
 import { createSessionManager } from '../lib/session';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core/index';
+import { Success, Failure, type Result } from '../types/core';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
+import { DEFAULT_PORTS } from '../config/defaults';
 
 export interface FixDockerfileConfig {
   sessionId: string;
@@ -70,7 +71,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 COPY . .
-EXPOSE 3000
+EXPOSE ${DEFAULT_PORTS.javascript[0]}
 CMD ["npm", "start"]`;
 
     const fixes = [

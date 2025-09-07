@@ -1,4 +1,4 @@
-import { Success, Failure, type Result } from '../types/core/index.js';
+import { Success, Failure, type Result } from '../types/core.js';
 import type { Logger } from 'pino';
 import type { ProgressReporter } from '../mcp/server-extensions.js';
 
@@ -27,6 +27,10 @@ type WorkflowResult = {
   metadata?: any;
 };
 
+/**
+ * Plan workflow steps based on type and current session state
+ * Implements smart step skipping for partially completed workflows
+ */
 const planWorkflowSteps = async (
   workflowType: string,
   params: any,
@@ -38,6 +42,7 @@ const planWorkflowSteps = async (
   if (workflowType === 'containerization') {
     const steps: WorkflowStep[] = [];
 
+    // Skip analysis if already completed in this session
     if (!sessionState?.completed_steps?.includes('analyze-repo')) {
       steps.push({
         toolName: 'analyze-repo',
@@ -54,6 +59,7 @@ const planWorkflowSteps = async (
       required: true,
     });
 
+    // Optional build step (enabled by default)
     if (params.buildImage !== false) {
       steps.push({
         toolName: 'build-image',
@@ -62,17 +68,19 @@ const planWorkflowSteps = async (
         required: false,
       });
 
+      // Security scan only if build is enabled
       if (params.scanImage !== false) {
         steps.push({
           toolName: 'scan',
           parameters: { ...params, sessionId },
           description: 'Scanning image for vulnerabilities',
           required: false,
+          // Only scan if build step produced an image ID
           condition: (results) => results[results.length - 1]?.imageId !== undefined,
         });
       }
 
-      // Step 5: Push image if requested
+      // Registry push only if both push flag and registry are specified
       if (params.pushImage && params.registry) {
         steps.push({
           toolName: 'push',
@@ -275,227 +283,268 @@ const updateSessionWithWorkflowProgress = async (
   }
 };
 
+/**
+ * Execute a workflow with intelligent orchestration
+ */
+export const executeWorkflow = async (
+  workflowType: string,
+  params: any,
+  context: WorkflowContext,
+  toolFactory: any,
+  aiService?: any,
+  sessionManager?: any,
+): Promise<Result<WorkflowResult>> => {
+  const { sessionId, progressReporter, signal, logger } = context;
+  const startTime = Date.now();
+
+  try {
+    // Validate workflow type
+    const validWorkflows = ['containerization', 'deployment', 'security', 'optimization'];
+    if (!validWorkflows.includes(workflowType)) {
+      return Failure(
+        `Invalid workflow type: ${workflowType}. Valid types: ${validWorkflows.join(', ')}`,
+      );
+    }
+
+    // Plan workflow steps
+    void progressReporter?.(5, 'Planning workflow steps...');
+    const steps = await planWorkflowSteps(workflowType, params, sessionId, sessionManager);
+
+    if (steps.length === 0) {
+      return Failure(`No steps planned for workflow: ${workflowType}`);
+    }
+
+    logger.info(
+      {
+        workflowType,
+        stepCount: steps.length,
+        steps: steps.map((s) => s.toolName),
+      },
+      'Workflow execution started',
+    );
+
+    const results: any[] = [];
+    const completedSteps: string[] = [];
+
+    // Execute each step
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      if (!step) continue;
+      const progressPercent = 10 + (i / steps.length) * 80;
+
+      void progressReporter?.(progressPercent, step.description || `Executing ${step.toolName}...`);
+
+      // Check for cancellation
+      if (signal?.aborted) {
+        logger.info({ workflowType, completedSteps }, 'Workflow cancelled by user');
+        return Failure('Workflow cancelled by user');
+      }
+
+      // Execute step with context
+      const stepResult = await executeWorkflowStep(
+        step,
+        toolFactory,
+        {
+          sessionId: sessionId || 'default',
+          signal: signal || new AbortController().signal,
+          logger: logger.child({ step: step.toolName }),
+          progressReporter: (p: number, m?: string) =>
+            progressReporter?.(progressPercent + (p * 0.8) / steps.length, m) || Promise.resolve(),
+        } as WorkflowContext,
+        results,
+      );
+
+      if (!stepResult.ok) {
+        if (step.required) {
+          // Required step failed - abort workflow
+          const error = `Required step ${i + 1} (${step.toolName}) failed: ${stepResult.error}`;
+          logger.error({ step: step.toolName, error: stepResult.error }, 'Workflow step failed');
+
+          const suggestions = [
+            'Review error message and fix the issue',
+            'Check input parameters are correct',
+            'Verify prerequisites are met',
+            sessionId ? 'Review session state for conflicts' : null,
+          ].filter(Boolean);
+
+          return Failure(`${error}\n\nRecovery options:\n- ${suggestions.join('\n- ')}`);
+        } else {
+          // Optional step failed - log and continue
+          logger.warn(
+            { step: step.toolName, error: stepResult.error },
+            'Optional step failed, continuing',
+          );
+          results.push({ error: stepResult.error, stepName: step.toolName });
+        }
+      } else {
+        results.push(stepResult.value);
+
+        if (!stepResult.value.skipped) {
+          completedSteps.push(step.toolName);
+        }
+      }
+
+      // Update session state if available
+      if (sessionId && sessionManager) {
+        await updateSessionWithWorkflowProgress(
+          sessionId,
+          sessionManager,
+          i + 1,
+          steps.length,
+          step.toolName,
+          stepResult.ok ? stepResult.value : { error: stepResult.error },
+        );
+      }
+    }
+
+    void progressReporter?.(95, 'Finalizing workflow...');
+
+    // Get final session state for recommendations
+    const finalSessionState =
+      sessionId && sessionManager ? await sessionManager.getState(sessionId) : undefined;
+
+    // Generate recommendations
+    const recommendations = generateWorkflowRecommendations(
+      workflowType,
+      results,
+      finalSessionState,
+    );
+
+    // Add AI insights if available
+    if (aiService && sessionId) {
+      const aiAnalysis = await aiService.analyzeResults({
+        toolName: 'workflow',
+        parameters: { workflowType, ...params },
+        result: { completedSteps, results },
+        sessionId,
+        context: finalSessionState,
+      });
+
+      if (aiAnalysis.ok && aiAnalysis.value.nextSteps) {
+        recommendations.push(...aiAnalysis.value.nextSteps);
+      }
+    }
+
+    const executionTime = Date.now() - startTime;
+
+    // Generate workflow summary
+    const summary: WorkflowResult = {
+      workflowType,
+      completedSteps,
+      results,
+      sessionId,
+      recommendations: [...new Set(recommendations)], // Remove duplicates
+      executionTime,
+      metadata: {
+        totalSteps: steps.length,
+        successfulSteps: completedSteps.length,
+        skippedSteps: results.filter((r) => r.skipped).length,
+        failedSteps: results.filter((r) => r.error).length,
+        aiEnhanced: !!aiService,
+        sessionTracked: !!sessionId,
+      },
+    };
+
+    void progressReporter?.(100, 'Workflow complete');
+
+    logger.info(
+      {
+        workflowType,
+        executionTime,
+        completedSteps: completedSteps.length,
+        totalSteps: steps.length,
+      },
+      'Workflow execution completed',
+    );
+
+    return Success(summary);
+  } catch (error: any) {
+    logger.error({ error, workflowType }, 'Workflow execution failed');
+    return Failure(`Workflow execution failed: ${error.message}`);
+  }
+};
+
+/**
+ * List available workflows
+ */
+export const listAvailableWorkflows = (): Array<{
+  name: string;
+  description: string;
+  steps: string[];
+}> => [
+  {
+    name: 'containerization',
+    description: 'Complete containerization workflow from analysis to deployment',
+    steps: ['analyze-repo', 'generate-dockerfile', 'build-image', 'scan', 'push'],
+  },
+  {
+    name: 'deployment',
+    description: 'Deploy application to Kubernetes cluster',
+    steps: ['generate-k8s-manifests', 'prepare-cluster', 'deploy', 'verify-deployment'],
+  },
+  {
+    name: 'security',
+    description: 'Security analysis and remediation workflow',
+    steps: ['analyze-repo', 'scan', 'fix-dockerfile'],
+  },
+  {
+    name: 'optimization',
+    description: 'Optimize Docker images for size and performance',
+    steps: ['analyze-repo', 'resolve-base-images', 'generate-dockerfile', 'build-image'],
+  },
+];
+
+/**
+ * Get workflow details including steps and estimated duration
+ */
+export const getWorkflowDetails = async (
+  workflowType: string,
+  sessionId?: string,
+  sessionManager?: any,
+): Promise<{
+  workflowType: string;
+  steps: Array<{ name: string; description?: string; required: boolean }>;
+  estimatedDuration: number;
+}> => {
+  const steps = await planWorkflowSteps(workflowType, {}, sessionId, sessionManager);
+  return {
+    workflowType,
+    steps: steps.map((s) => ({
+      name: s.toolName,
+      ...(s.description ? { description: s.description } : {}),
+      required: s.required !== false,
+    })),
+    estimatedDuration: steps.length * 30, // Rough estimate in seconds
+  };
+};
+
+/** @deprecated Use individual functions executeWorkflow, listAvailableWorkflows, getWorkflowDetails */
 export const createIntelligentOrchestrator = (
   toolFactory: any,
   aiService: any,
   sessionManager: any,
-  logger: Logger,
+  _logger: Logger,
 ): {
-  executeWorkflow: (workflowType: string, params: any, context: WorkflowContext) => Promise<Result<WorkflowResult>>;
-  listWorkflows: () => Array<{ name: string; description: string; steps: string[] }>;
-  getWorkflowDetails: (workflowType: string, sessionId?: string) => Promise<{ workflowType: string; steps: Array<{ name: string; description?: string; required: boolean }>; estimatedDuration: number }>;
-} => ({
-  async executeWorkflow(
+  executeWorkflow: (
     workflowType: string,
     params: any,
     context: WorkflowContext,
-  ): Promise<Result<WorkflowResult>> {
-    const { sessionId, progressReporter, signal } = context;
-    const startTime = Date.now();
-
-    try {
-      // Validate workflow type
-      const validWorkflows = ['containerization', 'deployment', 'security', 'optimization'];
-      if (!validWorkflows.includes(workflowType)) {
-        return Failure(
-          `Invalid workflow type: ${workflowType}. Valid types: ${validWorkflows.join(', ')}`,
-        );
-      }
-
-      // Plan workflow steps
-      void progressReporter?.(5, 'Planning workflow steps...');
-      const steps = await planWorkflowSteps(workflowType, params, sessionId, sessionManager);
-
-      if (steps.length === 0) {
-        return Failure(`No steps planned for workflow: ${workflowType}`);
-      }
-
-      logger.info(
-        {
-          workflowType,
-          stepCount: steps.length,
-          steps: steps.map((s) => s.toolName),
-        },
-        'Workflow execution started',
-      );
-
-      const results: any[] = [];
-      const completedSteps: string[] = [];
-
-      // Execute each step
-      for (let i = 0; i < steps.length; i++) {
-        const step = steps[i];
-        if (!step) continue;
-        const progressPercent = 10 + (i / steps.length) * 80;
-
-        void progressReporter?.(progressPercent, step.description || `Executing ${step.toolName}...`);
-
-        // Check for cancellation
-        if (signal?.aborted) {
-          logger.info({ workflowType, completedSteps }, 'Workflow cancelled by user');
-          return Failure('Workflow cancelled by user');
-        }
-
-        // Execute step with context
-        const stepResult = await executeWorkflowStep(
-          step,
-          toolFactory,
-          {
-            sessionId,
-            signal,
-            logger: logger.child({ step: step.toolName }),
-            progressReporter: (p: number, m?: string) =>
-              progressReporter?.(progressPercent + (p * 0.8) / steps.length, m) || Promise.resolve(),
-          },
-          results,
-        );
-
-        if (!stepResult.ok) {
-          if (step.required) {
-            // Required step failed - abort workflow
-            const error = `Required step ${i + 1} (${step.toolName}) failed: ${stepResult.error}`;
-            logger.error({ step: step.toolName, error: stepResult.error }, 'Workflow step failed');
-
-            const suggestions = [
-              'Review error message and fix the issue',
-              'Check input parameters are correct',
-              'Verify prerequisites are met',
-              sessionId ? 'Review session state for conflicts' : null,
-            ].filter(Boolean);
-
-            return Failure(`${error}\n\nRecovery options:\n- ${suggestions.join('\n- ')}`);
-          } else {
-            // Optional step failed - log and continue
-            logger.warn(
-              { step: step.toolName, error: stepResult.error },
-              'Optional step failed, continuing',
-            );
-            results.push({ error: stepResult.error, stepName: step.toolName });
-          }
-        } else {
-          results.push(stepResult.value);
-
-          if (!stepResult.value.skipped) {
-            completedSteps.push(step.toolName);
-          }
-        }
-
-        // Update session state if available
-        if (sessionId) {
-          await updateSessionWithWorkflowProgress(
-            sessionId,
-            sessionManager,
-            i + 1,
-            steps.length,
-            step.toolName,
-            stepResult.ok ? stepResult.value : { error: stepResult.error },
-          );
-        }
-      }
-
-      void progressReporter?.(95, 'Finalizing workflow...');
-
-      // Get final session state for recommendations
-      const finalSessionState = sessionId ? await sessionManager.getState(sessionId) : undefined;
-
-      // Generate recommendations
-      const recommendations = generateWorkflowRecommendations(
-        workflowType,
-        results,
-        finalSessionState,
-      );
-
-      // Add AI insights if available
-      if (aiService && sessionId) {
-        const aiAnalysis = await aiService.analyzeResults({
-          toolName: 'workflow',
-          parameters: { workflowType, ...params },
-          result: { completedSteps, results },
-          sessionId,
-          context: finalSessionState,
-        });
-
-        if (aiAnalysis.ok && aiAnalysis.value.nextSteps) {
-          recommendations.push(...aiAnalysis.value.nextSteps);
-        }
-      }
-
-      const executionTime = Date.now() - startTime;
-
-      // Generate workflow summary
-      const summary: WorkflowResult = {
-        workflowType,
-        completedSteps,
-        results,
-        sessionId,
-        recommendations: [...new Set(recommendations)], // Remove duplicates
-        executionTime,
-        metadata: {
-          totalSteps: steps.length,
-          successfulSteps: completedSteps.length,
-          skippedSteps: results.filter((r) => r.skipped).length,
-          failedSteps: results.filter((r) => r.error).length,
-          aiEnhanced: !!aiService,
-          sessionTracked: !!sessionId,
-        },
-      };
-
-      void progressReporter?.(100, 'Workflow complete');
-
-      logger.info(
-        {
-          workflowType,
-          executionTime,
-          completedSteps: completedSteps.length,
-          totalSteps: steps.length,
-        },
-        'Workflow execution completed',
-      );
-
-      return Success(summary);
-    } catch (error: any) {
-      logger.error({ error, workflowType }, 'Workflow execution failed');
-      return Failure(`Workflow execution failed: ${error.message}`);
-    }
-  },
-
-  // List available workflows
-  listWorkflows: () => [
-    {
-      name: 'containerization',
-      description: 'Complete containerization workflow from analysis to deployment',
-      steps: ['analyze-repo', 'generate-dockerfile', 'build-image', 'scan', 'push'],
-    },
-    {
-      name: 'deployment',
-      description: 'Deploy application to Kubernetes cluster',
-      steps: ['generate-k8s-manifests', 'prepare-cluster', 'deploy', 'verify-deployment'],
-    },
-    {
-      name: 'security',
-      description: 'Security analysis and remediation workflow',
-      steps: ['analyze-repo', 'scan', 'fix-dockerfile'],
-    },
-    {
-      name: 'optimization',
-      description: 'Optimize Docker images for size and performance',
-      steps: ['analyze-repo', 'resolve-base-images', 'generate-dockerfile', 'build-image'],
-    },
-  ],
-
-  // Get workflow details
-  getWorkflowDetails: async (workflowType: string, sessionId?: string) => {
-    const steps = await planWorkflowSteps(workflowType, {}, sessionId, sessionManager);
-    return {
-      workflowType,
-      steps: steps.map((s) => ({
-        name: s.toolName,
-        description: s.description,
-        required: s.required !== false,
-      })),
-      estimatedDuration: steps.length * 30, // Rough estimate in seconds
-    };
-  },
+  ) => Promise<Result<WorkflowResult>>;
+  listWorkflows: () => Array<{ name: string; description: string; steps: string[] }>;
+  getWorkflowDetails: (
+    workflowType: string,
+    sessionId?: string,
+  ) => Promise<{
+    workflowType: string;
+    steps: Array<{ name: string; description?: string; required: boolean }>;
+    estimatedDuration: number;
+  }>;
+} => ({
+  executeWorkflow: (workflowType: string, params: any, context: WorkflowContext) =>
+    executeWorkflow(workflowType, params, context, toolFactory, aiService, sessionManager),
+  listWorkflows: listAvailableWorkflows,
+  getWorkflowDetails: (workflowType: string, sessionId?: string) =>
+    getWorkflowDetails(workflowType, sessionId, sessionManager),
 });
 
 // Export types

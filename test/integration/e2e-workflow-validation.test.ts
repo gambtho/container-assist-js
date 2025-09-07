@@ -355,7 +355,7 @@ describe('End-to-End Workflow Validation', () => {
       // 4. Complete workflow
       const completedWorkflow = await consolidatedArchitecture.services.workflowOrchestrator.completeWorkflow(workflow);
 
-      // 5. Validate results across all teams
+      // 5. Validate results across all components
       expect(completedWorkflow.status).toBe('completed');
       expect(completedWorkflow.metrics.stepsCompleted).toBe(6);
       expect(completedWorkflow.metrics.errorsEncountered).toBe(0);
@@ -470,7 +470,7 @@ describe('End-to-End Workflow Validation', () => {
         expect(consolidatedArchitecture.infrastructure.logger.error).toHaveBeenCalled();
       }
 
-      // Verify error handling worked across all teams
+      // Verify error handling worked across all components
       expect(workflow.metrics.errorsEncountered).toBe(1);
       expect(workflow.status).toBe('failed');
 

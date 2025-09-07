@@ -6,18 +6,18 @@
  */
 
 import { 
-  setupSimpleMocks, 
+  setupMockFactories, 
   setupFailureMocks, 
   setupNetworkErrorMocks,
   mockSession,
   mockLogger,
-} from '../mocks/simple-mocks';
+} from '../mocks/mock-factories';
 
 /**
  * Standard test setup - use this for most tests
  */
 export const setupTest = () => {
-  const mocks = setupSimpleMocks();
+  const mocks = setupMockFactories();
   const session = mockSession();
   
   return {

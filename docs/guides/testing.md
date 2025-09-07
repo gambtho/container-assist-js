@@ -1,343 +1,123 @@
 # Testing Guide
 
-Comprehensive guide for all testing in the containerization-assist project, including unit tests, integration tests, and quality validation.
+This guide provides comprehensive information about the testing infrastructure, best practices, and procedures for the containerization-assist-js project.
 
-## Quick Start
+## Table of Contents
 
-### Development Commands
-```bash
-# Clean build artifacts
-npm run clean              # Remove dist, coverage, .tsbuildinfo
+- [Overview](#overview)
+- [Test Structure](#test-structure)  
+- [Running Tests](#running-tests)
+- [Writing Tests](#writing-tests)
+- [Test Categories](#test-categories)
+- [Performance Testing](#performance-testing)
+- [Maintenance & Automation](#maintenance--automation)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
 
-# Development mode with watch
-npm run dev                # Run CLI with tsx watch mode
+## Overview
 
-# Start built CLI
-npm run start              # Run dist/apps/cli.js
+The project uses a comprehensive 4-phase testing approach:
+
+- **Phase 1**: Foundation (Unit tests, infrastructure)
+- **Phase 2**: Integration (Real infrastructure testing)
+- **Phase 3**: E2E & Performance (Complex workflows, performance benchmarking)
+- **Phase 4**: Maintenance & Polish (CI integration, automation, cleanup)
+
+### Test Technology Stack
+
+- **Test Framework**: Jest with TypeScript support
+- **Test Structure**: Multi-project configuration (unit, integration, e2e)
+- **Mock Framework**: Jest built-in mocking + custom factories
+- **Infrastructure**: Docker, Kubernetes (Kind), Redis for integration tests
+- **Performance**: Custom performance monitoring and baseline management
+- **CI/CD**: GitHub Actions with comprehensive pipeline
+
+## Test Structure
+
+```
+test/
+├── unit/                 # Unit tests
+│   ├── tools/           # Tool-specific unit tests  
+│   ├── workflows/       # Workflow unit tests
+│   ├── lib/             # Library unit tests
+│   └── mcp/             # MCP-specific unit tests
+├── integration/         # Integration tests
+│   ├── workflows/       # End-to-end workflow tests
+│   └── mcp-server-integration.test.ts
+├── e2e/                 # End-to-end tests
+│   ├── workflows/       # Complete user workflows
+│   └── validation/      # Output validation tests
+├── performance/         # Performance tests
+│   ├── workflows/       # Performance benchmarks
+│   └── helpers/         # Performance test utilities
+├── fixtures/            # Test data and repositories
+│   ├── repositories/    # Sample repository configurations
+│   ├── expected-outputs/# Expected test outputs
+│   └── complex/         # Complex test scenarios
+├── helpers/             # Test utilities
+├── mocks/               # Mock implementations
+├── setup/               # Test setup and configuration
+└── baselines/           # Performance and quality baselines
 ```
 
-### Run Tests
+## Running Tests
+
+### Basic Test Commands
+
 ```bash
-# All tests
+# Run all tests
 npm test
 
-# Unit tests only (fast)
-npm run test:unit
-npm run test:unit:quick    # With 10s timeout
+# Run by category
+npm run test:unit              # Unit tests only
+npm run test:integration       # Integration tests only  
+npm run test:e2e              # End-to-end tests only
 
-# Integration tests (requires Docker)
-npm run test:integration
+# Run by module
+npm run test:tools            # Tool-specific tests
+npm run test:workflows        # Workflow tests
+npm run test:lib              # Library tests
+npm run test:mcp              # MCP tests
 
-# With coverage
-npm run test:coverage
+# Coverage reports
+npm run test:coverage         # Generate coverage report
+npm run test:unit:coverage    # Unit test coverage only
 
+# CI-optimized runs
+npm run test:ci               # Full CI test suite
+npm run test:ci:unit          # CI unit tests
+npm run test:ci:integration   # CI integration tests
+```
+
+### Advanced Test Options
+
+```bash
 # Watch mode for development
 npm run test:watch
-```
+npm run test:unit:watch
 
-### Validate Code Quality
-```bash
-# Standard validation (lint, typecheck, unit tests)
-npm run validate
+# Debug mode
+npm run test:debug
 
-# Run quality gates check
-npm run quality:gates
-
-# Check formatting
-npm run format:check
-```
-
-## Test Categories
-
-### Unit Tests
-- **Location**: `test/unit/`
-- **Speed**: Fast (< 30s total)
-- **Dependencies**: None
-- **Purpose**: Test individual components in isolation
-
-```bash
-# Run specific unit test
-npm test -- test/unit/specific.test.ts
-
-# Quick unit tests with 10s timeout
+# Quick runs with reduced timeouts
 npm run test:unit:quick
+npm run test:e2e:quick
+
+# Clear Jest cache
+npm run test:clear-cache
 ```
 
-### Integration Tests
-- **Location**: `test/integration/`
-- **Speed**: Slower (2-5 minutes)
-- **Dependencies**: Docker, optional Registry/Trivy/K8s
-- **Purpose**: Test cross-component workflows
+### Performance and Maintenance
 
 ```bash
-# Setup test environment
-docker-compose -f docker-compose.test.yml up -d
+# Performance monitoring
+npm run test:performance:monitor    # Run performance benchmarks
+npm run test:performance:baseline   # Update performance baselines
 
-# Run integration tests
-npm run test:integration
+# Test maintenance
+npm run test:maintenance           # Run test suite maintenance
+npm run test:maintenance:auto      # Auto-update test data
 
-# Run specific integration suite
-npm test -- --testPathPattern="docker-workflow"
+# Phase validation
+npm run test:validate:phase4       # Validate Phase 4 completion
 ```
-
-## Integration Test Environment
-
-### Prerequisites
-```bash
-# Required
-docker --version
-
-# Optional but recommended
-kubectl version --client
-trivy --version
-```
-
-### Test Services Setup
-```bash
-# Start all test services
-docker-compose -f docker-compose.test.yml up -d
-
-# Services provided:
-# - Registry (localhost:5000)
-# - Trivy Scanner (localhost:4954)
-# - PostgreSQL (localhost:5432)
-```
-
-### Environment Detection
-Tests automatically detect available services and adapt:
-- ✅ **Docker available**: Run real container tests
-- 🔄 **Registry unavailable**: Use mock push/pull
-- 🎭 **Trivy missing**: Use mock scanner
-- ☁️ **No K8s**: Skip deployment tests
-
-## Writing Tests
-
-### Unit Test Template
-```typescript
-import { describe, test, expect, beforeEach } from '@jest/globals';
-
-describe('ComponentName', () => {
-  beforeEach(() => {
-    // Setup
-  });
-
-  test('should do something', () => {
-    // Test implementation
-    expect(result).toBe(expected);
-  });
-});
-```
-
-### Integration Test Template
-```typescript
-import { 
-  describeWithEnvironment,
-  createTestLogger,
-  IntegrationTestCleanup
-} from '../utils/integration-test-utils';
-
-describeWithEnvironment(
-  'Feature Integration',
-  {
-    requirements: ['docker', 'registry'],
-    timeout: 10000
-  },
-  (testEnv) => {
-    let cleanup: IntegrationTestCleanup;
-    
-    beforeAll(async () => {
-      cleanup = new IntegrationTestCleanup();
-    });
-
-    afterAll(async () => {
-      await cleanup.cleanup();
-    });
-
-    test('should integrate components', async () => {
-      // Test with testEnv.capabilities
-    });
-  }
-);
-```
-
-## Test Configuration
-
-### Jest Configuration
-- **Config File**: `jest.config.js`
-- **Test Match**: `**/*.test.ts`
-- **Coverage**: Tracked but no hard thresholds enforced
-- **Timeout**: 30s default for unit tests, 120s for integration tests
-
-### Environment Variables
-```bash
-# Node options for ES modules
-NODE_OPTIONS='--experimental-vm-modules'
-
-# Skip typecheck in quality gates
-SKIP_TYPECHECK=true
-
-# Use local registry
-TEST_REGISTRY_HOST=localhost:5000
-USE_LOCAL_REGISTRY=true
-
-# Docker availability
-DOCKER_AVAILABLE=true
-
-# CI environment
-CI=true
-```
-
-## CI/CD Integration
-
-### GitHub Actions
-The project uses multiple GitHub Actions workflows:
-
-1. **CI/CD** (`ci.yml`):
-   - Quality checks (format, lint, typecheck)
-   - Unit tests (Node 18 and 20)
-   - Integration tests with Docker registry
-   - Test coverage reporting
-   - Security scanning
-   - MCP protocol compatibility
-
-2. **PR Quality** (`pr-quality.yml`):
-   - Quality metrics analysis
-   - PR comment with quality report
-   - Gate enforcement (non-blocking)
-
-3. **Release** (`release.yml`):
-   - NPM publishing
-   - GitHub release creation
-   - Docker image building
-
-### Pre-commit Validation
-**Husky Pre-commit Hook** (`.husky/pre-commit`):
-```bash
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
-echo "🛡️ Running pre-commit quality gates..."
-set -eu
-
-# Run lint-staged for incremental checks
-npx lint-staged
-
-# Run quality gates
-./scripts/quality-gates.sh
-
-# Auto-stage updated quality-gates.json if modified
-if git diff --name-only | grep -q "quality-gates.json"; then
-    echo "📊 Staging updated quality-gates.json metrics..."
-    git add quality-gates.json
-fi
-
-echo "✅ Pre-commit checks passed!"
-```
-
-**Lint-staged Configuration** (`package.json`):
-```json
-"lint-staged": {
-  "src/**/*.ts": [
-    "eslint --fix --max-warnings 750",
-    "prettier --write"
-  ]
-}
-```
-
-## Troubleshooting
-
-### Common Issues
-
-#### Docker Permission Errors
-```bash
-# Add current user to the docker group (log out/in or start a new shell)
-sudo usermod -aG docker $USER
-newgrp docker
-# Alternatively (temporary): grant user-specific access with ACLs
-# sudo setfacl -m user:$USER:rw /var/run/docker.sock
-```
-
-#### Test Timeouts
-```bash
-# Increase timeout for slow tests
-npm test -- --testTimeout=60000
-
-# Check for hanging processes
-npm test -- --detectOpenHandles
-```
-
-#### Registry Connection Issues
-```bash
-# Check registry is running
-curl http://localhost:5000/v2/
-
-# Restart registry
-docker-compose -f docker-compose.test.yml restart test-registry
-```
-
-## Performance Optimization
-
-### Speed Up Tests
-1. Use `test.only()` during development
-2. Run tests in parallel: `--maxWorkers=4`
-3. Skip integration tests when not needed
-4. Use `npm run test:unit:quick` for rapid feedback
-
-### Resource Management
-- Clean up Docker images after tests
-- Use temporary directories for test files
-- Implement proper cleanup in afterEach/afterAll
-- Monitor with `docker system df`
-
-## Best Practices
-
-### Do's ✅
-- Write tests for new features
-- Use descriptive test names
-- Clean up resources after tests
-- Test both success and failure cases
-- Use proper async/await handling
-
-### Don'ts ❌
-- Don't use hardcoded paths
-- Don't leave console.log in tests
-- Don't skip cleanup
-- Don't use real external services
-- Don't commit .only() or .skip()
-
-## Build and Bundle Management
-
-### Build Commands
-```bash
-# Production build with minification
-npm run build:prod
-
-# Fast development build (skip declarations)
-npm run build:fast
-
-# Development build with watch mode
-npm run build:watch
-
-# Development build (skip declarations)
-npm run build:dev
-
-# Standard build with test utils
-npm run build
-```
-
-### Bundle Analysis
-```bash
-# Check bundle size
-npm run bundle:size
-
-# Dry run npm publish
-npm run bundle:check
-
-# Release process
-npm run release  # Runs validation, builds prod, and publishes
-```
-
-## Related Documentation
-- [Quality Management](./quality-management.md)
-- [Development Workflow](../../README.md#development)
-- [Documentation Index](../README.md)

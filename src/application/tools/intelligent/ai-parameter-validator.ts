@@ -6,7 +6,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../../../types/core/index.js';
+import { Result, Success, Failure } from '../../../types/core.js';
 import { createAIService, type AIRequest, type AIResponse } from '../../../lib/ai.js';
 
 /**

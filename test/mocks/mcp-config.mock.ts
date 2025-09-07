@@ -273,21 +273,19 @@ export const createMockConfig = (
 };
 
 /**
- * Team-specific configuration helpers
+ * Specialized configuration helpers for different testing scenarios
  */
-export const getTeamAlphaConfig = (): MCPConfig => createMockConfig('development', {
-  // Focus on core infrastructure
+export const getTestConfigForResources = (): MCPConfig => createMockConfig('development', {
   resources: { maxSize: 20 * 1024 * 1024 }, // Larger for testing
   progress: { enableNotifications: true, retainHistory: true },
 });
 
-export const getTeamBetaConfig = (): MCPConfig => createMockConfig('development', {
+export const getTestConfigForSampling = (): MCPConfig => createMockConfig('development', {
   sampling: { maxCandidates: 7, defaultCandidates: 4 },
   resources: { cacheTTL: 300000 },
 });
 
-export const getTeamGammaConfig = (): MCPConfig => createMockConfig('development', {
-  // Focus on testing
+export const getTestConfigForInspection = (): MCPConfig => createMockConfig('development', {
   testing: {
     enableInspector: true,
     benchmarkSamples: 10,
@@ -295,8 +293,7 @@ export const getTeamGammaConfig = (): MCPConfig => createMockConfig('development
   },
 });
 
-export const getTeamDeltaConfig = (): MCPConfig => createMockConfig('development', {
-  // Focus on tools
+export const getTestConfigForTools = (): MCPConfig => createMockConfig('development', {
   tools: {
     enableResourceLinks: true,
     enableDynamicEnablement: true,
@@ -304,8 +301,7 @@ export const getTeamDeltaConfig = (): MCPConfig => createMockConfig('development
   },
 });
 
-export const getTeamEpsilonConfig = (): MCPConfig => createMockConfig('development', {
-  // Focus on integration
+export const getTestConfigForIntegration = (): MCPConfig => createMockConfig('development', {
   integration: {
     enableOrchestration: true,
     maxConcurrentOperations: 5,

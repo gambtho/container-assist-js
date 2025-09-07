@@ -8,7 +8,7 @@
 import { createSessionManager } from '../lib/session';
 import { createDockerClient } from '../lib/docker';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core/index';
+import { Success, Failure, type Result } from '../types/core';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
 
 export interface PushImageConfig {

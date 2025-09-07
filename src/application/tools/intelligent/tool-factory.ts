@@ -4,7 +4,7 @@
  */
 
 import type { Logger } from 'pino';
-import { pipe, type Tool } from '../../../lib/composition.js';
+import type { Tool } from '../../../types/tools.js';
 
 /**
  * Tool configuration for enhancement
@@ -31,85 +31,105 @@ export interface ToolConfigWithDefaults {
 /**
  * Add logging to a tool using functional composition
  */
-export const withLogging = (logger: Logger) => <T extends Tool>(tool: T): T => ({
-  ...tool,
-  async execute(params: any, toolLogger: Logger) {
-    const startTime = Date.now();
-    logger.info({ tool: tool.name, params }, 'Tool execution started');
+export const withLogging =
+  (logger: Logger) =>
+  <T extends Tool>(tool: T): T => ({
+    ...tool,
+    async execute(params: any, toolLogger: Logger) {
+      const startTime = Date.now();
+      logger.info({ tool: tool.name, params }, 'Tool execution started');
 
-    try {
-      const result = await tool.execute(params, toolLogger);
-      logger.info({
-        tool: tool.name,
-        duration: Date.now() - startTime,
-        success: result.ok,
-      }, 'Tool execution completed');
-      return result;
-    } catch (error) {
-      logger.error({ tool: tool.name, error }, 'Tool execution failed');
-      throw error;
-    }
-  },
-});
+      try {
+        const result = await tool.execute(params, toolLogger);
+        const success = result && typeof result === 'object' && 'ok' in result ? result.ok : true;
+        logger.info(
+          {
+            tool: tool.name,
+            duration: Date.now() - startTime,
+            success,
+          },
+          'Tool execution completed',
+        );
+        return result;
+      } catch (error) {
+        logger.error({ tool: tool.name, error }, 'Tool execution failed');
+        throw error;
+      }
+    },
+  });
 
 /**
  * Add metrics collection to a tool
  */
-export const withMetrics = (metricsCollector?: any) => <T extends Tool>(tool: T): T => {
-  if (!metricsCollector) return tool;
+export const withMetrics =
+  (metricsCollector?: any) =>
+  <T extends Tool>(tool: T): T => {
+    if (!metricsCollector) return tool;
 
-  return {
-    ...tool,
-    async execute(params: any, logger: Logger) {
-      const startTime = Date.now();
-      try {
-        const result = await tool.execute(params, logger);
-        metricsCollector.recordExecution(tool.name, Date.now() - startTime, result.ok);
-        return result;
-      } catch (error) {
-        metricsCollector.recordExecution(tool.name, Date.now() - startTime, false);
-        throw error;
-      }
-    },
+    return {
+      ...tool,
+      async execute(params: any, logger: Logger) {
+        const startTime = Date.now();
+        try {
+          const result = await tool.execute(params, logger);
+          const success = result && typeof result === 'object' && 'ok' in result ? result.ok : true;
+          metricsCollector.recordExecution(tool.name, Date.now() - startTime, success);
+          return result;
+        } catch (error) {
+          metricsCollector.recordExecution(tool.name, Date.now() - startTime, false);
+          throw error;
+        }
+      },
+    };
   };
-};
 
 /**
  * Add retry capability to a tool
  */
-export const withRetry = (attempts: number = 3) => <T extends Tool>(tool: T): T => ({
-  ...tool,
-  async execute(params: any, logger: Logger) {
-    let lastError: Error | undefined;
+export const withRetry =
+  (attempts: number = 3) =>
+  <T extends Tool>(tool: T): T => ({
+    ...tool,
+    async execute(params: any, logger: Logger) {
+      let lastError: Error | undefined;
 
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      try {
-        return await tool.execute(params, logger);
-      } catch (error) {
-        lastError = error as Error;
-        if (attempt < attempts) {
-          logger.warn({ tool: tool.name, attempt, error }, 'Tool execution failed, retrying');
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          return await tool.execute(params, logger);
+        } catch (error) {
+          lastError = error as Error;
+          if (attempt < attempts) {
+            logger.warn({ tool: tool.name, attempt, error }, 'Tool execution failed, retrying');
+            await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+          }
         }
       }
-    }
 
-    throw lastError;
-  },
-});
+      throw lastError;
+    },
+  });
 
 /**
  * Create an enhanced tool using functional composition
  */
-export const createEnhancedTool = <T extends Tool>(
+export const createIntelligentTool = <T extends Tool>(
   baseTool: T,
   config: ToolConfig & { logger: Logger; metricsCollector?: any } = { logger: console as any },
 ): T => {
-  return pipe(
-    withLogging(config.logger),
-    config.enableMetrics ? withMetrics(config.metricsCollector) : (t: T) => t,
-    config.enableRetry ? withRetry(config.retryAttempts) : (t: T) => t,
-  )(baseTool);
+  let result = baseTool;
+
+  // Apply enhancements in sequence
+  result = withLogging(config.logger)(result);
+
+  if (config.enableMetrics) {
+    result = withMetrics(config.metricsCollector)(result);
+  }
+
+  if (config.enableRetry) {
+    result = withRetry(config.retryAttempts)(result);
+  }
+
+  return result;
 };
 
 /**

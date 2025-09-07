@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import { createMockInfrastructure } from '../helpers/mock-infrastructure';
 
-// Global test timeout
+// Global test timeout for unit tests
 jest.setTimeout(10000);
 
 // Mock external dependencies by default for unit tests
@@ -23,7 +23,7 @@ jest.mock('../../src/lib/kubernetes', () => ({
 const originalConsole = console;
 beforeEach(() => {
   // Suppress console output in unit tests unless DEBUG is set
-  if (!process.env.DEBUG) {
+  if (!process.env.DEBUG && !process.env.JEST_DEBUG) {
     console.log = jest.fn();
     console.warn = jest.fn();
     console.error = jest.fn();

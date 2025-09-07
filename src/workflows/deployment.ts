@@ -87,7 +87,38 @@ export async function runDeploymentWorkflow(
     if (!clusterResult.ok) {
       prepareStep.status = 'failed';
       prepareStep.error = `Cluster preparation failed: ${clusterResult.error}`;
-      throw new Error(prepareStep.error);
+      const endTime = new Date();
+      const errorMessage = `Cluster preparation failed: ${clusterResult.error}`;
+
+      // Mark remaining steps as skipped
+      steps.forEach((step) => {
+        if (step.status === 'pending') {
+          step.status = 'skipped';
+        }
+      });
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Deployment workflow failed during cluster preparation');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     const cluster = clusterResult.value;
 
@@ -135,7 +166,38 @@ export async function runDeploymentWorkflow(
     if (!manifestResult.ok) {
       generateStep.status = 'failed';
       generateStep.error = `Manifest generation failed: ${manifestResult.error}`;
-      throw new Error(generateStep.error);
+      const endTime = new Date();
+      const errorMessage = `Manifest generation failed: ${manifestResult.error}`;
+
+      // Mark remaining steps as skipped
+      steps.forEach((step) => {
+        if (step.status === 'pending') {
+          step.status = 'skipped';
+        }
+      });
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Deployment workflow failed during manifest generation');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     const manifests = manifestResult.value;
 
@@ -177,7 +239,38 @@ export async function runDeploymentWorkflow(
     if (!pushResult.ok) {
       pushStep.status = 'failed';
       pushStep.error = `Image push failed: ${pushResult.error}`;
-      throw new Error(pushStep.error);
+      const endTime = new Date();
+      const errorMessage = `Image push failed: ${pushResult.error}`;
+
+      // Mark remaining steps as skipped
+      steps.forEach((step) => {
+        if (step.status === 'pending') {
+          step.status = 'skipped';
+        }
+      });
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Deployment workflow failed during image push');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     const push = pushResult.value;
 
@@ -220,7 +313,38 @@ export async function runDeploymentWorkflow(
     if (!deployResult.ok) {
       deployStep.status = 'failed';
       deployStep.error = `Deployment failed: ${deployResult.error}`;
-      throw new Error(deployStep.error);
+      const endTime = new Date();
+      const errorMessage = `Deployment failed: ${deployResult.error}`;
+
+      // Mark remaining steps as skipped
+      steps.forEach((step) => {
+        if (step.status === 'pending') {
+          step.status = 'skipped';
+        }
+      });
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Deployment workflow failed during application deployment');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     const deploy = deployResult.value;
 
@@ -316,9 +440,9 @@ export async function runDeploymentWorkflow(
         },
       },
       metadata: {
-        startTime: context.metadata.startTime as Date,
+        startTime: context.metadata.startTime,
         endTime,
-        duration: endTime.getTime() - (context.metadata.startTime as Date).getTime(),
+        duration: endTime.getTime() - context.metadata.startTime.getTime(),
         steps: context.steps,
       },
     };
@@ -357,9 +481,9 @@ export async function runDeploymentWorkflow(
       sessionId,
       error: errorMessage,
       metadata: {
-        startTime: context.metadata.startTime as Date,
+        startTime: context.metadata.startTime,
         endTime,
-        duration: endTime.getTime() - (context.metadata.startTime as Date).getTime(),
+        duration: endTime.getTime() - context.metadata.startTime.getTime(),
         steps: context.steps,
       },
     };

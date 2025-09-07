@@ -145,16 +145,16 @@ export function createMockFilesystem(files: Record<string, string | object> = {}
 /**
  * Result Type Helpers for Testing
  */
-export function createSuccessResult<T>(data: T) {
+export function createSuccessResult<T>(value: T) {
   return {
-    success: true as const,
-    data,
+    ok: true as const,
+    value,
   };
 }
 
 export function createFailureResult(error: string) {
   return {
-    success: false as const,
+    ok: false as const,
     error,
   };
 }

@@ -4,7 +4,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { Result } from '../types/core/index';
+import type { Result } from '../types/core';
 
 /**
  * MCP Tool definition
@@ -37,28 +37,6 @@ export interface MCPWorkflow {
     properties?: Record<string, object>;
     required?: string[];
   };
-}
-
-/**
- * Tool Registry interface
- */
-export interface ToolRegistry {
-  registerTool(tool: MCPTool): void;
-  getTool(name: string): MCPTool | undefined;
-  getAllTools(): MCPTool[];
-  getWorkflow(name: string): MCPWorkflow | undefined;
-  getAllWorkflows(): string[];
-  validateRegistry(): boolean;
-}
-
-/**
- * Workflow Registry interface
- */
-export interface WorkflowRegistry {
-  registerWorkflow(workflow: MCPWorkflow): void;
-  getWorkflow(name: string): MCPWorkflow | undefined;
-  getAllWorkflows(): string[];
-  getAllWorkflowObjects?(): MCPWorkflow[];
 }
 
 /**

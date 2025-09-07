@@ -80,22 +80,3 @@ export const ORCHESTRATOR_CONFIG = {
     },
   },
 } as const;
-
-export type OrchestratorConfig = typeof ORCHESTRATOR_CONFIG;
-
-/**
- * Helper to get stage configuration
- */
-export function getStageConfig(
-  stage: keyof typeof ORCHESTRATOR_CONFIG.STAGES,
-): (typeof ORCHESTRATOR_CONFIG.STAGES)[keyof typeof ORCHESTRATOR_CONFIG.STAGES] {
-  return ORCHESTRATOR_CONFIG.STAGES[stage];
-}
-
-/**
- * Helper to validate scoring weights sum to 100
- */
-export function validateScoringWeights(weights: Record<string, number>): boolean {
-  const sum = Object.values(weights).reduce((acc, val) => acc + val, 0);
-  return Math.abs(sum - 100) < 0.01; // Allow for floating point precision
-}

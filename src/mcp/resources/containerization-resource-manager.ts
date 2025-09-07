@@ -11,7 +11,7 @@ import {
   type ListResourcesResult,
   type ReadResourceResult,
 } from '@modelcontextprotocol/sdk/types.js';
-import { Result, Success, Failure } from '../../types/core/index.js';
+import { Result, Success, Failure } from '../../types/core.js';
 import { McpResourceManager } from './manager.js';
 import type { Resource } from './types.js';
 

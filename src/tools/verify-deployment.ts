@@ -8,7 +8,7 @@
 import { createSessionManager } from '../lib/session';
 import { createKubernetesClient } from '../lib/kubernetes';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core/index';
+import { Success, Failure, type Result } from '../types/core';
 import type { WorkflowState } from '../types/session';
 import { DEFAULT_TIMEOUTS } from '../config/defaults';
 

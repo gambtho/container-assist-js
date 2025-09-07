@@ -383,7 +383,7 @@ When you discover a new pattern:
 3. **Explain why** the pattern works
 4. **Add to troubleshooting** if it solves a common issue
 
-## Team Beta: Service Layer Success Patterns
+## Service Layer Success Patterns
 
 ### Complete ESM Service Layer Mock Pattern
 
@@ -392,7 +392,7 @@ When you discover a new pattern:
 **Solution**: Complete ESM mocking with client-level abstraction
 
 ```typescript
-// Team Beta Pattern - docker-service.test.ts
+// Service Layer Pattern - docker-service.test.ts
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import type { Logger } from 'pino';
 import { DockerError } from '../../../src/errors/index';
@@ -512,7 +512,7 @@ jest.unstable_mockModule('../../../src/infrastructure/docker-client', () => ({
 // 4. Realistic return types that match actual service contracts
 ```
 
-### Team Beta Results Summary
+### Service Layer Results Summary
 
 - ✅ **Fixed 2 test suites**: docker-service.test.ts (25 tests), session-manager.test.ts (25 tests)
 - ✅ **50 tests passing**: 0 failures, stable execution

@@ -85,7 +85,15 @@ export async function runContainerizationWorkflow(
     if (isFail(analysisResult)) {
       analyzeStep.status = 'failed';
       analyzeStep.error = `Analysis failed: ${analysisResult.error}`;
-      throw new Error(analyzeStep.error);
+      return {
+        success: false,
+        sessionId,
+        error: analyzeStep.error,
+        metadata: {
+          steps: context.steps,
+          endTime: new Date(),
+        },
+      };
     }
     const analysis = analysisResult.value;
 
@@ -120,7 +128,38 @@ export async function runContainerizationWorkflow(
     if (!dockerfileResult.ok) {
       generateStep.status = 'failed';
       generateStep.error = `Dockerfile generation failed: ${dockerfileResult.error}`;
-      throw new Error(generateStep.error);
+      const endTime = new Date();
+      const errorMessage = `Dockerfile generation failed: ${dockerfileResult.error}`;
+
+      // Mark remaining steps as skipped
+      steps.forEach((step) => {
+        if (step.status === 'pending') {
+          step.status = 'skipped';
+        }
+      });
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Containerization workflow failed during Dockerfile generation');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     const dockerfile = dockerfileResult.value;
 
@@ -157,7 +196,38 @@ export async function runContainerizationWorkflow(
     if (!buildResult.ok) {
       buildStep.status = 'failed';
       buildStep.error = `Build failed: ${buildResult.error}`;
-      throw new Error(buildStep.error);
+      const endTime = new Date();
+      const errorMessage = `Build failed: ${buildResult.error}`;
+
+      // Mark remaining steps as skipped
+      steps.forEach((step) => {
+        if (step.status === 'pending') {
+          step.status = 'skipped';
+        }
+      });
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Containerization workflow failed during image build');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     const build = buildResult.value;
 
@@ -227,6 +297,9 @@ export async function runContainerizationWorkflow(
       {
         sessionId,
         tag: tags[0] || 'latest',
+        imageName: build.imageId || `${analysis.language}-app`,
+        sourceTag: 'latest',
+        targetTag: tags[0] || 'latest',
       },
       logger,
     );
@@ -234,7 +307,38 @@ export async function runContainerizationWorkflow(
     if (!tagResult.ok) {
       tagStep.status = 'failed';
       tagStep.error = `Tagging failed: ${tagResult.error}`;
-      throw new Error(tagStep.error);
+      const endTime = new Date();
+      const errorMessage = `Tagging failed: ${tagResult.error}`;
+
+      // Mark remaining steps as skipped
+      steps.forEach((step) => {
+        if (step.status === 'pending') {
+          step.status = 'skipped';
+        }
+      });
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Containerization workflow failed during image tagging');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     const tag = tagResult.value;
 
@@ -280,9 +384,9 @@ export async function runContainerizationWorkflow(
         },
       },
       metadata: {
-        startTime: context.metadata.startTime as Date,
+        startTime: context.metadata.startTime,
         endTime,
-        duration: endTime.getTime() - (context.metadata.startTime as Date).getTime(),
+        duration: endTime.getTime() - context.metadata.startTime.getTime(),
         steps: context.steps,
       },
     };
@@ -321,9 +425,9 @@ export async function runContainerizationWorkflow(
       sessionId,
       error: errorMessage,
       metadata: {
-        startTime: context.metadata.startTime as Date,
+        startTime: context.metadata.startTime,
         endTime,
-        duration: endTime.getTime() - (context.metadata.startTime as Date).getTime(),
+        duration: endTime.getTime() - context.metadata.startTime.getTime(),
         steps: context.steps,
       },
     };

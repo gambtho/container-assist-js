@@ -1,0 +1,408 @@
+/**
+ * Dockerfile Sampling MCP Tools
+ */
+
+import type { Logger } from 'pino';
+import { Success, Failure, type Result } from '../types/core';
+import { SamplingService } from '../workflows/sampling/sampling-service';
+import type { SamplingConfig, ScoringCriteria, SamplingOptions } from '../workflows/sampling/types';
+
+/**
+ * Generate multiple Dockerfile variants using sampling strategies
+ */
+export const dockerfileSampling = {
+  name: 'dockerfile-sampling',
+  execute: async (
+    config: {
+      sessionId: string;
+      repoPath: string;
+      variantCount?: number;
+      strategies?: string[];
+      environment?: 'development' | 'staging' | 'production';
+      optimization?: 'size' | 'security' | 'performance' | 'balanced';
+      criteria?: Partial<ScoringCriteria>;
+    },
+    logger: Logger,
+  ): Promise<Result<any>> => {
+    try {
+      logger.info(
+        {
+          sessionId: config.sessionId,
+          repoPath: config.repoPath,
+          variantCount: config.variantCount,
+        },
+        'Starting Dockerfile sampling',
+      );
+
+      const samplingService = new SamplingService(logger);
+
+      const samplingConfig: SamplingConfig = {
+        sessionId: config.sessionId,
+        repoPath: config.repoPath,
+        variantCount: config.variantCount || 5,
+        ...(config.strategies && { strategies: config.strategies }),
+        ...(config.criteria && { criteria: config.criteria }),
+        ...(config.optimization && { constraints: { preferredOptimization: config.optimization } }),
+        enableCaching: true,
+        timeout: 120000, // 2 minutes for sampling
+      };
+
+      const result = await samplingService.generateVariants(samplingConfig);
+
+      if (!result.ok) {
+        return Failure(`Sampling failed: ${result.error}`);
+      }
+
+      const samplingResult = result.value;
+
+      logger.info(
+        {
+          sessionId: config.sessionId,
+          variantsGenerated: samplingResult.variants.length,
+          bestStrategy: samplingResult.bestVariant.strategy,
+          bestScore: samplingResult.bestVariant.score.total,
+        },
+        'Dockerfile sampling completed',
+      );
+
+      return Success({
+        sessionId: samplingResult.sessionId,
+        totalVariants: samplingResult.variants.length,
+        bestVariant: {
+          id: samplingResult.bestVariant.id,
+          strategy: samplingResult.bestVariant.strategy,
+          score: samplingResult.bestVariant.score.total,
+          content: samplingResult.bestVariant.content,
+          optimization: samplingResult.bestVariant.metadata.optimization,
+          features: samplingResult.bestVariant.metadata.features,
+          estimatedSize: samplingResult.bestVariant.metadata.estimatedSize,
+          buildComplexity: samplingResult.bestVariant.metadata.buildComplexity,
+        },
+        allVariants: samplingResult.variants.map((variant) => ({
+          id: variant.id,
+          strategy: variant.strategy,
+          score: variant.score.total,
+          rank: variant.rank,
+          optimization: variant.metadata.optimization,
+          features: variant.metadata.features,
+          warnings: variant.score.warnings,
+          recommendations: variant.score.recommendations,
+        })),
+        criteria: samplingResult.criteria,
+        metadata: {
+          strategiesUsed: samplingResult.metadata.strategiesUsed,
+          samplingDuration: samplingResult.metadata.samplingDuration,
+          scoringDuration: samplingResult.metadata.scoringDuration,
+          generatedAt: samplingResult.generated,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(
+        {
+          error: message,
+          sessionId: config.sessionId,
+        },
+        'Dockerfile sampling tool failed',
+      );
+
+      return Failure(`Sampling tool error: ${message}`);
+    }
+  },
+};
+
+/**
+ * Score and compare multiple Dockerfiles
+ */
+export const dockerfileCompare = {
+  name: 'dockerfile-compare',
+  execute: async (
+    config: {
+      sessionId: string;
+      dockerfiles: Array<{
+        id: string;
+        content: string;
+        strategy?: string;
+      }>;
+      criteria?: Partial<ScoringCriteria>;
+    },
+    logger: Logger,
+  ): Promise<Result<any>> => {
+    try {
+      logger.info(
+        {
+          sessionId: config.sessionId,
+          dockerfileCount: config.dockerfiles.length,
+        },
+        'Starting Dockerfile comparison',
+      );
+
+      if (!config.dockerfiles || config.dockerfiles.length < 2) {
+        return Failure('At least 2 Dockerfiles are required for comparison');
+      }
+
+      const samplingService = new SamplingService(logger);
+
+      const result = await samplingService.compareDockerfiles(
+        config.dockerfiles,
+        config.criteria as ScoringCriteria,
+      );
+
+      if (!result.ok) {
+        return Failure(`Comparison failed: ${result.error}`);
+      }
+
+      const comparison = result.value;
+
+      logger.info(
+        {
+          sessionId: config.sessionId,
+          compared: comparison.variants.length,
+          bestVariant: comparison.bestVariant.id,
+          bestScore: comparison.bestVariant.score.total,
+        },
+        'Dockerfile comparison completed',
+      );
+
+      return Success({
+        sessionId: config.sessionId,
+        bestVariant: {
+          id: comparison.bestVariant.id,
+          strategy: comparison.bestVariant.strategy,
+          score: comparison.bestVariant.score.total,
+          scoreBreakdown: comparison.bestVariant.score.breakdown,
+          reasons: comparison.bestVariant.score.reasons,
+          warnings: comparison.bestVariant.score.warnings,
+          recommendations: comparison.bestVariant.score.recommendations,
+        },
+        allVariants: comparison.variants.map((variant) => ({
+          id: variant.id,
+          strategy: variant.strategy,
+          score: variant.score.total,
+          rank: variant.rank,
+          scoreBreakdown: variant.score.breakdown,
+          warnings: variant.score.warnings.slice(0, 3), // Limit for brevity
+          recommendations: variant.score.recommendations.slice(0, 3),
+        })),
+        comparison: comparison.comparison,
+        summary: comparison.comparison.summary,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(
+        {
+          error: message,
+          sessionId: config.sessionId,
+        },
+        'Dockerfile comparison tool failed',
+      );
+
+      return Failure(`Comparison tool error: ${message}`);
+    }
+  },
+};
+
+/**
+ * Validate a single Dockerfile against best practices
+ */
+export const dockerfileValidate = {
+  name: 'dockerfile-validate',
+  execute: async (
+    config: {
+      sessionId: string;
+      content: string;
+      criteria?: Partial<ScoringCriteria>;
+    },
+    logger: Logger,
+  ): Promise<Result<any>> => {
+    try {
+      logger.info(
+        {
+          sessionId: config.sessionId,
+          contentLength: config.content.length,
+        },
+        'Starting Dockerfile validation',
+      );
+
+      if (!config.content || config.content.trim().length === 0) {
+        return Failure('Dockerfile content is required');
+      }
+
+      const samplingService = new SamplingService(logger);
+
+      const result = await samplingService.validateDockerfile(
+        config.content,
+        config.criteria as ScoringCriteria,
+      );
+
+      if (!result.ok) {
+        return Failure(`Validation failed: ${result.error}`);
+      }
+
+      const validation = result.value;
+
+      logger.info(
+        {
+          sessionId: config.sessionId,
+          score: validation.score,
+          isValid: validation.isValid,
+          issueCount: validation.issues.length,
+        },
+        'Dockerfile validation completed',
+      );
+
+      return Success({
+        sessionId: config.sessionId,
+        score: validation.score,
+        scoreBreakdown: validation.breakdown,
+        isValid: validation.isValid,
+        grade:
+          validation.score >= 80
+            ? 'A'
+            : validation.score >= 70
+              ? 'B'
+              : validation.score >= 60
+                ? 'C'
+                : validation.score >= 50
+                  ? 'D'
+                  : 'F',
+        issues: validation.issues,
+        recommendations: validation.recommendations,
+        summary: validation.isValid
+          ? 'Dockerfile meets quality standards'
+          : `Dockerfile needs improvement (${validation.issues.length} issues found)`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(
+        {
+          error: message,
+          sessionId: config.sessionId,
+        },
+        'Dockerfile validation tool failed',
+      );
+
+      return Failure(`Validation tool error: ${message}`);
+    }
+  },
+};
+
+/**
+ * Get best Dockerfile from sampling (simplified interface for workflow integration)
+ */
+export const dockerfileBest = {
+  name: 'dockerfile-best',
+  execute: async (
+    config: {
+      sessionId: string;
+      repoPath: string;
+      environment?: 'development' | 'staging' | 'production';
+      optimization?: 'size' | 'security' | 'performance' | 'balanced';
+    },
+    logger: Logger,
+  ): Promise<Result<any>> => {
+    try {
+      logger.info(
+        {
+          sessionId: config.sessionId,
+          repoPath: config.repoPath,
+          environment: config.environment,
+          optimization: config.optimization,
+        },
+        'Generating best Dockerfile via sampling',
+      );
+
+      const samplingService = new SamplingService(logger);
+
+      const options: SamplingOptions = {
+        environment: config.environment || 'production',
+        ...(config.optimization && { optimization: config.optimization }),
+      };
+
+      const result = await samplingService.generateBestDockerfile(
+        { sessionId: config.sessionId, repoPath: config.repoPath },
+        options,
+        logger,
+      );
+
+      if (!result.ok) {
+        return Failure(`Best Dockerfile generation failed: ${result.error}`);
+      }
+
+      const { content, score, metadata } = result.value;
+
+      logger.info(
+        {
+          sessionId: config.sessionId,
+          score: score * 100,
+          strategy: metadata.strategy,
+          optimization: metadata.optimization,
+        },
+        'Best Dockerfile generated successfully',
+      );
+
+      return Success({
+        sessionId: config.sessionId,
+        content,
+        score: score * 100, // Convert to 0-100 scale
+        strategy: metadata.strategy,
+        optimization: metadata.optimization,
+        features: metadata.features,
+        estimatedSize: metadata.estimatedSize,
+        buildComplexity: metadata.buildComplexity,
+        scoreBreakdown: metadata.scoreBreakdown,
+        recommendations: metadata.recommendations,
+        warnings: metadata.warnings,
+        metadata: {
+          approach: metadata.approach,
+          environment: metadata.environment,
+          variants: metadata.variants,
+          generatedAt: metadata.generatedAt,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(
+        {
+          error: message,
+          sessionId: config.sessionId,
+        },
+        'Best Dockerfile tool failed',
+      );
+
+      return Failure(`Best Dockerfile tool error: ${message}`);
+    }
+  },
+};
+
+/**
+ * List available sampling strategies
+ */
+export const samplingStrategies = {
+  name: 'sampling-strategies',
+  execute: async (_config: { sessionId?: string }, logger: Logger): Promise<Result<any>> => {
+    try {
+      logger.info('Retrieving available sampling strategies');
+
+      const samplingService = new SamplingService(logger);
+      const strategies = samplingService.getAvailableStrategies();
+
+      return Success({
+        strategies,
+        count: strategies.length,
+        descriptions: {
+          'security-first':
+            'Prioritizes security best practices with non-root users and minimal packages',
+          'performance-optimized':
+            'Optimizes for build speed and runtime performance using multi-stage builds',
+          'size-optimized': 'Minimizes final image size using distroless/alpine images',
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ error: message }, 'Sampling strategies tool failed');
+
+      return Failure(`Strategies tool error: ${message}`);
+    }
+  },
+};

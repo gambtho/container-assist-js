@@ -4,7 +4,7 @@
 
 import Docker from 'dockerode';
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../types/core/index.js';
+import { Success, Failure, type Result } from '../types/core.js';
 import type { DockerBuildOptions, DockerBuildResult } from '../types/docker';
 
 interface DockerPushResult {
@@ -83,7 +83,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         const inspect = await image.inspect();
 
         const imageInfo = {
-          id: inspect.Id,
+          Id: inspect.Id,
           repository: inspect.RepoTags?.[0]?.split(':')[0] || '',
           tag: inspect.RepoTags?.[0]?.split(':')[1] || 'latest',
           size: inspect.Size,

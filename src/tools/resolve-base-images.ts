@@ -8,7 +8,7 @@
 import { createSessionManager } from '../lib/session';
 import { createTimer, type Logger } from '../lib/logger';
 import { createDockerRegistryClient } from '../lib/docker-registry';
-import { Success, Failure, type Result } from '../types/core/index';
+import { Success, Failure, type Result } from '../types/core';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
 
 export interface ResolveBaseImagesConfig {
@@ -118,9 +118,9 @@ async function resolveBaseImages(
       primaryImage: {
         name: imageMetadata.name,
         tag: imageMetadata.tag,
-        digest: imageMetadata.digest,
-        size: imageMetadata.size,
-        lastUpdated: imageMetadata.lastUpdated,
+        ...(imageMetadata.digest && { digest: imageMetadata.digest }),
+        ...(imageMetadata.size && { size: imageMetadata.size }),
+        ...(imageMetadata.lastUpdated && { lastUpdated: imageMetadata.lastUpdated }),
       },
       alternativeImages: suggestedImages.slice(1, 3).map((img) => {
         const [name, tag] = img.split(':');

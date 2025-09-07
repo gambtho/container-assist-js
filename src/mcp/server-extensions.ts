@@ -1,10 +1,9 @@
 import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from 'pino';
 import { CancelledError } from './errors.js';
-// import type { ContainerizationMCPServer } from './server.js';
-import { Failure, type Result } from '../types/core/index.js';
+import { Failure, type Result } from '../types/core.js';
 
-// Functional approach with composable utilities
+/**\n * Functional approach with composable utilities\n * Design decision: Uses functional composition over inheritance/classes for easier testing and modularity\n */
 export type ProgressReporter = (progress: number, message?: string) => Promise<void>;
 export type ToolContext = {
   signal: AbortSignal;
@@ -42,12 +41,7 @@ const executeWithContext = async (
   const { signal, progressReporter, logger } = context;
 
   try {
-    // Check if tool supports enhanced execution
-    if (tool.executeEnhanced) {
-      return await tool.executeEnhanced(args, context);
-    }
-
-    // Fallback to standard execution
+    // Execute tool with progress reporting
     void progressReporter?.(50, `Executing ${tool.name}...`);
     const result = await tool.execute(args, logger);
     void progressReporter?.(100, 'Complete');

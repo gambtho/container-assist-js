@@ -6,7 +6,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../../../types/core/index.js';
+import { Result, Success, Failure } from '../../../types/core.js';
 import type {
   PromptArgument,
   GetPromptResult,
@@ -30,7 +30,7 @@ export interface TemplateContext {
 /**
  * Prompt template definition with MCP SDK compatibility
  */
-export interface EnhancedPromptTemplate {
+export interface AiPromptTemplate {
   id: string;
   name: string;
   description: string;
@@ -44,7 +44,7 @@ export interface EnhancedPromptTemplate {
  * Prompt Templates Manager
  */
 export class PromptTemplatesManager {
-  private templates: Map<string, EnhancedPromptTemplate> = new Map();
+  private templates: Map<string, AiPromptTemplate> = new Map();
   private logger: Logger;
 
   constructor(logger: Logger) {
@@ -56,7 +56,7 @@ export class PromptTemplatesManager {
    * Initialize default prompt templates
    */
   private initializeDefaultTemplates(): void {
-    const defaultTemplates: EnhancedPromptTemplate[] = [
+    const defaultTemplates: AiPromptTemplate[] = [
       {
         id: 'dockerfile-generation',
         name: 'Generate Dockerfile',
@@ -321,7 +321,7 @@ export class PromptTemplatesManager {
   /**
    * Register a custom prompt template
    */
-  async registerTemplate(template: EnhancedPromptTemplate): Promise<Result<void>> {
+  async registerTemplate(template: AiPromptTemplate): Promise<Result<void>> {
     try {
       // Validate template structure
       if (!template.id || !template.name || !template.description) {
@@ -380,7 +380,7 @@ export class PromptTemplatesManager {
   /**
    * Get templates by category
    */
-  getTemplatesByCategory(category: string): EnhancedPromptTemplate[] {
+  getTemplatesByCategory(category: string): AiPromptTemplate[] {
     return Array.from(this.templates.values()).filter((template) => template.category === category);
   }
 
@@ -411,7 +411,7 @@ export class PromptTemplatesManager {
   /**
    * Find template by name (case-insensitive)
    */
-  private findTemplateByName(name: string): EnhancedPromptTemplate | undefined {
+  private findTemplateByName(name: string): AiPromptTemplate | undefined {
     for (const template of this.templates.values()) {
       if (
         template.name.toLowerCase() === name.toLowerCase() ||
@@ -427,7 +427,7 @@ export class PromptTemplatesManager {
    * Generate context-aware description for a template
    */
   private generateContextualDescription(
-    template: EnhancedPromptTemplate,
+    template: AiPromptTemplate,
     context?: TemplateContext,
   ): string {
     let description = template.description;

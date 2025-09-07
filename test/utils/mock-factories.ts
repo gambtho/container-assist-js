@@ -1,5 +1,4 @@
 import {
-  Session,
   WorkflowState,
   AnalysisResult,
   DockerBuildResult,
@@ -9,7 +8,22 @@ import {
   DeploymentResult,
   WorkflowStep,
 } from '../../src/types/session';
-import { nanoid } from 'nanoid';
+
+// Test-only Session type (removed from production code)
+type Session = {
+  id: string;
+  repo_path: string;
+  metadata: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+  status?: string;
+  stage?: string;
+  labels?: Record<string, unknown>;
+  workflow_state?: WorkflowState;
+  version?: number;
+};
+// Mock ID generator for tests (replace nanoid to avoid ESM issues)
+const mockId = () => Math.random().toString(36).substring(7);
 import type { Logger } from '../../src/lib/logger';
 import { Success, Failure, type Result } from '../../src/types/core';
 import type { ApplicationConfig } from '../../src/config/types';
@@ -18,7 +32,7 @@ import { jest } from '@jest/globals';
 export function createMockSession(overrides?: Partial<Session>): Session {
   const now = new Date().toISOString();
   return {
-    id: nanoid(),
+    id: mockId(),
     created_at: now,
     updated_at: now,
     status: 'active',

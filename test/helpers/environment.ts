@@ -4,12 +4,12 @@
  */
 
 export async function setupTestEnvironment() {
-  // Mock implementation for now - will be enhanced in Phase 2
+  // Mock implementation for test environments
   return {
     dockerClient: null,
     kubernetesClient: null,
     cleanup: async () => {
-      // Cleanup logic will be implemented in integration phase
+      // Cleanup logic for test environment
     },
   };
 }

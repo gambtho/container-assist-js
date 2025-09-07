@@ -107,63 +107,19 @@ export function createTimer(
 }
 
 /**
- * Simple timer without logging - useful for pure timing
+ * Log sampling events for debugging
  */
-export function startTimer(): {
-  elapsed: () => number;
-  stop: () => number;
-} {
-  const startTime = Date.now();
-
-  return {
-    elapsed: () => Date.now() - startTime,
-    stop: () => Date.now() - startTime,
-  };
-}
-
-/**
- * Log a sampling event with structured data
- */
-export function logSamplingEvent(
+function logSamplingEvent(
   logger: pino.Logger,
   event: string,
-  data: Record<string, unknown>,
+  context: Record<string, unknown> = {},
 ): void {
-  logger.info(
+  logger.debug(
     {
       event_type: 'sampling',
-      event_name: event,
-      ...data,
+      event,
+      ...context,
     },
     `Sampling: ${event}`,
-  );
-}
-
-/**
- * Log an orchestrator event with structured data
- */
-export function logOrchestratorEvent(
-  logger: pino.Logger,
-  phase: string,
-  event:
-    | 'start'
-    | 'end'
-    | 'failure'
-    | 'attempt'
-    | 'patches_applied'
-    | 'scan_result'
-    | 'success'
-    | 'max_attempts'
-    | 'no_improvement',
-  data?: Record<string, unknown>,
-): void {
-  logger.info(
-    {
-      event_type: 'orchestrator',
-      phase,
-      event,
-      ...data,
-    },
-    `Orchestrator: ${phase} ${event}`,
   );
 }

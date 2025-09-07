@@ -8,94 +8,143 @@ import type { Logger } from 'pino';
 import {
   runContainerizationWorkflow,
   runBuildOnlyWorkflow,
-  type WorkflowConfig as SimpleWorkflowConfig,
+  type WorkflowConfig as ContainerizationWorkflowConfig,
 } from '../containerization-workflow.js';
-import { createIntelligentOrchestrator, type WorkflowContext } from '../intelligent-orchestration.js';
+import {
+  createIntelligentOrchestrator,
+  type WorkflowContext,
+} from '../intelligent-orchestration.js';
 
 /**
- * Unified WorkflowCoordinator - supports both simple and enhanced workflows
+ * Execute containerization workflow for a repository
+ * @param repositoryPath - Path to the repository to containerize
+ * @param logger - Logger instance for workflow execution
+ * @param config - Optional workflow configuration
+ * @returns Promise resolving to workflow execution result
  */
-export class WorkflowCoordinator {
-  private intelligentOrchestrator: any;
-
-  constructor(private logger: Logger) {
-    this.logger.info('Unified WorkflowCoordinator initialized');
-    // Initialize with minimal dependencies for enhanced workflows
-    this.intelligentOrchestrator = createIntelligentOrchestrator(
-      null, // toolFactory - will be passed in context
-      null, // aiService - optional
-      null, // sessionManager - optional
-      logger,
-    );
-  }
-
-  /**
-   * Execute simple containerization workflow
-   */
-  async executeWorkflow(
-    repositoryPath: string,
-    config?: Partial<SimpleWorkflowConfig>,
-  ): Promise<Result<any>> {
-    return runContainerizationWorkflow(repositoryPath, this.logger, config);
-  }
-
-  /**
-   * Execute enhanced containerization workflow with intelligent orchestration
-   */
-  async executeEnhancedWorkflow(
-    repositoryPath: string,
-    config?: Partial<SimpleWorkflowConfig>,
-  ): Promise<Result<any>> {
-    const context: WorkflowContext = {
-      sessionId: config?.sessionId,
-      logger: this.logger,
-    };
-
-    const params = {
-      repoPath: repositoryPath,
-      ...config,
-    };
-
-    return this.intelligentOrchestrator.executeWorkflow('containerization', params, context);
-  }
-
-  /**
-   * Execute simple build-only workflow
-   */
-  async executeBuildWorkflow(
-    repositoryPath: string,
-    config?: Partial<SimpleWorkflowConfig>,
-  ): Promise<Result<any>> {
-    return runBuildOnlyWorkflow(repositoryPath, this.logger, config);
-  }
-
-  /**
-   * Execute enhanced build-only workflow with intelligent orchestration
-   */
-  async executeEnhancedBuildWorkflow(
-    repositoryPath: string,
-    config?: Partial<SimpleWorkflowConfig>,
-  ): Promise<Result<any>> {
-    const context: WorkflowContext = {
-      sessionId: config?.sessionId,
-      logger: this.logger,
-    };
-
-    const params = {
-      repoPath: repositoryPath,
-      buildImage: true,
-      pushImage: false,
-      scanImage: false,
-      ...config,
-    };
-
-    return this.intelligentOrchestrator.executeWorkflow('optimization', params, context);
-  }
-}
-
-/**
- * Factory function for creating simple coordinator
- */
-export const createSimpleWorkflowCoordinator = (logger: Logger): WorkflowCoordinator => {
-  return new WorkflowCoordinator(logger);
+export const executeBasicContainerizationWorkflow = async (
+  repositoryPath: string,
+  logger: Logger,
+  config?: Partial<ContainerizationWorkflowConfig>,
+): Promise<Result<any>> => {
+  return runContainerizationWorkflow(repositoryPath, logger, config);
 };
+
+/**
+ * Execute build-only workflow for a repository
+ * @param repositoryPath - Path to the repository to build
+ * @param logger - Logger instance for workflow execution
+ * @param config - Optional workflow configuration
+ * @returns Promise resolving to build workflow execution result
+ */
+export const executeBuildWorkflow = async (
+  repositoryPath: string,
+  logger: Logger,
+  config?: Partial<ContainerizationWorkflowConfig>,
+): Promise<Result<any>> => {
+  return runBuildOnlyWorkflow(repositoryPath, logger, config);
+};
+
+/**
+ * Execute enhanced workflow using intelligent orchestration
+ * @param repositoryPath - Path to the repository
+ * @param workflowType - Type of workflow to execute (e.g., 'deployment', 'security')
+ * @param logger - Logger instance for workflow execution
+ * @param config - Optional workflow configuration with AI service and session management
+ * @returns Promise resolving to enhanced workflow execution result
+ */
+export const executeEnhancedWorkflow = async (
+  repositoryPath: string,
+  workflowType: string,
+  logger: Logger,
+  config?: Partial<
+    ContainerizationWorkflowConfig & { toolFactory?: any; aiService?: any; sessionManager?: any }
+  >,
+): Promise<Result<any>> => {
+  const orchestrator = createIntelligentOrchestrator(
+    config?.toolFactory || null,
+    config?.aiService || null,
+    config?.sessionManager || null,
+    logger,
+  );
+
+  const context: WorkflowContext = {
+    sessionId: (config as any)?.sessionId,
+    logger,
+  };
+
+  const params = {
+    repoPath: repositoryPath,
+    ...config,
+  };
+
+  return orchestrator.executeWorkflow(workflowType, params, context);
+};
+
+/**
+ * Execute deployment workflow - direct function
+ */
+export const executeDeploymentWorkflow = async (
+  repositoryPath: string,
+  logger: Logger,
+  config?: Partial<ContainerizationWorkflowConfig>,
+): Promise<Result<any>> => {
+  return executeEnhancedWorkflow(repositoryPath, 'deployment', logger, config);
+};
+
+/**
+ * Execute security workflow - direct function
+ */
+export const executeSecurityWorkflow = async (
+  repositoryPath: string,
+  logger: Logger,
+  config?: Partial<ContainerizationWorkflowConfig>,
+): Promise<Result<any>> => {
+  return executeEnhancedWorkflow(repositoryPath, 'security', logger, config);
+};
+
+/**
+ * Execute optimization workflow - direct function
+ */
+export const executeOptimizationWorkflow = async (
+  repositoryPath: string,
+  logger: Logger,
+  config?: Partial<ContainerizationWorkflowConfig>,
+): Promise<Result<any>> => {
+  return executeEnhancedWorkflow(repositoryPath, 'optimization', logger, config);
+};
+
+/**
+ * List available workflows
+ */
+export const getAvailableWorkflows = (): Array<{
+  name: string;
+  description: string;
+  execute: (repositoryPath: string, logger: Logger, config?: any) => Promise<Result<any>>;
+}> => [
+  {
+    name: 'containerization',
+    description: 'Complete containerization workflow from analysis to deployment',
+    execute: executeBasicContainerizationWorkflow,
+  },
+  {
+    name: 'build-only',
+    description: 'Build Docker image only',
+    execute: executeBuildWorkflow,
+  },
+  {
+    name: 'deployment',
+    description: 'Deploy application to Kubernetes cluster',
+    execute: executeDeploymentWorkflow,
+  },
+  {
+    name: 'security',
+    description: 'Security analysis and remediation workflow',
+    execute: executeSecurityWorkflow,
+  },
+  {
+    name: 'optimization',
+    description: 'Optimize Docker images for size and performance',
+    execute: executeOptimizationWorkflow,
+  },
+];

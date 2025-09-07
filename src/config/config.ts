@@ -3,7 +3,6 @@
  */
 
 import type { ApplicationConfig } from './types';
-import { mapEnvironmentToConfig } from './env-mapper';
 
 /**
  * Create default configuration with sensible defaults
@@ -77,64 +76,10 @@ function createDefaultConfig(): ApplicationConfig {
  * Create configuration with environment overrides
  * @returns ApplicationConfig with environment variable overrides applied
  */
-export function createConfiguration(): ApplicationConfig {
-  // Start with defaults
-  const defaults = createDefaultConfig();
-
-  // Get environment overrides
-  const envOverrides = mapEnvironmentToConfig();
-
-  // Merge defaults with environment overrides
-  return {
-    ...defaults,
-    ...envOverrides,
-    server: { ...defaults.server, ...envOverrides.server },
-    session: { ...defaults.session, ...envOverrides.session },
-    docker: { ...defaults.docker, ...envOverrides.docker },
-    kubernetes: { ...defaults.kubernetes, ...envOverrides.kubernetes },
-    workflow: { ...defaults.workflow, ...envOverrides.workflow },
-    mcp: { ...defaults.mcp, ...(envOverrides.mcp || {}) },
-  };
+function createConfiguration(): ApplicationConfig {
+  const defaultConfig = createDefaultConfig();
+  // Environment mapping is currently disabled - returns default configuration
+  return defaultConfig;
 }
 
-/**
- * Create configuration for specific environment
- * @param nodeEnv - Target environment
- * @returns ApplicationConfig optimized for the specified environment
- */
-export function createConfigurationForEnv(
-  nodeEnv: 'development' | 'production' | 'test',
-): ApplicationConfig {
-  const config = createConfiguration();
-  config.server.nodeEnv = nodeEnv;
-
-  switch (nodeEnv) {
-    case 'development':
-      config.server.logLevel = 'debug';
-      break;
-    case 'production':
-      config.server.logLevel = 'info';
-      break;
-    case 'test':
-      config.server.logLevel = 'error';
-      config.session.store = 'memory';
-      break;
-  }
-
-  return config;
-}
-
-/**
- * Get configuration summary for logging
- * @param config - Application configuration
- * @returns Summary object with key configuration values
- */
-export function getConfigurationSummary(config: ApplicationConfig): Record<string, unknown> {
-  return {
-    nodeEnv: config.server.nodeEnv,
-    logLevel: config.server.logLevel,
-    workflowMode: config.workflow.mode,
-    maxSessions: config.session.maxSessions,
-    dockerRegistry: config.docker.registry,
-  };
-}
+export { createDefaultConfig, createConfiguration };

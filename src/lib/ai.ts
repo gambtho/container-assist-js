@@ -7,7 +7,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../types/core/index.js';
+import { Success, Failure, type Result } from '../types/core.js';
 
 /**
  * AI request configuration for context generation
@@ -53,6 +53,11 @@ interface AIService {
   ping: () => Promise<Result<boolean>>;
 }
 
+/**
+ * Creates an AI service that provides structured context for MCP host AI
+ * @param logger - Logger instance for structured logging
+ * @returns AIService instance with generate and ping methods
+ */
 export const createAIService = (logger: Logger): AIService => {
   return {
     /**

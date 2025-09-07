@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document specifies the complete containerization workflow orchestrated by Team Epsilon, integrating all MCP tools with sampling capabilities and deployment verification.
+This document specifies the complete containerization workflow, integrating all MCP tools with sampling capabilities and deployment verification.
 
 ## Workflow Stages
 
@@ -252,22 +252,22 @@ interface WorkflowConfig {
 
 ## Integration Points
 
-### With Team Alpha (Core Infrastructure)
+### Core Infrastructure Integration
 - Resource management for large artifacts
 - Event emission for progress tracking
 - Configuration management for user preferences
 
-### With Team Beta (Sampling & Scoring)  
+### Sampling & Scoring Integration
 - Dockerfile candidate generation and scoring
 - K8s manifest candidate generation and scoring
 - Remediation strategy sampling
 
-### With Team Delta (Tools Enhancement)
+### Enhanced Tools Integration
 - Enhanced tool interfaces with resource links
 - Dynamic tool enablement based on repository analysis
 - Improved error handling and progress reporting
 
-### With Team Gamma (Testing Infrastructure)
+### Testing Infrastructure Integration
 - Integration test execution
 - Performance benchmarking
 - Regression detection

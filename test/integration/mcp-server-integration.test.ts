@@ -238,7 +238,7 @@ describe('Week 5: Comprehensive Integration Testing', () => {
       expect(components.testing.integrationTests.status).toBe('passing');
       
       const duration = performance.now() - startTime;
-      performanceBaseline.set('team-delta-integration', duration);
+      performanceBaseline.set('mcp-server-integration', duration);
       
       expect(duration).toBeLessThan(25); // Test utilities should be very fast
     });
@@ -419,7 +419,7 @@ describe('Week 5: Comprehensive Integration Testing', () => {
       // Take initial memory snapshot
       const initialMemory = process.memoryUsage();
       
-      // Perform operations across all team components
+      // Perform operations across all components
       const iterations = 500;
       
       for (let i = 0; i < iterations; i++) {

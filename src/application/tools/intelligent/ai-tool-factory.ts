@@ -3,8 +3,9 @@
  */
 
 import type { Logger } from 'pino';
-import { pipe, type Tool } from '../../../lib/composition.js';
-import { createEnhancedTool } from './tool-factory.js';
+import { pipe } from '../../../lib/composition.js';
+import type { Tool } from '../../../types/tools.js';
+import { createIntelligentTool } from './tool-factory.js';
 
 // Import base tools
 import { analyzeRepoTool } from '../../../tools/analyze-repo.js';
@@ -21,6 +22,15 @@ import { opsTool } from '../../../tools/ops.js';
 import { deployApplicationTool } from '../../../tools/deploy.js';
 import { generateK8sManifestsTool } from '../../../tools/generate-k8s-manifests.js';
 import { verifyDeploymentTool } from '../../../tools/verify-deployment.js';
+
+// Import sampling tools
+import {
+  dockerfileSampling,
+  dockerfileCompare,
+  dockerfileValidate,
+  dockerfileBest,
+  samplingStrategies,
+} from '../../../tools/sampling-tools.js';
 
 /**
  * Simple tool registry using Map
@@ -49,18 +59,32 @@ export const createToolRegistry = (
     deployApplicationTool,
     generateK8sManifestsTool,
     verifyDeploymentTool,
+    // Sampling tools
+    dockerfileSampling,
+    dockerfileCompare,
+    dockerfileValidate,
+    dockerfileBest,
+    samplingStrategies,
   ];
 
   const registry = new Map<string, Tool>();
 
-  baseTools.forEach((tool) => {
-    const enhancedTool = createEnhancedTool(tool, {
+  baseTools.forEach((rawTool) => {
+    // Create wrapper that matches Tool interface
+    const tool: Tool = {
+      name: rawTool.name,
+      execute: async (params: Record<string, unknown>, logger: Logger) => {
+        return await rawTool.execute(params as any, logger);
+      },
+    };
+
+    const aiEnhancedTool = createIntelligentTool(tool, {
       logger,
-      enableMetrics: config.enableMetrics,
+      enableMetrics: config.enableMetrics || false,
       enableRetry: true,
       retryAttempts: 3,
     });
-    registry.set(tool.name, enhancedTool);
+    registry.set(tool.name, aiEnhancedTool);
   });
 
   return registry;
@@ -83,68 +107,94 @@ export const getAllTools = (registry: ToolRegistry): Tool[] => {
 /**
  * AI enhancement functions using composition
  */
-export const withAI = (aiService: any, _sessionManager: any) => <T extends Tool>(tool: T): T => ({
-  ...tool,
-  async execute(params: any, logger: Logger) {
-    const result = await tool.execute(params, logger);
+export const withAI =
+  (aiService: any, _sessionManager: any) =>
+  <T extends Tool>(tool: T): T => ({
+    ...tool,
+    async execute(params: any, logger: Logger) {
+      const result = await tool.execute(params, logger);
 
-    // Add AI insights if available
-    if (result.ok && params.sessionId && aiService) {
-      try {
-        const aiContext = await aiService.generateWithContext({
-          prompt: `Enhance ${tool.name} results with AI insights`,
-          sessionId: params.sessionId,
-          context: result.value,
-        });
+      // Add AI insights if available
+      if (
+        result &&
+        typeof result === 'object' &&
+        'ok' in result &&
+        result.ok &&
+        params.sessionId &&
+        aiService
+      ) {
+        try {
+          const aiContext = await aiService.generateWithContext({
+            prompt: `Enhance ${tool.name} results with AI insights`,
+            sessionId: params.sessionId,
+            context: result.value,
+          });
 
-        if (aiContext.ok) {
-          return {
-            ...result,
-            value: {
-              ...result.value,
-              aiInsights: aiContext.value.context.guidance,
-              metadata: {
-                ...result.value.metadata,
-                aiEnhanced: true,
+          if (aiContext.ok) {
+            const resultValue = result.value;
+            return {
+              ...result,
+              value: {
+                ...(typeof resultValue === 'object' ? resultValue : {}),
+                aiInsights: aiContext.value.context.guidance,
+                metadata: {
+                  ...(resultValue?.metadata || {}),
+                  aiEnhanced: true,
+                },
               },
-            },
-          };
+            };
+          }
+        } catch (error) {
+          logger.warn({ tool: tool.name, error }, 'AI enhancement failed');
         }
-      } catch (error) {
-        logger.warn({ tool: tool.name, error }, 'AI enhancement failed');
       }
-    }
 
-    return result;
-  },
-});
+      return result;
+    },
+  });
 
 /**
- * Create AI-enhanced tool registry
+ * Create enhanced tool registry with AI capabilities
  */
+export const createEnhancedToolRegistry = (
+  logger: Logger,
+  config: {
+    aiService?: any;
+    sessionManager?: any;
+    enableMetrics?: boolean;
+    metricsCollector?: any;
+  } = {},
+): ToolRegistry => {
+  const baseRegistry = createToolRegistry(logger, {
+    enableMetrics: config.enableMetrics ?? false,
+  });
+
+  // Apply AI enhancements if available
+  if (config.aiService && config.sessionManager) {
+    baseRegistry.forEach((tool, name) => {
+      const aiEnhanced = pipe(withAI(config.aiService, config.sessionManager))(tool);
+      baseRegistry.set(name, aiEnhanced);
+    });
+  }
+
+  return baseRegistry;
+};
+
+/** @deprecated Use createEnhancedToolRegistry instead */
 export const createAIToolRegistry = (
   logger: Logger,
   aiService: any,
   sessionManager: any,
 ): ToolRegistry => {
-  const baseRegistry = createToolRegistry(logger);
-  const aiRegistry = new Map<string, Tool>();
-
-  baseRegistry.forEach((tool, name) => {
-    const aiEnhancedTool = pipe(
-      withAI(aiService, sessionManager),
-    )(tool);
-    aiRegistry.set(name, aiEnhancedTool);
-  });
-
-  return aiRegistry;
+  return createEnhancedToolRegistry(logger, { aiService, sessionManager });
 };
-
 
 /**
  * Get registry stats
  */
-export const getRegistryStats = (registry: ToolRegistry): {
+export const getRegistryStats = (
+  registry: ToolRegistry,
+): {
   totalTools: number;
   tools: string[];
 } => ({

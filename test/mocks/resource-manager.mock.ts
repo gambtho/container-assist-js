@@ -3,7 +3,7 @@ import type { Resource, ResourceManager } from '../../src/mcp/resources/types.js
 import { UriParser } from '../../src/mcp/resources/uri-schemes.js';
 
 /**
- * Mock ResourceManager for testing and independent team development
+ * Mock ResourceManager for testing
  * Simulates real behavior without external dependencies
  */
 export class MockResourceManager implements ResourceManager {

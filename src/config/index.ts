@@ -67,33 +67,29 @@ export const config = {
 } as const;
 
 /**
- * Compatibility exports for existing code
+ * Configuration utilities
  */
 
-/**
- * Get the current application configuration
- * @returns The application configuration object
- */
-export function getConfig(): typeof config {
-  return config;
-}
-
-/**
- * Create and return the application configuration (alias for getConfig)
- * @returns The application configuration object
- */
 export function createConfig(): typeof config {
   return config;
 }
 
-/**
- * Log configuration summary in development mode
- */
-export function logConfigSummaryIfDev(): void {
+export function logConfigSummaryIfDev(logger?: {
+  info: (message: string, data?: any) => void;
+}): void {
   if (process.env.NODE_ENV === 'development') {
-    // eslint-disable-next-line no-console
-    console.log('Configuration loaded:', config);
+    const configData = {
+      logLevel: config.server.logLevel,
+      workspace: config.workspace.workspaceDir,
+      docker: config.docker.socketPath,
+    };
+
+    if (logger) {
+      logger.info('Configuration loaded', configData);
+    } else {
+      // Fallback for cases where logger is not available
+      // eslint-disable-next-line no-console
+      console.log('Configuration loaded:', configData);
+    }
   }
 }
-
-export { config as default };

@@ -9,7 +9,7 @@ export type WorkflowMode = 'interactive' | 'auto' | 'batch';
 export type StoreType = 'memory' | 'file' | 'redis';
 
 // Server Configuration - Most used (7 references)
-export interface ServerConfig {
+interface ServerConfig {
   nodeEnv: NodeEnv;
   logLevel: LogLevel;
   port?: number;
@@ -17,7 +17,7 @@ export interface ServerConfig {
 }
 
 // Session Configuration - Frequently used (4 references)
-export interface SessionConfig {
+interface SessionConfig {
   store: StoreType;
   ttl: number;
   maxSessions: number;
@@ -27,7 +27,7 @@ export interface SessionConfig {
 }
 
 // Docker Configuration - Essential for containerization
-export interface DockerConfig {
+interface DockerConfig {
   socketPath: string;
   registry: string;
   host: string;
@@ -38,7 +38,7 @@ export interface DockerConfig {
 }
 
 // Kubernetes Configuration - Essential for deployment
-export interface KubernetesConfig {
+interface KubernetesConfig {
   kubeconfig: string;
   namespace: string;
   context: string;
@@ -47,7 +47,7 @@ export interface KubernetesConfig {
 }
 
 // Workflow Configuration - Frequently used (3 references)
-export interface WorkflowConfig {
+interface WorkflowConfig {
   mode: WorkflowMode;
   autoRetry: boolean;
   maxRetries: number;
@@ -56,20 +56,10 @@ export interface WorkflowConfig {
 }
 
 // MCP Configuration - Moved from advanced to core since tests depend on it
-export interface McpConfig {
+interface McpConfig {
   storePath: string;
   sessionTTL: string;
   maxSessions: number;
   enableMetrics: boolean;
   enableEvents: boolean;
-}
-
-// Core Application Configuration - Only essential configs
-export interface CoreConfig {
-  server: ServerConfig;
-  session: SessionConfig;
-  docker: DockerConfig;
-  kubernetes: KubernetesConfig;
-  workflow: WorkflowConfig;
-  mcp: McpConfig;
 }

@@ -10,7 +10,7 @@ import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../lib/session';
 import { createAIService } from '../lib/ai';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core/index';
+import { Success, Failure, type Result } from '../types/core';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
 import { DEFAULT_PORTS } from '../config/defaults';
 
@@ -370,7 +370,10 @@ function getSecurityRecommendations(
 }
 
 /**
- * Analyze repository
+ * Analyzes repository structure to detect language, framework, and build system
+ * @param config - Configuration options including sessionId, repoPath, depth, and includeTests
+ * @param logger - Logger instance for structured logging
+ * @returns Promise resolving to analysis result with language detection, dependencies, and recommendations
  */
 export async function analyzeRepo(
   config: AnalyzeRepoConfig,

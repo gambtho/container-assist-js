@@ -9,7 +9,7 @@ import * as yaml from 'js-yaml';
 import { createSessionManager } from '../lib/session';
 import { createKubernetesClient } from '../lib/kubernetes';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core/index';
+import { Success, Failure, type Result } from '../types/core';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
 import { DEFAULT_TIMEOUTS } from '../config/defaults';
 
@@ -149,7 +149,7 @@ export async function deployApplication(
           // Apply manifest using K8s client
           const applyResult = await k8sClient.applyManifest(manifest, namespace);
           if (!applyResult.ok) {
-            throw new Error(applyResult.error || 'Failed to apply manifest');
+            return Failure(applyResult.error || 'Failed to apply manifest');
           }
 
           deployedResources.push({

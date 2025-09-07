@@ -6,7 +6,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../types/core/index';
+import { Result, Success, Failure } from '../types/core';
 import { analyzeRepo } from '../tools/analyze-repo';
 import { generateDockerfile } from '../tools/generate-dockerfile';
 import { buildImage } from '../tools/build-image';
@@ -33,7 +33,16 @@ export interface WorkflowResult {
 }
 
 /**
- * Simple containerization workflow - replaces complex coordinator
+ * Executes the complete containerization workflow for a repository
+ *
+ * This workflow performs repository analysis, Dockerfile generation (with optional sampling),
+ * image building, and security scanning. It replaces the complex enterprise coordinator
+ * pattern with a simple sequential execution.
+ *
+ * @param repoPath - Path to the repository to containerize
+ * @param logger - Logger instance for structured logging
+ * @param config - Optional workflow configuration including sampling, security settings, and custom options
+ * @returns Promise resolving to workflow result with analysis, dockerfile, imageId, and scan results
  */
 export const runContainerizationWorkflow = async (
   repoPath: string,
@@ -71,10 +80,13 @@ export const runContainerizationWorkflow = async (
     result.analysis = analysis.value;
 
     // Step 2: Generate Dockerfile
+    // Strategy selection: sampling generates multiple candidates and picks the best,
+    // while standard generation creates a single optimized Dockerfile
     logger.info('Step 2: Generating Dockerfile');
     let dockerfileResult;
 
     if (config.enableSampling) {
+      // Sampling approach: generates multiple Dockerfile variants and selects the most optimized
       dockerfileResult = await generateBestDockerfile(
         {
           sessionId,
@@ -84,6 +96,7 @@ export const runContainerizationWorkflow = async (
         logger,
       );
     } else {
+      // Standard approach: single Dockerfile with optimization and multi-stage build patterns
       dockerfileResult = await generateDockerfile(
         {
           sessionId,

@@ -6,29 +6,36 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../../types/core/index.js';
+import { Success, Failure, type Result } from '../../../types/core.js';
 import { CancelledError } from '../../../mcp/errors.js';
 import type { ToolContext } from '../../../mcp/server-extensions.js';
 import { pipe } from '../../../lib/composition.js';
+import type { Tool as BaseTool } from '../../../types/tools.js';
+import type {
+  AIService,
+  SessionManager,
+  MetricsCollector,
+  ToolParameters,
+  ToolResult,
+} from '../../../types/ai-service.js';
 
-export interface Tool {
-  name: string;
-  description: string;
-  schema?: any;
-  execute: (params: any, logger: Logger) => Promise<Result<any>>;
+// Extended Tool interface for intelligent capabilities
+export interface Tool extends BaseTool {
+  description: string; // Make description required for intelligent tools
+  execute: (params: ToolParameters, logger: Logger) => Promise<Result<ToolResult>>;
 }
 
 export interface IntelligentTool extends Tool {
-  executeEnhanced?: (params: any, context: ToolContext) => Promise<Result<any>>;
+  executeEnhanced?: (params: ToolParameters, context: ToolContext) => Promise<Result<ToolResult>>;
 }
 
 /**
  * Add AI validation to a tool
  */
-export function withAIValidation(aiService: any, sessionManager: any) {
+export function withAIValidation(aiService: AIService, sessionManager: SessionManager) {
   return <T extends Tool>(tool: T): T => ({
     ...tool,
-    execute: async (params: any, logger: Logger) => {
+    execute: async (params: ToolParameters, logger: Logger) => {
       // Pre-execution validation if session is available
       if (params.sessionId && aiService) {
         const toolHistory = (await sessionManager?.getToolHistory(params.sessionId)) || [];
@@ -42,7 +49,7 @@ export function withAIValidation(aiService: any, sessionManager: any) {
         }
 
         // Log warnings
-        if (validation.value.warnings?.length > 0) {
+        if (validation.value.warnings && validation.value.warnings.length > 0) {
           logger.warn(
             {
               tool: tool.name,
@@ -53,7 +60,7 @@ export function withAIValidation(aiService: any, sessionManager: any) {
         }
 
         // Apply optimizations if suggested
-        if (validation.value.suggestions?.length > 0) {
+        if (validation.value.suggestions && validation.value.suggestions.length > 0) {
           params = applyOptimizations(params, validation.value.suggestions);
           logger.info(
             {
@@ -74,10 +81,10 @@ export function withAIValidation(aiService: any, sessionManager: any) {
 /**
  * Add AI result analysis to a tool
  */
-export function withAIAnalysis(aiService: any, sessionManager: any) {
+export function withAIAnalysis(aiService: AIService, sessionManager: SessionManager) {
   return <T extends Tool>(tool: T): T => ({
     ...tool,
-    execute: async (params: any, logger: Logger) => {
+    execute: async (params: ToolParameters, logger: Logger) => {
       const result = await tool.execute(params, logger);
 
       if (!result.ok || !params.sessionId || !aiService) {
@@ -100,9 +107,11 @@ export function withAIAnalysis(aiService: any, sessionManager: any) {
           toolName: tool.name,
           parameters: params,
           result: result.value,
-          insights: analysis.value.insights,
-          recommendations: analysis.value.nextSteps,
           timestamp: new Date().toISOString(),
+          context: {
+            insights: analysis.value.insights,
+            recommendations: analysis.value.nextSteps,
+          },
         });
 
         // Return enhanced result
@@ -125,10 +134,10 @@ export function withAIAnalysis(aiService: any, sessionManager: any) {
 /**
  * Add metrics tracking to a tool
  */
-export function withMetrics(metricsCollector?: any) {
+export function withMetrics(metricsCollector?: MetricsCollector) {
   return <T extends Tool>(tool: T): T => ({
     ...tool,
-    execute: async (params: any, logger: Logger) => {
+    execute: async (params: ToolParameters, logger: Logger) => {
       const startTime = Date.now();
 
       try {
@@ -176,7 +185,7 @@ export function withRetry(
 
   return <T extends Tool>(tool: T): T => ({
     ...tool,
-    execute: async (params: any, logger: Logger) => {
+    execute: async (params: ToolParameters, logger: Logger) => {
       let lastError: Error | undefined;
 
       for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -214,7 +223,7 @@ export function withRetry(
 export function withLogging(logger: Logger) {
   return <T extends Tool>(tool: T): T => ({
     ...tool,
-    execute: async (params: any, _logger: Logger) => {
+    execute: async (params: ToolParameters, _logger: Logger) => {
       logger.debug({ tool: tool.name, params }, `Executing tool: ${tool.name}`);
 
       try {
@@ -244,10 +253,10 @@ export function withLogging(logger: Logger) {
 /**
  * Add session tracking to a tool
  */
-export function withSessionTracking(sessionManager: any) {
+export function withSessionTracking(sessionManager: SessionManager) {
   return <T extends Tool>(tool: T): T => ({
     ...tool,
-    execute: async (params: any, logger: Logger) => {
+    execute: async (params: ToolParameters, logger: Logger) => {
       const sessionId = params.sessionId;
 
       if (!sessionId || !sessionManager) {
@@ -289,7 +298,7 @@ export function withSessionTracking(sessionManager: any) {
 export function withProgressReporting() {
   return <T extends IntelligentTool>(tool: T): T => ({
     ...tool,
-    executeEnhanced: async (params: any, context: ToolContext) => {
+    executeEnhanced: async (params: ToolParameters, context: ToolContext) => {
       const { progressReporter } = context;
 
       void progressReporter?.(0, `Starting ${tool.name}...`);
@@ -312,7 +321,7 @@ export function withProgressReporting() {
 export function withCancellation() {
   return <T extends IntelligentTool>(tool: T): T => ({
     ...tool,
-    executeEnhanced: async (params: any, context: ToolContext) => {
+    executeEnhanced: async (params: ToolParameters, context: ToolContext) => {
       const { signal } = context;
 
       // Check if already cancelled
@@ -353,50 +362,88 @@ export function composeEnhancers<T extends Tool>(
 }
 
 /**
- * Create a fully enhanced tool with all features
+ * Create enhanced tool with basic logging and session tracking
  */
+export const enhanceWithDefaults = <T extends Tool>(
+  tool: T,
+  logger: Logger,
+  sessionManager?: SessionManager,
+): T => {
+  const enhancers = [withLogging(logger)];
+
+  if (sessionManager) {
+    enhancers.push(withSessionTracking(sessionManager));
+  }
+
+  return pipe(...enhancers)(tool);
+};
+
+/**
+ * Create AI-enhanced tool with validation and analysis
+ */
+export const enhanceForAI = <T extends Tool>(
+  tool: T,
+  aiService: AIService,
+  sessionManager: SessionManager,
+  logger: Logger,
+): T => {
+  return pipe(
+    withLogging(logger),
+    withSessionTracking(sessionManager),
+    withAIValidation(aiService, sessionManager),
+    withAIAnalysis(aiService, sessionManager),
+  )(tool);
+};
+
+/**
+ * Create production-ready tool with all enhancements
+ */
+export const enhanceForProduction = <T extends Tool>(
+  tool: T,
+  logger: Logger,
+  metricsCollector?: MetricsCollector,
+  retry?: { attempts?: number; delay?: number; backoff?: boolean },
+): T => {
+  const enhancers = [withLogging(logger)];
+
+  if (metricsCollector) {
+    enhancers.push(withMetrics(metricsCollector));
+  }
+
+  if (retry) {
+    enhancers.push(withRetry(retry));
+  }
+
+  return pipe(...enhancers)(tool);
+};
+
+/** @deprecated Use enhanceWithDefaults, enhanceForAI, or enhanceForProduction instead */
 export function createIntelligentTool<T extends Tool>(
   tool: T,
   options: {
-    aiService?: any;
-    sessionManager?: any;
-    metricsCollector?: any;
+    aiService?: AIService;
+    sessionManager?: SessionManager;
+    metricsCollector?: MetricsCollector;
     logger?: Logger;
     retry?: { attempts?: number; delay?: number; backoff?: boolean };
     enableProgress?: boolean;
     enableCancellation?: boolean;
   } = {},
 ): T {
-  const enhancers: Array<(tool: T) => T> = [];
+  // Fallback to new API for backward compatibility
+  if (options.aiService && options.sessionManager && options.logger) {
+    return enhanceForAI(tool, options.aiService, options.sessionManager, options.logger);
+  }
 
-  // Add enhancers based on options
   if (options.logger) {
-    enhancers.push(withLogging(options.logger) as any);
+    return enhanceForProduction(tool, options.logger, options.metricsCollector, options.retry);
   }
 
-  if (options.sessionManager) {
-    enhancers.push(withSessionTracking(options.sessionManager) as any);
-  }
-
-  if (options.aiService && options.sessionManager) {
-    enhancers.push(withAIValidation(options.aiService, options.sessionManager) as any);
-    enhancers.push(withAIAnalysis(options.aiService, options.sessionManager) as any);
-  }
-
-  if (options.metricsCollector) {
-    enhancers.push(withMetrics(options.metricsCollector) as any);
-  }
-
-  if (options.retry) {
-    enhancers.push(withRetry(options.retry) as any);
-  }
-
-  // Apply all enhancers
-  return pipe(...enhancers)(tool);
+  return tool;
 }
 
 // Helper functions
-function applyOptimizations(params: any, suggestions: string[]): any {
+function applyOptimizations(params: ToolParameters, suggestions: string[]): ToolParameters {
   const optimized = { ...params };
 
   suggestions.forEach((suggestion) => {

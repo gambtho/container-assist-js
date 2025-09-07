@@ -7,7 +7,7 @@
 
 import * as k8s from '@kubernetes/client-node';
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../types/core/index.js';
+import { Success, Failure, type Result } from '../types/core.js';
 
 interface KubernetesClient {
   applyManifest: (manifest: any, namespace?: string) => Promise<Result<void>>;
@@ -43,7 +43,6 @@ export const createKubernetesClient = (logger: Logger, kubeconfig?: string): Kub
 
   const k8sApi = kc.makeApiClient(k8s.AppsV1Api);
   const coreApi = kc.makeApiClient(k8s.CoreV1Api);
-  const _rbacApi = kc.makeApiClient(k8s.RbacAuthorizationV1Api);
   const networkingApi = kc.makeApiClient(k8s.NetworkingV1Api);
 
   return {

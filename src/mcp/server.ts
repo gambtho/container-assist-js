@@ -16,9 +16,16 @@ import {
   GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from 'pino';
-import { createLogger } from '../lib/logger';
-import { createSessionManager } from '../lib/session';
-import { getMCPRegistry } from './registry';
+import { createLogger } from '../lib/logger.js';
+import { createSessionManager } from '../lib/session.js';
+import {
+  ensureInitialized,
+  getTool,
+  getAllTools,
+  getWorkflow,
+  getAllWorkflows,
+  getRegistryStats,
+} from './registry.js';
 import { McpResourceManager } from './resources/manager.js';
 import { ContainerizationResourceManager } from './resources/containerization-resource-manager.js';
 import { PromptTemplatesManager } from '../application/tools/intelligent/ai-prompts.js';
@@ -35,7 +42,7 @@ export class ContainerizationMCPServer implements IMCPServer {
   private server: Server;
   private transport: StdioServerTransport;
   private logger: Logger;
-  private registry: ReturnType<typeof getMCPRegistry>;
+  // No longer need registry wrapper - use direct functions
   private _sessionManager: ReturnType<typeof createSessionManager>;
   private resourceManager: ContainerizationResourceManager;
   private promptTemplates: PromptTemplatesManager;
@@ -43,7 +50,7 @@ export class ContainerizationMCPServer implements IMCPServer {
 
   constructor(logger?: Logger, options: MCPServerOptions = {}) {
     this.logger = logger ?? createLogger({ name: 'mcp-server' });
-    this.registry = getMCPRegistry(this.logger);
+    ensureInitialized(this.logger);
     this._sessionManager = createSessionManager(this.logger);
 
     const baseResourceManager = new McpResourceManager(
@@ -89,8 +96,8 @@ export class ContainerizationMCPServer implements IMCPServer {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       this.logger.debug('Received tools/list request');
 
-      const tools = this.registry.getAllTools();
-      const workflows = this.registry.getAllWorkflowObjects();
+      const tools = getAllTools();
+      const workflows = getAllWorkflows();
 
       const allItems = [
         ...tools.map((tool) => ({
@@ -116,7 +123,7 @@ export class ContainerizationMCPServer implements IMCPServer {
       this.logger.info({ tool: name }, 'Received tool execution request');
 
       try {
-        const workflow = this.registry.getWorkflow(name);
+        const workflow = getWorkflow(name);
         if (workflow) {
           this.logger.debug({ workflow: name }, 'Executing workflow');
 
@@ -132,7 +139,7 @@ export class ContainerizationMCPServer implements IMCPServer {
           };
         }
 
-        const tool = this.registry.getTool(name);
+        const tool = getTool(name);
         if (!tool) {
           this.logger.error({ tool: name }, 'Tool not found');
 
@@ -260,7 +267,11 @@ export class ContainerizationMCPServer implements IMCPServer {
 
         if (!readResult.ok) {
           this.logger.error({ uri, error: readResult.error }, 'Failed to read resource');
-          throw new Error(readResult.error);
+          return {
+            uri,
+            mimeType: 'text/plain',
+            text: `Error reading resource: ${readResult.error}`,
+          };
         }
 
         this.logger.debug(
@@ -323,7 +334,11 @@ export class ContainerizationMCPServer implements IMCPServer {
 
         if (!getResult.ok) {
           this.logger.error({ name, error: getResult.error }, 'Failed to get prompt');
-          throw new Error(getResult.error);
+          return {
+            name,
+            description: getResult.error,
+            arguments: [],
+          };
         }
 
         this.logger.debug(
@@ -355,9 +370,11 @@ export class ContainerizationMCPServer implements IMCPServer {
     }
 
     try {
-      // Validate registry before starting
-      if (!this.registry.validateRegistry()) {
-        throw new Error('Registry validation failed - not all tools are registered');
+      // Check registry stats
+      const registryStats = getRegistryStats();
+      if (registryStats.tools === 0) {
+        this.logger.error('No tools registered - registry initialization failed');
+        return;
       }
 
       // Connect server to transport
@@ -365,7 +382,7 @@ export class ContainerizationMCPServer implements IMCPServer {
 
       this.isRunning = true;
 
-      const stats = this.registry.getStats();
+      const stats = getRegistryStats();
       this.logger.info(
         {
           tools: stats.tools,
@@ -410,7 +427,7 @@ export class ContainerizationMCPServer implements IMCPServer {
       // The actual MCP protocol handling is done by the SDK
 
       if (request.method === 'tools/list') {
-        const tools = this.registry.getAllTools();
+        const tools = getAllTools();
         return {
           result: {
             tools: tools.map((t) => ({
@@ -425,7 +442,7 @@ export class ContainerizationMCPServer implements IMCPServer {
 
       if (request.method === 'tools/call' && request.params) {
         const { name, arguments: args } = request.params as { name: string; arguments: object };
-        const tool = this.registry.getTool(name);
+        const tool = getTool(name);
 
         if (!tool) {
           return {
@@ -480,7 +497,7 @@ export class ContainerizationMCPServer implements IMCPServer {
     resources: number;
     prompts: number;
   } {
-    const stats = this.registry.getStats();
+    const stats = getRegistryStats();
     const resourceStats = this.resourceManager.getStats();
     const promptStats = this.promptTemplates.getStats();
     return {

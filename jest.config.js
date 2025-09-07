@@ -12,7 +12,6 @@ export default {
     {
       displayName: 'unit',
       testMatch: ['**/test/unit/**/*.test.ts'],
-      testTimeout: 10000,
       setupFilesAfterEnv: ['<rootDir>/test/setup/unit-setup.ts'],
       transform: {
         '^.+\\.tsx?$': [
@@ -34,7 +33,6 @@ export default {
     {
       displayName: 'integration',
       testMatch: ['**/test/integration/**/*.test.ts'],
-      testTimeout: 60000,
       setupFilesAfterEnv: ['<rootDir>/test/setup/integration-setup.ts'],
       transform: {
         '^.+\\.tsx?$': [
@@ -56,7 +54,6 @@ export default {
     {
       displayName: 'e2e',
       testMatch: ['**/test/e2e/**/*.test.ts'],
-      testTimeout: 120000,
       setupFilesAfterEnv: ['<rootDir>/test/setup/e2e-setup.ts'],
       transform: {
         '^.+\\.tsx?$': [

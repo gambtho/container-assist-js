@@ -4,7 +4,7 @@
 import { Result, Success } from '../../types/core.js';
 import type { Logger } from 'pino';
 import type {
-  EnhancedTool,
+  IntelligentTool,
   ToolResult,
   Candidate,
   ScoredCandidate,
@@ -198,7 +198,7 @@ export const createMockWinnerSelector = <T>(logger: Logger): WinnerSelector<T> =
 });
 
 // Mock Enhanced Tools (workflow dependency)
-export const createMockEnhancedTools = (logger: Logger): Record<string, EnhancedTool> => ({
+export const createMockIntelligentTools = (logger: Logger): Record<string, IntelligentTool> => ({
   analyze_repository: {
     name: 'analyze_repository',
     supportsSampling: false,
@@ -425,7 +425,7 @@ export const createMockEnhancedTools = (logger: Logger): Record<string, Enhanced
 });
 
 // Mock remediation tool (conditional)
-export const createMockRemediationTool = (logger: Logger): EnhancedTool => ({
+export const createMockRemediationTool = (logger: Logger): IntelligentTool => ({
   name: 'remediate_vulnerabilities',
   supportsSampling: true,
   samplingConfig: {

@@ -19,6 +19,7 @@ import { McpProgressNotifier } from '../../src/mcp/events/emitter.js';
 import type { ResourceManager } from '../../src/mcp/resources/types.js';
 import type { ProgressNotifier } from '../../src/mcp/events/types.js';
 import type { MCPConfig } from '../../src/config/mcp-config.js';
+import { createMockProgressNotifier } from './orchestration-mocks.js';
 
 // Export mock implementations for testing
 export {
@@ -26,27 +27,24 @@ export {
   createMockResourceManager,
 } from './resource-manager.mock.js';
 
-export {
-  MockProgressNotifier,
-  createMockProgressNotifier,
-} from './progress-notifier.mock.js';
+// MockProgressNotifier removed - use the one in orchestration-mocks.ts instead
 
 export {
   MOCK_CONFIG_PRESETS,
   getMockConfig,
   createMockConfig,
-  getTeamAlphaConfig,
-  getTeamBetaConfig,
-  getTeamGammaConfig,
-  getTeamDeltaConfig,
-  getTeamEpsilonConfig,
+  getTestConfigForResources,
+  getTestConfigForSampling,
+  getTestConfigForInspection,
+  getTestConfigForTools,
+  getTestConfigForIntegration,
   validateMockConfig,
 } from './mcp-config.mock.js';
 
 export type { MockConfigPreset } from './mcp-config.mock.js';
 
 /**
- * Create real MCP infrastructure with Team Alpha implementations
+ * Create real MCP infrastructure with production implementations
  */
 export function createMCPInfrastructure(configOverrides?: Partial<MCPConfig>): {
   config: MCPConfig;
@@ -107,11 +105,8 @@ export function createMockMCPInfrastructure(preset: 'fast' | 'development' | 'mi
     failureRate: preset === 'stress' ? 0.02 : 0, // 2% failure rate for stress testing
   });
 
-  const progressNotifier = createMockProgressNotifier({
-    logEvents: preset !== 'minimal',
-    maxEvents: preset === 'stress' ? 10000 : 1000,
-    simulateDelay: preset === 'stress',
-  });
+  const logger = pino({ level: preset === 'minimal' ? 'warn' : 'info' });
+  const progressNotifier = createMockProgressNotifier(logger);
 
   return {
     config,
@@ -239,10 +234,7 @@ export const MockUtils = {
         failureRate: config.resourceFailureRate || 0,
         maxSize: config.maxResources || 1024 * 1024,
       }),
-      progressNotifier: createMockProgressNotifier({
-        simulateDelay: config.progressLatency || false,
-        logEvents: false, // Quiet for test scenarios
-      }),
+      progressNotifier: createMockProgressNotifier(pino({ level: 'warn' })),
       config: getMockConfig('fast'),
     };
   },
@@ -255,6 +247,4 @@ export function isMockResourceManager(manager: any): manager is MockResourceMana
   return manager && typeof manager.getResourceCount === 'function';
 }
 
-export function isMockProgressNotifier(notifier: any): notifier is MockProgressNotifier {
-  return notifier && typeof notifier.getStats === 'function';
-}
+// isMockProgressNotifier removed - no longer using complex MockProgressNotifier

@@ -8,7 +8,7 @@
 import { createSessionManager } from '../lib/session';
 import { createSecurityScanner } from '../lib/scanner';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core/index';
+import { Success, Failure, type Result } from '../types/core';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
 import type { DockerScanResult } from '../types/docker';
 
@@ -81,7 +81,7 @@ export async function scanImage(
 
     // Convert ScanResult to DockerScanResult
     const dockerScanResult: DockerScanResult = {
-      vulnerabilities: scanResult.vulnerabilities.map((v) => {
+      vulnerabilities: scanResult.vulnerabilities.map((v: any) => {
         const vuln: any = {
           id: v.id,
           severity: v.severity as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',

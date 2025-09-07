@@ -122,14 +122,7 @@ export type DeploymentResult = {
   ready?: boolean;
 };
 
-// Simple session type
-export type Session = {
-  id: string;
-  repo_path: string;
-  metadata: Record<string, unknown>;
-  created_at?: Date;
-  updated_at?: Date;
-};
+// Session type removed - was only used in tests
 
 // Simple workflow state type
 export type WorkflowState = {
@@ -149,15 +142,3 @@ export type WorkflowState = {
   status?: string;
   stage?: string;
 };
-
-// Simple session filter interface
-export interface SessionFilter {
-  includeMetadata?: boolean;
-  since?: Date;
-  status?: string;
-  limit?: number;
-  repo_path?: string;
-  labels?: Record<string, string>;
-  created_after?: Date;
-  created_before?: Date;
-}

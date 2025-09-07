@@ -3,51 +3,33 @@
  * Central export point for all intelligent tool functionality
  */
 
-// Tool types and guards
-export { isIntelligentTool } from './tool-wrapper.js';
-export type { IntelligentTool } from './tool-wrapper.js';
-
-// Tool Enhancers (new functional approach)
+// Tool enhancement functions (new functional approach)
 export {
-  withAIValidation,
-  withAIAnalysis,
-  withMetrics,
-  withRetry,
-  withLogging,
-  withSessionTracking,
-  withProgressReporting,
-  withCancellation,
+  enhanceWithDefaults,
+  enhanceForAI,
+  enhanceForProduction,
   composeEnhancers,
-  createIntelligentTool,
 } from './tool-capabilities.js';
-export type { Tool } from './tool-capabilities.js';
+export type { Tool, IntelligentTool } from './tool-capabilities.js';
 
-// Intelligent Tool Factory (new functional approach)
+// Tool registry (functional approach)
 export {
   createToolRegistry,
   getTool,
   getAllTools,
-  withAIEnhancement,
-  createAnalyzeRepoWithAI,
-  createDockerfileGeneratorWithAI,
-  createScannerWithAI,
-  createWorkflowExecutorWithAI,
-  createBaseTools,
-  createAIPoweredTools,
-  createIntelligentToolRegistry,
+  withAI,
+  createEnhancedToolRegistry,
+  getRegistryStats,
 } from './ai-tool-factory.js';
 export type { ToolRegistry } from './ai-tool-factory.js';
 
-// Intelligent Tools Factory (existing)
-export {
-  createIntelligentTools,
-  getOrCreateIntelligentTools,
-  getIntelligentToolsInstance,
-  resetIntelligentToolsInstance,
-  createContainerizationWorkflowConfig,
-} from './tool-factory.js';
-export type { IntelligentTools, IntelligentToolsConfig } from './tool-factory.js';
+// Legacy tool factory (functional composition)
+export { withLogging, withMetrics, withRetry, createWorkflowConfig } from './tool-factory.js';
 
-// Other intelligent components (if they exist)
+// AI components
 export * from './ai-prompts.js';
 export * from './ai-parameter-validator.js';
+
+// Deprecated exports (backward compatibility)
+export { createIntelligentTool } from './tool-capabilities.js';
+export { createAIToolRegistry } from './ai-tool-factory.js';
