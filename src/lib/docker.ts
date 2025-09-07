@@ -4,25 +4,96 @@
 
 import Docker from 'dockerode';
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../types/core';
-import type { DockerBuildOptions, DockerBuildResult } from '../types/docker';
+import { Success, Failure, type Result } from '../core/types';
+/**
+ * Options for building a Docker image.
+ */
+interface DockerBuildOptions {
+  /** Path to Dockerfile relative to context */
+  dockerfile?: string;
+  /** Primary tag for the built image */
+  t?: string;
+  /** Additional tags to apply to the built image */
+  tags?: string[];
+  /** Build context directory (default: current directory) */
+  context?: string;
+  /** Build-time variables (Docker ARG values) */
+  buildargs?: Record<string, string>;
+  /** Alternative property name for build arguments */
+  buildArgs?: Record<string, string>;
+  /** Target platform for multi-platform builds (e.g., 'linux/amd64') */
+  platform?: string;
+}
 
+/**
+ * Result of a Docker image build operation.
+ */
+interface DockerBuildResult {
+  /** Unique identifier of the built image */
+  imageId: string;
+  /** Build process log messages */
+  logs: string[];
+  /** Tags applied to the built image */
+  tags?: string[];
+}
+
+/**
+ * Result of pushing a Docker image to a registry.
+ */
 interface DockerPushResult {
+  /** Content-addressable digest of the pushed image */
   digest: string;
+  /** Size of the pushed image in bytes */
   size?: number;
 }
 
+/**
+ * Information about a Docker image.
+ */
 interface DockerImageInfo {
+  /** Unique identifier of the image */
   Id: string;
+  /** Repository tags associated with the image */
   RepoTags?: string[];
+  /** Size of the image in bytes */
   Size?: number;
+  /** ISO 8601 timestamp when the image was created */
   Created?: string;
 }
 
+/**
+ * Docker client interface for container operations.
+ */
 interface DockerClient {
+  /**
+   * Builds a Docker image from a Dockerfile.
+   * @param options - Build configuration options
+   * @returns Result containing build details or error
+   */
   buildImage: (options: DockerBuildOptions) => Promise<Result<DockerBuildResult>>;
+
+  /**
+   * Retrieves information about a Docker image.
+   * @param id - Image ID or tag
+   * @returns Result containing image information or error
+   */
   getImage: (id: string) => Promise<Result<DockerImageInfo>>;
+
+  /**
+   * Tags a Docker image with a new repository and tag.
+   * @param imageId - ID of the image to tag
+   * @param repository - Target repository name
+   * @param tag - Target tag name
+   * @returns Result indicating success or error
+   */
   tagImage: (imageId: string, repository: string, tag: string) => Promise<Result<void>>;
+
+  /**
+   * Pushes a Docker image to a registry.
+   * @param repository - Repository name
+   * @param tag - Tag to push
+   * @returns Result containing push details or error
+   */
   pushImage: (repository: string, tag: string) => Promise<Result<DockerPushResult>>;
 }
 
@@ -38,12 +109,11 @@ export const createDockerClient = (logger: Logger): DockerClient => {
     async buildImage(options: DockerBuildOptions): Promise<Result<DockerBuildResult>> {
       try {
         logger.debug({ options }, 'Starting Docker build');
-        const stream = await docker.buildImage(options.context, {
-          t: Array.isArray(options.tags) ? options.tags[0] : options.tags,
+        const stream = await docker.buildImage(options.context || '.', {
+          t: options.t || (Array.isArray(options.tags) ? options.tags[0] : options.tags),
           dockerfile: options.dockerfile,
-          buildargs: options.buildArgs,
+          buildargs: options.buildargs || options.buildArgs,
         });
-        logger.debug('Docker buildImage call completed, got stream');
 
         interface DockerBuildEvent {
           stream?: string;
@@ -65,9 +135,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
         const buildResult: DockerBuildResult = {
           imageId: result[result.length - 1]?.aux?.ID || '',
           tags: options.tags || [],
-          size: 0, // Would need additional inspection to get size
           logs: [],
-          success: true,
         };
 
         logger.debug({ buildResult }, 'Docker build completed successfully');
@@ -138,7 +206,6 @@ export const createDockerClient = (logger: Logger): DockerClient => {
             (event: DockerPushEvent) => {
               logger.debug(event, 'Docker push progress');
 
-              // Extract digest from push events
               if (event.aux?.Digest) {
                 digest = event.aux.Digest;
               }
@@ -149,7 +216,6 @@ export const createDockerClient = (logger: Logger): DockerClient => {
           );
         });
 
-        // If no digest from stream, inspect the image to get it
         if (!digest) {
           try {
             const inspectResult = await image.inspect();
@@ -158,7 +224,6 @@ export const createDockerClient = (logger: Logger): DockerClient => {
               `sha256:${inspectResult.Id.replace('sha256:', '')}`;
           } catch (inspectError) {
             logger.warn({ error: inspectError }, 'Could not get digest from image inspection');
-            // Generate a deterministic digest based on image ID as fallback
             digest = `sha256:${Date.now().toString(16)}${Math.random().toString(16).substr(2)}`;
           }
         }

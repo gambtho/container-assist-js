@@ -19,9 +19,9 @@ export type {
 // Strategy engine
 export {
   StrategyEngine,
-  SecurityFirstStrategy,
-  PerformanceStrategy,
-  SizeOptimizedStrategy,
+  createSecurityFirstStrategy as SecurityFirstStrategy,
+  createPerformanceStrategy as PerformanceStrategy,
+  createSizeOptimizedStrategy as SizeOptimizedStrategy,
 } from './strategy-engine';
 
 // Scoring system
@@ -33,7 +33,10 @@ export {
 } from './scorer';
 
 // Generation pipeline
-export { VariantGenerationPipeline, SamplingValidator } from './generation-pipeline';
+export { VariantGenerationPipeline } from './generation-pipeline';
+
+// Validation functions
+export * from './validation';
 
 // Main sampling service
 export { SamplingService } from './sampling-service';

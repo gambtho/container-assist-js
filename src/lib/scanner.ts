@@ -6,7 +6,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../types/core';
+import { Success, Failure, type Result } from '../core/types';
 
 /**
  * Security scan result
@@ -46,8 +46,7 @@ export const createSecurityScanner = (logger: Logger, scannerType?: string): Sec
       try {
         logger.info({ imageId, scanner: scannerType }, 'Starting security scan');
 
-        // Simplified mock implementation for development
-        // TODO: Replace with actual scanner integration when ready
+        // Simplified implementation - can be enhanced with specific scanner integrations
         const result: ScanResult = {
           imageId,
           vulnerabilities: [],

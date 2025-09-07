@@ -8,9 +8,15 @@
 import { createSessionManager } from '../lib/session';
 import { createTimer, type Logger } from '../lib/logger';
 import { getRecommendedBaseImage } from '../lib/base-images';
-import { Success, Failure, type Result } from '../types/core';
-import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../core/types';
 import { DEFAULT_PORTS } from '../config/defaults';
+import { createMCPHostAI, createPromptTemplate } from '../lib/mcp-host-ai';
 
 export interface FixDockerfileConfig {
   sessionId: string;
@@ -66,22 +72,98 @@ async function fixDockerfile(
 
     logger.info({ hasError: !!buildError }, 'Analyzing Dockerfile for issues');
 
-    // Generate optimized Dockerfile based on analysis
-    const baseImage = getRecommendedBaseImage('javascript'); // Default to javascript for now
-    const fixedDockerfile = `FROM ${baseImage}
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-EXPOSE ${DEFAULT_PORTS.javascript[0]}
-CMD ["npm", "start"]`;
+    // Use MCP Host AI to analyze and fix issues
+    const mcpHostAI = createMCPHostAI(logger);
 
-    const fixes = [
-      'Updated base image to Node 18 Alpine',
-      'Added separate package.json copy for better caching',
-      'Changed npm install to npm ci for reproducible builds',
-      'Added --only=production flag for smaller image',
-    ];
+    // Prepare context for AI analysis
+    const analysisContext = {
+      error: buildError || 'No specific error provided',
+      dockerfile: dockerfileToFix,
+      operation: 'fix',
+      focus: 'Analyze the Dockerfile and any build errors, then provide a corrected version',
+      toolName: 'fix-dockerfile',
+      expectsAIResponse: true,
+      type: 'dockerfile',
+    };
+
+    // Create prompt for fixing Dockerfile
+    const prompt = createPromptTemplate('dockerfile', {
+      ...analysisContext,
+      requirements: [
+        'Fix any syntax errors',
+        'Ensure proper build caching',
+        'Use security best practices',
+        'Optimize for minimal image size',
+      ],
+    });
+
+    // Submit to MCP Host AI
+    const aiResult = await mcpHostAI.submitPrompt(prompt, analysisContext);
+
+    let fixedDockerfile: string;
+    let fixes: string[] = [];
+
+    if (!aiResult.ok) {
+      logger.warn({ error: aiResult.error }, 'MCP AI request failed, using fallback fix');
+
+      // Fallback to basic fix if AI is unavailable
+      const analysisResult = session.workflow_state?.analysis_result;
+      const language = analysisResult?.language || 'javascript';
+      const baseImage = getRecommendedBaseImage(language);
+      const port = DEFAULT_PORTS[language as keyof typeof DEFAULT_PORTS]?.[0] || 3000;
+
+      fixedDockerfile = `FROM ${baseImage}\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\nEXPOSE ${port}\nCMD ["npm", "start"]`;
+
+      fixes = [
+        'Applied standard containerization best practices',
+        'Updated base image for security',
+        'Optimized layer caching',
+        'Added production dependencies only',
+      ];
+    } else {
+      // Parse AI response
+      const aiResponse = aiResult.value;
+
+      // Try to extract Dockerfile from response
+      // Look for code blocks or structured response
+      const dockerfileMatch = aiResponse.match(/```(?:dockerfile)?\n([\s\S]*?)```/);
+
+      if (dockerfileMatch?.[1]) {
+        fixedDockerfile = dockerfileMatch[1].trim();
+      } else {
+        // If AI returned a JSON structure, parse it
+        try {
+          const parsed = JSON.parse(aiResponse);
+          if (parsed.dockerfile) {
+            fixedDockerfile = parsed.dockerfile;
+            fixes = parsed.fixes || ['Dockerfile fixed based on AI analysis'];
+          } else if (parsed.content) {
+            fixedDockerfile = parsed.content;
+            fixes = parsed.improvements || ['Applied AI-suggested improvements'];
+          } else {
+            // Use the response as-is if it looks like a Dockerfile
+            fixedDockerfile = aiResponse;
+            fixes = ['Applied AI-generated fixes'];
+          }
+        } catch {
+          // If not JSON, use response as Dockerfile
+          fixedDockerfile = aiResponse;
+          fixes = ['Applied AI-generated optimizations'];
+        }
+      }
+
+      // Validate that we have a valid Dockerfile
+      if (!fixedDockerfile || !fixedDockerfile.includes('FROM')) {
+        logger.warn('AI response did not contain valid Dockerfile, using fallback');
+        const analysisResult = session.workflow_state?.analysis_result;
+        const language = analysisResult?.language || 'javascript';
+        const baseImage = getRecommendedBaseImage(language);
+        const port = DEFAULT_PORTS[language as keyof typeof DEFAULT_PORTS]?.[0] || 3000;
+
+        fixedDockerfile = `FROM ${baseImage}\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\nEXPOSE ${port}\nCMD ["npm", "start"]`;
+        fixes = ['Applied default containerization pattern'];
+      }
+    }
 
     // Update session with fixed Dockerfile
     const currentState = session.workflow_state as WorkflowState | undefined;

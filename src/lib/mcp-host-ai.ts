@@ -3,10 +3,14 @@
  *
  * Provides integration with the MCP host AI (Claude Code, Copilot, etc.)
  * for AI-enhanced tool capabilities and intelligent prompt processing.
+ *
+ * In the MCP architecture, the server cannot directly make completion requests.
+ * Instead, it provides structured prompts and metadata that the host can use
+ * to generate AI-powered responses.
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../types/core';
+import { Success, Failure, type Result } from '../core/types';
 
 /**
  * Interface for communicating with MCP Host AI
@@ -40,17 +44,26 @@ export interface MCPHostAIRequest {
   context?: Record<string, unknown>;
   maxLength?: number;
   temperature?: number;
+  sampling?: {
+    temperature?: number;
+    topP?: number;
+    maxTokens?: number;
+  };
 }
 
 /**
- * MCP Host AI response
+ * AI response format that can be processed by the host
  */
-export interface MCPHostAIResponse {
-  content: string;
-  metadata?: {
-    tokensUsed?: number;
-    model?: string;
-    processingTime?: number;
+export interface MCPAIResponse {
+  type: 'ai-completion-request';
+  prompt: string;
+  context: Record<string, unknown>;
+  sampling?: MCPHostAIRequest['sampling'];
+  metadata: {
+    toolName?: string;
+    operation?: string;
+    timestamp: string;
+    requestId: string;
   };
 }
 
@@ -58,10 +71,58 @@ export interface MCPHostAIResponse {
  * Create an MCP Host AI instance
  *
  * Note: In MCP architecture, the host (Claude Code, Copilot, etc.) provides the AI.
- * This implementation provides a clean interface for tools to request AI assistance
- * without needing to know the specifics of the host implementation.
+ * This implementation provides a structured interface for tools to signal AI needs
+ * to the host through proper MCP patterns.
  */
 export const createMCPHostAI = (logger: Logger): MCPHostAI => {
+  let requestCounter = 0;
+
+  // Generate unique request ID
+  const generateRequestId = (): string => {
+    requestCounter++;
+    return `mcp-ai-${Date.now()}-${requestCounter}`;
+  };
+
+  /**
+   * Generate placeholder response when actual AI is needed
+   */
+  const generatePlaceholderResponse = (
+    _prompt: string,
+    context?: Record<string, unknown>,
+  ): string => {
+    const promptType = String(context?.type || 'general');
+
+    const placeholders = {
+      dockerfile:
+        '# Dockerfile generation requires MCP host AI\n# Please ensure your MCP client supports AI completions',
+      kubernetes:
+        '# Kubernetes manifest generation requires MCP host AI\n# Please ensure your MCP client supports AI completions',
+      analysis: JSON.stringify(
+        {
+          status: 'pending',
+          message: 'Repository analysis requires MCP host AI support',
+          hint: 'Please ensure your MCP client supports AI completions',
+        },
+        null,
+        2,
+      ),
+      enhancement: JSON.stringify(
+        {
+          status: 'pending',
+          message: 'Result enhancement requires MCP host AI support',
+          originalData: context?.data || {},
+        },
+        null,
+        2,
+      ),
+      general:
+        'This operation requires MCP host AI support. Please ensure your MCP client supports AI completions.',
+    } as const;
+
+    // Type-safe access with proper fallback
+    return placeholders[promptType as keyof typeof placeholders] ?? placeholders.general;
+  };
+
   return {
     async submitPrompt(prompt: string, context?: Record<string, unknown>): Promise<Result<string>> {
       try {
@@ -70,56 +131,102 @@ export const createMCPHostAI = (logger: Logger): MCPHostAI => {
             promptLength: prompt.length,
             contextKeys: context ? Object.keys(context) : [],
           },
-          'Submitting prompt to MCP host AI',
+          'Preparing MCP AI completion request',
         );
 
-        // In MCP architecture, we signal the host that we need AI assistance
-        // The actual AI processing happens at the host level
-        // For now, we'll return a structured response that indicates AI assistance is needed
+        const requestId = generateRequestId();
 
-        const aiRequest = {
-          type: 'ai-assistance-request',
-          prompt,
-          context: context || {},
+        // Create structured AI request that follows MCP patterns
+        const metadata: MCPAIResponse['metadata'] = {
           timestamp: new Date().toISOString(),
+          requestId,
         };
 
-        // Log the AI request for the MCP host to process
+        if (context?.toolName && typeof context.toolName === 'string') {
+          metadata.toolName = context.toolName;
+        }
+
+        if (context?.operation && typeof context.operation === 'string') {
+          metadata.operation = context.operation;
+        }
+
+        const aiRequest: MCPAIResponse = {
+          type: 'ai-completion-request',
+          prompt,
+          context: context || {},
+          sampling: {
+            temperature: 0.7,
+            topP: 0.9,
+            maxTokens: 2000,
+          },
+          metadata,
+        };
+
+        // Log structured request for MCP host processing
         logger.info(
           {
-            aiRequest,
-            action: 'mcp-ai-request',
+            requestId,
+            type: 'mcp-ai-completion',
+            prompt: prompt.substring(0, 100),
+            contextSize: Object.keys(context || {}).length,
           },
-          'AI assistance requested from MCP host',
+          'MCP AI completion request prepared',
         );
 
-        // For now, return a placeholder that indicates AI processing is needed
-        // The MCP host will intercept these requests and provide AI responses
-        const response = `[AI-ASSISTANCE-NEEDED] ${JSON.stringify(aiRequest)}`;
+        // In a real MCP implementation, the host would handle this through
+        // the protocol's completion mechanism. We return a structured
+        // response that can be processed by the host.
+
+        // Production mode: return structured request for host processing
+        // The host should intercept and process these structured requests
+        const response = JSON.stringify(aiRequest, null, 2);
+
+        // If we detect this is being called from a tool that expects actual AI responses,
+        // we should provide a more helpful placeholder
+        if (context?.expectsAIResponse) {
+          return Success(generatePlaceholderResponse(prompt, context));
+        }
 
         return Success(response);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         logger.error(
           { error: message, prompt: prompt.substring(0, 100) },
-          'MCP host AI request failed',
+          'MCP AI request preparation failed',
         );
-        return Failure(`MCP host AI request failed: ${message}`);
+        return Failure(`MCP AI request failed: ${message}`);
       }
     },
 
     isAvailable(): boolean {
-      // In MCP architecture, AI is always available through the host
-      // The host manages AI availability and fallbacks
-      return true;
+      // Check if we're in an MCP environment that supports AI
+      // In production, the host manages AI availability
+
+      // Check for MCP host indicators
+      const hasMCPHost = Boolean(
+        process.env.MCP_HOST_TYPE ||
+          process.env.CLAUDE_CODE ||
+          process.env.GITHUB_COPILOT ||
+          process.env.MCP_SERVER_NAME,
+      );
+
+      return hasMCPHost;
     },
 
     getHostType(): string {
-      // The specific host type can be detected from environment or configuration
-      // Common MCP hosts: Claude Code, GitHub Copilot, etc.
-      return process.env.MCP_HOST_TYPE || 'claude-code';
+      // Detect the specific MCP host type from environment
+      if (process.env.MCP_HOST_TYPE) {
+        return process.env.MCP_HOST_TYPE;
+      }
+      if (process.env.CLAUDE_CODE) {
+        return 'claude-code';
+      }
+      if (process.env.GITHUB_COPILOT) {
+        return 'github-copilot';
+      }
+      return 'unknown' as string;
     },
-  };
+  } as MCPHostAI;
 };
 
 /**
@@ -178,25 +285,26 @@ Please provide helpful recommendations and insights.`;
  * Check if a response indicates that MCP host AI processing is needed
  */
 export const isAIAssistanceResponse = (response: string): boolean => {
-  return response.startsWith('[AI-ASSISTANCE-NEEDED]');
+  try {
+    const parsed = JSON.parse(response);
+    return parsed.type === 'ai-completion-request';
+  } catch {
+    // Legacy format check
+    return response.startsWith('[AI-ASSISTANCE-NEEDED]');
+  }
 };
 
 /**
- * Extract AI request data from an AI assistance response
+ * Parse an AI completion request from a response
  */
-export const extractAIRequest = (response: string): MCPHostAIRequest | null => {
-  if (!isAIAssistanceResponse(response)) {
-    return null;
-  }
-
+export const parseAICompletionRequest = (response: string): MCPAIResponse | null => {
   try {
-    const jsonStr = response.replace('[AI-ASSISTANCE-NEEDED] ', '');
-    const data = JSON.parse(jsonStr);
-    return {
-      prompt: data.prompt,
-      context: data.context,
-    };
+    const parsed = JSON.parse(response);
+    if (parsed.type === 'ai-completion-request') {
+      return parsed as MCPAIResponse;
+    }
   } catch {
-    return null;
+    // Not a valid AI completion request
   }
+  return null;
 };

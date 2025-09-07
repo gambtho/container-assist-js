@@ -1,8 +1,21 @@
 /**
- * Analyze Repository Tool - Flat Architecture
+ * Repository Analysis Tool
  *
- * Analyzes repository structure and detects language, framework, and build system
- * Follows architectural requirement: only imports from src/lib/
+ * Analyzes repository structure to detect programming languages, frameworks,
+ * build systems, and generates containerization recommendations.
+ *
+ * @example
+ * ```typescript
+ * const result = await analyzeRepo({
+ *   sessionId: 'session-123',
+ *   repoPath: '/path/to/project',
+ *   includeTests: true
+ * }, logger);
+ *
+ * if (result.ok) {
+ *   console.log(`Detected ${result.value.language} project with ${result.value.framework}`);
+ * }
+ * ```
  */
 
 import path from 'node:path';
@@ -11,8 +24,13 @@ import { createSessionManager } from '../lib/session';
 import { getRecommendedBaseImage } from '../lib/base-images';
 import { createMCPHostAI } from '../lib/mcp-host-ai';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core';
-import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../core/types';
 import { DEFAULT_PORTS } from '../config/defaults';
 import {
   enhanceAnalysisWithPerspective,
@@ -20,14 +38,25 @@ import {
   type AnalysisPerspective,
 } from './analysis-perspectives';
 
+/**
+ * Configuration for repository analysis
+ */
 export interface AnalyzeRepoConfig {
+  /** Unique session identifier for tracking analysis state */
   sessionId: string;
+  /** Path to the repository root directory */
   repoPath: string;
+  /** Directory traversal depth (default: 3) */
   depth?: number;
+  /** Whether to include test files in analysis */
   includeTests?: boolean;
+  /** Enable enhanced perspective-based analysis */
   usePerspectives?: boolean;
+  /** Specific analysis perspective to apply */
   perspective?: AnalysisPerspective;
+  /** Focus analysis on security aspects */
   securityFocus?: boolean;
+  /** Focus analysis on performance aspects */
   performanceFocus?: boolean;
 }
 

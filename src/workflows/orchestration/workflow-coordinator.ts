@@ -3,14 +3,14 @@
  * Eliminates unnecessary wrapper class and delegation
  */
 
-import { Result } from '../../types/core.js';
+import { Result } from '../../core/types';
 import type { Logger } from 'pino';
 import {
   runContainerizationWorkflow,
   runBuildOnlyWorkflow,
-  type WorkflowConfig as ContainerizationWorkflowConfig,
-} from '../containerization-workflow.js';
-import { executeWorkflow, type WorkflowContext } from '../intelligent-orchestration.js';
+  type ContainerizationConfig as ContainerizationWorkflowConfig,
+} from '../containerization-workflow';
+import { executeWorkflow, type WorkflowContext } from '../intelligent-orchestration';
 
 /**
  * Execute containerization workflow for a repository

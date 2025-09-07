@@ -1,5 +1,10 @@
 /**
- * Simplified Configuration Validation
- *
- * Replaces the complex Zod schema system with simple, practical validation.
+ * Configuration validation utilities for application settings.
  */
+
+/**
+ * Represents a validation error with descriptive message.
+ */
+export interface ValidationError {
+  message: string;
+}

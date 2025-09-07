@@ -7,7 +7,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../types/core';
+import { Success, Failure, type Result } from '../../core/types';
 import type {
   AnalysisContext,
   AnalysisVariant,

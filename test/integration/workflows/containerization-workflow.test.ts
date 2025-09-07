@@ -1,6 +1,5 @@
 /**
  * Integration Test Scenarios - Complete Containerization Workflows
- * Implements Phase 2 requirements from test-implementation-roadmap.md
  */
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';

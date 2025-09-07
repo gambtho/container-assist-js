@@ -3,9 +3,67 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../types/core';
+import { Success, Failure, type Result } from '../core/types';
 import { SamplingService } from '../workflows/sampling/sampling-service';
 import type { SamplingConfig, ScoringCriteria, SamplingOptions } from '../workflows/sampling/types';
+import { createMCPAIOrchestrator } from '../mcp/ai/orchestrator';
+import type { ValidationContext } from '../mcp/tools/validator';
+
+/**
+ * Validation hook helper for sampling tools
+ */
+async function validateSamplingParameters(
+  toolName: string,
+  parameters: Record<string, any>,
+  logger: Logger,
+  _context?: import('../mcp/core/types.js').MCPContext,
+): Promise<{ isValid: boolean; errors: string[]; warnings: string[] }> {
+  try {
+    // Create AI orchestrator if MCP context is available
+    const aiOrchestrator = createMCPAIOrchestrator(logger);
+
+    const validationContext: ValidationContext = {
+      toolName,
+      repositoryPath: parameters.repoPath,
+      environment: parameters.environment || 'development',
+      targetType: 'dockerfile',
+    };
+
+    const validationResult = await aiOrchestrator.validateParameters(
+      toolName,
+      parameters,
+      validationContext,
+    );
+
+    if (validationResult.ok) {
+      const { data } = validationResult.value;
+      return {
+        isValid: data.isValid,
+        errors: data.errors,
+        warnings: data.warnings,
+      };
+    } else {
+      // Fallback to basic validation if AI validation fails
+      logger.warn(
+        { toolName, error: validationResult.error },
+        'AI validation failed, using basic validation',
+      );
+      return {
+        isValid: true,
+        errors: [],
+        warnings: ['AI parameter validation unavailable'],
+      };
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn({ toolName, error: message }, 'Parameter validation error');
+    return {
+      isValid: true,
+      errors: [],
+      warnings: [`Parameter validation error: ${message}`],
+    };
+  }
+}
 
 /**
  * Generate multiple Dockerfile variants using sampling strategies
@@ -23,9 +81,7 @@ export const dockerfileSampling = {
       criteria?: Partial<ScoringCriteria>;
     },
     logger: Logger,
-    context?:
-      | import('../mcp/types.js').MCPContext
-      | import('../mcp/server-extensions.js').ToolContext,
+    context?: import('../mcp/core/types.js').MCPContext,
   ): Promise<Result<any>> => {
     try {
       logger.info(
@@ -37,12 +93,31 @@ export const dockerfileSampling = {
         'Starting Dockerfile sampling',
       );
 
+      // 1. Validate parameters using AI orchestrator
+      const validation = await validateSamplingParameters(
+        'dockerfile-sampling',
+        config,
+        logger,
+        context,
+      );
+
+      if (!validation.isValid) {
+        return Failure(`Parameter validation failed: ${validation.errors.join('; ')}`);
+      }
+
+      if (validation.warnings.length > 0) {
+        logger.warn(
+          { sessionId: config.sessionId, warnings: validation.warnings },
+          'Parameter validation warnings detected',
+        );
+      }
+
       // Enhanced progress tracking
-      const toolContext = context as import('../mcp/server-extensions.js').ToolContext;
+      const toolContext = context as import('../mcp/server/middleware.js').ToolContext;
       await toolContext?.progressUpdater?.(5, 'Initializing sampling service...');
 
       // Use prompt registry from MCP context if available, otherwise create default
-      const mcpContext = context as import('../mcp/types.js').MCPContext;
+      const mcpContext = context as import('../mcp/core/types.js').MCPContext;
       const samplingService = new SamplingService(logger, mcpContext?.promptRegistry);
 
       await toolContext?.progressUpdater?.(15, 'Configuring sampling strategy...');
@@ -144,7 +219,7 @@ export const dockerfileCompare = {
       criteria?: Partial<ScoringCriteria>;
     },
     logger: Logger,
-    context?: import('../mcp/types.js').MCPContext,
+    context?: import('../mcp/core/types.js').MCPContext,
   ): Promise<Result<any>> => {
     try {
       logger.info(
@@ -159,8 +234,27 @@ export const dockerfileCompare = {
         return Failure('At least 2 Dockerfiles are required for comparison');
       }
 
+      // 1. Validate parameters using AI orchestrator
+      const validation = await validateSamplingParameters(
+        'dockerfile-compare',
+        config,
+        logger,
+        context,
+      );
+
+      if (!validation.isValid) {
+        return Failure(`Parameter validation failed: ${validation.errors.join('; ')}`);
+      }
+
+      if (validation.warnings.length > 0) {
+        logger.warn(
+          { sessionId: config.sessionId, warnings: validation.warnings },
+          'Dockerfile comparison validation warnings',
+        );
+      }
+
       // Use prompt registry from MCP context if available, otherwise create default
-      const mcpContext = context as import('../mcp/types.js').MCPContext;
+      const mcpContext = context as import('../mcp/core/types.js').MCPContext;
       const samplingService = new SamplingService(logger, mcpContext?.promptRegistry);
 
       const result = await samplingService.compareDockerfiles(
@@ -234,7 +328,7 @@ export const dockerfileValidate = {
       criteria?: Partial<ScoringCriteria>;
     },
     logger: Logger,
-    context?: import('../mcp/types.js').MCPContext,
+    context?: import('../mcp/core/types.js').MCPContext,
   ): Promise<Result<any>> => {
     try {
       logger.info(
@@ -249,8 +343,27 @@ export const dockerfileValidate = {
         return Failure('Dockerfile content is required');
       }
 
+      // 1. Validate parameters using AI orchestrator
+      const paramValidation = await validateSamplingParameters(
+        'dockerfile-validate',
+        config,
+        logger,
+        context,
+      );
+
+      if (!paramValidation.isValid) {
+        return Failure(`Parameter validation failed: ${paramValidation.errors.join('; ')}`);
+      }
+
+      if (paramValidation.warnings.length > 0) {
+        logger.warn(
+          { sessionId: config.sessionId, warnings: paramValidation.warnings },
+          'Dockerfile validation parameter warnings',
+        );
+      }
+
       // Use prompt registry from MCP context if available, otherwise create default
-      const mcpContext = context as import('../mcp/types.js').MCPContext;
+      const mcpContext = context as import('../mcp/core/types.js').MCPContext;
       const samplingService = new SamplingService(logger, mcpContext?.promptRegistry);
 
       const result = await samplingService.validateDockerfile(
@@ -262,38 +375,38 @@ export const dockerfileValidate = {
         return Failure(`Validation failed: ${result.error}`);
       }
 
-      const validation = result.value;
+      const dockerfileValidation = result.value;
 
       logger.info(
         {
           sessionId: config.sessionId,
-          score: validation.score,
-          isValid: validation.isValid,
-          issueCount: validation.issues.length,
+          score: dockerfileValidation.score,
+          isValid: dockerfileValidation.isValid,
+          issueCount: dockerfileValidation.issues.length,
         },
         'Dockerfile validation completed',
       );
 
       return Success({
         sessionId: config.sessionId,
-        score: validation.score,
-        scoreBreakdown: validation.breakdown,
-        isValid: validation.isValid,
+        score: dockerfileValidation.score,
+        scoreBreakdown: dockerfileValidation.breakdown,
+        isValid: dockerfileValidation.isValid,
         grade:
-          validation.score >= 80
+          dockerfileValidation.score >= 80
             ? 'A'
-            : validation.score >= 70
+            : dockerfileValidation.score >= 70
               ? 'B'
-              : validation.score >= 60
+              : dockerfileValidation.score >= 60
                 ? 'C'
-                : validation.score >= 50
+                : dockerfileValidation.score >= 50
                   ? 'D'
                   : 'F',
-        issues: validation.issues,
-        recommendations: validation.recommendations,
-        summary: validation.isValid
+        issues: dockerfileValidation.issues,
+        recommendations: dockerfileValidation.recommendations,
+        summary: dockerfileValidation.isValid
           ? 'Dockerfile meets quality standards'
-          : `Dockerfile needs improvement (${validation.issues.length} issues found)`,
+          : `Dockerfile needs improvement (${dockerfileValidation.issues.length} issues found)`,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -323,7 +436,7 @@ export const dockerfileBest = {
       optimization?: 'size' | 'security' | 'performance' | 'balanced';
     },
     logger: Logger,
-    context?: import('../mcp/types.js').MCPContext,
+    context?: import('../mcp/core/types.js').MCPContext,
   ): Promise<Result<any>> => {
     try {
       logger.info(
@@ -336,8 +449,27 @@ export const dockerfileBest = {
         'Generating best Dockerfile via sampling',
       );
 
+      // 1. Validate parameters using AI orchestrator
+      const validation = await validateSamplingParameters(
+        'dockerfile-best',
+        config,
+        logger,
+        context,
+      );
+
+      if (!validation.isValid) {
+        return Failure(`Parameter validation failed: ${validation.errors.join('; ')}`);
+      }
+
+      if (validation.warnings.length > 0) {
+        logger.warn(
+          { sessionId: config.sessionId, warnings: validation.warnings },
+          'Best Dockerfile generation parameter warnings',
+        );
+      }
+
       // Use prompt registry from MCP context if available, otherwise create default
-      const mcpContext = context as import('../mcp/types.js').MCPContext;
+      const mcpContext = context as import('../mcp/core/types.js').MCPContext;
       const samplingService = new SamplingService(logger, mcpContext?.promptRegistry);
 
       const options: SamplingOptions = {
@@ -407,15 +539,30 @@ export const dockerfileBest = {
 export const samplingStrategies = {
   name: 'sampling-strategies',
   execute: async (
-    _config: { sessionId?: string },
+    config: { sessionId?: string },
     logger: Logger,
-    context?: import('../mcp/types.js').MCPContext,
+    context?: import('../mcp/core/types.js').MCPContext,
   ): Promise<Result<any>> => {
     try {
       logger.info('Retrieving available sampling strategies');
 
+      // 1. Validate parameters using AI orchestrator (minimal validation for info tool)
+      const validation = await validateSamplingParameters(
+        'sampling-strategies',
+        config,
+        logger,
+        context,
+      );
+
+      if (validation.warnings.length > 0) {
+        logger.debug(
+          { warnings: validation.warnings },
+          'Sampling strategies parameter warnings (non-critical)',
+        );
+      }
+
       // Use prompt registry from MCP context if available, otherwise create default
-      const mcpContext = context as import('../mcp/types.js').MCPContext;
+      const mcpContext = context as import('../mcp/core/types.js').MCPContext;
       const samplingService = new SamplingService(logger, mcpContext?.promptRegistry);
       const strategies = samplingService.getAvailableStrategies();
 

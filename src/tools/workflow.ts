@@ -7,9 +7,10 @@
 
 import { createSessionManager } from '../lib/session';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core';
+import { Success, Failure, type Result } from '../core/types';
 
-export interface WorkflowConfig {
+// Export specific workflow tool configuration
+export interface WorkflowToolConfig {
   sessionId?: string;
   repoPath: string;
   workflowType?: 'full' | 'build-only' | 'deploy-only' | 'quick' | 'containerization';
@@ -27,7 +28,8 @@ export interface WorkflowConfig {
   };
 }
 
-export interface WorkflowResult {
+// Export specific workflow tool result
+export interface WorkflowToolResult {
   ok: boolean;
   sessionId: string;
   workflowId: string;
@@ -62,7 +64,7 @@ export interface WorkflowStatusResult {
 /**
  * Get workflow steps based on type
  */
-function getWorkflowSteps(workflowType: string, options?: WorkflowConfig['options']): string[] {
+function getWorkflowSteps(workflowType: string, options?: WorkflowToolConfig['options']): string[] {
   const baseSteps = {
     full: [
       'analyze-repo',
@@ -138,13 +140,43 @@ function estimateWorkflowDuration(steps: string[]): number {
   return steps.reduce((total, step) => total + (stepDurations[step] ?? 5), 0);
 }
 
+// Import tool registry at the module level
+import { analyzeRepoTool } from '../tools/analyze-repo';
+import { generateDockerfileTool } from '../tools/generate-dockerfile';
+import { buildImageTool } from '../tools/build-image';
+import { scanImageTool } from '../tools/scan';
+import { pushImageTool } from '../tools/push';
+import { tagImageTool } from '../tools/tag';
+import { fixDockerfileTool } from '../tools/fix-dockerfile';
+import { resolveBaseImagesTool } from '../tools/resolve-base-images';
+import { prepareClusterTool } from '../tools/prepare-cluster';
+import { deployApplicationTool } from '../tools/deploy';
+import { generateK8sManifestsTool } from '../tools/generate-k8s-manifests';
+import { verifyDeploymentTool } from '../tools/verify-deployment';
+
+// Create tool mapping
+const toolMap: Record<string, any> = {
+  'analyze-repo': analyzeRepoTool,
+  'generate-dockerfile': generateDockerfileTool,
+  'build-image': buildImageTool,
+  'scan-image': scanImageTool,
+  'push-image': pushImageTool,
+  'tag-image': tagImageTool,
+  'fix-dockerfile': fixDockerfileTool,
+  'resolve-base-images': resolveBaseImagesTool,
+  'prepare-cluster': prepareClusterTool,
+  deploy: deployApplicationTool,
+  'generate-k8s-manifests': generateK8sManifestsTool,
+  'verify-deployment': verifyDeploymentTool,
+};
+
 /**
  * Execute a single workflow step
  */
 async function executeStep(
   step: string,
   sessionId: string,
-  config: WorkflowConfig,
+  config: WorkflowToolConfig,
   logger: Logger,
 ): Promise<{ ok: boolean; error?: string }> {
   const timer = createTimer(logger, `workflow-step-${step}`);
@@ -152,16 +184,62 @@ async function executeStep(
   try {
     logger.info({ step, sessionId }, `Executing workflow step: ${step}`);
 
-    // In a real implementation, this would dynamically load and execute the tool
-    // For now, we simulate execution
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Get the tool from the map
+    const tool = toolMap[step];
 
-    // Simulate occasional failures for testing
-    if (Math.random() > 0.95 && !config.automated) {
-      throw new Error(`Simulated failure in step ${step}`);
+    if (!tool) {
+      throw new Error(`Tool not found: ${step}`);
     }
 
-    timer.end({ step });
+    // Prepare tool configuration based on the step
+    const toolConfig: any = {
+      sessionId,
+      repoPath: config.repoPath,
+    };
+
+    // Add step-specific configuration
+    switch (step) {
+      case 'scan-image':
+        toolConfig.skipIfNoScanner = config.options?.skipSecurity;
+        break;
+      case 'push-image':
+        if (config.options?.registryUrl) {
+          toolConfig.registryUrl = config.options.registryUrl;
+        }
+        break;
+      case 'tag-image':
+        if (config.options?.imageTag) {
+          toolConfig.tag = config.options.imageTag;
+        }
+        break;
+      case 'deploy':
+        if (config.options?.namespace) {
+          toolConfig.namespace = config.options.namespace;
+        }
+        break;
+      case 'generate-k8s-manifests':
+        if (config.options?.namespace) {
+          toolConfig.namespace = config.options.namespace;
+        }
+        break;
+    }
+
+    // Execute the actual tool
+    const result = await tool.execute(toolConfig, logger);
+
+    // Handle Result<T> pattern
+    if (result && typeof result === 'object' && 'ok' in result) {
+      if (result.ok) {
+        timer.end({ step, success: true });
+        return { ok: true };
+      } else {
+        timer.end({ step, success: false, error: result.error });
+        return { ok: false, error: result.error };
+      }
+    }
+
+    // Handle direct response (backward compatibility)
+    timer.end({ step, success: true });
     return { ok: true };
   } catch (error) {
     timer.error(error);
@@ -176,7 +254,10 @@ async function executeStep(
 /**
  * Start or manage a workflow
  */
-async function workflow(config: WorkflowConfig, logger: Logger): Promise<Result<WorkflowResult>> {
+async function workflow(
+  config: WorkflowToolConfig,
+  logger: Logger,
+): Promise<Result<WorkflowToolResult>> {
   const timer = createTimer(logger, 'workflow');
   const startedAt = new Date().toISOString();
 
@@ -200,7 +281,7 @@ async function workflow(config: WorkflowConfig, logger: Logger): Promise<Result<
     }
 
     // Check if workflow is already running
-    const workflowState = session.workflow_state as any;
+    const workflowState = session.workflow_state;
     if (workflowState?.status === 'running') {
       return Success({
         ok: false,
@@ -364,7 +445,7 @@ async function getWorkflowStatus(
       return Failure('Session not found');
     }
 
-    const workflowState = session.workflow_state as any;
+    const workflowState = session.workflow_state;
     const steps = workflowState?.steps ?? [];
     const completedSteps = workflowState?.completedSteps ?? [];
     const progress = steps.length > 0 ? (completedSteps.length / steps.length) * 100 : 0;
@@ -387,6 +468,6 @@ async function getWorkflowStatus(
  */
 export const workflowTool = {
   name: 'workflow',
-  execute: (config: WorkflowConfig, logger: Logger) => workflow(config, logger),
+  execute: (config: WorkflowToolConfig, logger: Logger) => workflow(config, logger),
   getStatus: (sessionId: string, logger: Logger) => getWorkflowStatus(sessionId, logger),
 };

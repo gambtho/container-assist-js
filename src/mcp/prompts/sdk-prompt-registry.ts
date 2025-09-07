@@ -2,7 +2,7 @@
  * SDK-Native Prompt Registry
  *
  * Replaces the custom PromptTemplatesManager with a system that uses
- * SDK types directly and provides unified prompt management.
+ * SDK types directly and provides prompt management.
  */
 
 import type { Logger } from 'pino';
@@ -10,6 +10,8 @@ import {
   ListPromptsResult,
   GetPromptResult,
   PromptArgument,
+  McpError,
+  ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
 
 /**
@@ -21,7 +23,8 @@ export interface TemplateContext {
   framework?: string;
   dependencies?: string[];
   containerType?: 'dockerfile' | 'k8s-manifest';
-  securityLevel?: 'basic' | 'enhanced' | 'strict';
+  targetType?: 'dockerfile' | 'kubernetes' | 'analysis' | 'general';
+  securityLevel?: 'basic' | 'standard' | 'strict';
   environment?: 'development' | 'staging' | 'production';
   optimization?: 'security' | 'performance' | 'size' | 'balanced';
   focus?: string;
@@ -242,6 +245,118 @@ export class SDKPromptRegistry {
           },
         ],
       },
+      {
+        name: 'parameter-validation',
+        description: 'Validate tool parameters with AI assistance',
+        category: 'validation',
+        arguments: [
+          {
+            name: 'toolName',
+            description: 'Name of the tool being validated',
+            required: true,
+          },
+          {
+            name: 'parameters',
+            description: 'Parameters to validate (JSON format)',
+            required: true,
+          },
+          {
+            name: 'context',
+            description: 'Validation context (JSON format)',
+            required: false,
+          },
+          {
+            name: 'validationRules',
+            description: 'Specific validation rules to apply',
+            required: false,
+          },
+        ],
+        dynamicArguments: (context) => [
+          ...(context.language
+            ? [
+                {
+                  name: 'languageSpecific',
+                  description: `${context.language}-specific validation rules`,
+                  required: false,
+                },
+              ]
+            : []),
+          ...(context.environment === 'production'
+            ? [
+                {
+                  name: 'productionChecks',
+                  description: 'Additional production environment validations',
+                  required: false,
+                },
+              ]
+            : []),
+        ],
+        generateMessages: (args, context) => [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: this.generateParameterValidationPrompt(args, context),
+            },
+          },
+        ],
+      },
+      {
+        name: 'parameter-suggestions',
+        description: 'Generate parameter suggestions with AI assistance',
+        category: 'validation',
+        arguments: [
+          {
+            name: 'toolName',
+            description: 'Name of the tool needing parameters',
+            required: true,
+          },
+          {
+            name: 'partialParameters',
+            description: 'Existing partial parameters (JSON format)',
+            required: true,
+          },
+          {
+            name: 'context',
+            description: 'Parameter suggestion context (JSON format)',
+            required: false,
+          },
+          {
+            name: 'existingParams',
+            description: 'List of existing parameter names',
+            required: false,
+          },
+        ],
+        dynamicArguments: (context) => [
+          ...(context.targetType
+            ? [
+                {
+                  name: 'targetSpecific',
+                  description: `${context.targetType}-specific parameter suggestions`,
+                  required: false,
+                },
+              ]
+            : []),
+          ...(context.framework
+            ? [
+                {
+                  name: 'frameworkOptimized',
+                  description: `${context.framework} framework optimizations`,
+                  required: false,
+                },
+              ]
+            : []),
+        ],
+        generateMessages: (args, context) => [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: this.generateParameterSuggestionsPrompt(args, context),
+            },
+          },
+        ],
+      },
     ];
 
     defaultPrompts.forEach((prompt) => {
@@ -292,7 +407,7 @@ export class SDKPromptRegistry {
   async getPrompt(name: string, args?: Record<string, any>): Promise<GetPromptResult> {
     const prompt = this.prompts.get(name);
     if (!prompt) {
-      throw new Error(`Prompt not found: ${name}`);
+      throw new McpError(ErrorCode.MethodNotFound, `Prompt not found: ${name}`);
     }
 
     // Build arguments with dynamic context if available
@@ -466,8 +581,6 @@ export class SDKPromptRegistry {
    */
   private generateStrategyPrompt(args: Record<string, any>, context?: TemplateContext): string {
     const strategy = args.strategy;
-    // Analysis context available but not currently used
-    // const analysisContext = args.context;
 
     let prompt = `Generate optimized containerization strategy for ${strategy} optimization`;
 
@@ -490,6 +603,101 @@ export class SDKPromptRegistry {
     }
 
     prompt += `\n\nProvide specific recommendations for optimizing the containerization approach.`;
+
+    return prompt;
+  }
+
+  /**
+   * Generate parameter validation prompt text
+   */
+  private generateParameterValidationPrompt(
+    args: Record<string, any>,
+    context?: TemplateContext,
+  ): string {
+    const toolName = args.toolName;
+    const parameters = args.parameters;
+    const validationRules = args.validationRules || 'Apply standard validation rules';
+
+    let prompt = `Validate the parameters for the "${toolName}" tool and provide detailed feedback.\n\n`;
+
+    prompt += `**Tool:** ${toolName}\n`;
+    prompt += `**Parameters to validate:**\n${parameters}\n\n`;
+
+    if (args.context) {
+      prompt += `**Context:**\n${args.context}\n\n`;
+    }
+
+    prompt += `**Validation Requirements:**\n`;
+    prompt += `- ${validationRules}\n`;
+    prompt += `- Check for required parameters\n`;
+    prompt += `- Validate parameter types and formats\n`;
+    prompt += `- Ensure compatibility between parameters\n`;
+
+    if (context?.environment === 'production') {
+      prompt += `- Apply production-ready validation checks\n`;
+    }
+
+    if (context?.securityLevel === 'strict') {
+      prompt += `- Apply strict security validation rules\n`;
+    }
+
+    if (context?.language) {
+      prompt += `- Consider ${context.language}-specific requirements\n`;
+    }
+
+    prompt += `\n**Expected Response Format:**\n`;
+    prompt += `Provide insights about any errors, warnings, or recommendations for improvement. `;
+    prompt += `Focus on actionable feedback that helps users understand what needs to be fixed or optimized.`;
+
+    return prompt;
+  }
+
+  /**
+   * Generate parameter suggestions prompt text
+   */
+  private generateParameterSuggestionsPrompt(
+    args: Record<string, any>,
+    context?: TemplateContext,
+  ): string {
+    const toolName = args.toolName;
+    const partialParameters = args.partialParameters;
+    const existingParams = args.existingParams || 'none';
+
+    let prompt = `Generate intelligent parameter suggestions for the "${toolName}" tool based on the provided context and partial parameters.\n\n`;
+
+    prompt += `**Tool:** ${toolName}\n`;
+    prompt += `**Current Parameters:**\n${partialParameters}\n`;
+    prompt += `**Existing Parameter Keys:** ${existingParams}\n\n`;
+
+    if (args.context) {
+      prompt += `**Context:**\n${args.context}\n\n`;
+    }
+
+    prompt += `**Suggestion Requirements:**\n`;
+    prompt += `- Suggest missing required parameters\n`;
+    prompt += `- Recommend optimal parameter values based on best practices\n`;
+    prompt += `- Consider tool-specific requirements and constraints\n`;
+    prompt += `- Provide alternative parameter options where applicable\n`;
+
+    if (context?.targetType) {
+      prompt += `- Optimize for ${context.targetType} deployment\n`;
+    }
+
+    if (context?.environment) {
+      prompt += `- Optimize for ${context.environment} environment\n`;
+    }
+
+    if (context?.securityLevel) {
+      prompt += `- Apply ${context.securityLevel} security level requirements\n`;
+    }
+
+    if (context?.framework) {
+      prompt += `- Consider ${context.framework} framework-specific optimizations\n`;
+    }
+
+    prompt += `\n**Expected Response Format:**\n`;
+    prompt += `Provide specific parameter recommendations with explanations. `;
+    prompt += `Focus on practical suggestions that improve tool execution and follow containerization best practices.`;
 
     return prompt;
   }

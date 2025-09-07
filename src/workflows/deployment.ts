@@ -14,7 +14,7 @@ import { generateK8sManifests } from '../tools/generate-k8s-manifests';
 import { pushImage } from '../tools/push';
 import { deployApplication } from '../tools/deploy';
 import { verifyDeployment } from '../tools/verify-deployment';
-import { isFail } from '../types/core';
+import { isFail } from '../core/types';
 import { createSessionManager } from '../lib/session';
 import { createTimer, createLogger, type Logger } from '../lib/logger';
 import type {
@@ -297,7 +297,7 @@ export async function runDeploymentWorkflow(
       workflow_state: {
         ...((await sessionManager.get(sessionId))?.workflow_state || {}),
         manifests: manifests.manifests,
-      } as any,
+      },
     });
 
     const deployResult = await deployApplication(

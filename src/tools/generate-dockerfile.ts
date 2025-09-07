@@ -7,8 +7,13 @@ import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../lib/session';
 import { createMCPHostAI, createPromptTemplate } from '../lib/mcp-host-ai';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core';
-import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../core/types';
 import { getDefaultPort, DEFAULT_NETWORK, DEFAULT_CONTAINER } from '../config/defaults';
 import { getRecommendedBaseImage } from '../lib/base-images';
 

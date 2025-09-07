@@ -18,7 +18,7 @@ export interface BaseImageOptions {
   /** Optional framework context */
   framework?: string;
   /** Optimization preference */
-  preference?: 'security' | 'performance' | 'size' | 'compatibility';
+  preference?: 'security' | 'performance' | 'size' | 'compatibility' | 'balanced';
 }
 
 /**
@@ -122,7 +122,22 @@ export function getSuggestedBaseImages(language: string, _framework?: string): s
 }
 
 /**
- * Get comprehensive base image recommendations
+ * Get comprehensive base image recommendations with context-aware selection
+ *
+ * This function implements a multi-tiered selection strategy:
+ * 1. Primary recommendation: Most widely compatible and supported
+ * 2. Alternative options: Different trade-offs (size vs compatibility)
+ * 3. Security-focused: Minimal attack surface, regularly updated
+ * 4. Performance-focused: Optimized for build time and runtime efficiency
+ *
+ * Design rationale:
+ * - Alpine images prioritized for size and security (smaller attack surface)
+ * - Slim variants used when Alpine compatibility is problematic
+ * - Full images available for complex dependency requirements
+ * - Framework-specific optimizations applied when context available
+ *
+ * @param options - Selection criteria including language, framework, and optimization preference
+ * @returns Comprehensive recommendations with multiple options for different scenarios
  */
 export function getBaseImageRecommendations(options: BaseImageOptions): BaseImageRecommendations {
   const langKey = options.language.toLowerCase();

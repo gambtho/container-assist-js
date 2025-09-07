@@ -7,9 +7,22 @@ import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../lib/session';
 import { createDockerClient } from '../lib/docker';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core';
-import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
-import type { DockerBuildOptions } from '../types/docker';
+import { updateWorkflowState, type WorkflowState, type Result } from '../core/types';
+import {
+  ValidationError,
+  DockerError,
+  FileSystemError,
+  SessionError,
+  ErrorCodes,
+  executeAsResult,
+} from '../lib/errors';
+// Local type for Docker build options
+interface DockerBuildOptions {
+  dockerfile?: string;
+  t?: string;
+  buildargs?: Record<string, string>;
+  platform?: string;
+}
 
 export interface BuildImageConfig {
   sessionId: string;
@@ -114,15 +127,12 @@ function analyzeBuildSecurity(dockerfile: string, buildArgs: Record<string, stri
 }
 
 /**
- * Build Docker image from Dockerfile with specified configuration
- * @param config - Build configuration including session ID, context, tags, etc.
- * @param logger - Logger instance for debug and info output
- * @returns Promise resolving to Result with build details or failure message
+ * Internal implementation using exceptions
  */
-export async function buildImage(
+async function buildImageInternal(
   config: BuildImageConfig,
   logger: Logger,
-): Promise<Result<BuildImageResult>> {
+): Promise<BuildImageResult> {
   const timer = createTimer(logger, 'build-image');
 
   try {
@@ -148,10 +158,17 @@ export async function buildImage(
     const sessionManager = createSessionManager(logger);
     const dockerClient = createDockerClient(logger);
 
+    // Validate inputs
+    if (!sessionId) {
+      throw new ValidationError('Session ID is required', { config });
+    }
+
     // Get session
     const session = await sessionManager.get(sessionId);
     if (!session) {
-      return Failure('Session not found');
+      throw new SessionError(`Session ${sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND, {
+        sessionId,
+      });
     }
 
     // Determine paths
@@ -176,7 +193,11 @@ export async function buildImage(
           await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
           logger.info({ dockerfilePath }, 'Created Dockerfile from session content');
         } else {
-          return Failure(`Dockerfile not found at ${dockerfilePath}`);
+          throw new FileSystemError(
+            `Dockerfile not found at ${dockerfilePath}`,
+            ErrorCodes.FILE_NOT_FOUND,
+            { dockerfilePath, repoPath },
+          );
         }
       }
     }
@@ -195,12 +216,10 @@ export async function buildImage(
 
     // Prepare Docker build options
     const buildOptions: DockerBuildOptions = {
-      context: repoPath,
       dockerfile: dockerfilePath,
-      tags: tags.length > 0 ? tags : [`${sessionId}:latest`],
-      buildArgs: finalBuildArgs,
+      buildargs: finalBuildArgs,
       ...(target !== undefined && { target }),
-      noCache,
+      ...(noCache !== undefined && { noCache }),
       ...(platform !== undefined && { platform }),
     };
 
@@ -208,7 +227,11 @@ export async function buildImage(
     const buildResult = await dockerClient.buildImage(buildOptions);
 
     if (!buildResult.ok) {
-      return Failure(buildResult.error ?? 'Build failed');
+      throw new DockerError(
+        buildResult.error ?? 'Docker build failed',
+        ErrorCodes.DOCKER_BUILD_FAILED,
+        { buildOptions, dockerfilePath },
+      );
     }
 
     const buildTime = Date.now() - startTime;
@@ -219,10 +242,10 @@ export async function buildImage(
       build_result: {
         success: true,
         imageId: buildResult.value.imageId ?? '',
-        tags: buildResult.value.tags,
-        size: buildResult.value.size ?? 0,
+        tags: buildResult.value.tags || [],
+        size: (buildResult.value as any).size ?? 0,
         metadata: {
-          layers: buildResult.value.layers,
+          layers: (buildResult.value as any).layers,
           buildTime,
           logs: buildResult.value.logs,
           securityWarnings,
@@ -238,27 +261,41 @@ export async function buildImage(
     timer.end({ imageId: buildResult.value.imageId, buildTime });
     logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');
 
-    return Success({
+    return {
       success: true,
       sessionId,
       imageId: buildResult.value.imageId,
-      tags: buildResult.value.tags,
-      size: buildResult.value.size ?? 0,
-      ...(buildResult.value.layers !== undefined && { layers: buildResult.value.layers }),
+      tags: buildResult.value.tags || [],
+      size: (buildResult.value as any).size ?? 0,
+      ...((buildResult.value as any).layers !== undefined && {
+        layers: (buildResult.value as any).layers,
+      }),
       buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
-    });
+    };
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Docker image build failed');
-
-    return Failure(error instanceof Error ? error.message : String(error));
+    throw error; // Re-throw for proper error propagation
   }
 }
 
 /**
- * Build image tool instance
+ * MCP-compatible wrapper that returns Result<T>
+ * @param config - Build configuration including session ID, context, tags, etc.
+ * @param logger - Logger instance for debug and info output
+ * @returns Promise resolving to Result with build details or failure message
+ */
+export async function buildImage(
+  config: BuildImageConfig,
+  logger: Logger,
+): Promise<Result<BuildImageResult>> {
+  return executeAsResult(() => buildImageInternal(config, logger));
+}
+
+/**
+ * Build image tool instance (uses Result<T> for MCP compatibility)
  */
 export const buildImageTool = {
   name: 'build-image',

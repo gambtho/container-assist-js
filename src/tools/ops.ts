@@ -7,7 +7,7 @@
 
 import * as os from 'os';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core';
+import { Success, Failure, type Result } from '../core/types';
 
 interface PingConfig {
   message?: string;

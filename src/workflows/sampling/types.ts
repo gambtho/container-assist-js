@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { Result } from '../../types/core';
+import type { Result } from '../../core/types';
 
 /**
  * Repository analysis context for sampling
@@ -25,7 +25,7 @@ export interface DockerfileContext {
   constraints: {
     targetEnvironment: 'development' | 'staging' | 'production';
     maxImageSize?: string;
-    securityLevel: 'basic' | 'enhanced' | 'strict';
+    securityLevel: 'basic' | 'standard' | 'strict';
     buildTimeLimit?: number;
   };
 }
@@ -144,6 +144,7 @@ export interface SamplingConfig {
   strategies?: string[]; // Default: all available
   criteria?: Partial<ScoringCriteria>; // Default: balanced weights
   constraints?: SelectionConstraints;
+  environment?: 'development' | 'staging' | 'production'; // Default: development
   enableCaching?: boolean; // Default: true
   timeout?: number; // Default: 60000ms
 }

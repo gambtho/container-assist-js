@@ -8,14 +8,41 @@
 import { createSessionManager } from '../lib/session';
 import { createSecurityScanner } from '../lib/scanner';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core';
-import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
-import type { DockerScanResult } from '../types/docker';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../core/types';
 
 export interface ScanImageConfig {
   sessionId: string;
   scanner?: 'trivy' | 'snyk' | 'grype';
   severityThreshold?: 'low' | 'medium' | 'high' | 'critical';
+}
+
+interface DockerScanResult {
+  vulnerabilities?: Array<{
+    id?: string;
+    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+    package?: string;
+    version?: string;
+    description?: string;
+    fixedVersion?: string;
+  }>;
+  summary?: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    unknown?: number;
+    total: number;
+  };
+  scanTime?: string;
+  metadata?: {
+    image: string;
+  };
 }
 
 export interface ScanImageResult {

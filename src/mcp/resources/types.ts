@@ -1,4 +1,4 @@
-import { Result } from '../../types/core.js';
+import { Result } from '../../core/types';
 
 export type ResourceCategory =
   | 'dockerfile'
@@ -6,7 +6,10 @@ export type ResourceCategory =
   | 'scan-result'
   | 'build-artifact'
   | 'deployment-status'
-  | 'session-data';
+  | 'session-data'
+  | 'sampling-result'
+  | 'sampling-variant'
+  | 'sampling-config';
 
 export interface Resource {
   uri: string;
@@ -40,11 +43,12 @@ export interface ResourceCache {
   keys(pattern?: string): string[];
 }
 
-export const URI_SCHEMES = {
+const URI_SCHEMES = {
   MCP: 'mcp',
   CACHE: 'cache',
   SESSION: 'session',
   TEMP: 'temp',
+  SAMPLING: 'sampling',
 } as const;
 
 export type UriScheme = (typeof URI_SCHEMES)[keyof typeof URI_SCHEMES];

@@ -1,1 +1,0 @@
-// Mock configuration types - simplified

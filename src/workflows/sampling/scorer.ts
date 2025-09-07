@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../types/core';
+import { Success, Failure, type Result } from '../../core/types';
 import type {
   DockerfileVariant,
   ScoredVariant,
@@ -71,10 +71,10 @@ export class DockerfileAnalyzer {
         .filter((line) => line);
 
       const analysis = {
-        security: this.analyzeSecurityFeatures(content, lines, variant),
-        performance: this.analyzePerformanceFeatures(content, lines, variant),
+        security: this.analyzeSecurityFeatures(content, lines),
+        performance: this.analyzePerformanceFeatures(content, lines),
         size: this.analyzeSizeOptimization(content, lines, variant),
-        maintainability: this.analyzeMaintainabilityFeatures(content, lines, variant),
+        maintainability: this.analyzeMaintainabilityFeatures(content, lines),
       };
 
       this.logger.debug({ variant: variant.id }, 'Dockerfile analysis completed');
@@ -86,17 +86,28 @@ export class DockerfileAnalyzer {
     }
   }
 
-  private analyzeSecurityFeatures(
-    content: string,
-    lines: string[],
-    _variant: DockerfileVariant,
-  ): SecurityAnalysis {
+  /**
+   * Analyzes security aspects of a Dockerfile.
+   * Evaluates base image choice, user privileges, package management,
+   * security tools, and potential credential leaks.
+   *
+   * Scoring breakdown (100 points total):
+   * - Base image security: 25 points (alpine/distroless preferred)
+   * - User management: 25 points (non-root user required)
+   * - Package management: 20 points (proper cleanup practices)
+   * - Security tools: 20 points (healthcheck, init system)
+   * - Secrets handling: 10 points (no hardcoded credentials)
+   *
+   * @param content - Full Dockerfile content
+   * @param lines - Dockerfile lines for line-by-line analysis
+   * @returns SecurityAnalysis with score, features, issues, and recommendations
+   */
+  private analyzeSecurityFeatures(content: string, lines: string[]): SecurityAnalysis {
     const lowerContent = content.toLowerCase();
     let score = 0;
     const features: string[] = [];
     const issues: string[] = [];
 
-    // Base image security (25 points)
     if (lowerContent.includes('alpine') || lowerContent.includes('distroless')) {
       score += 25;
       features.push('Secure base image');
@@ -107,7 +118,6 @@ export class DockerfileAnalyzer {
       issues.push('Using latest tag - potential security risk');
     }
 
-    // User management (25 points)
     const userLines = lines.filter((line) => line.toLowerCase().startsWith('user '));
     if (userLines.some((line) => !line.toLowerCase().includes('user root'))) {
       score += 25;
@@ -116,7 +126,6 @@ export class DockerfileAnalyzer {
       issues.push('Running as root user');
     }
 
-    // Package management (20 points)
     if (lowerContent.includes('apt-get update') && lowerContent.includes('apt-get install')) {
       if (lowerContent.includes('rm -rf /var/lib/apt') || lowerContent.includes('apt-get clean')) {
         score += 20;
@@ -127,7 +136,6 @@ export class DockerfileAnalyzer {
       }
     }
 
-    // Security tools and practices (20 points)
     if (lowerContent.includes('healthcheck')) {
       score += 10;
       features.push('Health check configured');
@@ -137,7 +145,6 @@ export class DockerfileAnalyzer {
       features.push('Init system for proper signal handling');
     }
 
-    // Secrets and credentials (10 points)
     if (
       !lowerContent.includes('password') &&
       !lowerContent.includes('secret') &&
@@ -157,24 +164,33 @@ export class DockerfileAnalyzer {
     };
   }
 
-  private analyzePerformanceFeatures(
-    content: string,
-    lines: string[],
-    _variant: DockerfileVariant,
-  ): PerformanceAnalysis {
+  /**
+   * Evaluates performance optimization techniques in a Dockerfile.
+   * Focuses on build speed, layer caching, and runtime efficiency.
+   *
+   * Scoring breakdown (100 points total):
+   * - Multi-stage builds: 30 points (reduces final image size)
+   * - Layer optimization: 25 points (command chaining)
+   * - Build cache mounts: 20 points (faster rebuilds)
+   * - Dependency caching: 15 points (separate dependency copy)
+   * - Build tool optimization: 10 points (deterministic installs)
+   *
+   * @param content - Full Dockerfile content
+   * @param lines - Dockerfile lines for analysis
+   * @returns PerformanceAnalysis with optimizations, bottlenecks, and recommendations
+   */
+  private analyzePerformanceFeatures(content: string, lines: string[]): PerformanceAnalysis {
     const lowerContent = content.toLowerCase();
     let score = 0;
     const optimizations: string[] = [];
     const bottlenecks: string[] = [];
 
-    // Multi-stage build (30 points)
     const fromCount = lines.filter((line) => line.toLowerCase().startsWith('from ')).length;
     if (fromCount > 1) {
       score += 30;
       optimizations.push('Multi-stage build');
     }
 
-    // Layer optimization (25 points)
     if (lowerContent.includes('&&')) {
       const chainedCommands = content.split('&&').length - 1;
       if (chainedCommands > 3) {
@@ -186,13 +202,11 @@ export class DockerfileAnalyzer {
       }
     }
 
-    // Build cache optimization (20 points)
     if (lowerContent.includes('--mount=type=cache')) {
       score += 20;
       optimizations.push('Build cache mounts');
     }
 
-    // Dependency caching (15 points)
     const copyPackageFirst = lines.findIndex(
       (line) =>
         line.toLowerCase().includes('copy package') ||
@@ -210,7 +224,6 @@ export class DockerfileAnalyzer {
       bottlenecks.push('Suboptimal layer caching - copy dependencies separately');
     }
 
-    // Build tool optimization (10 points)
     if (
       lowerContent.includes('npm ci') ||
       lowerContent.includes('yarn install --frozen-lockfile')
@@ -228,6 +241,15 @@ export class DockerfileAnalyzer {
     };
   }
 
+  /**
+   * Analyzes size optimization strategies in a Dockerfile.
+   * Evaluates base image choice, cleanup practices, and layer efficiency.
+   *
+   * @param content - Full Dockerfile content
+   * @param lines - Dockerfile lines for analysis
+   * @param variant - Dockerfile variant with metadata
+   * @returns SizeAnalysis with optimizations, wasteful practices, and estimated size
+   */
   private analyzeSizeOptimization(
     content: string,
     lines: string[],
@@ -303,7 +325,6 @@ export class DockerfileAnalyzer {
   private analyzeMaintainabilityFeatures(
     content: string,
     lines: string[],
-    _variant: DockerfileVariant,
   ): MaintainabilityAnalysis {
     let score = 0;
     const goodPractices: string[] = [];

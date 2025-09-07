@@ -4,9 +4,9 @@
  * Simple gate validators to ensure quality at each workflow stage
  */
 
-import { Result, Success, Failure } from '../../types/core.js';
+import { Result, Success, Failure } from '../../core/types';
 import type { Logger } from 'pino';
-import { config } from '../../config/index.js';
+import { config } from '../../config/index';
 
 /**
  * Gate validation result

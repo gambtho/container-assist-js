@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../../types/core.js';
-import type { ResourceCache } from './types.js';
+import { Result, Success, Failure } from '../../core/types';
+import type { ResourceCache } from './types';
 
 interface CacheEntry {
   value: unknown;

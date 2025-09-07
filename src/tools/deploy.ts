@@ -9,8 +9,13 @@ import * as yaml from 'js-yaml';
 import { createSessionManager } from '../lib/session';
 import { createKubernetesClient } from '../lib/kubernetes';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core';
-import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../core/types';
 import { DEFAULT_TIMEOUTS } from '../config/defaults';
 
 export interface DeployApplicationConfig {
@@ -90,7 +95,7 @@ function orderManifests(manifests: unknown[]): unknown[] {
 export async function deployApplication(
   config: DeployApplicationConfig,
   logger: Logger,
-  context?: import('../mcp/server-extensions.js').ToolContext,
+  context?: import('../mcp/server/middleware.js').ToolContext,
 ): Promise<Result<DeployApplicationResult>> {
   const timer = createTimer(logger, 'deploy-application');
 
@@ -355,6 +360,6 @@ export const deployApplicationTool = {
   execute: (
     config: DeployApplicationConfig,
     logger: Logger,
-    context?: import('../mcp/server-extensions.js').ToolContext,
+    context?: import('../mcp/server/middleware.js').ToolContext,
   ) => deployApplication(config, logger, context),
 };

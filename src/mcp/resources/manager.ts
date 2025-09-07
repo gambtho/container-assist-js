@@ -4,10 +4,10 @@ import {
   type ReadResourceResult,
   type Resource as MCPResource,
 } from '@modelcontextprotocol/sdk/types.js';
-import { Result, Success, Failure } from '../../types/core.js';
-import type { Resource, ResourceCache, ResourceCategory } from './types.js';
-import { UriParser } from './uri-schemes.js';
-import { MemoryResourceCache } from './cache.js';
+import { Result, Success, Failure } from '../../core/types';
+import type { Resource, ResourceCache, ResourceCategory } from './types';
+import { UriParser } from './uri-schemes';
+import { MemoryResourceCache } from './cache';
 
 /**
  * Resource configuration
@@ -29,7 +29,7 @@ export interface ResourceContext {
   logger: Logger;
   // Category indexing for efficient resource discovery
   categoryIndex?: Map<ResourceCategory, Set<string>>;
-  // Resource metadata index for enhanced features
+  // Resource metadata index for advanced features
   resourceIndex?: Map<string, Resource>;
 }
 
@@ -58,6 +58,9 @@ export const createResourceContext = (
     'build-artifact',
     'deployment-status',
     'session-data',
+    'sampling-result',
+    'sampling-variant',
+    'sampling-config',
   ];
   categories.forEach((category) => {
     context.categoryIndex!.set(category, new Set());
@@ -146,7 +149,7 @@ export const publishResource = async (
     // Determine MIME type
     const mimeType = determineMimeType(content);
 
-    // Create resource with enhanced metadata
+    // Create resource with metadata
     const now = new Date();
     const effectiveTtl = ttl ?? config.defaultTtl;
 
@@ -301,7 +304,8 @@ export const listResources = async (
         key.startsWith('scan://') ||
         key.startsWith('analysis://') ||
         key.startsWith('build://') ||
-        key.startsWith('session://')
+        key.startsWith('session://') ||
+        key.startsWith('sampling://')
       );
     });
 

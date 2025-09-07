@@ -7,7 +7,7 @@ import {
   K8sManifestResult,
   DeploymentResult,
   WorkflowStep,
-} from '../../src/types/session';
+} from '../../src/core/types';
 
 // Test-only Session type (removed from production code)
 type Session = {

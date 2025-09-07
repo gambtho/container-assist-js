@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../types/core';
+import { Success, Failure, type Result } from '../../core/types';
 import type {
   SamplingConfig,
   SamplingOptions,
@@ -14,19 +14,41 @@ import type {
 } from './types';
 import { VariantGenerationPipeline } from './generation-pipeline';
 import { DEFAULT_SCORING_CRITERIA } from './scorer';
-import { SDKPromptRegistry } from '../../mcp/prompts/sdk-prompt-registry.js';
+import { SDKPromptRegistry } from '../../mcp/prompts/sdk-prompt-registry';
+import { createMCPAIOrchestrator, type MCPAIOrchestrator } from '../../mcp/ai/orchestrator';
+import type { ValidationContext } from '../../mcp/tools/validator';
+import {
+  createSDKResourceManager,
+  createResourceContext,
+  type SDKResourceManager,
+} from '../../mcp/resources/manager';
+import { UriParser } from '../../mcp/resources/uri-schemes';
 
 /**
  * High-level sampling service that provides the main API for Dockerfile sampling
  */
 export class SamplingService {
   private pipeline: VariantGenerationPipeline;
+  private aiOrchestrator: MCPAIOrchestrator;
+  private resourceManager: SDKResourceManager;
 
   constructor(
     private logger: Logger,
     promptRegistry?: SDKPromptRegistry,
   ) {
     this.pipeline = new VariantGenerationPipeline(logger, promptRegistry);
+    this.aiOrchestrator = createMCPAIOrchestrator(logger, promptRegistry ? { promptRegistry } : {});
+
+    // Initialize resource management for sampling results
+    const resourceContext = createResourceContext(
+      {
+        defaultTtl: 3600000, // 1 hour
+        maxResourceSize: 10 * 1024 * 1024, // 10MB
+        cacheConfig: { defaultTtl: 3600000 },
+      },
+      logger,
+    );
+    this.resourceManager = createSDKResourceManager(resourceContext);
   }
 
   /**
@@ -39,6 +61,30 @@ export class SamplingService {
     logger: Logger,
   ): Promise<Result<{ content: string; score: number; metadata: Record<string, unknown> }>> {
     try {
+      // 1. Validate parameters using AI orchestrator
+      const validationContext: ValidationContext = {
+        toolName: 'dockerfile-sampling',
+        repositoryPath: config.repoPath,
+        environment: options.environment || 'development',
+        targetType: 'dockerfile',
+      };
+
+      const validationResult = await this.aiOrchestrator.validateParameters(
+        'dockerfile-best',
+        { ...config, ...options },
+        validationContext,
+      );
+
+      if (validationResult.ok && !validationResult.value.data.isValid) {
+        logger.warn(
+          {
+            errors: validationResult.value.data.errors,
+            warnings: validationResult.value.data.warnings,
+          },
+          'Parameter validation failed, proceeding with warnings',
+        );
+      }
+
       const samplingConfig: SamplingConfig = {
         sessionId: config.sessionId,
         repoPath: config.repoPath,
@@ -108,7 +154,93 @@ export class SamplingService {
    * Generate and score multiple variants (for detailed analysis)
    */
   async generateVariants(config: SamplingConfig): Promise<Result<SamplingResult>> {
-    return this.pipeline.generateSampledDockerfiles(config);
+    // 1. Validate sampling configuration parameters
+    const validationContext: ValidationContext = {
+      toolName: 'dockerfile-sampling',
+      repositoryPath: config.repoPath,
+      environment: config.environment || 'development',
+      targetType: 'dockerfile',
+    };
+
+    const validationResult = await this.aiOrchestrator.validateParameters(
+      'dockerfile-sampling',
+      config,
+      validationContext,
+    );
+
+    if (validationResult.ok && !validationResult.value.data.isValid) {
+      this.logger.warn(
+        {
+          sessionId: config.sessionId,
+          errors: validationResult.value.data.errors,
+          warnings: validationResult.value.data.warnings,
+        },
+        'Sampling configuration validation issues detected',
+      );
+
+      // Return validation errors if critical
+      const criticalErrors = validationResult.value.data.errors.filter(
+        (error) => error.includes('required') || error.includes('invalid'),
+      );
+
+      if (criticalErrors.length > 0) {
+        return Failure(`Configuration validation failed: ${criticalErrors.join('; ')}`);
+      }
+    }
+
+    // 2. Check if sampling results are already cached
+    const cacheUri = UriParser.build('sampling', `${config.sessionId}/variants`);
+    const cachedResult = await this.resourceManager.readResource(cacheUri);
+
+    if (cachedResult.ok && cachedResult.value) {
+      this.logger.info({ sessionId: config.sessionId }, 'Using cached sampling results');
+
+      try {
+        const text = cachedResult.value.contents?.[0]?.text ?? '{}';
+        const cachedData = JSON.parse(typeof text === 'string' ? text : '{}');
+        return Success(cachedData as SamplingResult);
+      } catch (error) {
+        this.logger.warn(
+          { sessionId: config.sessionId, error },
+          'Failed to parse cached sampling results, generating new ones',
+        );
+      }
+    }
+
+    // 3. Generate new sampling results
+    const result = await this.pipeline.generateSampledDockerfiles(config);
+
+    // 4. Cache successful results for future use
+    if (result.ok) {
+      const cacheResult = await this.resourceManager.publishEnhanced(
+        cacheUri,
+        result.value,
+        {
+          category: 'sampling-result',
+          name: `sampling-${config.sessionId}`,
+          description: `Sampling results for session ${config.sessionId}`,
+          annotations: {
+            tags: ['dockerfile', 'sampling', config.sessionId],
+            priority: 1,
+          },
+        },
+        3600000, // 1 hour TTL
+      );
+
+      if (cacheResult.ok) {
+        this.logger.info(
+          { sessionId: config.sessionId, cacheUri },
+          'Sampling results cached successfully',
+        );
+      } else {
+        this.logger.warn(
+          { sessionId: config.sessionId, error: cacheResult.error },
+          'Failed to cache sampling results',
+        );
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -301,5 +433,60 @@ export class SamplingService {
     });
 
     return { summary, advantages, tradeoffs };
+  }
+
+  /**
+   * Clean up sampling resources for a session
+   */
+  async cleanupSamplingResources(sessionId: string): Promise<Result<number>> {
+    try {
+      const pattern = `sampling://${sessionId}/*`;
+      const cleanupResult = await this.resourceManager.invalidateResource(pattern);
+
+      if (cleanupResult.ok) {
+        this.logger.info({ sessionId, pattern }, 'Sampling resources cleaned up successfully');
+        return Success(1); // Return count of cleaned resources
+      } else {
+        return Failure(`Failed to clean up sampling resources: ${cleanupResult.error}`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error({ sessionId, error: message }, 'Sampling resource cleanup failed');
+      return Failure(`Sampling resource cleanup error: ${message}`);
+    }
+  }
+
+  /**
+   * Get cached sampling results for a session
+   */
+  async getCachedSamplingResults(sessionId: string): Promise<Result<SamplingResult | null>> {
+    try {
+      const cacheUri = UriParser.build('sampling', `${sessionId}/variants`);
+      const cachedResult = await this.resourceManager.readResource(cacheUri);
+
+      if (cachedResult.ok && cachedResult.value) {
+        try {
+          const text = cachedResult.value.contents?.[0]?.text ?? '{}';
+          const cachedData = JSON.parse(typeof text === 'string' ? text : '{}');
+          return Success(cachedData as SamplingResult);
+        } catch (error) {
+          this.logger.warn({ sessionId, error }, 'Failed to parse cached sampling results');
+          return Success(null);
+        }
+      }
+
+      return Success(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error({ sessionId, error: message }, 'Failed to get cached sampling results');
+      return Failure(`Failed to get cached results: ${message}`);
+    }
+  }
+
+  /**
+   * Get sampling resource statistics
+   */
+  getSamplingResourceStats(): ReturnType<typeof this.resourceManager.getStats> {
+    return this.resourceManager.getStats();
   }
 }

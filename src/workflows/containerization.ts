@@ -14,7 +14,7 @@ import { generateDockerfile } from '../tools/generate-dockerfile';
 import { buildImage } from '../tools/build-image';
 import { scanImage } from '../tools/scan';
 import { tagImage } from '../tools/tag';
-import { isFail } from '../types/core';
+import { isFail } from '../core/types';
 import { getRecommendedBaseImage } from '../lib/base-images';
 import { createSessionManager } from '../lib/session';
 import { createTimer, createLogger, type Logger } from '../lib/logger';
@@ -26,7 +26,43 @@ import type {
 } from './types';
 
 /**
- * Run the complete containerization workflow
+ * Executes the complete containerization workflow
+ *
+ * Orchestrates a multi-step process to containerize an application:
+ * 1. Repository analysis for language/framework detection
+ * 2. Dockerfile generation with security best practices
+ * 3. Docker image building with optimization
+ * 4. Security vulnerability scanning
+ * 5. Image tagging for deployment
+ *
+ * @param params - Configuration parameters for the workflow
+ * @param params.sessionId - Unique identifier for tracking workflow state
+ * @param params.projectPath - Path to the project repository
+ * @param params.buildOptions - Optional build customizations (tags, platform, etc.)
+ * @param params.scanOptions - Optional security scanning preferences
+ * @param providedLogger - Optional logger instance (creates default if not provided)
+ *
+ * @returns Promise resolving to workflow result with success status, artifacts, and metadata
+ *
+ * @example
+ * ```typescript
+ * const result = await runContainerizationWorkflow({
+ *   sessionId: 'project-123',
+ *   projectPath: '/path/to/project',
+ *   buildOptions: {
+ *     tags: ['myapp:latest', 'myapp:v1.0.0'],
+ *     platform: 'linux/amd64'
+ *   },
+ *   scanOptions: {
+ *     severity: 'high'
+ *   }
+ * });
+ *
+ * if (result.success) {
+ *   console.log(`Image built: ${result.data.imageId}`);
+ *   console.log(`Tags: ${result.data.imageTags}`);
+ * }
+ * ```
  */
 export async function runContainerizationWorkflow(
   params: ContainerizationWorkflowParams,
@@ -259,7 +295,7 @@ export async function runContainerizationWorkflow(
       workflow_state: {
         ...((await sessionManager.get(sessionId))?.workflow_state || {}),
         build_result: build,
-      } as any,
+      },
     });
 
     const scanResult = await scanImage(

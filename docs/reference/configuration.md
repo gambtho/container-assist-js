@@ -389,7 +389,7 @@ The system searches for configuration files in the following order:
 
 ```javascript
 // Programmatic configuration
-import { createMCPServer } from './src/mcp/server';
+import { createMCPServer } from './src/mcp/server/server';
 
 const server = createMCPServer({
   ai: {

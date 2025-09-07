@@ -6,14 +6,15 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../types/core';
+import { Result, Success, Failure } from '../core/types';
 import { analyzeRepo } from '../tools/analyze-repo';
 import { generateDockerfile } from '../tools/generate-dockerfile';
 import { buildImage } from '../tools/build-image';
 import { scanImage } from '../tools/scan';
 import { generateBestDockerfile } from './dockerfile-sampling';
 
-export interface WorkflowConfig {
+// Specific configuration for containerization workflow
+export interface ContainerizationConfig {
   enableSampling?: boolean;
   enablePerspectives?: boolean;
   analysisPerspective?: 'comprehensive' | 'security-focused' | 'performance-focused';
@@ -26,7 +27,8 @@ export interface WorkflowConfig {
   customDockerfile?: string;
 }
 
-export interface WorkflowResult {
+// Specific result for containerization workflow
+export interface ContainerizationResult {
   ok: boolean;
   analysis?: any;
   dockerfile?: string;
@@ -51,14 +53,14 @@ export interface WorkflowResult {
 export const runContainerizationWorkflow = async (
   repoPath: string,
   logger: Logger,
-  config: WorkflowConfig = {},
-): Promise<Result<WorkflowResult>> => {
+  config: ContainerizationConfig = {},
+): Promise<Result<ContainerizationResult>> => {
   const startTime = Date.now();
   const sessionId = `workflow-${Date.now()}`;
 
   logger.info({ repoPath, sessionId }, 'Starting containerization workflow');
 
-  const result: WorkflowResult = {
+  const result: ContainerizationResult = {
     ok: false,
     duration: 0,
     errors: [],
@@ -211,7 +213,7 @@ export const runContainerizationWorkflow = async (
 export const runBuildOnlyWorkflow = async (
   repoPath: string,
   logger: Logger,
-  config: WorkflowConfig = {},
+  config: ContainerizationConfig = {},
 ): Promise<Result<{ imageId: string; duration: number }>> => {
   const startTime = Date.now();
   const sessionId = `build-${Date.now()}`;

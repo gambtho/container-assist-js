@@ -22,7 +22,8 @@ npx lint-staged
 ./scripts/quality-gates.sh
 
 # Stage the quality-gates.json file if it was modified AND still exists
-if git status --porcelain | grep -q "quality-gates.json" && [ -f "quality-gates.json" ]; then
+# Check: file exists AND is not deleted in git status
+if [ -f quality-gates.json ] && git status --porcelain | grep -v '^D ' | grep -q "quality-gates.json"; then
     echo "📊 Staging updated quality-gates.json metrics..."
     git add quality-gates.json
 fi

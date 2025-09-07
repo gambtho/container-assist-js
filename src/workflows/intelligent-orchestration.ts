@@ -1,6 +1,6 @@
-import { Success, Failure, type Result } from '../types/core';
+import { Success, Failure, type Result } from '../core/types';
 import type { Logger } from 'pino';
-import type { ProgressReporter } from '../mcp/server-extensions.js';
+import type { ProgressReporter } from '../mcp/server/middleware';
 
 type WorkflowStep = {
   toolName: string;
@@ -28,8 +28,14 @@ type WorkflowResult = {
 };
 
 /**
- * Plan workflow steps based on type and current session state
- * Implements smart step skipping for partially completed workflows
+ * Plans workflow steps based on type and session state.
+ * Skips already completed steps when resuming workflows.
+ *
+ * @param workflowType - The type of workflow to plan ('containerization', 'deployment', 'security')
+ * @param params - Workflow parameters including optional flags for build, scan, and push
+ * @param sessionId - Optional session identifier for resuming workflows
+ * @param sessionManager - Manager for tracking workflow session state
+ * @returns Array of workflow steps to execute
  */
 const planWorkflowSteps = async (
   workflowType: string,
@@ -42,7 +48,6 @@ const planWorkflowSteps = async (
   if (workflowType === 'containerization') {
     const steps: WorkflowStep[] = [];
 
-    // Skip analysis if already completed in this session
     if (!sessionState?.completed_steps?.includes('analyze-repo')) {
       steps.push({
         toolName: 'analyze-repo',
@@ -59,7 +64,6 @@ const planWorkflowSteps = async (
       required: true,
     });
 
-    // Optional build step (enabled by default)
     if (params.buildImage !== false) {
       steps.push({
         toolName: 'build-image',
@@ -68,19 +72,16 @@ const planWorkflowSteps = async (
         required: false,
       });
 
-      // Security scan only if build is enabled
       if (params.scanImage !== false) {
         steps.push({
           toolName: 'scan',
           parameters: { ...params, sessionId },
           description: 'Scanning image for vulnerabilities',
           required: false,
-          // Only scan if build step produced an image ID
           condition: (results) => results[results.length - 1]?.imageId !== undefined,
         });
       }
 
-      // Registry push only if both push flag and registry are specified
       if (params.pushImage && params.registry) {
         steps.push({
           toolName: 'push',
@@ -95,7 +96,6 @@ const planWorkflowSteps = async (
     return steps;
   }
 
-  // Deployment workflow
   if (workflowType === 'deployment') {
     return [
       {
@@ -125,7 +125,6 @@ const planWorkflowSteps = async (
     ];
   }
 
-  // Security workflow
   if (workflowType === 'security') {
     return [
       {
@@ -215,11 +214,7 @@ const executeWorkflowStep = async (
   return tool.execute(step.parameters, logger);
 };
 
-const generateWorkflowRecommendations = (
-  workflowType: string,
-  results: any[],
-  _sessionState: any,
-): string[] => {
+const generateWorkflowRecommendations = (workflowType: string, results: any[]): string[] => {
   const recommendations: string[] = [];
 
   // General recommendations
@@ -412,11 +407,7 @@ export const executeWorkflow = async (
       sessionId && sessionManager ? await sessionManager.getState(sessionId) : undefined;
 
     // Generate recommendations
-    const recommendations = generateWorkflowRecommendations(
-      workflowType,
-      results,
-      finalSessionState,
-    );
+    const recommendations = generateWorkflowRecommendations(workflowType, results);
 
     // Add AI insights if available
     if (aiService && sessionId) {
@@ -466,64 +457,11 @@ export const executeWorkflow = async (
     );
 
     return Success(summary);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ error, workflowType }, 'Workflow execution failed');
-    return Failure(`Workflow execution failed: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    return Failure(`Workflow execution failed: ${message}`);
   }
-};
-
-/**
- * List available workflows
- */
-export const listAvailableWorkflows = (): Array<{
-  name: string;
-  description: string;
-  steps: string[];
-}> => [
-  {
-    name: 'containerization',
-    description: 'Complete containerization workflow from analysis to deployment',
-    steps: ['analyze-repo', 'generate-dockerfile', 'build-image', 'scan', 'push'],
-  },
-  {
-    name: 'deployment',
-    description: 'Deploy application to Kubernetes cluster',
-    steps: ['generate-k8s-manifests', 'prepare-cluster', 'deploy', 'verify-deployment'],
-  },
-  {
-    name: 'security',
-    description: 'Security analysis and remediation workflow',
-    steps: ['analyze-repo', 'scan', 'fix-dockerfile'],
-  },
-  {
-    name: 'optimization',
-    description: 'Optimize Docker images for size and performance',
-    steps: ['analyze-repo', 'resolve-base-images', 'generate-dockerfile', 'build-image'],
-  },
-];
-
-/**
- * Get workflow details including steps and estimated duration
- */
-export const getWorkflowDetails = async (
-  workflowType: string,
-  sessionId?: string,
-  sessionManager?: any,
-): Promise<{
-  workflowType: string;
-  steps: Array<{ name: string; description?: string; required: boolean }>;
-  estimatedDuration: number;
-}> => {
-  const steps = await planWorkflowSteps(workflowType, {}, sessionId, sessionManager);
-  return {
-    workflowType,
-    steps: steps.map((s) => ({
-      name: s.toolName,
-      ...(s.description ? { description: s.description } : {}),
-      required: s.required !== false,
-    })),
-    estimatedDuration: steps.length * 30, // Rough estimate in seconds
-  };
 };
 
 // Export types

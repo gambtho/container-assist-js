@@ -1,4 +1,4 @@
-import { TestRepositoryConfig } from '../../types';
+import { TestRepositoryConfig } from '../../types.js';
 import path from 'path';
 
 export const securityHardenedAppConfig: TestRepositoryConfig = {

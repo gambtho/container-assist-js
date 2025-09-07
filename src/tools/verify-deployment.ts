@@ -8,8 +8,7 @@
 import { createSessionManager } from '../lib/session';
 import { createKubernetesClient } from '../lib/kubernetes';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core';
-import type { WorkflowState } from '../types/session';
+import { Success, Failure, type Result, type WorkflowState } from '../core/types';
 import { DEFAULT_TIMEOUTS } from '../config/defaults';
 
 export interface VerifyDeploymentConfig {
@@ -120,11 +119,11 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
 
       // Consider 2xx and 3xx responses as healthy
       return response.ok || (response.status >= 300 && response.status < 400);
-    } catch (fetchError: any) {
+    } catch (fetchError: unknown) {
       clearTimeout(timeoutId);
 
       // If it's an abort error, the request timed out
-      if (fetchError.name === 'AbortError') {
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
         return false;
       }
 

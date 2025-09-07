@@ -1,5 +1,5 @@
-import { Result, Success, Failure } from '../../types/core.js';
-import type { ParsedUri, UriScheme } from './types.js';
+import { Result, Success, Failure } from '../../core/types';
+import type { ParsedUri, UriScheme } from './types';
 
 export class UriParser {
   /**
@@ -93,6 +93,7 @@ export class UriParser {
       CACHE: 'cache',
       SESSION: 'session',
       TEMP: 'temp',
+      SAMPLING: 'sampling',
     }).includes(scheme as UriScheme);
   }
 }

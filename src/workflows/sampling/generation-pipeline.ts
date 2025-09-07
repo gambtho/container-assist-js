@@ -3,147 +3,65 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, isFail, type Result } from '../../types/core';
-import { DEFAULT_TIMEOUTS, getDefaultPort } from '../../config/defaults';
-import type {
-  SamplingConfig,
-  SamplingResult,
-  DockerfileContext,
-  DockerfileVariant,
-  ScoringCriteria,
-} from './types';
+import { Success, Failure, isFail, type Result } from '../../core/types';
+import { getDefaultPort } from '../../config/defaults';
+import type { SamplingConfig, SamplingResult, DockerfileContext, ScoringCriteria } from './types';
 import { StrategyEngine } from './strategy-engine';
-import { SDKPromptRegistry } from '../../mcp/prompts/sdk-prompt-registry.js';
-import { VariantScorer, DEFAULT_SCORING_CRITERIA } from './scorer';
+import { SDKPromptRegistry } from '../../mcp/prompts/sdk-prompt-registry';
+import { VariantScorer } from './scorer';
 import { analyzeRepo } from '../../tools/analyze-repo';
+import { validateSamplingConfig, validateScoringCriteria } from './validation';
+import { createMCPAIOrchestrator, type MCPAIOrchestrator } from '../../mcp/ai/orchestrator';
 
 /**
- * Validation utilities for sampling data
- */
-export class SamplingValidator {
-  static validateDockerfileContent(content: string): Result<void> {
-    if (!content || content.trim().length === 0) {
-      return Failure('Dockerfile content cannot be empty');
-    }
-
-    const lines = content
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line);
-
-    // Must have at least one FROM instruction
-    if (!lines.some((line) => line.toLowerCase().startsWith('from '))) {
-      return Failure('Dockerfile must contain at least one FROM instruction');
-    }
-
-    // Check for basic structure
-    if (lines.length < 3) {
-      return Failure(
-        'Dockerfile appears too minimal - needs at least FROM, WORKDIR/COPY, and CMD/ENTRYPOINT',
-      );
-    }
-
-    return Success(undefined);
-  }
-
-  static validateSamplingConfig(config: SamplingConfig): Result<void> {
-    if (!config.sessionId || config.sessionId.trim().length === 0) {
-      return Failure('Session ID is required');
-    }
-
-    if (!config.repoPath || config.repoPath.trim().length === 0) {
-      return Failure('Repository path is required');
-    }
-
-    if (config.variantCount && (config.variantCount < 1 || config.variantCount > 10)) {
-      return Failure('Variant count must be between 1 and 10');
-    }
-
-    const minTimeout = 5000; // 5 seconds
-    const maxTimeout = DEFAULT_TIMEOUTS.dockerBuild; // 5 minutes
-    if (config.timeout && (config.timeout < minTimeout || config.timeout > maxTimeout)) {
-      return Failure(
-        `Timeout must be between ${minTimeout / 1000} seconds and ${maxTimeout / 1000 / 60} minutes`,
-      );
-    }
-
-    return Success(undefined);
-  }
-
-  static validateScoringCriteria(criteria: Partial<ScoringCriteria>): Result<ScoringCriteria> {
-    const weights = {
-      security: criteria.security ?? DEFAULT_SCORING_CRITERIA.security,
-      performance: criteria.performance ?? DEFAULT_SCORING_CRITERIA.performance,
-      size: criteria.size ?? DEFAULT_SCORING_CRITERIA.size,
-      maintainability: criteria.maintainability ?? DEFAULT_SCORING_CRITERIA.maintainability,
-    };
-
-    // Check individual weights
-    for (const [key, weight] of Object.entries(weights)) {
-      if (weight < 0 || weight > 1) {
-        return Failure(`${key} weight must be between 0 and 1`);
-      }
-    }
-
-    // Check total weight
-    const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
-    if (Math.abs(total - 1) > 0.01) {
-      return Failure('Scoring criteria weights must sum to 1.0');
-    }
-
-    return Success(weights as ScoringCriteria);
-  }
-
-  static validateVariant(variant: DockerfileVariant): Result<void> {
-    if (!variant.id || variant.id.trim().length === 0) {
-      return Failure('Variant must have a valid ID');
-    }
-
-    const contentValidation = this.validateDockerfileContent(variant.content);
-    if (!contentValidation.ok) {
-      return contentValidation;
-    }
-
-    if (!variant.strategy || variant.strategy.trim().length === 0) {
-      return Failure('Variant must specify the strategy used');
-    }
-
-    if (!variant.metadata) {
-      return Failure('Variant must include metadata');
-    }
-
-    if (!variant.metadata.baseImage || variant.metadata.baseImage.trim().length === 0) {
-      return Failure('Variant metadata must specify base image');
-    }
-
-    return Success(undefined);
-  }
-}
-
-/**
- * Main generation pipeline for Dockerfile sampling
+ * Main generation pipeline for Dockerfile sampling with AI validation
  */
 export class VariantGenerationPipeline {
   private strategyEngine: StrategyEngine;
   private scorer: VariantScorer;
+  private aiOrchestrator: MCPAIOrchestrator;
 
   constructor(
     private logger: Logger,
     promptRegistry?: SDKPromptRegistry,
+    aiOrchestrator?: MCPAIOrchestrator,
   ) {
     this.strategyEngine = new StrategyEngine(logger, promptRegistry);
     this.scorer = new VariantScorer(logger);
+    this.aiOrchestrator =
+      aiOrchestrator ||
+      createMCPAIOrchestrator(logger, promptRegistry ? { promptRegistry } : undefined);
   }
 
   /**
-   * Execute complete sampling pipeline
+   * Execute complete sampling pipeline with AI validation
    */
   async generateSampledDockerfiles(config: SamplingConfig): Promise<Result<SamplingResult>> {
     const startTime = Date.now();
 
     try {
-      // Validate configuration
-      const configValidation = SamplingValidator.validateSamplingConfig(config);
+      // Step 0: AI-enhanced parameter validation
+      const aiValidationResult = await this.aiOrchestrator.validateParameters(
+        'dockerfile-sampling',
+        config,
+        {
+          toolName: 'dockerfile-sampling',
+          environment: config.environment || 'development',
+          targetType: 'dockerfile',
+        },
+      );
+
+      if (aiValidationResult.ok && !aiValidationResult.value.data.isValid) {
+        const errors = aiValidationResult.value.data.errors;
+        this.logger.warn(
+          { errors, sessionId: config.sessionId },
+          'AI validation failed for sampling configuration',
+        );
+        return Failure(`Configuration validation failed: ${errors.join(', ')}`);
+      }
+
+      // Enhanced configuration validation
+      const configValidation = validateSamplingConfig(config);
       if (!configValidation.ok) {
         return Failure(`Invalid configuration: ${configValidation.error}`);
       }
@@ -323,7 +241,7 @@ export class VariantGenerationPipeline {
     context?: DockerfileContext,
   ): Promise<ScoringCriteria> {
     if (customCriteria) {
-      const validation = SamplingValidator.validateScoringCriteria(customCriteria);
+      const validation = validateScoringCriteria(customCriteria);
       if (validation.ok) {
         return validation.value;
       }
@@ -441,9 +359,9 @@ export class VariantGenerationPipeline {
     return 'production'; // Default to production for sampling
   }
 
-  private determineSecurityLevel(_config: SamplingConfig): 'basic' | 'enhanced' | 'strict' {
+  private determineSecurityLevel(_config: SamplingConfig): 'basic' | 'standard' | 'strict' {
     // Could be enhanced based on detected security requirements
-    return 'enhanced'; // Default to enhanced security
+    return 'standard'; // Default to enhanced security
   }
 
   /**

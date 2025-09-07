@@ -3,7 +3,7 @@
  * Manages MCP server and client for E2E tests
  */
 
-import { Result, Success, Failure } from '../../src/types/core';
+import { Result, Success, Failure } from '../../src/core/types';
 
 export interface MCPClient {
   callTool(toolName: string, params: any): Promise<Result<any>>;

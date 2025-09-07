@@ -6,7 +6,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../types/core';
+import { Result, Success, Failure } from '../core/types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -470,7 +470,7 @@ export class CacheManager {
 
   private async evictOldest(): Promise<void> {
     let oldestKey: string | undefined;
-    let oldestTimestamp = Date.now();
+    let oldestTimestamp = Infinity;
 
     for (const [key, entry] of this.cache.entries()) {
       if (entry.timestamp < oldestTimestamp) {

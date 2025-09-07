@@ -9,7 +9,8 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
-import type { WorkflowState } from '../types/session.js';
+import type { WorkflowState } from '../core/types';
+import { SessionError, ErrorCodes } from './errors';
 
 interface SessionConfig {
   ttl?: number; // Session TTL in seconds (default: 24 hours)
@@ -74,7 +75,11 @@ export class SessionManager {
     if (this.sessions.size >= this.maxSessions) {
       this.cleanupExpiredSessions();
       if (this.sessions.size >= this.maxSessions) {
-        throw new Error(`Maximum sessions (${this.maxSessions}) reached`);
+        throw new SessionError(
+          `Maximum sessions (${this.maxSessions}) reached`,
+          ErrorCodes.SESSION_LIMIT_EXCEEDED,
+          { maxSessions: this.maxSessions, currentCount: this.sessions.size },
+        );
       }
     }
 
@@ -82,10 +87,13 @@ export class SessionManager {
     const now = new Date();
 
     const workflowState: WorkflowState = {
+      sessionId: id,
       metadata: {},
       completed_steps: [],
       errors: {},
       current_step: null,
+      createdAt: now,
+      updatedAt: now,
     };
 
     const session: InternalSession = {
@@ -127,7 +135,9 @@ export class SessionManager {
   async update(sessionId: string, state: Partial<WorkflowState>): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) {
-      throw new Error(`Session ${sessionId} not found`);
+      throw new SessionError(`Session ${sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND, {
+        sessionId,
+      });
     }
 
     // Update workflow state
@@ -135,8 +145,9 @@ export class SessionManager {
       ...session.workflowState,
       ...state,
       metadata: { ...session.workflowState.metadata, ...state.metadata },
-      completed_steps: state.completed_steps ?? session.workflowState.completed_steps,
+      completed_steps: state.completed_steps ?? session.workflowState.completed_steps ?? [],
       errors: { ...session.workflowState.errors, ...state.errors },
+      updatedAt: new Date(),
     };
 
     const updatedSession: InternalSession = {

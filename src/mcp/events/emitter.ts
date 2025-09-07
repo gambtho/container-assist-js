@@ -1,1 +1,1 @@
-// MCP event emitter - simplified
+// MCP event emitter

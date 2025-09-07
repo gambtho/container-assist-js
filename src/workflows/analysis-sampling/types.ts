@@ -3,8 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { Result } from '../../types/core';
-import type { AnalyzeRepoResult } from '../../tools/analyze-repo';
+import type { Result } from '../../core/types';
 
 /**
  * Analysis context for sampling different perspectives
@@ -24,10 +23,42 @@ export interface AnalysisContext {
 /**
  * Enhanced analysis result with sampling metadata
  */
-export interface AnalysisVariant extends AnalyzeRepoResult {
+export interface AnalysisVariant {
   id: string;
   strategy: string;
   perspective: 'comprehensive' | 'security' | 'performance' | 'architecture' | 'deployment';
+
+  // Core analysis data from AnalyzeRepoResult
+  sessionId: string;
+  language: string;
+  languageVersion?: string;
+  framework?: string;
+  frameworkVersion?: string;
+  buildSystem?: {
+    type: string;
+    buildFile: string;
+    buildCommand: string;
+    testCommand?: string;
+  };
+  dependencies: Array<{
+    name: string;
+    version?: string;
+    type: string;
+  }>;
+  ports: number[];
+  hasDockerfile: boolean;
+  hasDockerCompose: boolean;
+  hasKubernetes: boolean;
+  recommendations?: any;
+
+  // Extended analysis properties
+  files?: any[];
+  frameworks?: any[];
+  patterns?: any;
+  security?: any;
+  deployment?: any;
+
+  // Sampling metadata
   insights: {
     keyFindings: string[];
     riskAssessments: string[];
@@ -40,6 +71,7 @@ export interface AnalysisVariant extends AnalyzeRepoResult {
   analysisTime: number;
   filesAnalyzed: number;
   generated: Date;
+  metadata?: any;
 }
 
 /**

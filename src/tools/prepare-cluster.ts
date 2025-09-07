@@ -8,8 +8,7 @@
 import { createSessionManager } from '../lib/session';
 import { createKubernetesClient } from '../lib/kubernetes';
 import { createTimer, type Logger } from '../lib/logger';
-import { Success, Failure, type Result } from '../types/core';
-import type { WorkflowState } from '../types/session';
+import { Success, Failure, type Result, type WorkflowState } from '../core/types';
 
 export interface PrepareClusterConfig {
   sessionId: string;

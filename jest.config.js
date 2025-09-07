@@ -11,8 +11,10 @@ export default {
   projects: [
     {
       displayName: 'unit',
-      testMatch: ['**/test/unit/**/*.test.ts'],
+      testMatch: ['<rootDir>/test/__tests__/unit/**/*.test.ts'],
       setupFilesAfterEnv: ['<rootDir>/test/setup/unit-setup.ts'],
+      testEnvironment: 'node',
+      coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
       transform: {
         '^.+\\.tsx?$': [
           'ts-jest',
@@ -32,8 +34,10 @@ export default {
     },
     {
       displayName: 'integration',
-      testMatch: ['**/test/integration/**/*.test.ts'],
+      testMatch: ['<rootDir>/test/__tests__/integration/**/*.integration.test.ts'],
       setupFilesAfterEnv: ['<rootDir>/test/setup/integration-setup.ts'],
+      testEnvironment: 'node',
+      testTimeout: 30000,
       transform: {
         '^.+\\.tsx?$': [
           'ts-jest',
@@ -53,8 +57,33 @@ export default {
     },
     {
       displayName: 'e2e',
-      testMatch: ['**/test/e2e/**/*.test.ts'],
+      testMatch: ['<rootDir>/test/__tests__/e2e/**/*.e2e.test.ts'],
       setupFilesAfterEnv: ['<rootDir>/test/setup/e2e-setup.ts'],
+      testEnvironment: 'node',
+      testTimeout: 60000,
+      maxWorkers: 1,
+      transform: {
+        '^.+\\.tsx?$': [
+          'ts-jest',
+          {
+            useESM: true,
+            tsconfig: {
+              module: 'ES2022',
+              moduleResolution: 'bundler',
+              target: 'ES2022',
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+              isolatedModules: true
+            },
+          },
+        ],
+      },
+    },
+    {
+      displayName: 'performance',
+      testMatch: ['<rootDir>/test/performance/**/*.perf.test.ts'],
+      testEnvironment: 'node',
+      testTimeout: 120000,
       transform: {
         '^.+\\.tsx?$': [
           'ts-jest',
@@ -111,6 +140,12 @@ export default {
       lines: 80,
       statements: 80
     },
+    './src/mcp/': {
+      branches: 85,
+      functions: 85,
+      lines: 85,
+      statements: 85
+    },
     './src/tools/': {
       branches: 85,
       functions: 90,
@@ -122,12 +157,23 @@ export default {
       functions: 85,
       lines: 85,
       statements: 85
+    },
+    './src/lib/': {
+      branches: 75,
+      functions: 80,
+      lines: 85,
+      statements: 85
     }
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {
     // Handle .js imports and map them to .ts
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    
+    // Core types mapping from different locations
+    '^\\.\\./core/types\\.js$': '<rootDir>/src/core/types.ts',
+    '^\\./core/types\\.js$': '<rootDir>/src/core/types.ts',
+    '^\\.\\./\\.\\./core/types\\.js$': '<rootDir>/src/core/types.ts',
     
     // Test fixtures and helpers
     '^@fixtures/(.*)$': '<rootDir>/test/fixtures/$1',

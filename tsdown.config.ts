@@ -6,11 +6,11 @@ const isTestBuild = process.env.BUILD_TEST_UTILS === 'true';
 
 const mainEntries = {
   // Main entry point (package.json main/exports ".") - now points to MCP server
-  'src/mcp/server': 'src/mcp/server.ts',
+  'src/mcp/server': 'src/mcp/server/server.ts',
   // CLI entry point (package.json bin)
-  'apps/cli': 'apps/cli.ts',
+  'src/cli/cli': 'src/cli/cli.ts',
   // Additional exports from package.json exports (match output paths)
-  'src/types/core': 'src/types/core.ts',
+  'src/core/types': 'src/core/types.ts',
   'src/config/types': 'src/config/types.ts'
 };
 

@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../types/core';
+import { Success, Failure, type Result } from '../../core/types';
 import type {
   AnalysisVariant,
   ScoredAnalysisVariant,
@@ -25,7 +25,7 @@ export const DEFAULT_ANALYSIS_SCORING_CRITERIA: AnalysisScoringCriteria = {
 /**
  * Focus-specific scoring criteria presets
  */
-export const ANALYSIS_SCORING_PRESETS: Record<string, AnalysisScoringCriteria> = {
+const ANALYSIS_SCORING_PRESETS: Record<string, AnalysisScoringCriteria> = {
   comprehensive: {
     accuracy: { weight: 0.25, minScore: 0.5 },
     completeness: { weight: 0.4, minScore: 0.6 },
@@ -61,7 +61,7 @@ export const ANALYSIS_SCORING_PRESETS: Record<string, AnalysisScoringCriteria> =
 /**
  * Advanced analysis evaluator for detailed scoring
  */
-export class AnalysisEvaluator {
+class AnalysisEvaluator {
   constructor(private logger: Logger) {}
 
   /**

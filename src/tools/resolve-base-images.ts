@@ -8,8 +8,13 @@
 import { createSessionManager } from '../lib/session';
 import { createTimer, type Logger } from '../lib/logger';
 import { createDockerRegistryClient } from '../lib/docker-registry';
-import { Success, Failure, type Result } from '../types/core';
-import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../core/types';
 import { getSuggestedBaseImages, getRecommendedBaseImage } from '../lib/base-images';
 
 export interface ResolveBaseImagesConfig {

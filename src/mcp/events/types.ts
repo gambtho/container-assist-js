@@ -1,1 +1,1 @@
-// MCP event types - simplified
+// MCP event types

@@ -6,9 +6,27 @@ echo "🛡️ Quality Gates Validation $(date)"
 echo "========================================="
 echo ""
 
+# Display configuration if verbose
+if [ "${VERBOSE:-false}" = "true" ]; then
+    echo "📋 Quality Gate Thresholds:"
+    echo "  • Max Lint Errors: $MAX_LINT_ERRORS"
+    echo "  • Max Lint Warnings: $MAX_LINT_WARNINGS"
+    echo "  • Max Type Errors: $MAX_TYPE_ERRORS"
+    echo "  • Max Dead Code: $MAX_DEADCODE"
+    echo "  • Max Build Time: ${MAX_BUILD_TIME_SECONDS}s"
+    echo ""
+fi
+
 # Configuration
 QUALITY_CONFIG="quality-gates.json"
 
+# Configurable quality gate thresholds via environment
+MIN_COVERAGE=${MIN_COVERAGE:-80}
+MAX_LINT_ERRORS=${MAX_LINT_ERRORS:-0}
+MAX_LINT_WARNINGS=${MAX_LINT_WARNINGS:-400}
+MAX_TYPE_ERRORS=${MAX_TYPE_ERRORS:-0}
+MAX_DEADCODE=${MAX_DEADCODE:-200}
+MAX_BUILD_TIME_SECONDS=${MAX_BUILD_TIME_SECONDS:-5}
 
 # Check for required tools with better error messages
 for cmd in npm bc jq; do
@@ -161,10 +179,10 @@ TIMESTAMP=$(date -Iseconds)
 update_json_safely '.metrics.lint.current = ($warnings | tonumber) | .metrics.lint.warnings = ($warnings | tonumber) | .metrics.lint.errors = ($errors | tonumber) | .metrics.lint.lastUpdated = $ts' \
    --arg warnings "$CURRENT_WARNINGS" --arg errors "$CURRENT_ERRORS" --arg ts "$TIMESTAMP"
 
-if [ "$CURRENT_ERRORS" -eq 0 ]; then
-    print_status "PASS" "No ESLint errors found"
+if [ "$CURRENT_ERRORS" -le "$MAX_LINT_ERRORS" ]; then
+    print_status "PASS" "ESLint errors within threshold: $CURRENT_ERRORS ≤ $MAX_LINT_ERRORS"
 else
-    print_status "FAIL" "$CURRENT_ERRORS ESLint errors must be fixed before proceeding"
+    print_status "FAIL" "$CURRENT_ERRORS ESLint errors exceed threshold of $MAX_LINT_ERRORS"
     exit 1
 fi
 
@@ -183,7 +201,8 @@ fi
 echo "Gate 2: ESLint Warning Ratcheting"
 echo "----------------------------------"
 
-if [ "$CURRENT_WARNINGS" -le "$BASELINE_WARNINGS" ]; then
+# Check against both baseline and configured maximum
+if [ "$CURRENT_WARNINGS" -le "$BASELINE_WARNINGS" ] && [ "$CURRENT_WARNINGS" -le "$MAX_LINT_WARNINGS" ]; then
     REDUCTION=$((BASELINE_WARNINGS - CURRENT_WARNINGS))
     if [ "$REDUCTION" -gt 0 ]; then
         PERCENTAGE=$(echo "scale=1; ($REDUCTION * 100) / $BASELINE_WARNINGS" | bc -l 2>/dev/null || echo "N/A")
@@ -304,10 +323,10 @@ if command -v npm >/dev/null 2>&1; then
             update_json_safely '.metrics.build.lastBuildTimeMs = ($time | tonumber) | .metrics.build.lastUpdated = $ts' \
                --arg time "$BUILD_TIME_MS" --arg ts "$TIMESTAMP"
             
-            if [ "$BUILD_TIME_SECONDS" -lt 5 ]; then
-                print_status "PASS" "Build completed in ${BUILD_TIME_SECONDS}s (< 5s threshold)"
+            if [ "$BUILD_TIME_SECONDS" -lt "$MAX_BUILD_TIME_SECONDS" ]; then
+                print_status "PASS" "Build completed in ${BUILD_TIME_SECONDS}s (< ${MAX_BUILD_TIME_SECONDS}s threshold)"
             else
-                print_status "WARN" "Build took ${BUILD_TIME_SECONDS}s (consider optimization if > 3s)"
+                print_status "WARN" "Build took ${BUILD_TIME_SECONDS}s (exceeds ${MAX_BUILD_TIME_SECONDS}s threshold)"
             fi
         else
             print_status "WARN" "Could not measure build time accurately"
@@ -326,17 +345,17 @@ fi
 # Final Summary
 echo "🎉 Quality Gates Summary"
 echo "========================"
-echo "ESLint Errors: $CURRENT_ERRORS"
-echo "ESLint Warnings: $CURRENT_WARNINGS"
-echo "Unused Exports: $DEADCODE_COUNT"
+echo "ESLint Errors: $CURRENT_ERRORS (threshold: $MAX_LINT_ERRORS)"
+echo "ESLint Warnings: $CURRENT_WARNINGS (threshold: $MAX_LINT_WARNINGS)"
+echo "Unused Exports: $DEADCODE_COUNT (threshold: $MAX_DEADCODE)"
 echo "TypeScript: ✅ Compiles"
 echo "Build: ✅ Successful"
 echo ""
 
-if [ "${CURRENT_WARNINGS:-0}" -gt 400 ] || [ "${DEADCODE_COUNT:-0}" -gt 200 ]; then
+if [ "${CURRENT_WARNINGS:-0}" -gt "$MAX_LINT_WARNINGS" ] || [ "${DEADCODE_COUNT:-0}" -gt "$MAX_DEADCODE" ]; then
     print_status "INFO" "Consider running aggressive cleanup to reach production targets:"
-    echo "  • ESLint warnings target: <400 (current: $CURRENT_WARNINGS)"
-    echo "  • Dead code target: <200 (current: $DEADCODE_COUNT)"
+    echo "  • ESLint warnings target: <$MAX_LINT_WARNINGS (current: $CURRENT_WARNINGS)"
+    echo "  • Dead code target: <$MAX_DEADCODE (current: $DEADCODE_COUNT)"
     echo ""
 fi
 

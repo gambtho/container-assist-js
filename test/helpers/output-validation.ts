@@ -1,4 +1,4 @@
-import { Result, Success, Failure } from '../../src/types/core';
+import { Result, Success, Failure } from '../../src/core/types';
 import { Logger } from 'pino';
 import * as fs from 'fs/promises';
 import * as path from 'path';

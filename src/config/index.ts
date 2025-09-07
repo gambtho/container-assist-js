@@ -97,7 +97,10 @@ export function logConfigSummaryIfDev(logger?: {
 }): void {
   if (process.env.NODE_ENV === 'development') {
     const configData = {
-      logLevel: config.server.logLevel,
+      server: {
+        logLevel: config.server.logLevel,
+        port: config.server.port,
+      },
       workspace: config.workspace.workspaceDir,
       docker: config.docker.socketPath,
     };

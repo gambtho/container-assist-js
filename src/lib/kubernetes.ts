@@ -7,7 +7,7 @@
 
 import * as k8s from '@kubernetes/client-node';
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../types/core';
+import { Success, Failure, type Result } from '../core/types';
 
 interface KubernetesClient {
   applyManifest: (manifest: any, namespace?: string) => Promise<Result<void>>;
@@ -140,9 +140,12 @@ export const createKubernetesClient = (logger: Logger, kubeconfig?: string): Kub
       try {
         await coreApi.readNamespace({ name: namespace });
         return true;
-      } catch (error: any) {
-        if (error?.response?.statusCode === 404) {
-          return false;
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'response' in error) {
+          const response = (error as any).response;
+          if (response?.statusCode === 404) {
+            return false;
+          }
         }
         logger.warn({ namespace, error }, 'Error checking namespace');
         return false;
