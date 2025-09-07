@@ -5,14 +5,14 @@
 
 import type { Logger } from 'pino';
 import type { Result } from '../../core/types';
-import type { SDKPromptRegistry } from '../prompts/sdk-prompt-registry';
+import type { MCPPromptRegistry } from '../prompts/mcp-prompt-registry';
 import type { SDKResourceManager } from '../resources/manager';
 
 /**
  * MCP Context provided to tools during execution
  */
 export interface MCPContext {
-  promptRegistry?: SDKPromptRegistry;
+  promptRegistry?: MCPPromptRegistry;
   resourceManager?: SDKResourceManager;
 }
 

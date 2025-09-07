@@ -5,7 +5,7 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../lib/session';
-import { createMCPHostAI, createPromptTemplate } from '../lib/mcp-host-ai';
+import { createMCPHostAI, createPromptTemplate, type MCPHostAI } from '../lib/mcp-host-ai';
 import { createTimer, type Logger } from '../lib/logger';
 import {
   Success,
@@ -159,17 +159,140 @@ function getStartCommand(analysis: { language?: string; framework?: string }): s
 }
 
 /**
- * Generate optimized Dockerfile based on analysis and options
+ * Generate AI-enhanced Dockerfile based on analysis and options
  * @param analysis - Repository analysis containing language, framework, dependencies
  * @param options - Generation options including multi-stage and security settings
+ * @param mcpHostAI - MCP Host AI instance for intelligent generation
+ * @param logger - Logger for debug information
  * @returns Complete Dockerfile content as string
  */
-function generateOptimizedDockerfile(
+async function generateAIDockerfile(
   analysis: {
     language?: string;
     framework?: string;
     dependencies?: Array<{ name: string }>;
     ports?: number[];
+    build_system?: { type?: string };
+  },
+  options: GenerateDockerfileConfig,
+  mcpHostAI: MCPHostAI,
+  logger: Logger,
+): Promise<string> {
+  try {
+    const context = {
+      language: analysis.language,
+      framework: analysis.framework,
+      dependencies: analysis.dependencies,
+      ports: analysis.ports,
+      buildTools: analysis.build_system?.type,
+      securityLevel: options.securityHardening ? 'strict' : 'standard',
+      optimization: options.optimization ? 'balanced' : 'minimal',
+      multistage: options.multistage !== false,
+      expectsAIResponse: true,
+      type: 'dockerfile',
+    };
+
+    const prompt = createPromptTemplate('dockerfile', {
+      ...context,
+      requirements: [
+        'Use best practices for the detected language/framework',
+        'Optimize for minimal image size',
+        'Include security hardening',
+        'Use multi-stage builds where appropriate',
+        'Add proper health checks',
+        'Configure non-root user',
+      ],
+    });
+
+    const result = await mcpHostAI.submitPrompt(prompt, context);
+
+    if (result.ok) {
+      logger.debug(
+        { language: analysis.language, framework: analysis.framework },
+        'AI-enhanced Dockerfile generated',
+      );
+      return parseDockerfileFromAIResponse(result.value);
+    } else {
+      logger.warn(
+        { error: result.error },
+        'AI Dockerfile generation failed, falling back to template',
+      );
+    }
+  } catch (error) {
+    logger.warn({ error }, 'AI Dockerfile generation error, falling back to template');
+  }
+
+  // Fall back to template-based generation
+  return generateTemplateDockerfile(analysis, options);
+}
+
+/**
+ * Parse Dockerfile content from AI response
+ * @param aiResponse - Raw AI response that may contain Dockerfile content
+ * @returns Cleaned Dockerfile content
+ */
+function parseDockerfileFromAIResponse(aiResponse: string): string {
+  // Extract Dockerfile content from AI response
+  // Look for code blocks first
+  const dockerfileMatch = aiResponse.match(/```(?:dockerfile|docker)?\n([\s\S]*?)\n```/i);
+  if (dockerfileMatch?.[1]) {
+    return dockerfileMatch[1].trim();
+  }
+
+  // If no code blocks, check if the response is already a Dockerfile
+  if (aiResponse.trim().startsWith('FROM ')) {
+    return aiResponse.trim();
+  }
+
+  // If response contains Dockerfile commands, extract them
+  const lines = aiResponse.split('\n');
+  const dockerfileLines: string[] = [];
+  let inDockerfile = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('FROM ')) {
+      inDockerfile = true;
+    }
+    if (inDockerfile) {
+      // Check if this looks like a Dockerfile instruction
+      if (
+        trimmed.startsWith('FROM ') ||
+        trimmed.startsWith('RUN ') ||
+        trimmed.startsWith('COPY ') ||
+        trimmed.startsWith('WORKDIR ') ||
+        trimmed.startsWith('EXPOSE ') ||
+        trimmed.startsWith('ENV ') ||
+        trimmed.startsWith('USER ') ||
+        trimmed.startsWith('CMD ') ||
+        trimmed.startsWith('ENTRYPOINT ') ||
+        trimmed.startsWith('HEALTHCHECK ') ||
+        trimmed.startsWith('ARG ') ||
+        trimmed.startsWith('LABEL ') ||
+        trimmed.startsWith('#') ||
+        trimmed === ''
+      ) {
+        dockerfileLines.push(line);
+      }
+    }
+  }
+
+  return dockerfileLines.length > 0 ? dockerfileLines.join('\n') : aiResponse.trim();
+}
+
+/**
+ * Generate template-based Dockerfile (fallback when AI is unavailable)
+ * @param analysis - Repository analysis containing language, framework, dependencies
+ * @param options - Generation options including multi-stage and security settings
+ * @returns Complete Dockerfile content as string
+ */
+function generateTemplateDockerfile(
+  analysis: {
+    language?: string;
+    framework?: string;
+    dependencies?: Array<{ name: string }>;
+    ports?: number[];
+    build_system?: { type?: string };
   },
   options: GenerateDockerfileConfig,
 ): string {
@@ -305,52 +428,38 @@ export async function generateDockerfile(
       return Failure('Repository must be analyzed first - run analyze_repo');
     }
 
-    // Generate Dockerfile content
-    const dockerfileContent = generateOptimizedDockerfile(analysisResult, config);
+    // Generate Dockerfile content with AI enhancement when available
+    let processedContent: string;
+    let aiGenerated = false;
 
-    // Request AI enhancement from MCP host (when available)
-    const processedContent = dockerfileContent;
     try {
       if (mcpHostAI.isAvailable()) {
-        const aiPrompt = createPromptTemplate('dockerfile', {
-          language: analysisResult.language,
-          framework: analysisResult.framework,
-          dependencies: analysisResult.dependencies,
-          ports: analysisResult.ports,
-          optimization,
-          multistage,
-          securityHardening,
-          baseImage:
-            config.baseImage ?? getRecommendedBaseImage(analysisResult.language ?? 'unknown'),
-          generatedContent: dockerfileContent,
-        });
-
-        const aiResponse = await mcpHostAI.submitPrompt(aiPrompt, {
-          toolName: 'generate-dockerfile',
-          baseDockerfile: dockerfileContent,
-          optimizations: { optimization, multistage, securityHardening },
-        });
-
-        if (aiResponse.ok) {
-          logger.debug('AI enhancement requested from MCP host for Dockerfile generation');
-
-          // Store AI request info in workflow state for reference
-          const currentWorkflowState = session.workflow_state as WorkflowState | undefined;
-          const updatedContext = updateWorkflowState(currentWorkflowState ?? {}, {
-            metadata: {
-              ...(currentWorkflowState?.metadata ?? {}),
-              ai_enhancement_requested: true,
-              ai_request_type: 'dockerfile-generation',
-              timestamp: new Date().toISOString(),
-            },
-          });
-          await sessionManager.update(sessionId, {
-            workflow_state: updatedContext,
-          });
-        }
+        logger.debug('Using AI-enhanced Dockerfile generation');
+        processedContent = await generateAIDockerfile(analysisResult, config, mcpHostAI, logger);
+        aiGenerated = true;
+      } else {
+        logger.debug('Using template-based Dockerfile generation');
+        processedContent = generateTemplateDockerfile(analysisResult, config);
       }
     } catch (error) {
-      logger.debug({ error }, 'MCP host AI enhancement request failed');
+      logger.warn({ error }, 'AI generation failed, falling back to template');
+      processedContent = generateTemplateDockerfile(analysisResult, config);
+    }
+
+    // Store AI generation info in workflow state
+    if (aiGenerated) {
+      const currentWorkflowState = session.workflow_state as WorkflowState | undefined;
+      const updatedContext = updateWorkflowState(currentWorkflowState ?? {}, {
+        metadata: {
+          ...(currentWorkflowState?.metadata ?? {}),
+          ai_enhancement_used: true,
+          ai_generation_type: 'dockerfile',
+          timestamp: new Date().toISOString(),
+        },
+      });
+      await sessionManager.update(sessionId, {
+        workflow_state: updatedContext,
+      });
     }
 
     // Determine output path

@@ -25,7 +25,7 @@ type Session = {
 // Mock ID generator for tests (replace nanoid to avoid ESM issues)
 const mockId = () => Math.random().toString(36).substring(7);
 import type { Logger } from '../../src/lib/logger';
-import { Success, Failure, type Result } from '../../src/types/core';
+import { Success, Failure, type Result } from '../../src/core/types';
 import type { ApplicationConfig } from '../../src/config/types';
 import { jest } from '@jest/globals';
 
@@ -180,7 +180,7 @@ spec:
         image: test-app:latest
         ports:
         - containerPort: 3000`,
-        file_path: './k8s/deployment.yaml',
+        file_path: './test/fixtures/k8s/deployment.yaml',
       },
       {
         kind: 'Service',
@@ -198,7 +198,7 @@ spec:
   - port: 80
     targetPort: 3000
   type: ClusterIP`,
-        file_path: './k8s/service.yaml',
+        file_path: './test/fixtures/k8s/service.yaml',
       },
     ],
     deployment_strategy: 'rolling',

@@ -14,8 +14,9 @@ import type {
 } from './types';
 import { VariantGenerationPipeline } from './generation-pipeline';
 import { DEFAULT_SCORING_CRITERIA } from './scorer';
-import { SDKPromptRegistry } from '../../mcp/prompts/sdk-prompt-registry';
+import { MCPPromptRegistry } from '../../mcp/prompts/mcp-prompt-registry';
 import { createMCPAIOrchestrator, type MCPAIOrchestrator } from '../../mcp/ai/orchestrator';
+import { NativeMCPSampling } from '../../mcp/sampling/native-sampling';
 import type { ValidationContext } from '../../mcp/tools/validator';
 import {
   createSDKResourceManager,
@@ -31,13 +32,15 @@ export class SamplingService {
   private pipeline: VariantGenerationPipeline;
   private aiOrchestrator: MCPAIOrchestrator;
   private resourceManager: SDKResourceManager;
+  private nativeSampling: NativeMCPSampling;
 
   constructor(
     private logger: Logger,
-    promptRegistry?: SDKPromptRegistry,
+    promptRegistry?: MCPPromptRegistry,
   ) {
     this.pipeline = new VariantGenerationPipeline(logger, promptRegistry);
     this.aiOrchestrator = createMCPAIOrchestrator(logger, promptRegistry ? { promptRegistry } : {});
+    this.nativeSampling = new NativeMCPSampling(logger);
 
     // Initialize resource management for sampling results
     const resourceContext = createResourceContext(
@@ -82,6 +85,127 @@ export class SamplingService {
             warnings: validationResult.value.data.warnings,
           },
           'Parameter validation failed, proceeding with warnings',
+        );
+      }
+
+      // Use native MCP sampling when available for optimal quality and performance
+      // This path leverages enhanced AI models with context-aware prompting
+      if (this.nativeSampling.isAvailable()) {
+        logger.info(
+          {
+            sessionId: config.sessionId,
+            optimization: options.optimization,
+            environment: options.environment,
+          },
+          'Using native MCP sampling for enhanced Dockerfile generation',
+        );
+
+        // Analyze repository structure to inform generation strategy
+        const repoAnalysis = await this.analyzeRepositoryContext(config.repoPath, logger);
+        const enhancedPrompt = this.buildEnhancedPrompt(config.repoPath, options, repoAnalysis);
+
+        // Apply repository-specific strategies for specialized frameworks and patterns
+        const samplingResult = await this.nativeSampling.sampleDockerfileStrategies(
+          enhancedPrompt,
+          {
+            sessionId: config.sessionId,
+            environment: options.environment,
+            optimization: options.optimization,
+            ...repoAnalysis,
+          },
+        );
+
+        if (samplingResult.ok) {
+          const strategies = samplingResult.value;
+          const strategiesList = Object.keys(strategies);
+
+          logger.info(
+            {
+              sessionId: config.sessionId,
+              strategiesGenerated: strategiesList,
+              source: 'native-mcp-strategies',
+            },
+            'Native MCP strategy sampling successful',
+          );
+
+          // Choose optimal strategy based on user preferences and repository characteristics
+          // Fallback hierarchy: user preference -> balanced -> first available
+          const preferredStrategy = options.optimization || 'balanced';
+          const selectedContent =
+            strategies[preferredStrategy] || strategies['balanced'] || Object.values(strategies)[0];
+
+          if (selectedContent) {
+            // Calculate confidence score based on strategy alignment and content quality metrics
+            const confidence = this.calculateNativeConfidence(
+              selectedContent,
+              options,
+              strategiesList.length,
+            );
+
+            return Success({
+              content: selectedContent,
+              score: confidence,
+              metadata: {
+                approach: 'native-mcp-strategy-sampling',
+                environment: options.environment,
+                variants: strategiesList.length,
+                strategy: preferredStrategy,
+                optimization: options.optimization || 'balanced',
+                features: this.extractDockerfileFeatures(selectedContent),
+                strategiesGenerated: strategiesList,
+                repoAnalysis,
+                generatedAt: new Date().toISOString(),
+                nativeMCP: true,
+                confidence,
+              },
+            });
+          }
+        }
+
+        // Fallback to diversity boost if strategy sampling fails
+        logger.info(
+          { sessionId: config.sessionId },
+          'Strategy sampling unavailable, trying diversity boost',
+        );
+
+        const enhancedPromptForDiversity = this.buildEnhancedPrompt(config.repoPath, options);
+        const diversityResult = await this.nativeSampling.sampleWithDiversityBoost(
+          enhancedPromptForDiversity,
+          0.8, // Target diversity
+          3, // Max attempts
+        );
+
+        if (diversityResult.ok && diversityResult.value.length > 0) {
+          const bestContent = diversityResult.value[0];
+          if (bestContent) {
+            const confidence = this.calculateNativeConfidence(
+              bestContent,
+              options,
+              diversityResult.value.length,
+            );
+
+            return Success({
+              content: bestContent,
+              score: confidence,
+              metadata: {
+                approach: 'native-mcp-diversity-sampling',
+                environment: options.environment,
+                variants: diversityResult.value.length,
+                strategy: 'adaptive',
+                optimization: options.optimization || 'balanced',
+                features: this.extractDockerfileFeatures(bestContent),
+                diversity: 0.8,
+                generatedAt: new Date().toISOString(),
+                nativeMCP: true,
+                confidence,
+              },
+            });
+          }
+        }
+
+        logger.warn(
+          { sessionId: config.sessionId },
+          'Native MCP sampling failed, falling back to pipeline',
         );
       }
 
@@ -488,5 +612,227 @@ export class SamplingService {
    */
   getSamplingResourceStats(): ReturnType<typeof this.resourceManager.getStats> {
     return this.resourceManager.getStats();
+  }
+
+  /**
+   * Analyze repository context for enhanced prompting
+   * @param repoPath - Absolute path to the repository directory
+   * @param logger - Logger instance for debug output
+   * @returns Promise resolving to repository context metadata
+   */
+  private async analyzeRepositoryContext(
+    repoPath: string,
+    logger: Logger,
+  ): Promise<Record<string, unknown>> {
+    const repoPathStr = String(repoPath);
+    try {
+      // Basic repository analysis - could be enhanced with actual file analysis
+      const context: Record<string, unknown> = {
+        repoPath,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Try to detect language and framework from common indicators
+      try {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+
+        // Check for common files
+        const files: string[] = await fs.readdir(repoPathStr).catch(() => [] as string[]);
+
+        if (files.includes('package.json')) {
+          try {
+            const fileName = 'package.json';
+            const packagePath = path.join(repoPathStr, fileName);
+            const packageContent = await fs.readFile(packagePath, 'utf-8');
+            const packageJson = JSON.parse(packageContent);
+
+            (context as any).language = 'javascript';
+            (context as any).appName = packageJson.name;
+            (context as any).dependencies = Object.keys(packageJson.dependencies || {}).slice(
+              0,
+              10,
+            );
+
+            // Detect framework
+            if (packageJson.dependencies?.['next'] || packageJson.dependencies?.['@next/core']) {
+              (context as any).framework = 'nextjs';
+            } else if (packageJson.dependencies?.['express']) {
+              (context as any).framework = 'express';
+            } else if (packageJson.dependencies?.['react']) {
+              (context as any).framework = 'react';
+            }
+          } catch (error) {
+            logger.debug({ error }, 'Failed to parse package.json');
+          }
+        } else if (files.includes('requirements.txt') || files.includes('pyproject.toml')) {
+          (context as any).language = 'python';
+          (context as any).framework = 'python';
+        } else if (files.includes('pom.xml') || files.includes('build.gradle')) {
+          const pomFile = 'pom.xml';
+          (context as any).language = 'java';
+          (context as any).framework = files.includes(pomFile) ? 'maven' : 'gradle';
+        } else if (files.includes('go.mod')) {
+          (context as any).language = 'go';
+          (context as any).framework = 'go';
+        }
+
+        // Check for Docker-related files
+        const dockerFile = 'Dockerfile';
+        if (files.includes(dockerFile)) {
+          (context as any).hasExistingDockerfile = true;
+        }
+        const composeFiles = ['docker-compose.yml', 'docker-compose.yaml'];
+        if (composeFiles.some((file) => files.includes(file))) {
+          (context as any).hasDockerCompose = true;
+        }
+
+        (context as any).detectedFiles = files.slice(0, 20); // Limit for logging
+      } catch (error) {
+        logger.debug(
+          { error, repoPath: repoPathStr },
+          'Repository analysis failed, using defaults',
+        );
+      }
+
+      return context;
+    } catch (error) {
+      logger.warn({ error, repoPath: repoPathStr }, 'Repository context analysis failed');
+      return { repoPath: repoPathStr, language: 'unknown' };
+    }
+  }
+
+  /**
+   * Build enhanced prompt with repository context
+   * @param repoPath - Path to the repository being analyzed
+   * @param options - Sampling options including environment and optimization preferences
+   * @param repoAnalysis - Optional repository analysis context
+   * @returns Formatted prompt string for AI Dockerfile generation
+   */
+  private buildEnhancedPrompt(
+    repoPath: string,
+    options: SamplingOptions,
+    repoAnalysis?: Record<string, unknown>,
+  ): string {
+    const environment = options.environment || 'production';
+    const optimization = options.optimization || 'balanced';
+
+    let prompt = `Generate an optimized Dockerfile for the repository at ${repoPath}.
+
+Requirements:
+- Target environment: ${environment}
+- Optimization focus: ${optimization}`;
+
+    if (repoAnalysis) {
+      if (repoAnalysis.language) {
+        prompt += `\n- Programming language: ${String(repoAnalysis.language)}`;
+      }
+      if (repoAnalysis.framework) {
+        prompt += `\n- Framework: ${String(repoAnalysis.framework)}`;
+      }
+      if (repoAnalysis.dependencies && Array.isArray(repoAnalysis.dependencies)) {
+        prompt += `\n- Key dependencies: ${repoAnalysis.dependencies.slice(0, 5).join(', ')}`;
+      }
+      if (repoAnalysis.hasExistingDockerfile) {
+        prompt += `\n- Note: Repository already contains a Dockerfile - provide an improved version`;
+      }
+    }
+
+    prompt += `\n
+Best practices to follow:
+- Use multi-stage builds for ${optimization} optimization
+- Apply security best practices (non-root user, minimal packages)
+- Include health checks for ${environment} deployment
+- Optimize layer caching for build performance
+- Follow containerization security guidelines`;
+
+    if (environment === 'production') {
+      prompt += `\n- Production-ready configurations with proper resource limits`;
+    }
+
+    if (optimization === 'security') {
+      prompt += `\n- Prioritize security hardening and vulnerability reduction`;
+    } else if (optimization === 'performance') {
+      prompt += `\n- Focus on runtime performance and startup speed`;
+    } else if (optimization === 'size') {
+      prompt += `\n- Minimize final image size using distroless or alpine bases`;
+    }
+
+    return prompt;
+  }
+
+  /**
+   * Calculate confidence score for native MCP results
+   */
+  private calculateNativeConfidence(
+    content: string,
+    options: SamplingOptions,
+    variantCount: number,
+  ): number {
+    let confidence = 0.85; // Base confidence for native MCP
+
+    // Boost confidence based on content quality indicators
+    if (content.includes('FROM ') && content.includes('COPY ') && content.includes('CMD ')) {
+      confidence += 0.05; // Basic Dockerfile structure
+    }
+
+    if (content.includes('USER ') && !content.includes('USER root')) {
+      confidence += 0.03; // Security: non-root user
+    }
+
+    if (content.includes('HEALTHCHECK')) {
+      confidence += 0.02; // Production readiness
+    }
+
+    // Boost based on strategy alignment
+    if (options.optimization === 'security' && content.includes('USER ')) {
+      confidence += 0.03;
+    } else if (options.optimization === 'size' && content.includes('alpine')) {
+      confidence += 0.03;
+    } else if (options.optimization === 'performance' && content.includes('# multi-stage')) {
+      confidence += 0.03;
+    }
+
+    // Boost based on variant count (more variants = higher confidence)
+    confidence += Math.min(variantCount * 0.01, 0.05);
+
+    return Math.min(confidence, 0.98); // Cap at 98%
+  }
+
+  /**
+   * Extract Dockerfile features for metadata
+   */
+  private extractDockerfileFeatures(content: string): string[] {
+    const features: string[] = [];
+
+    if (content.includes('# multi-stage') || (content.match(/FROM /g) || []).length > 1) {
+      features.push('multi-stage');
+    }
+
+    if (content.includes('USER ') && !content.includes('USER root')) {
+      features.push('security-hardened');
+    }
+
+    if (content.includes('HEALTHCHECK')) {
+      features.push('health-checks');
+    }
+
+    if (content.includes('alpine') || content.includes('distroless')) {
+      features.push('size-optimized');
+    }
+
+    if (content.includes('--no-cache') || content.includes('npm ci')) {
+      features.push('build-optimized');
+    }
+
+    if (content.includes('EXPOSE')) {
+      features.push('service-ready');
+    }
+
+    if (content.includes('WORKDIR')) {
+      features.push('structured');
+    }
+
+    return features.length > 0 ? features : ['standard'];
   }
 }

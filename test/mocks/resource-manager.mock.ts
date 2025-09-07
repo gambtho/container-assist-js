@@ -1,4 +1,4 @@
-import { Result, Success, Failure } from '../../src/types/core.js';
+import { Result, Success, Failure } from '../../src/core/types.js';
 import type { Resource, ResourceManager } from '../../src/mcp/resources/types.js';
 import { UriParser } from '../../src/mcp/resources/uri-schemes.js';
 

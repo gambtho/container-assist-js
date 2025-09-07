@@ -389,16 +389,11 @@ The system searches for configuration files in the following order:
 
 ```javascript
 // Programmatic configuration
-import { createMCPServer } from './src/mcp/server/server';
+import { SDKNativeMCPServer } from './src/mcp/server';
 
-const server = createMCPServer({
-  ai: {
-    enabled: true,
-    model: 'gpt-4'
-  },
-  docker: {
-    registry: 'my-registry.io'
-  }
+const server = new SDKNativeMCPServer(undefined, {
+  name: 'containerization-assist',
+  version: '1.0.0'
 });
 ```
 

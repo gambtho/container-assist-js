@@ -8,7 +8,7 @@
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '../../core/types';
 import type { MCPHostAI } from '../../lib/mcp-host-ai';
-import type { SDKPromptRegistry } from '../../mcp/prompts/sdk-prompt-registry';
+import type { MCPPromptRegistry } from '../../mcp/prompts/mcp-prompt-registry';
 
 /**
  * AI augmentation request context
@@ -54,7 +54,7 @@ export class AIAugmentationService {
 
   constructor(
     private mcpHostAI: MCPHostAI,
-    private promptRegistry: SDKPromptRegistry,
+    private promptRegistry: MCPPromptRegistry,
     logger: Logger,
   ) {
     this.logger = logger.child({ component: 'AIAugmentationService' });

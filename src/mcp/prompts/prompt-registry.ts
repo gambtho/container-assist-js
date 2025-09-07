@@ -56,12 +56,12 @@ export interface SDKPromptDefinition {
 /**
  * SDK-Native Prompt Registry
  */
-export class SDKPromptRegistry {
+export class PromptRegistry {
   private prompts: Map<string, SDKPromptDefinition> = new Map();
   private logger: Logger;
 
   constructor(logger: Logger) {
-    this.logger = logger.child({ component: 'SDKPromptRegistry' });
+    this.logger = logger.child({ component: 'PromptRegistry' });
     this.initializeDefaultPrompts();
   }
 
@@ -363,7 +363,7 @@ export class SDKPromptRegistry {
       this.prompts.set(prompt.name, prompt);
     });
 
-    this.logger.info({ count: defaultPrompts.length }, 'SDK prompts initialized');
+    this.logger.info({ count: defaultPrompts.length }, 'Prompts initialized');
   }
 
   /**

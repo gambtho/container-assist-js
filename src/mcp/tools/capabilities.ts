@@ -72,60 +72,6 @@ export function withAIValidation(aiService: AIService, sessionManager: SessionMa
 }
 
 /**
- * Add AI result analysis to a tool
- * @deprecated Use withCentralizedAI() instead for centralized AI augmentation
- */
-export function withAIAnalysis(aiService: AIService, sessionManager: SessionManager) {
-  return <T extends Tool>(tool: T): T => ({
-    ...tool,
-    execute: async (params: ToolParameters, logger: Logger) => {
-      const result = await tool.execute(params, logger);
-
-      if (!result.ok || !params.sessionId || !aiService) {
-        return result;
-      }
-
-      // Analyze results with AI
-      const sessionState = await sessionManager?.getState?.(params.sessionId);
-      const analysis = await aiService?.analyzeResults?.({
-        toolName: tool.name,
-        parameters: params,
-        result: result.value,
-        sessionId: params.sessionId,
-        context: sessionState,
-      });
-
-      if (analysis?.ok) {
-        // Store in session history
-        await sessionManager?.addToolExecution?.(params.sessionId, {
-          toolName: tool.name,
-          parameters: params,
-          result: result.value,
-          timestamp: new Date().toISOString(),
-          context: {
-            insights: analysis.value.insights,
-            recommendations: analysis.value.nextSteps,
-          },
-        });
-
-        // Return AI-analyzed result
-        return Success({
-          ...result.value,
-          aiInsights: analysis.value.insights,
-          recommendations: analysis.value.nextSteps,
-          metadata: {
-            ...result.value.metadata,
-            aiAnalyzed: true,
-          },
-        });
-      }
-
-      return result;
-    },
-  });
-}
-
-/**
  * Add centralized AI enhancement to a tool (Modern - using centralized service)
  */
 export function withCentralizedAI(aiAugmentationService: AIAugmentationService) {
@@ -425,6 +371,7 @@ export const enhanceWithDefaults = <T extends Tool>(
 
 /**
  * Create AI-powered tool with validation and analysis
+ * @deprecated Use createProductionTool with aiAugmentationService instead
  */
 export const enhanceForAI = <T extends Tool>(
   tool: T,
@@ -436,31 +383,7 @@ export const enhanceForAI = <T extends Tool>(
     withLogging(logger),
     withSessionTracking(sessionManager),
     withAIValidation(aiService, sessionManager),
-    withAIAnalysis(aiService, sessionManager),
   )(tool);
-};
-
-/**
- * Create production-ready tool with all augmentations
- * @deprecated Use createProductionTool() instead for standardized tool creation
- */
-export const enhanceForProduction = <T extends Tool>(
-  tool: T,
-  logger: Logger,
-  metricsCollector?: MetricsCollector,
-  retry?: { attempts?: number; delay?: number; backoff?: boolean },
-): T => {
-  const enhancers = [withLogging(logger)];
-
-  if (metricsCollector) {
-    enhancers.push(withMetrics(metricsCollector));
-  }
-
-  if (retry) {
-    enhancers.push(withRetry(retry));
-  }
-
-  return pipe(...enhancers)(tool);
 };
 
 /**

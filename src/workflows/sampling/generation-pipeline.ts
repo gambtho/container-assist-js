@@ -7,7 +7,7 @@ import { Success, Failure, isFail, type Result } from '../../core/types';
 import { getDefaultPort } from '../../config/defaults';
 import type { SamplingConfig, SamplingResult, DockerfileContext, ScoringCriteria } from './types';
 import { StrategyEngine } from './strategy-engine';
-import { SDKPromptRegistry } from '../../mcp/prompts/sdk-prompt-registry';
+import { MCPPromptRegistry } from '../../mcp/prompts/mcp-prompt-registry';
 import { VariantScorer } from './scorer';
 import { analyzeRepo } from '../../tools/analyze-repo';
 import { validateSamplingConfig, validateScoringCriteria } from './validation';
@@ -23,7 +23,7 @@ export class VariantGenerationPipeline {
 
   constructor(
     private logger: Logger,
-    promptRegistry?: SDKPromptRegistry,
+    promptRegistry?: MCPPromptRegistry,
     aiOrchestrator?: MCPAIOrchestrator,
   ) {
     this.strategyEngine = new StrategyEngine(logger, promptRegistry);

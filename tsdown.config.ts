@@ -5,8 +5,8 @@ import { existsSync } from 'fs';
 const isTestBuild = process.env.BUILD_TEST_UTILS === 'true';
 
 const mainEntries = {
-  // Main entry point (package.json main/exports ".") - now points to MCP server
-  'src/mcp/server': 'src/mcp/server/server.ts',
+  // Main entry point (package.json main/exports ".") - points to main MCP server entry
+  'src/mcp/server': 'src/mcp/server.ts',
   // CLI entry point (package.json bin)
   'src/cli/cli': 'src/cli/cli.ts',
   // Additional exports from package.json exports (match output paths)

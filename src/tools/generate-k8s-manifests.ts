@@ -8,7 +8,7 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../lib/session';
-import { createMCPHostAI, createPromptTemplate } from '../lib/mcp-host-ai';
+import { createMCPHostAI, type MCPHostAI } from '../lib/mcp-host-ai';
 import { createTimer, type Logger } from '../lib/logger';
 import {
   Success,
@@ -18,15 +18,27 @@ import {
   type WorkflowState,
 } from '../core/types';
 
+/**
+ * Configuration for Kubernetes manifest generation
+ */
 export interface GenerateK8sManifestsConfig {
+  /** Session identifier for storing results */
   sessionId: string;
+  /** Application name (defaults to detected name) */
   appName?: string;
+  /** Kubernetes namespace (defaults to 'default') */
   namespace?: string;
+  /** Number of replicas (defaults to 1) */
   replicas?: number;
+  /** Application port (defaults to detected port) */
   port?: number;
+  /** Service type for external access */
   serviceType?: 'ClusterIP' | 'NodePort' | 'LoadBalancer';
+  /** Enable ingress controller */
   ingressEnabled?: boolean;
+  /** Hostname for ingress routing */
   ingressHost?: string;
+  /** Resource requests and limits */
   resources?: {
     requests?: {
       memory: string;
@@ -37,25 +49,48 @@ export interface GenerateK8sManifestsConfig {
       cpu: string;
     };
   };
+  /** Horizontal pod autoscaling configuration */
   autoscaling?: {
     enabled: boolean;
     minReplicas?: number;
     maxReplicas?: number;
     targetCPU?: number;
   };
+  /** Deployment environment (development, staging, production) */
   environment?: string;
+  /** Security hardening level */
+  securityLevel?: 'standard' | 'strict';
+  /** Enable high availability features */
+  highAvailability?: boolean;
+  /** Enable monitoring/observability */
+  monitoring?: boolean;
+  /** Include ConfigMap for configuration */
+  hasConfig?: boolean;
+  hasSecrets?: boolean;
 }
 
+/**
+ * Result of Kubernetes manifest generation operation
+ */
 export interface GenerateK8sManifestsResult {
+  /** Whether the generation was successful */
   ok: boolean;
+  /** Session identifier used for generation */
   sessionId: string;
+  /** Generated YAML manifest content */
   manifests: string;
+  /** Path where manifests were written */
   path: string;
+  /** List of generated Kubernetes resources */
   resources: Array<{
+    /** Resource type (Deployment, Service, etc.) */
     kind: string;
+    /** Resource name */
     name: string;
+    /** Target namespace */
     namespace: string;
   }>;
+  /** Optional warnings about the configuration */
   warnings?: string[];
 }
 
@@ -231,6 +266,219 @@ function generateHPA(config: {
 }
 
 /**
+ * AI-powered manifest generation with advanced features
+ */
+async function generateAIK8sManifests(
+  config: GenerateK8sManifestsConfig,
+  mcpHostAI: MCPHostAI,
+  logger: Logger,
+  image: string,
+): Promise<object[]> {
+  try {
+    const {
+      appName = 'app',
+      namespace = 'default',
+      replicas = 1,
+      environment = 'production',
+      securityLevel = 'standard',
+      highAvailability = false,
+      monitoring = false,
+      hasConfig = false,
+      hasSecrets = false,
+    } = config;
+
+    const context = {
+      appName,
+      namespace,
+      environment,
+      replicas,
+      image,
+      resources: config.resources,
+      features: {
+        autoscaling: environment === 'production',
+        podDisruptionBudget: highAvailability,
+        networkPolicies: securityLevel === 'strict',
+        serviceMonitor: monitoring,
+        configMaps: hasConfig,
+        secrets: hasSecrets,
+      },
+      expectsAIResponse: true,
+      type: 'kubernetes',
+    };
+
+    const prompt = `Generate production-ready Kubernetes manifests with:
+    - Deployment with ${replicas} replicas
+    - Service (ClusterIP or LoadBalancer based on environment)
+    - Ingress with TLS
+    ${context.features.autoscaling ? '- HorizontalPodAutoscaler' : ''}
+    ${context.features.podDisruptionBudget ? '- PodDisruptionBudget' : ''}
+    ${context.features.networkPolicies ? '- NetworkPolicy for security' : ''}
+    ${context.features.serviceMonitor ? '- ServiceMonitor for Prometheus' : ''}
+    
+    Follow best practices for ${environment} environment.`;
+
+    const result = await mcpHostAI.submitPrompt(prompt, context);
+
+    if (result.ok) {
+      logger.debug({ appName, environment }, 'AI-enhanced K8s manifests generated');
+      return parseK8sManifestsFromAI(result.value);
+    } else {
+      logger.warn({ error: result.error }, 'AI K8s generation failed, falling back to basic');
+    }
+  } catch (error) {
+    logger.warn({ error }, 'AI K8s generation error, falling back to basic');
+  }
+
+  // Fall back to basic manifest generation
+  return generateBasicManifests(config, image);
+}
+
+/**
+ * Parse K8s manifests from AI response
+ */
+function parseK8sManifestsFromAI(aiResponse: string): object[] {
+  try {
+    // Look for YAML code blocks first
+    const yamlMatch = aiResponse.match(/```(?:yaml|yml)?\n([\s\S]*?)\n```/i);
+    const yamlContent = yamlMatch?.[1] ? yamlMatch[1] : aiResponse;
+
+    // Basic YAML parsing - split by document separator
+    const documents = yamlContent.split(/^---\s*$/m).filter((doc) => doc.trim());
+
+    const manifests: object[] = [];
+
+    for (const doc of documents) {
+      const trimmedDoc = doc.trim();
+      if (!trimmedDoc) continue;
+
+      try {
+        // Simple YAML to JSON conversion for basic structures
+        const manifest = parseYAMLtoJSON(trimmedDoc);
+        if (manifest && typeof manifest === 'object' && (manifest as any).kind) {
+          manifests.push(manifest);
+        }
+      } catch (parseError) {
+        // If YAML parsing fails, skip this document
+        continue;
+      }
+    }
+
+    return manifests.length > 0 ? manifests : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+/**
+ * Simple YAML to JSON parser for basic K8s manifests
+ * Note: This is a simplified parser for demo purposes
+ */
+function parseYAMLtoJSON(yamlString: string): object | null {
+  try {
+    // This is a very basic YAML parser - in production you'd use a proper YAML library
+    const lines = yamlString.split('\n');
+    const result: any = {};
+    let currentObj = result;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const colonIndex = trimmed.indexOf(':');
+
+      if (colonIndex === -1) continue;
+
+      const key = trimmed.substring(0, colonIndex).trim();
+      const value = trimmed.substring(colonIndex + 1).trim();
+
+      // Simple value assignment
+      if (value && value !== '') {
+        if (value.startsWith('"') && value.endsWith('"')) {
+          currentObj[key] = value.slice(1, -1);
+        } else if (value === 'true' || value === 'false') {
+          currentObj[key] = value === 'true';
+        } else if (!isNaN(Number(value))) {
+          currentObj[key] = Number(value);
+        } else {
+          currentObj[key] = value;
+        }
+      } else {
+        currentObj[key] = {};
+        currentObj = currentObj[key];
+      }
+    }
+
+    return result.kind ? result : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Generate basic manifests (fallback when AI is unavailable)
+ */
+function generateBasicManifests(config: GenerateK8sManifestsConfig, image: string): object[] {
+  const {
+    appName = 'app',
+    namespace = 'default',
+    replicas = 1,
+    port = 8080,
+    serviceType = 'ClusterIP',
+    ingressEnabled = false,
+    ingressHost,
+    resources,
+    autoscaling,
+  } = config;
+
+  const manifests: object[] = [];
+
+  // 1. Deployment
+  const deployment = generateDeployment({
+    appName,
+    namespace,
+    replicas,
+    image,
+    port,
+    ...(resources && { resources }),
+  });
+  manifests.push(deployment);
+
+  // 2. Service
+  const service = generateService({
+    appName,
+    namespace,
+    port,
+    serviceType,
+  });
+  manifests.push(service);
+
+  // 3. Ingress (if enabled)
+  if (ingressEnabled) {
+    const ingress = generateIngress({
+      appName,
+      namespace,
+      ...(ingressHost && { host: ingressHost }),
+      port,
+    });
+    manifests.push(ingress);
+  }
+
+  // 4. HPA (if autoscaling enabled)
+  if (autoscaling?.enabled) {
+    const hpa = generateHPA({
+      appName,
+      namespace,
+      minReplicas: autoscaling.minReplicas ?? replicas,
+      maxReplicas: autoscaling.maxReplicas ?? replicas * 3,
+      targetCPU: autoscaling.targetCPU ?? 80,
+    });
+    manifests.push(hpa);
+  }
+
+  return manifests;
+}
+
+/**
  * Generate warnings based on configuration
  */
 function generateWarnings(config: GenerateK8sManifestsConfig): string[] {
@@ -269,13 +517,6 @@ export async function generateK8sManifests(
       sessionId,
       appName = 'app',
       namespace = 'default',
-      replicas = 1,
-      port = 8080,
-      serviceType = 'ClusterIP',
-      ingressEnabled = false,
-      ingressHost,
-      resources,
-      autoscaling,
       environment = 'production',
     } = config;
 
@@ -301,81 +542,58 @@ export async function generateK8sManifests(
     const buildResult = workflowState?.build_result;
     const image = buildResult?.tags?.[0] ?? `${appName}:latest`;
 
-    // Generate manifests
-    const manifests: object[] = [];
-    const resourceList: Array<{ kind: string; name: string; namespace: string }> = [];
+    // Generate manifests with AI enhancement when available
+    let manifests: object[];
+    let aiGenerated = false;
 
-    // 1. Deployment
-    const deployment = generateDeployment({
-      appName,
-      namespace,
-      replicas,
-      image,
-      port,
-      ...(resources && { resources }),
-    });
-    manifests.push(deployment);
-    resourceList.push({ kind: 'Deployment', name: appName, namespace });
-
-    // 2. Service
-    const service = generateService({
-      appName,
-      namespace,
-      port,
-      serviceType,
-    });
-    manifests.push(service);
-    resourceList.push({ kind: 'Service', name: appName, namespace });
-
-    // 3. Ingress (if enabled)
-    if (ingressEnabled) {
-      const ingress = generateIngress({
-        appName,
-        namespace,
-        ...(ingressHost && { host: ingressHost }),
-        port,
-      });
-      manifests.push(ingress);
-      resourceList.push({ kind: 'Ingress', name: `${appName}-ingress`, namespace });
-    }
-
-    // 4. HPA (if autoscaling enabled)
-    if (autoscaling?.enabled) {
-      const hpa = generateHPA({
-        appName,
-        namespace,
-        minReplicas: autoscaling.minReplicas ?? replicas,
-        maxReplicas: autoscaling.maxReplicas ?? replicas * 3,
-        targetCPU: autoscaling.targetCPU ?? 80,
-      });
-      manifests.push(hpa);
-      resourceList.push({ kind: 'HorizontalPodAutoscaler', name: `${appName}-hpa`, namespace });
-    }
-
-    // Request AI enhancement from MCP host (when available)
     try {
       if (mcpHostAI.isAvailable()) {
-        const aiPrompt = createPromptTemplate('kubernetes', {
-          appName,
-          namespace,
-          environment,
-          replicas: config.replicas,
-          resources: config.resources,
-          manifests,
-        });
-
-        const aiResponse = await mcpHostAI.submitPrompt(aiPrompt, {
-          toolName: 'generate-k8s-manifests',
-          generatedManifests: manifests,
-          environment,
-        });
-
-        if (aiResponse.ok) {
-          logger.debug('AI enhancement requested from MCP host for K8s manifests');
-        }
+        logger.debug('Using AI-enhanced K8s manifest generation');
+        manifests = await generateAIK8sManifests(config, mcpHostAI, logger, image);
+        aiGenerated = manifests.length > 0;
+      } else {
+        logger.debug('Using basic K8s manifest generation');
+        manifests = generateBasicManifests(config, image);
       }
     } catch (error) {
-      logger.debug({ error }, 'MCP host AI enhancement request failed');
+      logger.warn({ error }, 'AI manifest generation failed, falling back to basic');
+      manifests = generateBasicManifests(config, image);
+    }
+
+    // If AI didn't generate any manifests, fall back to basic generation
+    if (manifests.length === 0) {
+      logger.debug('No AI manifests generated, using basic generation');
+      manifests = generateBasicManifests(config, image);
+      aiGenerated = false;
+    }
+
+    // Build resource list from manifests
+    const resourceList: Array<{ kind: string; name: string; namespace: string }> = [];
+    for (const manifest of manifests) {
+      const m = manifest as any;
+      if (m.kind && m.metadata?.name) {
+        resourceList.push({
+          kind: m.kind,
+          name: m.metadata.name,
+          namespace: m.metadata.namespace || namespace,
+        });
+      }
+    }
+
+    // Store AI generation info in workflow state
+    if (aiGenerated) {
+      const currentState = session.workflow_state as WorkflowState | undefined;
+      const updatedContext = updateWorkflowState(currentState ?? {}, {
+        metadata: {
+          ...(currentState?.metadata ?? {}),
+          ai_enhancement_used: true,
+          ai_generation_type: 'kubernetes',
+          timestamp: new Date().toISOString(),
+        },
+      });
+      await sessionManager.update(sessionId, {
+        workflow_state: updatedContext,
+      });
     }
 
     // Convert manifests to YAML string
@@ -401,8 +619,8 @@ export async function generateK8sManifests(
           content: yaml,
           file_path: manifestPath,
         })),
-        replicas,
-        ...(resources && { resources }),
+        replicas: config.replicas ?? 1,
+        ...(config.resources && { resources: config.resources }),
         output_path: manifestPath,
       },
       completed_steps: [...(currentState?.completed_steps ?? []), 'generate-k8s-manifests'],

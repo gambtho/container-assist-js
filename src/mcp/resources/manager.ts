@@ -5,9 +5,10 @@ import {
   type Resource as MCPResource,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Result, Success, Failure } from '../../core/types';
-import type { Resource, ResourceCache, ResourceCategory } from './types';
+import type { Resource, ResourceCategory } from './types';
 import { UriParser } from './uri-schemes';
 import { MemoryResourceCache } from './cache';
+import { ResourceCache } from './resource-cache';
 
 /**
  * Resource configuration
@@ -17,6 +18,9 @@ export interface ResourceConfig {
   maxResourceSize: number;
   cacheConfig?: {
     defaultTtl: number;
+    maxSize?: number;
+    maxMemoryUsage?: number;
+    enableAccessTracking?: boolean;
   };
 }
 
@@ -43,7 +47,16 @@ export const createResourceContext = (
 ): ResourceContext => {
   const context: ResourceContext = {
     cache:
-      cache ?? new MemoryResourceCache(config.cacheConfig?.defaultTtl ?? config.defaultTtl, logger),
+      cache ??
+      new ResourceCache(
+        {
+          defaultTtl: config.cacheConfig?.defaultTtl ?? config.defaultTtl,
+          maxSize: config.cacheConfig?.maxSize ?? 100,
+          maxMemoryUsage: config.cacheConfig?.maxMemoryUsage ?? 50 * 1024 * 1024,
+          enableAccessTracking: config.cacheConfig?.enableAccessTracking ?? true,
+        },
+        logger,
+      ),
     config,
     logger: logger.child({ component: 'ResourceManager' }),
     categoryIndex: new Map(),
@@ -752,39 +765,6 @@ export const readResourceSDK = async (
     );
   }
 };
-
-/**
- * Convenience API with pre-bound context (Legacy - for backward compatibility)
- * @deprecated Use createSDKResourceManager instead
- */
-export const createResourceAPI = (
-  context: ResourceContext,
-): {
-  publish: (
-    uri: string,
-    content: unknown,
-    ttl?: number,
-    metadata?: PublishMetadata,
-  ) => Promise<Result<string>>;
-  read: (uri: string) => Promise<Result<Resource | null>>;
-  invalidate: (pattern: string) => Promise<Result<void>>;
-  list: (pattern: string) => Promise<Result<string[]>>;
-  cleanup: () => Promise<Result<void>>;
-  getMetadata: (uri: string) => Promise<Result<Omit<Resource, 'content'> | null>>;
-  getByCategory: (category: ResourceCategory, filters?: any) => Promise<Result<Resource[]>>;
-  search: (query: any) => Promise<Result<Resource[]>>;
-} => ({
-  publish: (uri: string, content: unknown, ttl?: number, metadata?: PublishMetadata) =>
-    publishResource(uri, content, context, ttl, metadata),
-  read: (uri: string) => readResource(uri, context),
-  invalidate: (pattern: string) => invalidateResource(pattern, context),
-  list: (pattern: string) => listResources(pattern, context),
-  cleanup: () => cleanupResources(context),
-  getMetadata: (uri: string) => getResourceMetadata(uri, context),
-  getByCategory: (category: ResourceCategory, filters?: any) =>
-    getResourcesByCategory(category, context, filters),
-  search: (query: any) => searchResources(query, context),
-});
 
 /**
  * SDK-native resource manager interface

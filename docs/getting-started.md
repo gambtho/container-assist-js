@@ -182,7 +182,7 @@ await client.callTool({
 await client.callTool({
   name: 'deploy',
   arguments: {
-    manifestPath: './k8s/',
+    manifestPath: './test/fixtures/k8s/',
     namespace: 'default',
     sessionId: 'session-123'
   }

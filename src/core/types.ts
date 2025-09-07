@@ -227,6 +227,3 @@ export interface MockConfig {
   delay?: number;
   failureRate?: number;
 }
-
-// Re-export commonly used types for backward compatibility
-export type { Logger } from 'pino';

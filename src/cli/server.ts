@@ -3,7 +3,7 @@
  * Uses direct SDK patterns with Zod schemas
  */
 
-import { SDKNativeMCPServer } from '../mcp/server/sdk-server';
+import { MCPServer } from '../mcp/server/mcp-server';
 import { createLogger } from '../lib/logger';
 import { config as applicationConfig } from '../config/index';
 import process from 'node:process';
@@ -21,7 +21,7 @@ async function main(): Promise<void> {
     logger.info('Starting SDK-Native MCP Server with Zod schemas');
 
     // Create and start the SDK-native server
-    const server = new SDKNativeMCPServer(logger, {
+    const server = new MCPServer(logger, {
       name: 'containerization-assist',
       version: '2.0.0',
     });

@@ -4,7 +4,7 @@
 
 import { MockMCPSampler } from './mock-mcp-sampler';
 import { createMockLogger } from './test-helpers';
-import type { Logger } from '../../src/infrastructure/core/logger-types';
+import type { Logger } from 'pino';
 
 export interface TestDependencies {
   logger: Logger;

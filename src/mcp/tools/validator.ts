@@ -5,9 +5,9 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../../core/types.js';
+import { Result, Success, Failure } from '../../core/types';
 import type { AIAugmentationService } from '../../lib/ai/ai-service';
-import type { SDKPromptRegistry } from '../prompts/sdk-prompt-registry';
+import type { MCPPromptRegistry } from '../prompts/mcp-prompt-registry';
 
 /**
  * Parameter validation context with MCP-compatible types
@@ -62,7 +62,7 @@ export class AIParameterValidator {
   constructor(
     logger: Logger,
     private aiAugmentationService?: AIAugmentationService,
-    private promptRegistry?: SDKPromptRegistry,
+    private promptRegistry?: MCPPromptRegistry,
   ) {
     this.logger = logger.child({ component: 'AIParameterValidator' });
   }
@@ -425,7 +425,7 @@ export class AIParameterValidator {
 export const createAIParameterValidator = (
   logger: Logger,
   aiAugmentationService?: AIAugmentationService,
-  promptRegistry?: SDKPromptRegistry,
+  promptRegistry?: MCPPromptRegistry,
 ): AIParameterValidator => {
   return new AIParameterValidator(logger, aiAugmentationService, promptRegistry);
 };

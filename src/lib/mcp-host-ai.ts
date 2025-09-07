@@ -4,13 +4,12 @@
  * Provides integration with the MCP host AI (Claude Code, Copilot, etc.)
  * for AI-enhanced tool capabilities and intelligent prompt processing.
  *
- * In the MCP architecture, the server cannot directly make completion requests.
- * Instead, it provides structured prompts and metadata that the host can use
- * to generate AI-powered responses.
+ * Now includes full SDK client integration for proper MCP completion handling.
  */
 
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '../core/types';
+import { MCPClient } from '../mcp/client/mcp-client';
 
 /**
  * Interface for communicating with MCP Host AI
@@ -68,13 +67,21 @@ export interface MCPAIResponse {
 }
 
 /**
- * Create an MCP Host AI instance
+ * Create an MCP Host AI instance with SDK client integration
  *
- * Note: In MCP architecture, the host (Claude Code, Copilot, etc.) provides the AI.
- * This implementation provides a structured interface for tools to signal AI needs
- * to the host through proper MCP patterns.
+ * Now provides both SDK client-based AI completions and fallback
+ * structured responses for environments without SDK support.
  */
 export const createMCPHostAI = (logger: Logger): MCPHostAI => {
+  const sdkClient = new MCPClient(logger, {
+    capabilities: {
+      completion: true,
+      prompts: true,
+      resources: false,
+      sampling: true,
+    },
+  });
+
   let requestCounter = 0;
 
   // Generate unique request ID
@@ -84,7 +91,7 @@ export const createMCPHostAI = (logger: Logger): MCPHostAI => {
   };
 
   /**
-   * Generate placeholder response when actual AI is needed
+   * Generate placeholder response when SDK is unavailable
    */
   const generatePlaceholderResponse = (
     _prompt: string,
@@ -130,13 +137,35 @@ export const createMCPHostAI = (logger: Logger): MCPHostAI => {
           {
             promptLength: prompt.length,
             contextKeys: context ? Object.keys(context) : [],
+            sdkAvailable: sdkClient.isConnected(),
           },
-          'Preparing MCP AI completion request',
+          'Processing MCP AI completion request',
         );
 
         const requestId = generateRequestId();
 
-        // Create structured AI request that follows MCP patterns
+        // Try SDK client first if available
+        if (sdkClient.isConnected() || process.env.USE_SDK_CLIENT === 'true') {
+          logger.info({ requestId }, 'Using SDK client for completion');
+
+          const sdkResult = await sdkClient.complete(prompt, {
+            ...context,
+            requestId,
+            promptName: (context?.type as string) || 'default',
+          });
+
+          if (sdkResult.ok) {
+            logger.debug({ requestId }, 'SDK completion successful');
+            return sdkResult;
+          }
+
+          logger.warn(
+            { requestId, error: sdkResult.error },
+            'SDK completion failed, falling back to structured response',
+          );
+        }
+
+        // Fallback to structured response for host processing
         const metadata: MCPAIResponse['metadata'] = {
           timestamp: new Date().toISOString(),
           requestId,
@@ -162,45 +191,43 @@ export const createMCPHostAI = (logger: Logger): MCPHostAI => {
           metadata,
         };
 
-        // Log structured request for MCP host processing
         logger.info(
           {
             requestId,
-            type: 'mcp-ai-completion',
-            prompt: prompt.substring(0, 100),
+            type: 'mcp-ai-completion-structured',
+            promptLength: prompt.length,
             contextSize: Object.keys(context || {}).length,
           },
-          'MCP AI completion request prepared',
+          'Generated structured MCP AI request',
         );
 
-        // In a real MCP implementation, the host would handle this through
-        // the protocol's completion mechanism. We return a structured
-        // response that can be processed by the host.
-
-        // Production mode: return structured request for host processing
-        // The host should intercept and process these structured requests
-        const response = JSON.stringify(aiRequest, null, 2);
-
-        // If we detect this is being called from a tool that expects actual AI responses,
-        // we should provide a more helpful placeholder
+        // If tool expects AI response, provide working placeholder
         if (context?.expectsAIResponse) {
           return Success(generatePlaceholderResponse(prompt, context));
         }
 
-        return Success(response);
+        // Return structured request for host processing
+        return Success(JSON.stringify(aiRequest, null, 2));
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         logger.error(
           { error: message, prompt: prompt.substring(0, 100) },
-          'MCP AI request preparation failed',
+          'MCP AI request processing failed',
         );
         return Failure(`MCP AI request failed: ${message}`);
       }
     },
 
     isAvailable(): boolean {
-      // Check if we're in an MCP environment that supports AI
-      // In production, the host manages AI availability
+      // Check SDK client first
+      if (sdkClient.isConnected()) {
+        return true;
+      }
+
+      // Check for explicit SDK client usage
+      if (process.env.USE_SDK_CLIENT === 'true') {
+        return true;
+      }
 
       // Check for MCP host indicators
       const hasMCPHost = Boolean(
@@ -214,7 +241,12 @@ export const createMCPHostAI = (logger: Logger): MCPHostAI => {
     },
 
     getHostType(): string {
-      // Detect the specific MCP host type from environment
+      // Check if using SDK client
+      if (sdkClient.isConnected() || process.env.USE_SDK_CLIENT === 'true') {
+        return 'sdk-client';
+      }
+
+      // Detect specific MCP host type from environment
       if (process.env.MCP_HOST_TYPE) {
         return process.env.MCP_HOST_TYPE;
       }

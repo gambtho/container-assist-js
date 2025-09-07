@@ -112,7 +112,10 @@ export class SecurityScanner {
    */
   async scanImage(imageId: string, options?: ScanOptions): Promise<Result<ScanResult>> {
     try {
-      this.validateScanOptions(options);
+      const validationResult = this.validateScanOptions(options);
+      if (isFail(validationResult)) {
+        return validationResult;
+      }
 
       this.logger.info({ imageId, options }, 'Starting security scan');
 
@@ -143,7 +146,11 @@ export class SecurityScanner {
         this.logger.warn({ stderr: result.value.stderr }, 'Scanner warnings');
       }
 
-      const scanResult = this.parseTrivyOutput(result.value.stdout);
+      const parseResult = this.parseTrivyOutput(result.value.stdout);
+      if (isFail(parseResult)) {
+        return parseResult;
+      }
+      const scanResult = parseResult.value;
 
       this.logger.info(
         {
@@ -183,8 +190,11 @@ export class SecurityScanner {
         return Failure(`Filesystem scan failed: ${result.error}`);
       }
 
-      const scanResult = this.parseTrivyOutput(result.value.stdout);
-      return Success(scanResult);
+      const parseResult = this.parseTrivyOutput(result.value.stdout);
+      if (isFail(parseResult)) {
+        return parseResult;
+      }
+      return Success(parseResult.value);
     } catch (error) {
       return Failure(
         `Filesystem scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -211,8 +221,11 @@ export class SecurityScanner {
         return Failure(`Secret scan failed: ${result.error}`);
       }
 
-      const secretResult = this.parseSecretOutput(result.value.stdout);
-      return Success(secretResult);
+      const parseResult = this.parseSecretOutput(result.value.stdout);
+      if (isFail(parseResult)) {
+        return parseResult;
+      }
+      return Success(parseResult.value);
     } catch (error) {
       return Failure(
         `Secret scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -302,17 +315,19 @@ export class SecurityScanner {
     }
   }
 
-  private validateScanOptions(options?: ScanOptions): void {
+  private validateScanOptions(options?: ScanOptions): Result<void> {
     if (
       options?.minSeverity &&
       !['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(options.minSeverity)
     ) {
-      throw new Error(`Invalid severity level: ${options.minSeverity}`);
+      return Failure(`Invalid severity level: ${options.minSeverity}`);
     }
 
     if (options?.timeout && options.timeout < 0) {
-      throw new Error(`Invalid timeout: ${options.timeout}`);
+      return Failure(`Invalid timeout: ${options.timeout}`);
     }
+
+    return Success(undefined);
   }
 
   private getSeverityFilter(minSeverity: string): string {
@@ -326,7 +341,7 @@ export class SecurityScanner {
     return severityLevels[minSeverity as keyof typeof severityLevels] || 'CRITICAL,HIGH,MEDIUM,LOW';
   }
 
-  private parseTrivyOutput(output: string): ScanResult {
+  private parseTrivyOutput(output: string): Result<ScanResult> {
     try {
       const trivyResult = JSON.parse(output);
       const vulnerabilities: VulnerabilityFinding[] = [];
@@ -378,19 +393,19 @@ export class SecurityScanner {
 
       const total = critical + high + medium + low + unknown;
 
-      return {
+      return Success({
         vulnerabilities,
         summary: { critical, high, medium, low, unknown, total },
         passed: total === 0,
-      };
+      });
     } catch (error) {
-      throw new Error(
+      return Failure(
         `Failed to parse scan results: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
 
-  private parseSecretOutput(output: string): SecretScanResult {
+  private parseSecretOutput(output: string): Result<SecretScanResult> {
     try {
       const trivyResult = JSON.parse(output);
       const secrets: SecretFinding[] = [];
@@ -431,12 +446,12 @@ export class SecurityScanner {
 
       const total = high + medium + low;
 
-      return {
+      return Success({
         secrets,
         summary: { total, high, medium, low },
-      };
+      });
     } catch (error) {
-      throw new Error(
+      return Failure(
         `Failed to parse secret scan results: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }

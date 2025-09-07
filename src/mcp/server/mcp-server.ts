@@ -30,7 +30,7 @@ import {
   createResourceContext,
   type SDKResourceManager,
 } from '../resources/manager';
-import { SDKPromptRegistry } from '../prompts/sdk-prompt-registry';
+import { MCPPromptRegistry } from '../prompts/mcp-prompt-registry';
 import { DEFAULT_CACHE } from '../../config/defaults';
 import type { Tool } from '../../core/types';
 
@@ -38,13 +38,13 @@ import type { Tool } from '../../core/types';
  * MCP Server class that integrates containerization tools with the MCP protocol.
  * Handles tool invocation, resource management, and prompt templates.
  */
-export class SDKNativeMCPServer {
+export class MCPServer {
   private server: Server;
   private transport: StdioServerTransport;
   private logger: Logger;
   private sessionManager: ReturnType<typeof createSessionManager>;
   private resourceManager: SDKResourceManager;
-  private promptRegistry: SDKPromptRegistry;
+  private promptRegistry: MCPPromptRegistry;
   private toolRegistry: Map<string, Tool>;
   private isRunning: boolean = false;
 
@@ -60,7 +60,7 @@ export class SDKNativeMCPServer {
     this.sessionManager = createSessionManager(this.logger);
 
     // Initialize prompt registry
-    this.promptRegistry = new SDKPromptRegistry(this.logger);
+    this.promptRegistry = new MCPPromptRegistry(this.logger);
 
     // Initialize resource manager with SDK patterns
     const resourceContext = createResourceContext(
@@ -283,9 +283,18 @@ export class SDKNativeMCPServer {
     });
 
     // Prompt handlers with context-aware completions
-    this.server.setRequestHandler(ListPromptsRequestSchema, async (request: any) => {
-      const category = request.params?.cursor as string;
-      return await this.promptRegistry.listPrompts(category);
+    this.server.setRequestHandler(ListPromptsRequestSchema, async (_request: any) => {
+      const promptNames = this.promptRegistry.listPrompts();
+      return {
+        prompts: promptNames.map((name) => {
+          const info = this.promptRegistry.getPromptInfo(name);
+          return {
+            name,
+            description: info?.description || `${name} prompt`,
+            arguments: info?.arguments || [],
+          };
+        }),
+      };
     });
 
     this.server.setRequestHandler(GetPromptRequestSchema, async (request: any) => {
@@ -375,7 +384,7 @@ export class SDKNativeMCPServer {
           tools: this.toolRegistry.size,
           workflows: 2,
           resources: await this.getResourceCount(),
-          prompts: this.promptRegistry.getPromptsByCategory('').length,
+          prompts: this.promptRegistry.listPrompts().length,
         },
         'SDK-native MCP server started',
       );
@@ -420,12 +429,14 @@ export class SDKNativeMCPServer {
     tools: number;
     resources: number;
     prompts: number;
+    workflows: number;
   } {
     return {
       running: this.isRunning,
       tools: this.toolRegistry.size,
       resources: this.resourceManager.getStats().total,
-      prompts: this.promptRegistry.getPromptsByCategory('').length,
+      prompts: this.promptRegistry.listPrompts().length,
+      workflows: 2,
     };
   }
 }

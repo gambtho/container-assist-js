@@ -5,7 +5,7 @@
  */
 
 import { program } from 'commander';
-import { ContainerizationMCPServer } from '../mcp/server/server';
+import { MCPServer } from '../mcp/server/mcp-server';
 import { createConfig, logConfigSummaryIfDev } from '../config/index';
 import { createLogger } from '../lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
@@ -41,7 +41,6 @@ program
   .option('--port <port>', 'port for HTTP transport (default: stdio)', parseInt)
   .option('--host <host>', 'host for HTTP transport (default: localhost)', 'localhost')
   .option('--dev', 'enable development mode with debug logging')
-  .option('--mock', 'use mock AI sampler for testing')
   .option('--validate', 'validate configuration and exit')
   .option('--list-tools', 'list all registered MCP tools and exit')
   .option('--health-check', 'perform system health check and exit')
@@ -85,7 +84,6 @@ Environment Variables:
   WORKSPACE_DIR            Working directory for operations
   DOCKER_SOCKET            Docker daemon socket path
   K8S_NAMESPACE            Default Kubernetes namespace
-  MOCK_MODE                Enable mock mode for testing
   NODE_ENV                 Environment (development, production)
 `,
   );
@@ -115,44 +113,42 @@ function validateDockerSocket(options: any): { dockerSocket: string; warnings: s
   const warnings: string[] = [];
   let dockerSocket = '';
 
-  if (!options.mock) {
-    const allSocketOptions = [
-      options.dockerSocket,
-      process.env.DOCKER_SOCKET,
-      ...defaultDockerSockets,
-    ].filter(Boolean);
+  const allSocketOptions = [
+    options.dockerSocket,
+    process.env.DOCKER_SOCKET,
+    ...defaultDockerSockets,
+  ].filter(Boolean);
 
-    for (const thisSocket of allSocketOptions) {
-      if (!thisSocket) continue;
+  for (const thisSocket of allSocketOptions) {
+    if (!thisSocket) continue;
 
-      try {
-        const stat = statSync(thisSocket);
-        if (!stat.isSocket()) {
-          warnings.push(`${thisSocket} exists but is not a socket`);
-          continue;
-        }
-
-        // Only log when not in pure MCP mode
-        if (!process.env.MCP_MODE) {
-          console.error(`✅ Using Docker socket: ${thisSocket}`);
-        }
-        dockerSocket = thisSocket;
-        break;
-      } catch (error) {
-        warnings.push(`Cannot access Docker socket: ${thisSocket}`);
+    try {
+      const stat = statSync(thisSocket);
+      if (!stat.isSocket()) {
+        warnings.push(`${thisSocket} exists but is not a socket`);
+        continue;
       }
-    }
 
-    if (!dockerSocket) {
-      return {
-        dockerSocket: '',
-        warnings: [
-          `No valid Docker socket found in: ${allSocketOptions.join(', ')}`,
-          'Docker operations will fail unless --mock mode is used',
-          'Consider: 1) Starting Docker Desktop, 2) Using --mock flag, 3) Specifying --docker-socket <path>',
-        ],
-      };
+      // Only log when not in pure MCP mode
+      if (!process.env.MCP_MODE) {
+        console.error(`✅ Using Docker socket: ${thisSocket}`);
+      }
+      dockerSocket = thisSocket;
+      break;
+    } catch (error) {
+      warnings.push(`Cannot access Docker socket: ${thisSocket}`);
     }
+  }
+
+  if (!dockerSocket) {
+    return {
+      dockerSocket: '',
+      warnings: [
+        `No valid Docker socket found in: ${allSocketOptions.join(', ')}`,
+        'Docker operations require a valid Docker connection',
+        'Consider: 1) Starting Docker Desktop, 2) Specifying --docker-socket <path>',
+      ],
+    };
   }
 
   return { dockerSocket, warnings };
@@ -168,7 +164,7 @@ function provideContextualGuidance(error: Error, options: any): void {
     console.error('  • Verify Docker socket access permissions');
     console.error('  • Check Docker socket path with: docker context ls');
     console.error('  • Test Docker connection: docker version');
-    console.error('  • Try mock mode for testing: --mock');
+    console.error('  • Check Docker daemon is running');
     console.error('  • Specify custom socket: --docker-socket <path>');
   }
 
@@ -211,7 +207,7 @@ function provideContextualGuidance(error: Error, options: any): void {
   console.error('\n🛠️ General troubleshooting steps:');
   console.error('  1. Run health check: containerization-assist-mcp --health-check');
   console.error('  2. Validate config: containerization-assist-mcp --validate');
-  console.error('  3. Try mock mode: containerization-assist-mcp --mock');
+  console.error('  3. Check Docker: docker version');
   console.error('  4. Enable debug logging: --log-level debug --dev');
   console.error('  5. Check system requirements: docs/REQUIREMENTS.md');
   console.error('  6. Review troubleshooting guide: docs/TROUBLESHOOTING.md');
@@ -309,7 +305,6 @@ async function main(): Promise<void> {
     if (options.dockerSocket) process.env.DOCKER_SOCKET = options.dockerSocket;
     if (options.k8sNamespace) process.env.K8S_NAMESPACE = options.k8sNamespace;
     if (options.dev) process.env.NODE_ENV = 'development';
-    if (options.mock) process.env.MOCK_MODE = 'true';
 
     // Create configuration (reads from environment)
     const config = createConfig();
@@ -324,17 +319,17 @@ async function main(): Promise<void> {
       console.error(`  • Workspace: ${config.workspace?.workspaceDir || process.cwd()}`);
       console.error(`  • Docker Socket: ${process.env.DOCKER_SOCKET || '/var/run/docker.sock'}`);
       console.error(`  • K8s Namespace: ${process.env.K8S_NAMESPACE || 'default'}`);
-      console.error(`  • Mock Mode: ${process.env.MOCK_MODE === 'true' ? 'enabled' : 'disabled'}`);
+      console.error(`  • SDK Native: enabled`);
       console.error(`  • Environment: ${process.env.NODE_ENV || 'production'}`);
 
-      // Test Docker connection if not in mock mode
-      if (!options.mock) {
+      // Test Docker connection
+      {
         console.error('\n🐳 Testing Docker connection...');
         try {
           execSync('docker version', { stdio: 'pipe' });
           console.error('  ✅ Docker connection successful');
         } catch (error) {
-          console.error('  ⚠️  Docker connection failed - consider using --mock for testing');
+          console.error('  ⚠️  Docker connection failed - ensure Docker is running');
         }
       }
 
@@ -361,7 +356,10 @@ async function main(): Promise<void> {
 
     // Create server
     const logger = getLogger();
-    const server = new ContainerizationMCPServer(logger);
+    const server = new MCPServer(logger, {
+      name: 'containerization-assist',
+      version: '2.0.0',
+    });
 
     if (options.listTools) {
       getLogger().info('Listing available tools');
@@ -402,7 +400,6 @@ async function main(): Promise<void> {
         config: {
           logLevel: config.server.logLevel,
           workspace: config.workspace?.workspaceDir || process.cwd(),
-          mockMode: options.mock,
           devMode: options.dev,
         },
       },
@@ -419,10 +416,6 @@ async function main(): Promise<void> {
       console.error(`🏠 Workspace: ${config.workspace?.workspaceDir || process.cwd()}`);
       console.error(`📊 Log Level: ${config.server.logLevel}`);
       console.error(`🔌 Transport: ${transport.details}`);
-
-      if (options.mock) {
-        console.error('🤖 Running with mock AI sampler');
-      }
 
       if (options.dev) {
         console.error('🔧 Development mode enabled');

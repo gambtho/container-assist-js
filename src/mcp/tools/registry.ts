@@ -13,7 +13,7 @@ import {
 import type { Tool } from '../../core/types';
 import { AIAugmentationService } from '../../lib/ai/ai-service';
 import type { MCPHostAI } from '../../lib/mcp-host-ai';
-import type { SDKPromptRegistry } from '../prompts/sdk-prompt-registry';
+import type { MCPPromptRegistry } from '../prompts/mcp-prompt-registry';
 import { createProductionTool } from './capabilities';
 
 // Import base tools
@@ -309,7 +309,7 @@ export const createAIToolRegistry = (
   logger: Logger,
   config: {
     mcpHostAI?: MCPHostAI;
-    promptRegistry?: SDKPromptRegistry;
+    promptRegistry?: MCPPromptRegistry;
     enableMetrics?: boolean;
     metricsCollector?: any;
     sessionManager?: any;
@@ -348,10 +348,54 @@ export const createMCPToolRegistry = (
 ): SDKToolRegistry => {
   const sdkRegistry = createSDKToolRegistry(logger, server);
 
-  // Populate with all tools using the legacy tool creation logic
-  const legacyTools = createToolRegistry(logger, config);
-  legacyTools.forEach((tool) => {
-    sdkRegistry.registerTool(tool);
+  // Create tools directly using modern approach
+  const baseTools = [
+    analyzeRepoTool,
+    generateDockerfileTool,
+    buildImageTool,
+    scanImageTool,
+    pushImageTool,
+    tagImageTool,
+    workflowTool,
+    fixDockerfileTool,
+    resolveBaseImagesTool,
+    prepareClusterTool,
+    opsTool,
+    deployApplicationTool,
+    generateK8sManifestsTool,
+    verifyDeploymentTool,
+  ];
+
+  baseTools.forEach((rawTool) => {
+    // Create wrapper that matches Tool interface
+    const baseTool: any = {
+      name: rawTool.name,
+      description: (rawTool as any).description || `${rawTool.name} tool`,
+      execute: async (params: Record<string, unknown>, logger: Logger) => {
+        return await rawTool.execute(params as any, logger);
+      },
+    };
+
+    // Use standardized production tool enhancement
+    const enhancementConfig: Parameters<typeof createProductionTool>[1] = {
+      logger,
+      retry: { attempts: 3, delay: 1000, backoff: true },
+    };
+
+    if (config.aiAugmentationService !== undefined) {
+      enhancementConfig.aiAugmentationService = config.aiAugmentationService;
+    }
+
+    if (config.metricsCollector !== undefined) {
+      enhancementConfig.metricsCollector = config.metricsCollector;
+    }
+
+    if (config.sessionManager !== undefined) {
+      enhancementConfig.sessionManager = config.sessionManager;
+    }
+
+    const enhancedTool = createProductionTool(baseTool, enhancementConfig);
+    sdkRegistry.registerTool(enhancedTool);
   });
 
   // Setup server handlers for SDK-native request handling

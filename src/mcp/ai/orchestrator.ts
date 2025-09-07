@@ -19,7 +19,7 @@ import {
   type AIAugmentationContext,
   type AIAugmentationResult,
 } from '../../lib/ai/ai-service';
-import { SDKPromptRegistry } from '../prompts/sdk-prompt-registry';
+import { MCPPromptRegistry } from '../prompts/mcp-prompt-registry';
 import { createMCPHostAI, type MCPHostAI } from '../../lib/mcp-host-ai';
 
 /**
@@ -70,7 +70,7 @@ export interface AIOperationResult<T = any> {
 export class MCPAIOrchestrator {
   private logger: Logger;
   private mcpHostAI: MCPHostAI;
-  private promptRegistry: SDKPromptRegistry;
+  private promptRegistry: MCPPromptRegistry;
   private aiAugmentationService: AIAugmentationService;
   private parameterValidator: AIParameterValidator;
   private operationCache: Map<string, { result: any; timestamp: number }> = new Map();
@@ -79,7 +79,7 @@ export class MCPAIOrchestrator {
   constructor(
     logger: Logger,
     options?: {
-      promptRegistry?: SDKPromptRegistry;
+      promptRegistry?: MCPPromptRegistry;
       aiService?: AIAugmentationService;
       validator?: AIParameterValidator;
     },
@@ -90,7 +90,7 @@ export class MCPAIOrchestrator {
     this.mcpHostAI = createMCPHostAI(logger);
 
     // Initialize or use provided services
-    this.promptRegistry = options?.promptRegistry || new SDKPromptRegistry(logger);
+    this.promptRegistry = options?.promptRegistry || new MCPPromptRegistry(logger);
     this.aiAugmentationService =
       options?.aiService || new AIAugmentationService(this.mcpHostAI, this.promptRegistry, logger);
     this.parameterValidator = options?.validator || new AIParameterValidator(logger);
@@ -562,7 +562,7 @@ export class MCPAIOrchestrator {
 export const createMCPAIOrchestrator = (
   logger: Logger,
   options?: {
-    promptRegistry?: SDKPromptRegistry;
+    promptRegistry?: MCPPromptRegistry;
     aiService?: AIAugmentationService;
     validator?: AIParameterValidator;
   },

@@ -150,7 +150,7 @@ function createConfiguration(): ApplicationConfig {
  * @returns ApplicationConfig configured for the specified environment
  */
 function createConfigurationForEnv(env: string): ApplicationConfig {
-  // Temporarily set NODE_ENV to ensure consistent environment-specific config
+  // Set NODE_ENV for consistent environment-specific configuration
   const originalNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = env;
 
@@ -181,5 +181,28 @@ function createConfigurationForEnv(env: string): ApplicationConfig {
 
 /**
  * Get configuration summary with key values
+ * @param config - The application configuration
+ * @returns Summary object with key configuration values
  */
-export { createDefaultConfig, createConfiguration, createConfigurationForEnv };
+function getConfigurationSummary(config: ApplicationConfig): {
+  nodeEnv: string;
+  logLevel: string;
+  workflowMode: string;
+  maxSessions: number;
+  dockerRegistry: string;
+} {
+  return {
+    nodeEnv: config.server.nodeEnv,
+    logLevel: config.server.logLevel,
+    workflowMode: config.workflow.mode,
+    maxSessions: config.session.maxSessions,
+    dockerRegistry: config.docker.registry,
+  };
+}
+
+export {
+  createDefaultConfig,
+  createConfiguration,
+  createConfigurationForEnv,
+  getConfigurationSummary,
+};

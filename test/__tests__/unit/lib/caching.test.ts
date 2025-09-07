@@ -1,6 +1,6 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 import { CacheManager, CacheEntry, CacheOptions } from '../../../../src/lib/caching';
-import { Result, Success, Failure } from '../../../../src/types/core';
+import { Result, Success, Failure } from '../../../../src/core/types';
 import type { Logger } from 'pino';
 import * as fs from 'fs/promises';
 import * as path from 'path';
