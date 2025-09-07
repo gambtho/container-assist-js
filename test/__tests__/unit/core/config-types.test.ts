@@ -7,7 +7,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import {
   config,
-  getConfig,
   createConfig,
   logConfigSummaryIfDev,
 } from '../../../../src/config/index';
@@ -138,8 +137,8 @@ describe('Configuration Types', () => {
   });
 
   describe('Configuration Factory Functions', () => {
-    it('should getConfig return configuration', () => {
-      const config1 = getConfig();
+    it('should createConfig return configuration', () => {
+      const config1 = createConfig();
       expect(config1).toBeDefined();
       expect(config1.server).toBeDefined();
       expect(config1.server.logLevel).toBeDefined();
@@ -158,7 +157,7 @@ describe('Configuration Types', () => {
       expect(config.server.port).toBe(8080);
       
       // Should persist in underlying config
-      expect(getConfig().server.port).toBe(8080);
+      expect(createConfig().server.port).toBe(8080);
     });
 
     it('should createConfig return configuration object', () => {
@@ -169,7 +168,7 @@ describe('Configuration Types', () => {
     });
 
     it('should have basic config structure', () => {
-      const configInstance = getConfig();
+      const configInstance = createConfig();
       expect(configInstance).toBeDefined();
       expect(configInstance.server).toBeDefined();
     });

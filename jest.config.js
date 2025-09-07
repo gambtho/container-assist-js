@@ -37,7 +37,6 @@ export default {
       testMatch: ['<rootDir>/test/__tests__/integration/**/*.integration.test.ts'],
       setupFilesAfterEnv: ['<rootDir>/test/setup/integration-setup.ts'],
       testEnvironment: 'node',
-      testTimeout: 30000,
       transform: {
         '^.+\\.tsx?$': [
           'ts-jest',
@@ -60,7 +59,6 @@ export default {
       testMatch: ['<rootDir>/test/__tests__/e2e/**/*.e2e.test.ts'],
       setupFilesAfterEnv: ['<rootDir>/test/setup/e2e-setup.ts'],
       testEnvironment: 'node',
-      testTimeout: 60000,
       maxWorkers: 1,
       transform: {
         '^.+\\.tsx?$': [
@@ -83,7 +81,6 @@ export default {
       displayName: 'performance',
       testMatch: ['<rootDir>/test/performance/**/*.perf.test.ts'],
       testEnvironment: 'node',
-      testTimeout: 120000,
       transform: {
         '^.+\\.tsx?$': [
           'ts-jest',

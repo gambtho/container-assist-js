@@ -5,7 +5,7 @@
  */
 
 import type { TestCase, MCPTestRunner, TestResult } from '../../infrastructure/test-runner.js';
-import { ORCHESTRATOR_CONFIG } from '../../../../src/config/orchestrator-config.js';
+import { config } from '../../../../src/config';
 
 export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();
@@ -87,7 +87,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
               repoPath: './test/fixtures/optimized-repo', // Well-structured repo
               enableSampling: true,
               maxCandidates: 5,
-              earlyStopThreshold: ORCHESTRATOR_CONFIG.EARLY_STOP_THRESHOLD
+              earlyStopThreshold: config.orchestrator.earlyStopThreshold
             }
           });
           
@@ -96,7 +96,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
           // Check if early stop triggered
           const earlyStop = 
             response.samplingMetadata?.stoppedEarly === true &&
-            response.samplingMetadata?.winnerScore >= ORCHESTRATOR_CONFIG.EARLY_STOP_THRESHOLD &&
+            response.samplingMetadata?.winnerScore >= config.orchestrator.earlyStopThreshold &&
             response.samplingMetadata?.candidatesGenerated < 5;
           
           return {
@@ -137,7 +137,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
                 { id: 'c2', score: 85.2, generatedAt: new Date('2024-01-02').getTime() },
                 { id: 'c3', score: 70.0, generatedAt: new Date('2024-01-03').getTime() }
               ],
-              tiebreakMargin: ORCHESTRATOR_CONFIG.TIEBREAK_MARGIN
+              tiebreakMargin: config.orchestrator.tiebreakMargin
             }
           });
           
@@ -180,24 +180,24 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
             name: 'test-scoring',
             arguments: {
               scores: {
-                staticLint: 80,
-                imageSize: 90,
-                buildTime: 70,
-                warnings: 100
+                build: 80,
+                size: 90,
+                security: 70,
+                speed: 100
               },
-              weights: ORCHESTRATOR_CONFIG.DOCKERFILE_WEIGHTS
+              weights: config.sampling.weights.dockerfile
             }
           });
           
           const response = JSON.parse(result.content[0].text);
           
           // Calculate expected score manually
-          const weights = ORCHESTRATOR_CONFIG.DOCKERFILE_WEIGHTS;
+          const weights = config.sampling.weights.dockerfile;
           const expectedScore = 
-            (80 * weights.staticLint + 
-             90 * weights.imageSize + 
-             70 * weights.buildTime + 
-             100 * weights.warnings) / 100;
+            (80 * weights.build + 
+             90 * weights.size + 
+             70 * weights.security + 
+             100 * weights.speed) / 100;
           
           const scoreCorrect = Math.abs(response.finalScore - expectedScore) < 0.01;
           

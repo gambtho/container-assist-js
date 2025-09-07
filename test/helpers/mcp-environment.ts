@@ -99,7 +99,7 @@ CMD ["npm", "start"]`;
             } else if (params.sessionId?.includes('python') || params.repositoryPath?.includes('python') || params.repoPath?.includes('python')) {
               dockerfileContent = dockerfileContent.replace('FROM python:3.11-alpine', 'FROM python:3.11-slim');
             } else {
-              dockerfileContent = dockerfileContent.replace('FROM node:18-alpine', 'FROM node:18-alpine');
+              dockerfileContent = dockerfileContent.replace('FROM node:18-alpine', 'FROM gcr.io/distroless/nodejs18-debian11');
             }
           }
           

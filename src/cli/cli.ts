@@ -18,8 +18,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const packageJsonPath = __dirname.includes('dist')
-  ? join(__dirname, '../../package.json') // dist/apps/ -> root
-  : join(__dirname, '../package.json'); // apps/ -> root
+  ? join(__dirname, '../../../package.json') // dist/src/cli/ -> root
+  : join(__dirname, '../../package.json'); // src/cli/ -> root
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
 let logger: any = null;

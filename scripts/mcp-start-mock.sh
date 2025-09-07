@@ -6,4 +6,4 @@ cd "$(dirname "$0")/.."
 export MCP_MODE=true
 export MCP_QUIET=true
 
-exec npx tsx apps/cli.ts --mock "$@"
+exec npx tsx src/cli/cli.ts --mock "$@"

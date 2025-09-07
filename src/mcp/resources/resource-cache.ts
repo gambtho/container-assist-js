@@ -297,8 +297,17 @@ export class ResourceCache implements IResourceCache {
       return allKeys.filter((key) => key.startsWith(prefix));
     }
 
+    // Escape all RegExp special characters except glob wildcards (* ? [ ])
+    // This prevents injection of unintended RegExp patterns
+    const escapedPattern = pattern.replace(/[.+^${}()|\\]/g, '\\$&');
+
+    // Now safely replace glob wildcards with their RegExp equivalents
     const regex = new RegExp(
-      pattern.replace(/\*/g, '.*').replace(/\?/g, '.').replace(/\[/g, '\\[').replace(/\]/g, '\\]'),
+      escapedPattern
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.')
+        .replace(/\\\[/g, '[') // Unescape [ that was escaped above
+        .replace(/\\\]/g, ']'), // Unescape ] that was escaped above
     );
 
     return allKeys.filter((key) => regex.test(key));

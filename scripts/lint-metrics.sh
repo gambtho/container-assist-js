@@ -49,9 +49,8 @@ else
 fi
 
 # Update current metrics in JSON
-TIMESTAMP=$(date -Iseconds)
-jq --arg warnings "$TOTAL_WARNINGS" --arg errors "$TOTAL_ERRORS" --arg ts "$TIMESTAMP" \
-   '.metrics.lint.current = ($warnings | tonumber) | .metrics.lint.warnings = ($warnings | tonumber) | .metrics.lint.errors = ($errors | tonumber) | .metrics.lint.lastUpdated = $ts' \
+jq --arg warnings "$TOTAL_WARNINGS" --arg errors "$TOTAL_ERRORS" \
+   '.metrics.lint.current = ($warnings | tonumber) | .metrics.lint.warnings = ($warnings | tonumber) | .metrics.lint.errors = ($errors | tonumber)' \
    $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
 
 echo "Total warnings: $TOTAL_WARNINGS"
@@ -114,8 +113,8 @@ echo "Total unused exports: $DEADCODE_COUNT"
 echo ""
 
 # Update deadcode metrics in JSON
-jq --arg count "$DEADCODE_COUNT" --arg ts "$TIMESTAMP" \
-   '.metrics.deadcode.current = ($count | tonumber) | .metrics.deadcode.lastUpdated = $ts' \
+jq --arg count "$DEADCODE_COUNT" \
+   '.metrics.deadcode.current = ($count | tonumber)' \
    $QUALITY_CONFIG > ${QUALITY_CONFIG}.tmp && mv ${QUALITY_CONFIG}.tmp $QUALITY_CONFIG
 
 # Read deadcode baseline from JSON

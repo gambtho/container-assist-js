@@ -11,6 +11,13 @@ import { MemoryResourceCache } from './cache';
 import { ResourceCache } from './resource-cache';
 
 /**
+ * Escape special RegExp characters in a string to use it as a literal pattern
+ */
+const escapeRegExp = (str: string): string => {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+/**
  * Resource configuration
  */
 export interface ResourceConfig {
@@ -438,7 +445,7 @@ export const getResourcesByCategory = async (
         if (
           filters.namePattern &&
           resource.name &&
-          !new RegExp(filters.namePattern).test(resource.name)
+          !new RegExp(escapeRegExp(filters.namePattern)).test(resource.name)
         ) {
           continue;
         }
@@ -522,7 +529,11 @@ export const searchResources = async (
       let matches = true;
 
       // Name matching
-      if (query.name && resource.name && !new RegExp(query.name, 'i').test(resource.name)) {
+      if (
+        query.name &&
+        resource.name &&
+        !new RegExp(escapeRegExp(query.name), 'i').test(resource.name)
+      ) {
         matches = false;
       }
 
@@ -533,7 +544,7 @@ export const searchResources = async (
             ? resource.content
             : JSON.stringify(resource.content);
 
-        if (!new RegExp(query.content, 'i').test(contentStr)) {
+        if (!new RegExp(escapeRegExp(query.content), 'i').test(contentStr)) {
           matches = false;
         }
       }

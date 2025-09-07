@@ -5,7 +5,7 @@
  */
 
 import type { TestCase, MCPTestRunner, TestResult } from '../../infrastructure/test-runner.js';
-import { ORCHESTRATOR_CONFIG } from '../../../../src/config/orchestrator-config.js';
+import { config } from '../../../../src/config';
 
 export const createRemediationTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();
@@ -40,7 +40,7 @@ export const createRemediationTests = (testRunner: MCPTestRunner): TestCase[] =>
               sessionId,
               imageId,
               maxAttempts: 3,
-              targetThresholds: ORCHESTRATOR_CONFIG.SCAN_THRESHOLDS
+              targetThresholds: config.orchestrator.scanThresholds
             }
           });
           
@@ -49,7 +49,7 @@ export const createRemediationTests = (testRunner: MCPTestRunner): TestCase[] =>
           const remediationSuccessful = 
             response.success &&
             response.finalScan?.vulnerabilities?.critical === 0 &&
-            response.finalScan?.vulnerabilities?.high <= ORCHESTRATOR_CONFIG.SCAN_THRESHOLDS.high;
+            response.finalScan?.vulnerabilities?.high <= config.orchestrator.scanThresholds.high;
           
           return {
             success: remediationSuccessful,
@@ -217,7 +217,7 @@ export const createRemediationTests = (testRunner: MCPTestRunner): TestCase[] =>
               imageId: 'test/flaky-image:latest',
               maxAttempts: 3,
               retryBackoff: 'exponential',
-              targetThresholds: ORCHESTRATOR_CONFIG.SCAN_THRESHOLDS
+              targetThresholds: config.orchestrator.scanThresholds
             }
           });
           

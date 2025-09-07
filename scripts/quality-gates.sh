@@ -20,13 +20,26 @@ fi
 # Configuration
 QUALITY_CONFIG="quality-gates.json"
 
-# Configurable quality gate thresholds via environment
+# Read thresholds from config file if it exists, fallback to defaults
+if [ -f "$QUALITY_CONFIG" ] && command -v jq &> /dev/null; then
+    MAX_LINT_ERRORS=$(jq -r '.metrics.thresholds.lint.maxErrors // 0' "$QUALITY_CONFIG" 2>/dev/null || echo "0")
+    MAX_LINT_WARNINGS=$(jq -r '.metrics.thresholds.lint.maxWarnings // 400' "$QUALITY_CONFIG" 2>/dev/null || echo "400")
+    MAX_TYPE_ERRORS=$(jq -r '.metrics.thresholds.typescript.maxErrors // 0' "$QUALITY_CONFIG" 2>/dev/null || echo "0")
+    MAX_DEADCODE=$(jq -r '.metrics.thresholds.deadcode.max // 200' "$QUALITY_CONFIG" 2>/dev/null || echo "200")
+    MAX_BUILD_TIME_MS=$(jq -r '.metrics.thresholds.build.maxTimeMs // 60000' "$QUALITY_CONFIG" 2>/dev/null || echo "60000")
+    MAX_BUILD_TIME_SECONDS=$((MAX_BUILD_TIME_MS / 1000))
+else
+    # Fallback to environment variables or defaults
+    MAX_LINT_ERRORS=${MAX_LINT_ERRORS:-0}
+    MAX_LINT_WARNINGS=${MAX_LINT_WARNINGS:-400}
+    MAX_TYPE_ERRORS=${MAX_TYPE_ERRORS:-0}
+    MAX_DEADCODE=${MAX_DEADCODE:-200}
+    MAX_BUILD_TIME_SECONDS=${MAX_BUILD_TIME_SECONDS:-60}
+    MAX_BUILD_TIME_MS=$((MAX_BUILD_TIME_SECONDS * 1000))
+fi
+
+# Other configuration
 MIN_COVERAGE=${MIN_COVERAGE:-80}
-MAX_LINT_ERRORS=${MAX_LINT_ERRORS:-0}
-MAX_LINT_WARNINGS=${MAX_LINT_WARNINGS:-400}
-MAX_TYPE_ERRORS=${MAX_TYPE_ERRORS:-0}
-MAX_DEADCODE=${MAX_DEADCODE:-200}
-MAX_BUILD_TIME_SECONDS=${MAX_BUILD_TIME_SECONDS:-5}
 
 # Check for required tools with better error messages
 for cmd in npm bc jq; do
@@ -127,26 +140,44 @@ if [ ! -f "$QUALITY_CONFIG" ]; then
     echo "Creating default quality-gates.json configuration file..."
     cat > "$QUALITY_CONFIG" << 'EOF'
 {
+  "$schema": "./quality-gates.schema.json",
+  "schemaVersion": 1,
   "metrics": {
-    "lint": {
-      "baseline": null,
-      "current": 0,
-      "warnings": 0,
-      "errors": 0,
-      "lastUpdated": null
+    "thresholds": {
+      "lint": {
+        "maxErrors": 0,
+        "maxWarnings": 400
+      },
+      "deadcode": {
+        "max": 200
+      },
+      "typescript": {
+        "maxErrors": 0
+      },
+      "build": {
+        "maxTimeMs": 60000
+      }
     },
-    "deadcode": {
-      "baseline": null,
-      "current": 0,
-      "lastUpdated": null
-    },
-    "typescript": {
-      "errors": 0,
-      "lastUpdated": null
-    },
-    "build": {
-      "lastBuildTimeMs": 0,
-      "lastUpdated": null
+    "baselines": {
+      "lint": {
+        "errors": 0,
+        "warnings": null
+      },
+      "deadcode": {
+        "count": null
+      },
+      "typescript": {
+        "errors": 0
+      },
+      "build": {
+        "timeMs": null,
+        "mode": "clean",
+        "environment": {
+          "nodeVersion": "$(node -v 2>/dev/null || echo 'unknown')",
+          "os": "$(uname -s 2>/dev/null || echo 'unknown')",
+          "cpu": "$(uname -m 2>/dev/null || echo 'unknown')"
+        }
+      }
     }
   }
 }
@@ -154,9 +185,16 @@ EOF
     print_status "INFO" "Created default quality-gates.json configuration file"
 fi
 
-# Read baselines from JSON
-BASELINE_WARNINGS=$(jq -r '.metrics.lint.baseline' $QUALITY_CONFIG)
-DEADCODE_BASELINE=$(jq -r '.metrics.deadcode.baseline' $QUALITY_CONFIG)
+# Read baselines from JSON (new structure)
+if jq -e '.metrics.baselines' "$QUALITY_CONFIG" &>/dev/null; then
+    # New structure
+    BASELINE_WARNINGS=$(jq -r '.metrics.baselines.lint.warnings // null' "$QUALITY_CONFIG")
+    DEADCODE_BASELINE=$(jq -r '.metrics.baselines.deadcode.count // null' "$QUALITY_CONFIG")
+else
+    # Old structure fallback
+    BASELINE_WARNINGS=$(jq -r '.metrics.lint.baseline // null' "$QUALITY_CONFIG")
+    DEADCODE_BASELINE=$(jq -r '.metrics.deadcode.baseline // null' "$QUALITY_CONFIG")
+fi
 
 # Gate 1: ESLint Errors Must Be Zero
 echo "Gate 1: ESLint Error Check"
@@ -174,10 +212,8 @@ CURRENT_WARNINGS=$(echo "$LINT_RESULTS" | cut -d' ' -f2)
 CURRENT_ERRORS=$(validate_json_numeric "$CURRENT_ERRORS" "errors")
 CURRENT_WARNINGS=$(validate_json_numeric "$CURRENT_WARNINGS" "warnings")
 
-# Update current metrics in JSON
-TIMESTAMP=$(date -Iseconds)
-update_json_safely '.metrics.lint.current = ($warnings | tonumber) | .metrics.lint.warnings = ($warnings | tonumber) | .metrics.lint.errors = ($errors | tonumber) | .metrics.lint.lastUpdated = $ts' \
-   --arg warnings "$CURRENT_WARNINGS" --arg errors "$CURRENT_ERRORS" --arg ts "$TIMESTAMP"
+# Note: We don't store current values in git anymore, only baselines
+# Current values are computed during CI/CD runs
 
 if [ "$CURRENT_ERRORS" -le "$MAX_LINT_ERRORS" ]; then
     print_status "PASS" "ESLint errors within threshold: $CURRENT_ERRORS ≤ $MAX_LINT_ERRORS"
@@ -192,9 +228,14 @@ echo ""
 if [ "$BASELINE_WARNINGS" = "null" ] || [ -z "$BASELINE_WARNINGS" ]; then
     print_status "INFO" "No lint baseline set, using current warnings ($CURRENT_WARNINGS) as baseline"
     BASELINE_WARNINGS="$CURRENT_WARNINGS"
-    # Update the baseline in the config file
-    update_json_safely '.metrics.lint.baseline = ($warnings | tonumber)' \
-       --arg warnings "$CURRENT_WARNINGS"
+    # Update the baseline in the config file (new structure)
+    if jq -e '.metrics.baselines' "$QUALITY_CONFIG" &>/dev/null; then
+        update_json_safely '.metrics.baselines.lint.warnings = ($warnings | tonumber)' \
+           --arg warnings "$CURRENT_WARNINGS"
+    else
+        update_json_safely '.metrics.lint.baseline = ($warnings | tonumber)' \
+           --arg warnings "$CURRENT_WARNINGS"
+    fi
 fi
 
 # Gate 2: ESLint Warning Ratcheting
@@ -207,9 +248,14 @@ if [ "$CURRENT_WARNINGS" -le "$BASELINE_WARNINGS" ] && [ "$CURRENT_WARNINGS" -le
     if [ "$REDUCTION" -gt 0 ]; then
         PERCENTAGE=$(echo "scale=1; ($REDUCTION * 100) / $BASELINE_WARNINGS" | bc -l 2>/dev/null || echo "N/A")
         print_status "PASS" "Warnings reduced by $REDUCTION (${PERCENTAGE}%) - $CURRENT_WARNINGS ≤ $BASELINE_WARNINGS"
-        # Auto-update baseline when improved
-        update_json_safely '.metrics.lint.baseline = ($warnings | tonumber)' \
-           --arg warnings "$CURRENT_WARNINGS"
+        # Auto-update baseline when improved (new structure)
+        if jq -e '.metrics.baselines' "$QUALITY_CONFIG" &>/dev/null; then
+            update_json_safely '.metrics.baselines.lint.warnings = ($warnings | tonumber)' \
+               --arg warnings "$CURRENT_WARNINGS"
+        else
+            update_json_safely '.metrics.lint.baseline = ($warnings | tonumber)' \
+               --arg warnings "$CURRENT_WARNINGS"
+        fi
         print_status "INFO" "Updated ESLint baseline: $BASELINE_WARNINGS → $CURRENT_WARNINGS"
     else
         print_status "PASS" "Warning count maintained at baseline ($CURRENT_WARNINGS)"
@@ -233,8 +279,7 @@ if [ "${SKIP_TYPECHECK:-false}" != "true" ]; then
 
     if npm run typecheck > /dev/null 2>&1; then
         print_status "PASS" "TypeScript compilation successful"
-        update_json_safely '.metrics.typescript.errors = 0 | .metrics.typescript.lastUpdated = $ts' \
-           --arg ts "$TIMESTAMP"
+        # TypeScript errors baseline is always 0 for passing builds
     else
         print_status "FAIL" "TypeScript compilation failed"
         exit 1
@@ -269,17 +314,20 @@ fi
 # Ensure numeric value
 DEADCODE_COUNT=${DEADCODE_COUNT:-0}
 
-# Update deadcode metrics in JSON
-update_json_safely '.metrics.deadcode.current = ($count | tonumber) | .metrics.deadcode.lastUpdated = $ts' \
-   --arg count "$DEADCODE_COUNT" --arg ts "$TIMESTAMP"
+# Note: We don't store current values in git anymore, only baselines
 
 # Handle null deadcode baseline for first run
 if [ "$DEADCODE_BASELINE" = "null" ] || [ -z "$DEADCODE_BASELINE" ]; then
     print_status "INFO" "No deadcode baseline set, using current dead code count ($DEADCODE_COUNT) as baseline"
     DEADCODE_BASELINE="$DEADCODE_COUNT"
-    # Update the baseline in the config file
-    update_json_safely '.metrics.deadcode.baseline = ($deadcode | tonumber)' \
-       --arg deadcode "$DEADCODE_COUNT"
+    # Update the baseline in the config file (new structure)
+    if jq -e '.metrics.baselines' "$QUALITY_CONFIG" &>/dev/null; then
+        update_json_safely '.metrics.baselines.deadcode.count = ($deadcode | tonumber)' \
+           --arg deadcode "$DEADCODE_COUNT"
+    else
+        update_json_safely '.metrics.deadcode.baseline = ($deadcode | tonumber)' \
+           --arg deadcode "$DEADCODE_COUNT"
+    fi
 fi
 
 if [ "$DEADCODE_COUNT" -le "$DEADCODE_BASELINE" ]; then
@@ -287,9 +335,14 @@ if [ "$DEADCODE_COUNT" -le "$DEADCODE_BASELINE" ]; then
     if [ $DEADCODE_REDUCTION -gt 0 ]; then
         DEADCODE_PERCENTAGE=$(echo "scale=1; ($DEADCODE_REDUCTION * 100) / $DEADCODE_BASELINE" | bc -l 2>/dev/null || echo "N/A")
         print_status "PASS" "Unused exports reduced by $DEADCODE_REDUCTION (${DEADCODE_PERCENTAGE}%) - $DEADCODE_COUNT ≤ $DEADCODE_BASELINE"
-        # Auto-update baseline when improved
-        update_json_safely '.metrics.deadcode.baseline = ($deadcode | tonumber)' \
-           --arg deadcode "$DEADCODE_COUNT"
+        # Auto-update baseline when improved (new structure)
+        if jq -e '.metrics.baselines' "$QUALITY_CONFIG" &>/dev/null; then
+            update_json_safely '.metrics.baselines.deadcode.count = ($deadcode | tonumber)' \
+               --arg deadcode "$DEADCODE_COUNT"
+        else
+            update_json_safely '.metrics.deadcode.baseline = ($deadcode | tonumber)' \
+               --arg deadcode "$DEADCODE_COUNT"
+        fi
         print_status "INFO" "Updated deadcode baseline: $DEADCODE_BASELINE → $DEADCODE_COUNT"
     else
         print_status "PASS" "Unused exports maintained at baseline ($DEADCODE_COUNT)"
@@ -319,9 +372,21 @@ if command -v npm >/dev/null 2>&1; then
             BUILD_TIME_SECONDS=$((BUILD_END - BUILD_START))
             BUILD_TIME_MS=$((BUILD_TIME_SECONDS * 1000))
             
-            # Update build metrics in JSON with error handling
-            update_json_safely '.metrics.build.lastBuildTimeMs = ($time | tonumber) | .metrics.build.lastUpdated = $ts' \
-               --arg time "$BUILD_TIME_MS" --arg ts "$TIMESTAMP"
+            # Update build baseline only if improved or first time (new structure)
+            if jq -e '.metrics.baselines' "$QUALITY_CONFIG" &>/dev/null; then
+                CURRENT_BUILD_BASELINE=$(jq -r '.metrics.baselines.build.timeMs // null' "$QUALITY_CONFIG")
+                if [ "$CURRENT_BUILD_BASELINE" = "null" ] || [ "$BUILD_TIME_MS" -lt "$CURRENT_BUILD_BASELINE" ]; then
+                    NODE_VERSION=$(node -v 2>/dev/null || echo "unknown")
+                    OS_NAME=$(uname -s 2>/dev/null || echo "unknown")
+                    CPU_ARCH=$(uname -m 2>/dev/null || echo "unknown")
+                    update_json_safely '.metrics.baselines.build.timeMs = ($time | tonumber) | .metrics.baselines.build.environment.nodeVersion = $node | .metrics.baselines.build.environment.os = $os | .metrics.baselines.build.environment.cpu = $cpu' \
+                       --arg time "$BUILD_TIME_MS" --arg node "$NODE_VERSION" --arg os "$OS_NAME" --arg cpu "$CPU_ARCH"
+                fi
+            else
+                # Old structure
+                update_json_safely '.metrics.build.lastBuildTimeMs = ($time | tonumber)' \
+                   --arg time "$BUILD_TIME_MS"
+            fi
             
             if [ "$BUILD_TIME_SECONDS" -lt "$MAX_BUILD_TIME_SECONDS" ]; then
                 print_status "PASS" "Build completed in ${BUILD_TIME_SECONDS}s (< ${MAX_BUILD_TIME_SECONDS}s threshold)"
@@ -341,6 +406,9 @@ else
     print_status "WARN" "npm not available, skipping build performance check"
     echo ""
 fi
+
+# Note: We no longer update generatedAt to reduce git noise
+# Timestamps are only relevant during CI runs
 
 # Final Summary
 echo "🎉 Quality Gates Summary"

@@ -78,11 +78,15 @@ export class UriParser {
   static matches(uri: string, pattern: string): boolean {
     if (pattern === '*') return true;
 
-    // Convert glob-style pattern to regex
-    const regexPattern = pattern
+    // First escape all RegExp special characters except glob wildcards
+    const escapedPattern = pattern.replace(/[.+^${}()|\\]/g, '\\$&');
+
+    // Then convert glob-style pattern to regex
+    const regexPattern = escapedPattern
       .replace(/\*/g, '.*')
       .replace(/\?/g, '.')
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&');
+      .replace(/\\\[/g, '[') // Unescape [ that was escaped above
+      .replace(/\\\]/g, ']'); // Unescape ] that was escaped above
 
     return new RegExp(`^${regexPattern}$`).test(uri);
   }
