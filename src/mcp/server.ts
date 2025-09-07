@@ -22,6 +22,8 @@ import { getMCPRegistry } from './registry';
 import { McpResourceManager } from './resources/manager.js';
 import { EnhancedResourceManager } from './resources/enhanced-resource-manager.js';
 import { PromptTemplatesManager } from '../application/tools/enhanced/prompt-templates.js';
+import { DEFAULT_CACHE } from '../config/defaults.js';
+import { enhanceServer } from './enhanced-server.js';
 // Workflows are registered via the registry
 // Workflows are now registered via the registry
 import type { MCPServer as IMCPServer, MCPServerOptions, MCPRequest, MCPResponse } from './types';
@@ -46,12 +48,12 @@ export class ContainerizationMCPServer implements IMCPServer {
     this.registry = getMCPRegistry(this.logger);
     this._sessionManager = createSessionManager(this.logger);
 
-    // Initialize resource management
+    // Initialize resource management with centralized defaults
     const baseResourceManager = new McpResourceManager(
       {
-        defaultTtl: 300000, // 5 minutes
-        maxResourceSize: 10 * 1024 * 1024, // 10MB
-        cacheConfig: { defaultTtl: 300000 },
+        defaultTtl: DEFAULT_CACHE.defaultTtl,
+        maxResourceSize: DEFAULT_CACHE.maxFileSize,
+        cacheConfig: { defaultTtl: DEFAULT_CACHE.defaultTtl },
       },
       this.logger,
     );
@@ -86,6 +88,9 @@ export class ContainerizationMCPServer implements IMCPServer {
 
     // Setup request handlers
     this.setupHandlers();
+
+    // Enhance server with progress reporting and cancellation support
+    enhanceServer(this);
   }
 
   /**
@@ -276,7 +281,10 @@ export class ContainerizationMCPServer implements IMCPServer {
           throw new Error(readResult.error);
         }
 
-        this.logger.debug({ uri, contentCount: readResult.value.contents.length }, 'Resource read successful');
+        this.logger.debug(
+          { uri, contentCount: readResult.value.contents.length },
+          'Resource read successful',
+        );
         return readResult.value;
       } catch (error) {
         this.logger.error({ uri, error }, 'Resource reading failed');
@@ -318,13 +326,16 @@ export class ContainerizationMCPServer implements IMCPServer {
 
       try {
         // Extract context from arguments if provided
-        const context = promptArgs && Object.keys(promptArgs).length > 0 ? {
-          repositoryPath: promptArgs.repositoryPath as string,
-          language: promptArgs.language as string,
-          framework: promptArgs.framework as string,
-          securityLevel: promptArgs.securityLevel as 'basic' | 'enhanced' | 'strict',
-          environment: promptArgs.environment as 'development' | 'staging' | 'production',
-        } : undefined;
+        const context =
+          promptArgs && Object.keys(promptArgs).length > 0
+            ? {
+                repositoryPath: promptArgs.repositoryPath as string,
+                language: promptArgs.language as string,
+                framework: promptArgs.framework as string,
+                securityLevel: promptArgs.securityLevel as 'basic' | 'enhanced' | 'strict',
+                environment: promptArgs.environment as 'development' | 'staging' | 'production',
+              }
+            : undefined;
 
         const getResult = await this.promptTemplates.getPrompt(name, context);
 
@@ -333,7 +344,15 @@ export class ContainerizationMCPServer implements IMCPServer {
           throw new Error(getResult.error);
         }
 
-        this.logger.debug({ name, argumentCount: Array.isArray(getResult.value.arguments) ? getResult.value.arguments.length : 0 }, 'Prompt retrieved');
+        this.logger.debug(
+          {
+            name,
+            argumentCount: Array.isArray(getResult.value.arguments)
+              ? getResult.value.arguments.length
+              : 0,
+          },
+          'Prompt retrieved',
+        );
         return getResult.value;
       } catch (error) {
         this.logger.error({ name, error }, 'Prompt get failed');
@@ -472,7 +491,13 @@ export class ContainerizationMCPServer implements IMCPServer {
   /**
    * Get server status
    */
-  getStatus(): { running: boolean; tools: number; workflows: number; resources: number; prompts: number } {
+  getStatus(): {
+    running: boolean;
+    tools: number;
+    workflows: number;
+    resources: number;
+    prompts: number;
+  } {
     const stats = this.registry.getStats();
     const resourceStats = this.resourceManager.getStats();
     const promptStats = this.promptTemplates.getStats();

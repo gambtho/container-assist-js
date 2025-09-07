@@ -83,7 +83,7 @@ export const loadConfig = (): Config => {
 
     // Build settings
     buildTimeout: Number(process.env.BUILD_TIMEOUT) || 300000, // 5 minutes
-    scanTimeout: Number(process.env.SCAN_TIMEOUT) || 180000,   // 3 minutes
+    scanTimeout: Number(process.env.SCAN_TIMEOUT) || 180000, // 3 minutes
 
     // Session settings
     sessionTtl: Number(process.env.SESSION_TTL) || 86400, // 24 hours

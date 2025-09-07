@@ -9,21 +9,32 @@ import type { Logger } from 'pino';
 import { createLogger } from '../lib/logger';
 import type { Result } from '../types/core/index';
 
-// Import tool creators from flat tools structure
-import { createAnalyzeRepoTool } from '../tools/analyze-repo';
+// Import tool instances from flat tools structure
+import { analyzeRepoTool } from '../tools/analyze-repo';
 import { buildImageTool } from '../tools/build-image';
 import { deployApplicationTool } from '../tools/deploy';
-import { createFixDockerfileTool } from '../tools/fix-dockerfile';
-import { createGenerateDockerfileTool } from '../tools/generate-dockerfile';
+import { fixDockerfileTool } from '../tools/fix-dockerfile';
+import { generateDockerfileTool } from '../tools/generate-dockerfile';
 import { generateK8sManifestsTool } from '../tools/generate-k8s-manifests';
-import { createOpsTool } from '../tools/ops';
-import { createPrepareClusterTool } from '../tools/prepare-cluster';
-import { createPushTool } from '../tools/push';
-import { createResolveBaseImagesTool } from '../tools/resolve-base-images';
-import { createScanTool } from '../tools/scan';
-import { createTagTool } from '../tools/tag';
+import { opsTool } from '../tools/ops';
+import { prepareClusterTool } from '../tools/prepare-cluster';
+import { pushImageTool } from '../tools/push';
+import { resolveBaseImagesTool } from '../tools/resolve-base-images';
+import { scanImageTool } from '../tools/scan';
+import { tagImageTool } from '../tools/tag';
 import { verifyDeploymentTool } from '../tools/verify-deployment';
-import { createWorkflowTool } from '../tools/workflow';
+import { workflowTool } from '../tools/workflow';
+
+// Import AI enhancement capabilities
+import { createAIService } from '../lib/ai';
+import { createSessionManager } from '../lib/session';
+import {
+  createAnalyzeRepoWithAI,
+  createDockerfileGeneratorWithAI,
+  createScannerWithAI,
+  createWorkflowExecutorWithAI,
+  withAIEnhancement,
+} from '../application/tools/enhanced/intelligent-factory';
 
 // Import workflows
 import { containerizationWorkflow } from '../workflows/containerization';
@@ -47,10 +58,14 @@ class MCPToolRegistry implements ToolRegistry, WorkflowRegistry {
   }
 
   /**
-   * Register all 14 tools from the flat tools structure
+   * Register all 14 tools from the flat tools structure with AI enhancements
    */
   private registerAllTools(): void {
-    this.logger.info('Registering all tools in MCP registry');
+    this.logger.info('Registering all tools in MCP registry with AI enhancements');
+
+    // Create AI service and session manager for tool enhancement
+    const aiService = createAIService(this.logger);
+    const sessionManager = createSessionManager(this.logger);
 
     // Tool metadata for MCP
     const toolMetadata: Record<string, { description: string; schema: object }> = {
@@ -241,27 +256,41 @@ class MCPToolRegistry implements ToolRegistry, WorkflowRegistry {
       },
     };
 
+    // Create AI-enhanced versions of specialized tools
+    const specializedTools = new Map<string, any>([
+      ['analyze-repo', createAnalyzeRepoWithAI(aiService, sessionManager, this.logger)],
+      [
+        'generate-dockerfile',
+        createDockerfileGeneratorWithAI(aiService, sessionManager, this.logger),
+      ],
+      ['scan', createScannerWithAI(aiService, sessionManager, this.logger)],
+      ['workflow', createWorkflowExecutorWithAI(aiService, sessionManager, this.logger)],
+    ]);
+
+    // Create AI enhancer for other tools
+    const enhancer = withAIEnhancement(aiService, sessionManager, this.logger);
+
     // Create and register tools with full MCPTool interface
     const toolCreators = [
-      createAnalyzeRepoTool,
-      () => buildImageTool, // Direct object, wrapped in function for compatibility
-      () => deployApplicationTool, // Direct object, wrapped in function for compatibility
-      createFixDockerfileTool,
-      createGenerateDockerfileTool,
-      () => generateK8sManifestsTool, // Direct object, wrapped in function for compatibility
-      createOpsTool,
-      createPrepareClusterTool,
-      createPushTool,
-      createResolveBaseImagesTool,
-      createScanTool,
-      createTagTool,
-      () => verifyDeploymentTool, // Direct object, wrapped in function for compatibility
-      createWorkflowTool,
+      () => specializedTools.get('analyze-repo') || enhancer(analyzeRepoTool),
+      () => enhancer(buildImageTool),
+      () => enhancer(deployApplicationTool),
+      () => enhancer(fixDockerfileTool),
+      () => specializedTools.get('generate-dockerfile') || enhancer(generateDockerfileTool),
+      () => enhancer(generateK8sManifestsTool),
+      () => enhancer(opsTool),
+      () => enhancer(prepareClusterTool),
+      () => enhancer(pushImageTool),
+      () => enhancer(resolveBaseImagesTool),
+      () => specializedTools.get('scan') || enhancer(scanImageTool),
+      () => enhancer(tagImageTool),
+      () => enhancer(verifyDeploymentTool),
+      () => specializedTools.get('workflow') || enhancer(workflowTool),
     ];
 
     toolCreators.forEach((creator) => {
       try {
-        const toolImpl = creator(this.logger.child({ component: 'tool' }));
+        const toolImpl = creator();
         const metadata = toolMetadata[toolImpl.name];
 
         if (!metadata) {
@@ -279,12 +308,12 @@ class MCPToolRegistry implements ToolRegistry, WorkflowRegistry {
             required?: string[];
             additionalProperties?: boolean;
           },
-          execute: async (params: object, _logger: Logger) => {
+          execute: async (params: object, logger: Logger) => {
             // Each tool handles its own type validation internally
-            // We pass params directly and the tool will validate and type-check at runtime
-            return (toolImpl as { execute: (params: object) => Promise<Result<unknown>> }).execute(
-              params,
-            );
+            // We pass params and logger directly - the tool signature has changed
+            return (
+              toolImpl as { execute: (params: object, logger: Logger) => Promise<Result<unknown>> }
+            ).execute(params, logger || this.logger.child({ component: 'tool' }));
           },
         };
 

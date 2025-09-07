@@ -9,9 +9,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
-import type {
-  WorkflowState,
-} from '../types/session.js';
+import type { WorkflowState } from '../types/session.js';
 
 interface SessionConfig {
   ttl?: number; // Session TTL in seconds (default: 24 hours)

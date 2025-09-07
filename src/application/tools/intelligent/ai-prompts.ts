@@ -86,16 +86,24 @@ export class PromptTemplatesManager {
           },
         ],
         dynamicArguments: (context) => [
-          ...(context.dependencies?.length ? [{
-            name: 'dependencies',
-            description: `Detected dependencies: ${context.dependencies.join(', ')}`,
-            required: false,
-          }] : []),
-          ...(context.language ? [{
-            name: 'optimizations',
-            description: `${context.language}-specific optimizations to apply`,
-            required: false,
-          }] : []),
+          ...(context.dependencies?.length
+            ? [
+                {
+                  name: 'dependencies',
+                  description: `Detected dependencies: ${context.dependencies.join(', ')}`,
+                  required: false,
+                },
+              ]
+            : []),
+          ...(context.language
+            ? [
+                {
+                  name: 'optimizations',
+                  description: `${context.language}-specific optimizations to apply`,
+                  required: false,
+                },
+              ]
+            : []),
         ],
       },
       {
@@ -127,16 +135,24 @@ export class PromptTemplatesManager {
           },
         ],
         dynamicArguments: (context) => [
-          ...(context.environment === 'production' ? [{
-            name: 'highAvailability',
-            description: 'Enable high availability features (anti-affinity, PDBs)',
-            required: false,
-          }] : []),
-          ...(context.securityLevel === 'strict' ? [{
-            name: 'securityContext',
-            description: 'Apply strict security contexts and policies',
-            required: false,
-          }] : []),
+          ...(context.environment === 'production'
+            ? [
+                {
+                  name: 'highAvailability',
+                  description: 'Enable high availability features (anti-affinity, PDBs)',
+                  required: false,
+                },
+              ]
+            : []),
+          ...(context.securityLevel === 'strict'
+            ? [
+                {
+                  name: 'securityContext',
+                  description: 'Apply strict security contexts and policies',
+                  required: false,
+                },
+              ]
+            : []),
         ],
       },
       {
@@ -158,11 +174,15 @@ export class PromptTemplatesManager {
           },
         ],
         dynamicArguments: (context) => [
-          ...(context.environment === 'production' ? [{
-            name: 'productionChecks',
-            description: 'Additional production security checks',
-            required: false,
-          }] : []),
+          ...(context.environment === 'production'
+            ? [
+                {
+                  name: 'productionChecks',
+                  description: 'Additional production security checks',
+                  required: false,
+                },
+              ]
+            : []),
         ],
       },
       {
@@ -189,16 +209,20 @@ export class PromptTemplatesManager {
           },
         ],
         dynamicArguments: (context) => [
-          ...(context.language ? [{
-            name: 'languageSpecific',
-            description: `${context.language}-specific troubleshooting steps`,
-            required: false,
-          }] : []),
+          ...(context.language
+            ? [
+                {
+                  name: 'languageSpecific',
+                  description: `${context.language}-specific troubleshooting steps`,
+                  required: false,
+                },
+              ]
+            : []),
         ],
       },
     ];
 
-    defaultTemplates.forEach(template => {
+    defaultTemplates.forEach((template) => {
       this.templates.set(template.id, template);
     });
 
@@ -213,25 +237,30 @@ export class PromptTemplatesManager {
       const templates = Array.from(this.templates.values());
 
       const filteredTemplates = category
-        ? templates.filter(t => t.category === category)
+        ? templates.filter((t) => t.category === category)
         : templates;
 
-      const prompts = filteredTemplates.map(template => ({
+      const prompts = filteredTemplates.map((template) => ({
         name: template.name,
         description: template.description,
         arguments: template.arguments || [],
       }));
 
-      this.logger.debug({
-        category,
-        totalTemplates: templates.length,
-        filteredCount: prompts.length,
-      }, 'Listed prompt templates');
+      this.logger.debug(
+        {
+          category,
+          totalTemplates: templates.length,
+          filteredCount: prompts.length,
+        },
+        'Listed prompt templates',
+      );
 
       return Success({ prompts });
     } catch (error) {
       this.logger.error({ error, category }, 'Failed to list prompts');
-      return Failure(`Failed to list prompts: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to list prompts: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -257,28 +286,35 @@ export class PromptTemplatesManager {
       const contextualDescription = this.generateContextualDescription(template, context);
 
       const result: GetPromptResult = {
-        messages: [{
-          role: 'user',
-          content: {
-            type: 'text',
-            text: contextualDescription,
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: contextualDescription,
+            },
           },
-        }],
+        ],
         name: template.name,
         description: contextualDescription,
         arguments: arguments_,
       };
 
-      this.logger.debug({
-        templateId: template.id,
-        argumentCount: arguments_.length,
-        hasContext: !!context,
-      }, 'Generated prompt template');
+      this.logger.debug(
+        {
+          templateId: template.id,
+          argumentCount: arguments_.length,
+          hasContext: !!context,
+        },
+        'Generated prompt template',
+      );
 
       return Success(result);
     } catch (error) {
       this.logger.error({ error, name, context }, 'Failed to get prompt');
-      return Failure(`Failed to get prompt: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to get prompt: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -294,16 +330,21 @@ export class PromptTemplatesManager {
 
       this.templates.set(template.id, template);
 
-      this.logger.info({
-        templateId: template.id,
-        name: template.name,
-        category: template.category,
-      }, 'Custom prompt template registered');
+      this.logger.info(
+        {
+          templateId: template.id,
+          name: template.name,
+          category: template.category,
+        },
+        'Custom prompt template registered',
+      );
 
       return Success(undefined);
     } catch (error) {
       this.logger.error({ error, template }, 'Failed to register template');
-      return Failure(`Failed to register template: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to register template: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -319,15 +360,20 @@ export class PromptTemplatesManager {
 
       template.context = { ...template.context, ...context };
 
-      this.logger.debug({
-        templateId,
-        contextKeys: Object.keys(context),
-      }, 'Template context updated');
+      this.logger.debug(
+        {
+          templateId,
+          contextKeys: Object.keys(context),
+        },
+        'Template context updated',
+      );
 
       return Success(undefined);
     } catch (error) {
       this.logger.error({ error, templateId, context }, 'Failed to update template context');
-      return Failure(`Failed to update template context: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to update template context: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -335,8 +381,7 @@ export class PromptTemplatesManager {
    * Get templates by category
    */
   getTemplatesByCategory(category: string): EnhancedPromptTemplate[] {
-    return Array.from(this.templates.values())
-      .filter(template => template.category === category);
+    return Array.from(this.templates.values()).filter((template) => template.category === category);
   }
 
   /**
@@ -350,11 +395,11 @@ export class PromptTemplatesManager {
     const templates = Array.from(this.templates.values());
     const byCategory: Record<string, number> = {};
 
-    templates.forEach(template => {
+    templates.forEach((template) => {
       byCategory[template.category] = (byCategory[template.category] || 0) + 1;
     });
 
-    const withDynamicArgs = templates.filter(t => !!t.dynamicArguments).length;
+    const withDynamicArgs = templates.filter((t) => !!t.dynamicArguments).length;
 
     return {
       total: templates.length,
@@ -368,8 +413,10 @@ export class PromptTemplatesManager {
    */
   private findTemplateByName(name: string): EnhancedPromptTemplate | undefined {
     for (const template of this.templates.values()) {
-      if (template.name.toLowerCase() === name.toLowerCase() ||
-          template.id.toLowerCase() === name.toLowerCase()) {
+      if (
+        template.name.toLowerCase() === name.toLowerCase() ||
+        template.id.toLowerCase() === name.toLowerCase()
+      ) {
         return template;
       }
     }

@@ -12,6 +12,7 @@ import { createAIService } from '../lib/ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
+import { DEFAULT_PORTS } from '../config/defaults';
 
 export interface AnalyzeRepoConfig {
   sessionId: string;
@@ -292,19 +293,10 @@ async function analyzeDependencies(
 async function detectPorts(_repoPath: string, language: string): Promise<number[]> {
   const ports: Set<number> = new Set();
 
-  // Common default ports by language/framework
-  const defaultPorts: Record<string, number[]> = {
-    javascript: [3000, 8080],
-    typescript: [3000, 8080],
-    python: [5000, 8000],
-    java: [8080, 8081],
-    go: [8080, 3000],
-    rust: [8080, 3000],
-    ruby: [3000, 9292],
-    php: [8080, 80],
-  };
+  // Use centralized default ports by language/framework
+  const languageKey = language as keyof typeof DEFAULT_PORTS;
+  const languagePorts = DEFAULT_PORTS[languageKey] || DEFAULT_PORTS.default;
 
-  const languagePorts = defaultPorts[language];
   if (languagePorts) {
     languagePorts.forEach((port) => ports.add(port));
   }
@@ -434,7 +426,8 @@ export async function analyzeRepo(
 
       if (aiResponse.ok) {
         // Extract insights from the structured context
-        aiInsights = aiResponse.value.context.guidance || 'Analysis completed using AI context preparation';
+        aiInsights =
+          aiResponse.value.context.guidance || 'Analysis completed using AI context preparation';
       }
     } catch (error) {
       logger.debug({ error }, 'AI analysis skipped');
@@ -533,14 +526,9 @@ export async function analyzeRepo(
 }
 
 /**
- * Factory function for creating analyze-repo tool instances
+ * Analyze repository tool instance
  */
-export function createAnalyzeRepoTool(logger: Logger): {
-  name: string;
-  execute: (config: AnalyzeRepoConfig) => Promise<Result<AnalyzeRepoResult>>;
-} {
-  return {
-    name: 'analyze-repo',
-    execute: (config: AnalyzeRepoConfig) => analyzeRepo(config, logger),
-  };
-}
+export const analyzeRepoTool = {
+  name: 'analyze-repo',
+  execute: (config: AnalyzeRepoConfig, logger: Logger) => analyzeRepo(config, logger),
+};

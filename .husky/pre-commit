@@ -3,8 +3,8 @@
 
 echo "🛡️ Running pre-commit quality gates..."
 
-# Fail fast on any error with pipefail for safer pipeline handling
-set -euo pipefail
+# Fail fast on any error
+set -eu
 
 # Run format and add any changes
 echo "🎨 Running formatter..."

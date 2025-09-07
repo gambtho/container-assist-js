@@ -5,11 +5,13 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
+import * as yaml from 'js-yaml';
 import { createSessionManager } from '../lib/session';
 import { createKubernetesClient } from '../lib/kubernetes';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
+import { DEFAULT_TIMEOUTS } from '../config/defaults';
 
 export interface DeployApplicationConfig {
   sessionId: string;
@@ -53,17 +55,9 @@ function parseManifest(content: string): unknown[] {
     const parsed = JSON.parse(content);
     return Array.isArray(parsed) ? parsed : [parsed];
   } catch {
-    // For YAML, we'll do simple splitting on ---
-    // In production, use a proper YAML parser
-    const docs = content.split(/^---$/m).filter((doc) => doc.trim());
-    return docs.map((doc) => {
-      try {
-        return JSON.parse(doc) as unknown;
-      } catch {
-        // Mock parsing for YAML-like content
-        return { kind: 'Unknown', metadata: { name: 'unknown' } };
-      }
-    });
+    // Parse YAML documents (supports multi-document YAML)
+    const documents = yaml.loadAll(content);
+    return documents.filter((doc) => doc !== null && doc !== undefined);
   }
 }
 
@@ -142,7 +136,7 @@ export async function deployApplication(
 
     logger.info({ manifestCount: orderedManifests.length, dryRun }, 'Deploying manifests');
 
-    // Deploy manifests (mock for now)
+    // Deploy manifests
     const deployedResources: Array<{ kind: string; name: string; namespace: string }> = [];
 
     if (!dryRun) {
@@ -152,7 +146,7 @@ export async function deployApplication(
             kind?: string;
             metadata?: { name?: string; namespace?: string };
           };
-          // In production, use actual K8s client to apply manifest
+          // Apply manifest using K8s client
           const applyResult = await k8sClient.applyManifest(manifest, namespace);
           if (!applyResult.ok) {
             throw new Error(applyResult.error || 'Failed to apply manifest');
@@ -196,25 +190,30 @@ export async function deployApplication(
     const deploymentName = deployment?.metadata?.name ?? 'app';
     const serviceName = service?.metadata?.name ?? deploymentName;
 
-    // Wait for deployment to be ready (mock for now)
-    let ready = true;
-    let readyReplicas = 1;
+    // Wait for deployment to be ready
+    let ready = false;
+    let readyReplicas = 0;
     const totalReplicas = deployment?.spec?.replicas ?? 1;
 
     if (wait && !dryRun) {
-      // In production, actually wait for deployment
+      // Wait for deployment with configurable retry delay
       const startTime = Date.now();
+      const retryDelay = DEFAULT_TIMEOUTS.deploymentPoll || 5000;
       while (Date.now() - startTime < timeout * 1000) {
         // Check deployment status
         const statusResult = await k8sClient.getDeploymentStatus(namespace, deploymentName);
-        if (statusResult.ok && statusResult.value.ready) {
+        if (statusResult.ok && statusResult.value?.ready) {
           ready = true;
-          readyReplicas = statusResult.value.readyReplicas || 0;
+          readyReplicas = statusResult.value?.readyReplicas || 0;
           break;
         }
-        // Wait a bit before checking again
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        // Wait before checking again using configured delay
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
       }
+    } else if (dryRun) {
+      // For dry runs, mark as ready
+      ready = true;
+      readyReplicas = totalReplicas;
     }
 
     // Build endpoints

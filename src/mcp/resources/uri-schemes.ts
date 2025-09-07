@@ -33,7 +33,9 @@ export class UriParser {
 
       return Success(result);
     } catch (error) {
-      return Failure(`Failed to parse URI: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to parse URI: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 

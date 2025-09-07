@@ -40,11 +40,11 @@ export interface PrepareClusterResult {
 /**
  * Check cluster connectivity
  */
-async function checkConnectivity(k8sClient: unknown, logger: Logger): Promise<boolean> {
+async function checkConnectivity(k8sClient: any, logger: Logger): Promise<boolean> {
   try {
-    const connected = await (k8sClient as { ping: () => Promise<boolean> }).ping();
+    const connected = await k8sClient.ping();
     logger.debug({ connected }, 'Cluster connectivity check');
-    return connected as boolean;
+    return connected;
   } catch (error) {
     logger.warn({ error }, 'Cluster connectivity check failed');
     return false;
@@ -54,16 +54,11 @@ async function checkConnectivity(k8sClient: unknown, logger: Logger): Promise<bo
 /**
  * Check namespace exists
  */
-async function checkNamespace(
-  _k8sClient: unknown,
-  namespace: string,
-  logger: Logger,
-): Promise<boolean> {
+async function checkNamespace(k8sClient: any, namespace: string, logger: Logger): Promise<boolean> {
   try {
-    // In production, actually check if namespace exists
-    // For now, mock as existing
-    logger.debug({ namespace }, 'Checking namespace');
-    return true;
+    const exists = await k8sClient.namespaceExists(namespace);
+    logger.debug({ namespace, exists }, 'Checking namespace');
+    return exists;
   } catch (error) {
     logger.warn({ namespace, error }, 'Namespace check failed');
     return false;
@@ -73,11 +68,7 @@ async function checkNamespace(
 /**
  * Create namespace if needed
  */
-async function createNamespace(
-  k8sClient: unknown,
-  namespace: string,
-  logger: Logger,
-): Promise<void> {
+async function createNamespace(k8sClient: any, namespace: string, logger: Logger): Promise<void> {
   try {
     const namespaceManifest = {
       apiVersion: 'v1',
@@ -87,8 +78,12 @@ async function createNamespace(
       },
     };
 
-    await (k8sClient as { apply: (manifest: object) => Promise<void> }).apply(namespaceManifest);
-    logger.info({ namespace }, 'Namespace created');
+    const result = await k8sClient.applyManifest(namespaceManifest);
+    if (result.success) {
+      logger.info({ namespace }, 'Namespace created');
+    } else {
+      throw new Error(result.error || 'Failed to create namespace');
+    }
   } catch (error) {
     logger.error({ namespace, error }, 'Failed to create namespace');
     throw error;
@@ -98,7 +93,7 @@ async function createNamespace(
 /**
  * Setup RBAC if needed
  */
-async function setupRbac(k8sClient: unknown, namespace: string, logger: Logger): Promise<void> {
+async function setupRbac(k8sClient: any, namespace: string, logger: Logger): Promise<void> {
   try {
     // Create service account
     const serviceAccount = {
@@ -110,8 +105,12 @@ async function setupRbac(k8sClient: unknown, namespace: string, logger: Logger):
       },
     };
 
-    await (k8sClient as { apply: (manifest: object) => Promise<void> }).apply(serviceAccount);
-    logger.info({ namespace }, 'RBAC configured');
+    const result = await k8sClient.applyManifest(serviceAccount, namespace);
+    if (result.success) {
+      logger.info({ namespace }, 'RBAC configured');
+    } else {
+      logger.warn({ namespace, error: result.error }, 'RBAC setup failed');
+    }
   } catch (error) {
     logger.warn({ namespace, error }, 'RBAC setup failed');
   }
@@ -120,12 +119,11 @@ async function setupRbac(k8sClient: unknown, namespace: string, logger: Logger):
 /**
  * Check for ingress controller
  */
-async function checkIngressController(_k8sClient: unknown, logger: Logger): Promise<boolean> {
+async function checkIngressController(k8sClient: any, logger: Logger): Promise<boolean> {
   try {
-    // In production, check if ingress controller is installed
-    // For now, mock as installed
-    logger.debug('Checking for ingress controller');
-    return true;
+    const hasIngress = await k8sClient.checkIngressController();
+    logger.debug({ hasIngress }, 'Checking for ingress controller');
+    return hasIngress;
   } catch (error) {
     logger.warn({ error }, 'Ingress controller check failed');
     return false;
@@ -179,8 +177,8 @@ export async function prepareCluster(
       return Failure('Cannot connect to Kubernetes cluster');
     }
 
-    // 2. Check permissions (mock for now)
-    checks.permissions = true;
+    // 2. Check permissions
+    checks.permissions = await k8sClient.checkPermissions(namespace);
     if (!checks.permissions) {
       warnings.push('Limited permissions - some operations may fail');
     }
@@ -266,14 +264,9 @@ export async function prepareCluster(
 }
 
 /**
- * Factory function for creating prepare-cluster tool instances
+ * Prepare cluster tool instance
  */
-export function createPrepareClusterTool(logger: Logger): {
-  name: string;
-  execute: (config: PrepareClusterConfig) => Promise<Result<PrepareClusterResult>>;
-} {
-  return {
-    name: 'prepare-cluster',
-    execute: (config: PrepareClusterConfig) => prepareCluster(config, logger),
-  };
-}
+export const prepareClusterTool = {
+  name: 'prepare-cluster',
+  execute: (config: PrepareClusterConfig, logger: Logger) => prepareCluster(config, logger),
+};

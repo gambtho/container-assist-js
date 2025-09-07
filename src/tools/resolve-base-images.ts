@@ -7,6 +7,7 @@
 
 import { createSessionManager } from '../lib/session';
 import { createTimer, type Logger } from '../lib/logger';
+import { createDockerRegistryClient } from '../lib/docker-registry';
 import { Success, Failure, type Result } from '../types/core/index';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
 
@@ -105,13 +106,21 @@ async function resolveBaseImages(
 
     const [imageName, imageTag] = primaryImage.split(':');
 
+    // Get real image metadata from Docker registry
+    const registryClient = createDockerRegistryClient(logger);
+    const imageMetadata = await registryClient.getImageMetadata(
+      imageName ?? 'node',
+      imageTag ?? 'latest',
+    );
+
     const recommendation: BaseImageRecommendation = {
       sessionId,
       primaryImage: {
-        name: imageName ?? 'node',
-        tag: imageTag ?? 'latest',
-        size: 50 * 1024 * 1024, // Mock size: 50MB
-        lastUpdated: new Date().toISOString(),
+        name: imageMetadata.name,
+        tag: imageMetadata.tag,
+        digest: imageMetadata.digest,
+        size: imageMetadata.size,
+        lastUpdated: imageMetadata.lastUpdated,
       },
       alternativeImages: suggestedImages.slice(1, 3).map((img) => {
         const [name, tag] = img.split(':');
@@ -162,14 +171,9 @@ async function resolveBaseImages(
 }
 
 /**
- * Factory function for creating resolve-base-images tool instances
+ * Resolve base images tool instance
  */
-export function createResolveBaseImagesTool(logger: Logger): {
-  name: string;
-  execute: (config: ResolveBaseImagesConfig) => Promise<Result<BaseImageRecommendation>>;
-} {
-  return {
-    name: 'resolve-base-images',
-    execute: (config: ResolveBaseImagesConfig) => resolveBaseImages(config, logger),
-  };
-}
+export const resolveBaseImagesTool = {
+  name: 'resolve-base-images',
+  execute: (config: ResolveBaseImagesConfig, logger: Logger) => resolveBaseImages(config, logger),
+};

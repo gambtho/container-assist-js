@@ -383,16 +383,10 @@ async function getWorkflowStatus(
 }
 
 /**
- * Factory function for creating workflow tool instances
+ * Workflow tool instance
  */
-export function createWorkflowTool(logger: Logger): {
-  name: string;
-  execute: (config: WorkflowConfig) => Promise<Result<WorkflowResult>>;
-  getStatus: (sessionId: string) => Promise<Result<WorkflowStatusResult>>;
-} {
-  return {
-    name: 'workflow',
-    execute: (config: WorkflowConfig) => workflow(config, logger),
-    getStatus: (sessionId: string) => getWorkflowStatus(sessionId, logger),
-  };
-}
+export const workflowTool = {
+  name: 'workflow',
+  execute: (config: WorkflowConfig, logger: Logger) => workflow(config, logger),
+  getStatus: (sessionId: string, logger: Logger) => getWorkflowStatus(sessionId, logger),
+};

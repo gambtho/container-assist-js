@@ -66,9 +66,9 @@ export class AIParameterValidator {
   private schemas: Map<string, ParameterSchema> = new Map();
   private logger: Logger;
 
-  constructor(logger: Logger, apiKey?: string) {
+  constructor(logger: Logger) {
     this.logger = logger.child({ component: 'AIParameterValidator' });
-    this.aiService = createAIService(this.logger, apiKey);
+    this.aiService = createAIService(this.logger);
     this.initializeDefaultSchemas();
   }
 
@@ -107,16 +107,24 @@ export class AIParameterValidator {
           },
         ],
         contextualRules: (context) => [
-          ...(context.environment === 'production' ? [{
-            parameter: 'enableHealthCheck',
-            required: true,
-            type: 'boolean' as const,
-          }] : []),
-          ...(context.securityLevel === 'strict' ? [{
-            parameter: 'nonRootUser',
-            required: true,
-            type: 'boolean' as const,
-          }] : []),
+          ...(context.environment === 'production'
+            ? [
+                {
+                  parameter: 'enableHealthCheck',
+                  required: true,
+                  type: 'boolean' as const,
+                },
+              ]
+            : []),
+          ...(context.securityLevel === 'strict'
+            ? [
+                {
+                  parameter: 'nonRootUser',
+                  required: true,
+                  type: 'boolean' as const,
+                },
+              ]
+            : []),
         ],
       },
       {
@@ -152,12 +160,16 @@ export class AIParameterValidator {
           },
         ],
         contextualRules: (context) => [
-          ...(context.environment === 'production' ? [{
-            parameter: 'replicas',
-            required: true,
-            type: 'number' as const,
-            min: 3,
-          }] : []),
+          ...(context.environment === 'production'
+            ? [
+                {
+                  parameter: 'replicas',
+                  required: true,
+                  type: 'number' as const,
+                  min: 3,
+                },
+              ]
+            : []),
         ],
       },
       {
@@ -229,25 +241,34 @@ export class AIParameterValidator {
           },
         ],
         contextualRules: (context) => [
-          ...(context.environment === 'production' ? [{
-            parameter: 'enableGates',
-            required: true,
-            type: 'boolean' as const,
-          }, {
-            parameter: 'enableRemediation',
-            required: true,
-            type: 'boolean' as const,
-          }] : []),
-          ...(context.securityLevel === 'strict' ? [{
-            parameter: 'enableScoring',
-            required: true,
-            type: 'boolean' as const,
-          }] : []),
+          ...(context.environment === 'production'
+            ? [
+                {
+                  parameter: 'enableGates',
+                  required: true,
+                  type: 'boolean' as const,
+                },
+                {
+                  parameter: 'enableRemediation',
+                  required: true,
+                  type: 'boolean' as const,
+                },
+              ]
+            : []),
+          ...(context.securityLevel === 'strict'
+            ? [
+                {
+                  parameter: 'enableScoring',
+                  required: true,
+                  type: 'boolean' as const,
+                },
+              ]
+            : []),
         ],
       },
     ];
 
-    defaultSchemas.forEach(schema => {
+    defaultSchemas.forEach((schema) => {
       this.schemas.set(schema.toolName, schema);
     });
 
@@ -274,41 +295,55 @@ export class AIParameterValidator {
       };
 
       // Perform basic validation
-      const basicValidation = await this.performBasicValidation(schema, parameters, validationContext);
+      const basicValidation = await this.performBasicValidation(
+        schema,
+        parameters,
+        validationContext,
+      );
       if (!basicValidation.ok) {
         return basicValidation;
       }
 
       // Perform AI-powered optimization
-      const aiOptimization = await this.performAIOptimization(schema, parameters, validationContext);
+      const aiOptimization = await this.performAIOptimization(
+        schema,
+        parameters,
+        validationContext,
+      );
       if (!aiOptimization.ok) {
-        this.logger.warn({ error: aiOptimization.error }, 'AI optimization failed, using basic validation');
+        this.logger.warn(
+          { error: aiOptimization.error },
+          'AI optimization failed, using basic validation',
+        );
         return Success(basicValidation.value);
       }
 
       // Merge results
       const mergedResult: ValidationResult = {
         ...basicValidation.value,
-        suggestions: [
-          ...basicValidation.value.suggestions,
-          ...aiOptimization.value.suggestions,
-        ],
-        optimizedParameters: aiOptimization.value.optimizedParameters || basicValidation.value.optimizedParameters,
+        suggestions: [...basicValidation.value.suggestions, ...aiOptimization.value.suggestions],
+        optimizedParameters:
+          aiOptimization.value.optimizedParameters || basicValidation.value.optimizedParameters,
       };
 
-      this.logger.debug({
-        toolName,
-        isValid: mergedResult.isValid,
-        errorCount: mergedResult.errors.length,
-        warningCount: mergedResult.warnings.length,
-        suggestionCount: mergedResult.suggestions.length,
-        hasOptimizations: !!mergedResult.optimizedParameters,
-      }, 'Parameter validation completed');
+      this.logger.debug(
+        {
+          toolName,
+          isValid: mergedResult.isValid,
+          errorCount: mergedResult.errors.length,
+          warningCount: mergedResult.warnings.length,
+          suggestionCount: mergedResult.suggestions.length,
+          hasOptimizations: !!mergedResult.optimizedParameters,
+        },
+        'Parameter validation completed',
+      );
 
       return Success(mergedResult);
     } catch (error) {
       this.logger.error({ error, toolName, parameters, context }, 'Parameter validation failed');
-      return Failure(`Parameter validation failed: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Parameter validation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -319,16 +354,21 @@ export class AIParameterValidator {
     try {
       this.schemas.set(schema.toolName, schema);
 
-      this.logger.info({
-        toolName: schema.toolName,
-        parameterCount: schema.parameters.length,
-        hasContextualRules: !!schema.contextualRules,
-      }, 'Custom parameter schema registered');
+      this.logger.info(
+        {
+          toolName: schema.toolName,
+          parameterCount: schema.parameters.length,
+          hasContextualRules: !!schema.contextualRules,
+        },
+        'Custom parameter schema registered',
+      );
 
       return Success(undefined);
     } catch (error) {
       this.logger.error({ error, schema }, 'Failed to register parameter schema');
-      return Failure(`Failed to register schema: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to register schema: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -352,7 +392,7 @@ export class AIParameterValidator {
         context: {
           toolDescription: schema.description,
           partialParameters,
-          availableParameters: schema.parameters.map(p => ({
+          availableParameters: schema.parameters.map((p) => ({
             name: p.parameter,
             type: p.type,
             required: p.required,
@@ -370,15 +410,23 @@ export class AIParameterValidator {
       // Parse AI guidance into suggestions
       const suggestions = this.parseAISuggestions(aiResponse.value, schema, partialParameters);
 
-      this.logger.debug({
-        toolName,
-        suggestionCount: Object.keys(suggestions.suggestions).length,
-      }, 'Generated parameter suggestions');
+      this.logger.debug(
+        {
+          toolName,
+          suggestionCount: Object.keys(suggestions.suggestions).length,
+        },
+        'Generated parameter suggestions',
+      );
 
       return Success(suggestions);
     } catch (error) {
-      this.logger.error({ error, toolName, partialParameters, context }, 'Failed to get parameter suggestions');
-      return Failure(`Failed to get parameter suggestions: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        { error, toolName, partialParameters, context },
+        'Failed to get parameter suggestions',
+      );
+      return Failure(
+        `Failed to get parameter suggestions: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -430,7 +478,9 @@ export class AIParameterValidator {
       }
 
       if (rule.maxLength && typeof value === 'string' && value.length > rule.maxLength) {
-        errors.push(`Parameter '${rule.parameter}' must be no more than ${rule.maxLength} characters`);
+        errors.push(
+          `Parameter '${rule.parameter}' must be no more than ${rule.maxLength} characters`,
+        );
       }
 
       // Numeric validation
@@ -444,7 +494,9 @@ export class AIParameterValidator {
 
       // Allowed values validation
       if (rule.allowedValues && !rule.allowedValues.includes(value)) {
-        errors.push(`Parameter '${rule.parameter}' must be one of: ${rule.allowedValues.join(', ')}`);
+        errors.push(
+          `Parameter '${rule.parameter}' must be one of: ${rule.allowedValues.join(', ')}`,
+        );
       }
 
       // Custom validation
@@ -488,7 +540,7 @@ export class AIParameterValidator {
           toolDescription: schema.description,
           currentParameters: parameters,
           validationContext: context,
-          parameterRules: schema.parameters.map(p => ({
+          parameterRules: schema.parameters.map((p) => ({
             name: p.parameter,
             type: p.type,
             required: p.required,
@@ -519,7 +571,9 @@ export class AIParameterValidator {
         optimizedParameters: this.generateBasicOptimizations(parameters, context),
       });
     } catch (error) {
-      return Failure(`AI optimization failed: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `AI optimization failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -556,7 +610,7 @@ export class AIParameterValidator {
     const suggestions: Record<string, unknown> = {};
 
     // Use schema information for better suggestions
-    schema.parameters.forEach(param => {
+    schema.parameters.forEach((param) => {
       if (!partialParameters[param.parameter] && param.allowedValues) {
         suggestions[param.parameter] = param.allowedValues[0];
       }
@@ -581,7 +635,10 @@ export class AIParameterValidator {
   /**
    * Extract optimization suggestions from AI response
    */
-  private extractOptimizationSuggestions(aiResponse: AIResponse, context: ValidationContext): string[] {
+  private extractOptimizationSuggestions(
+    aiResponse: AIResponse,
+    context: ValidationContext,
+  ): string[] {
     const suggestions: string[] = [];
 
     if (aiResponse.context.guidance?.includes('multi-stage')) {
@@ -640,7 +697,7 @@ export class AIParameterValidator {
 
     return {
       totalSchemas: schemas.length,
-      schemasByTool: schemas.map(s => s.toolName),
+      schemasByTool: schemas.map((s) => s.toolName),
       averageParameterCount: schemas.length > 0 ? Math.round(totalParameters / schemas.length) : 0,
     };
   }

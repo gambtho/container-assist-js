@@ -31,7 +31,9 @@ export class ResourceValidator {
       const validSchemes = ['mcp', 'cache', 'session', 'temp'];
 
       if (!validSchemes.includes(url.protocol.slice(0, -1))) {
-        return Failure(`Invalid URI scheme: ${url.protocol}. Must be one of: ${validSchemes.join(', ')}`);
+        return Failure(
+          `Invalid URI scheme: ${url.protocol}. Must be one of: ${validSchemes.join(', ')}`,
+        );
       }
 
       if (!url.pathname || url.pathname === '/') {
@@ -40,7 +42,9 @@ export class ResourceValidator {
 
       return Success(undefined);
     } catch (error) {
-      return Failure(`Invalid URI format: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Invalid URI format: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -68,7 +72,9 @@ export class ResourceValidator {
       JSON.stringify(content);
       return Success(undefined);
     } catch (error) {
-      return Failure(`Content is not JSON serializable: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Content is not JSON serializable: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }
@@ -96,7 +102,10 @@ export class ProgressUtils {
         message: reportMessage,
       });
 
-      logger.debug({ token, progress: clampedProgress, message: reportMessage }, 'Progress reported');
+      logger.debug(
+        { token, progress: clampedProgress, message: reportMessage },
+        'Progress reported',
+      );
     };
   }
 
@@ -153,7 +162,9 @@ export class ProgressUtils {
     }
 
     if (!/^[a-zA-Z0-9_-]+$/.test(token)) {
-      return Failure('Progress token must contain only alphanumeric characters, underscores, and hyphens');
+      return Failure(
+        'Progress token must contain only alphanumeric characters, underscores, and hyphens',
+      );
     }
 
     return Success(undefined);
@@ -167,7 +178,11 @@ export class ErrorUtils {
   /**
    * Create a standardized error result
    */
-  static createError(message: string, code?: string, _details?: Record<string, unknown>): Result<never> {
+  static createError(
+    message: string,
+    code?: string,
+    _details?: Record<string, unknown>,
+  ): Result<never> {
     const errorMessage = code ? `[${code}] ${message}` : message;
     return Failure(errorMessage);
   }
@@ -240,7 +255,7 @@ export class ErrorUtils {
         if (logger) {
           logger.warn({ attempt, maxAttempts, error: lastError }, 'Operation failed, retrying...');
         }
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
 
@@ -284,11 +299,14 @@ export class ResourceUtils {
     // Publish
     const result = await resourceManager.publish(uri, content, ttl);
     if (result.ok && logger) {
-      logger.info({
-        uri,
-        size: sizeValidation.value,
-        ttl,
-      }, 'Resource published with validation');
+      logger.info(
+        {
+          uri,
+          size: sizeValidation.value,
+          ttl,
+        },
+        'Resource published with validation',
+      );
     }
 
     return result;
@@ -368,11 +386,14 @@ export class LoggingUtils {
     metadata: Record<string, unknown> = {},
   ): void {
     const duration = Date.now() - startTime;
-    logger.info({
-      operation,
-      duration,
-      ...metadata,
-    }, `Operation ${operation} completed in ${duration}ms`);
+    logger.info(
+      {
+        operation,
+        duration,
+        ...metadata,
+      },
+      `Operation ${operation} completed in ${duration}ms`,
+    );
   }
 
   /**
@@ -391,12 +412,15 @@ export class LoggingUtils {
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
-      logger.error({
-        operation: operationName,
-        duration,
-        error: ErrorUtils.extractErrorMessage(error),
-        ...metadata,
-      }, `Operation ${operationName} failed after ${duration}ms`);
+      logger.error(
+        {
+          operation: operationName,
+          duration,
+          error: ErrorUtils.extractErrorMessage(error),
+          ...metadata,
+        },
+        `Operation ${operationName} failed after ${duration}ms`,
+      );
       throw error;
     }
   }
@@ -414,8 +438,15 @@ export class ConfigUtils {
 
     for (const key in override) {
       if (override[key] !== undefined) {
-        if (typeof override[key] === 'object' && override[key] !== null && !Array.isArray(override[key])) {
-          result[key] = this.deepMerge(result[key] || {} as any, override[key] as any) as T[Extract<keyof T, string>];
+        if (
+          typeof override[key] === 'object' &&
+          override[key] !== null &&
+          !Array.isArray(override[key])
+        ) {
+          result[key] = this.deepMerge(
+            (result[key] || {}) as Record<string, unknown>,
+            override[key] as Record<string, unknown>,
+          ) as T[Extract<keyof T, string>];
         } else {
           result[key] = override[key] as T[Extract<keyof T, string>];
         }

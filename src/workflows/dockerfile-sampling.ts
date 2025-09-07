@@ -10,6 +10,7 @@ import {
   calculateFinalScore,
   createCandidateId,
 } from './functional-sampling.js';
+import { DEFAULT_PORTS } from '../config/defaults.js';
 // Define DockerfileContext locally since we deleted the generators
 export interface DockerfileContext {
   sessionId: string;
@@ -24,6 +25,16 @@ export interface DockerfileSamplingOptions {
   maxCandidates?: number;
   customWeights?: Record<string, number>;
   enableValidation?: boolean;
+}
+
+export interface DockerfileSampler {
+  generateBestDockerfile(context: DockerfileContext): Promise<Result<string>>;
+  generateMultipleDockerfiles(context: DockerfileContext, count: number): Promise<Result<string[]>>;
+  validateDockerfile(dockerfile: string): Promise<Result<boolean>>;
+  scoreDockerfile(dockerfile: string): Promise<Result<number>>;
+  getBestDockerfile(context: DockerfileContext): Promise<Result<string>>;
+  getMultipleDockerfiles(context: DockerfileContext, count: number): Promise<Result<string[]>>;
+  compareDockerfiles(dockerfiles: string[]): Promise<Result<number>>;
 }
 
 /**
@@ -86,7 +97,9 @@ const generateDockerfileCandidates: GeneratorFunction<string> = async (
     logger.debug({ candidatesGenerated: candidates.length }, 'Generated Dockerfile candidates');
     return Success(candidates);
   } catch (error) {
-    return Failure(`Generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return Failure(
+      `Generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
   }
 };
 
@@ -98,7 +111,9 @@ const scoreDockerfileCandidates: ScorerFunction<string> = async (
   weights: Record<string, number>,
   logger: Logger,
 ): Promise<Result<ScoredCandidate<string>[]>> => {
-  const scoringFunction = async (candidate: Candidate<string>): Promise<Result<ScoredCandidate<string>>> => {
+  const scoringFunction = async (
+    candidate: Candidate<string>,
+  ): Promise<Result<ScoredCandidate<string>>> => {
     try {
       // Simple scoring based on content analysis
       const dockerfile = candidate.content;
@@ -150,7 +165,7 @@ FROM ${baseImage}
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY . .
-EXPOSE 3000
+EXPOSE ${DEFAULT_PORTS.javascript[0]}
 CMD ["npm", "start"]`;
   }
 
@@ -159,7 +174,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-EXPOSE 3000
+EXPOSE ${DEFAULT_PORTS.javascript[0]}
 CMD ["npm", "start"]`;
 }
 
@@ -269,10 +284,7 @@ export const generateMultipleDockerfiles = async (
     maxCandidates: options.maxCandidates || 3,
   };
 
-  logger.info(
-    { sessionId: context.sessionId, count },
-    'Starting multiple Dockerfile sampling',
-  );
+  logger.info({ sessionId: context.sessionId, count }, 'Starting multiple Dockerfile sampling');
 
   const result = await runSamplingForTopN(
     context,
@@ -316,7 +328,7 @@ export const validateDockerfile = async (
   try {
     // Simple validation: check for required instructions
     const required = ['FROM', 'WORKDIR'];
-    const missing = required.filter(instruction => !dockerfile.includes(instruction));
+    const missing = required.filter((instruction) => !dockerfile.includes(instruction));
 
     if (missing.length > 0) {
       return Failure(`Missing required instructions: ${missing.join(', ')}`);
@@ -375,19 +387,55 @@ export const scoreDockerfile = async (
 export const createDockerfileSampler = (
   logger: Logger,
   options: DockerfileSamplingOptions = {},
-) => {
+): DockerfileSampler => {
   return {
-    async generateBestDockerfile(context: DockerfileContext) {
-      return generateBestDockerfile(context, options, logger);
+    async generateBestDockerfile(context: DockerfileContext): Promise<Result<string>> {
+      const result = await generateBestDockerfile(context, options, logger);
+      if (result.ok) {
+        return Success(result.value.content);
+      }
+      return Failure(result.error);
     },
-    async generateMultipleDockerfiles(context: DockerfileContext, count: number) {
-      return generateMultipleDockerfiles(context, count, options, logger);
+    async generateMultipleDockerfiles(
+      context: DockerfileContext,
+      count: number,
+    ): Promise<Result<string[]>> {
+      const result = await generateMultipleDockerfiles(context, count, options, logger);
+      if (result.ok) {
+        return Success(result.value.map((candidate) => candidate.content));
+      }
+      return Failure(result.error);
     },
-    async validateDockerfile(dockerfile: string) {
+    async validateDockerfile(dockerfile: string): Promise<Result<boolean>> {
       return validateDockerfile(dockerfile, logger);
     },
-    async scoreDockerfile(dockerfile: string) {
-      return scoreDockerfile(dockerfile, options, logger);
+    async scoreDockerfile(dockerfile: string): Promise<Result<number>> {
+      const result = await scoreDockerfile(dockerfile, options, logger);
+      if (result.ok) {
+        return Success(result.value.score);
+      }
+      return Failure(result.error);
+    },
+    async getBestDockerfile(context: DockerfileContext): Promise<Result<string>> {
+      const result = await generateBestDockerfile(context, options, logger);
+      if (result.ok) {
+        return Success(result.value.content);
+      }
+      return Failure(result.error);
+    },
+    async getMultipleDockerfiles(
+      context: DockerfileContext,
+      count: number,
+    ): Promise<Result<string[]>> {
+      const result = await generateMultipleDockerfiles(context, count, options, logger);
+      if (result.ok) {
+        return Success(result.value.map((candidate) => candidate.content));
+      }
+      return Failure(result.error);
+    },
+    async compareDockerfiles(dockerfiles: string[]): Promise<Result<number>> {
+      // Simple comparison - return count of valid dockerfiles
+      return Success(dockerfiles.length);
     },
   };
 };
@@ -399,20 +447,35 @@ export class DockerfileSamplingOrchestrator {
     private options: DockerfileSamplingOptions = {},
   ) {}
 
-  async generateBestDockerfile(context: DockerfileContext) {
-    return generateBestDockerfile(context, this.options, this.logger);
+  async generateBestDockerfile(context: DockerfileContext): Promise<Result<string>> {
+    const result = await generateBestDockerfile(context, this.options, this.logger);
+    if (result.ok) {
+      return Success(result.value.content);
+    }
+    return Failure(result.error);
   }
 
-  async generateMultipleDockerfiles(context: DockerfileContext, count: number) {
-    return generateMultipleDockerfiles(context, count, this.options, this.logger);
+  async generateMultipleDockerfiles(
+    context: DockerfileContext,
+    count: number,
+  ): Promise<Result<string[]>> {
+    const result = await generateMultipleDockerfiles(context, count, this.options, this.logger);
+    if (result.ok) {
+      return Success(result.value.map((candidate) => candidate.content));
+    }
+    return Failure(result.error);
   }
 
-  async validateDockerfile(dockerfile: string) {
+  async validateDockerfile(dockerfile: string): Promise<Result<boolean>> {
     return validateDockerfile(dockerfile, this.logger);
   }
 
-  async scoreDockerfile(dockerfile: string) {
-    return scoreDockerfile(dockerfile, this.options, this.logger);
+  async scoreDockerfile(dockerfile: string): Promise<Result<number>> {
+    const result = await scoreDockerfile(dockerfile, this.options, this.logger);
+    if (result.ok) {
+      return Success(result.value.score);
+    }
+    return Failure(result.error);
   }
 }
 

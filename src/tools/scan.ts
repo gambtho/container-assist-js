@@ -81,7 +81,7 @@ export async function scanImage(
 
     // Convert ScanResult to DockerScanResult
     const dockerScanResult: DockerScanResult = {
-      vulnerabilities: scanResult.vulnerabilities.map(v => {
+      vulnerabilities: scanResult.vulnerabilities.map((v) => {
         const vuln: any = {
           id: v.id,
           severity: v.severity as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
@@ -199,14 +199,9 @@ export async function scanImage(
 }
 
 /**
- * Factory function for creating scan tool instances
+ * Scan image tool instance
  */
-export function createScanTool(logger: Logger): {
-  name: string;
-  execute: (config: ScanImageConfig) => Promise<Result<ScanImageResult>>;
-} {
-  return {
-    name: 'scan',
-    execute: (config: ScanImageConfig) => scanImage(config, logger),
-  };
-}
+export const scanImageTool = {
+  name: 'scan',
+  execute: (config: ScanImageConfig, logger: Logger) => scanImage(config, logger),
+};

@@ -80,7 +80,7 @@ export class StageGates {
    */
   async checkAnalysisGate(analysis: AnalysisResult): Promise<Result<GateResult>> {
     const required = ['language', 'framework', 'entrypoint'];
-    const missing = required.filter(field => !analysis[field]);
+    const missing = required.filter((field) => !analysis[field]);
 
     if (missing.length > 0) {
       this.logger.warn({ missing }, 'Analysis gate failed: missing required fields');
@@ -317,7 +317,9 @@ export class StageGates {
         const result = await additionalChecks(data);
         return Success(result);
       } catch (error) {
-        return Failure(`Gate check error: ${error instanceof Error ? error.message : String(error)}`);
+        return Failure(
+          `Gate check error: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 

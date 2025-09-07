@@ -7,11 +7,7 @@
 
 import { Result } from '../../types/core.js';
 import type { Logger } from 'pino';
-import type {
-  Candidate,
-  ScoredCandidate,
-  GenerationContext,
-} from '../../lib/sampling.js';
+import type { Candidate, ScoredCandidate, GenerationContext } from '../../lib/sampling.js';
 
 // Re-export types that are still needed for compatibility
 export type { Candidate, ScoredCandidate, GenerationContext };

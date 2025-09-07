@@ -29,7 +29,6 @@ describe('Configuration Validation', () => {
     delete process.env.DOCKER_REGISTRY;
     delete process.env.KUBE_NAMESPACE;
     delete process.env.KUBECONFIG;
-    delete process.env.AI_API_KEY;
     delete process.env.AI_MODEL;
     delete process.env.AI_BASE_URL;
     delete process.env.MOCK_MODE;
@@ -76,7 +75,6 @@ describe('Configuration Validation', () => {
     it('should handle nested configuration paths', () => {
       process.env.DOCKER_HOST = '/custom/docker.sock';
       process.env.KUBE_NAMESPACE = 'production';
-      process.env.AI_API_KEY = 'test-api-key';
       process.env.AI_BASE_URL = 'https://api.custom.com';
 
       const config = createConfiguration();
@@ -158,7 +156,6 @@ describe('Configuration Validation', () => {
 
     it('should still apply environment overrides for specific environments', () => {
       process.env.MAX_SESSIONS = '50';
-      process.env.AI_API_KEY = 'production-key';
 
       const config = createConfigurationForEnv('production');
 

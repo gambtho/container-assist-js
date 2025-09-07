@@ -1,5 +1,6 @@
 import { Result, Success, Failure } from '../types/core.js';
 import type { Logger } from 'pino';
+import { DEFAULT_CACHE } from '../config/defaults.js';
 
 // Enhanced caching interfaces for sampling
 export interface CacheEntry<T> {
@@ -45,10 +46,10 @@ export class SamplingCache {
   private config: CacheConfig;
 
   private readonly DEFAULT_CONFIG: CacheConfig = {
-    maxSize: 1000,
-    maxMemory: 100 * 1024 * 1024, // 100MB
-    defaultTtl: 3600000, // 1 hour
-    cleanupInterval: 300000, // 5 minutes
+    maxSize: DEFAULT_CACHE.maxSize,
+    maxMemory: DEFAULT_CACHE.maxFileSize * 10, // 100MB (10 * default file size)
+    defaultTtl: DEFAULT_CACHE.defaultTtl,
+    cleanupInterval: DEFAULT_CACHE.cleanupInterval,
     enableCompression: false, // Would need compression library
     enableMetrics: true,
   };
@@ -104,7 +105,6 @@ export class SamplingCache {
 
       this.logger.debug({ key, size, ttl }, 'Cache entry stored');
       return Success(undefined);
-
     } catch (error) {
       const errorMessage = `Cache set failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
       this.logger.error({ key, error }, errorMessage);
@@ -139,7 +139,6 @@ export class SamplingCache {
       this.logger.debug({ key, accessCount: entry.metadata.accessCount }, 'Cache hit');
 
       return Success(entry.data);
-
     } catch (error) {
       const errorMessage = `Cache get failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
       this.logger.error({ key, error }, errorMessage);
@@ -148,14 +147,16 @@ export class SamplingCache {
   }
 
   // Invalidate entries by pattern or tags
-  async invalidate(pattern: string | { tags?: string[]; keyPattern?: string }): Promise<Result<number>> {
+  async invalidate(
+    pattern: string | { tags?: string[]; keyPattern?: string },
+  ): Promise<Result<number>> {
     try {
       let invalidatedCount = 0;
 
       if (typeof pattern === 'string') {
         // Pattern-based invalidation
         const regex = new RegExp(pattern);
-        const keysToDelete = Array.from(this.cache.keys()).filter(key => regex.test(key));
+        const keysToDelete = Array.from(this.cache.keys()).filter((key) => regex.test(key));
 
         for (const key of keysToDelete) {
           this.cache.delete(key);
@@ -170,9 +171,7 @@ export class SamplingCache {
 
           // Check tag matching
           if (pattern.tags && pattern.tags.length > 0) {
-            const hasMatchingTag = pattern.tags.some(tag =>
-              entry.metadata.tags.includes(tag),
-            );
+            const hasMatchingTag = pattern.tags.some((tag) => entry.metadata.tags.includes(tag));
             if (hasMatchingTag) shouldDelete = true;
           }
 
@@ -191,12 +190,27 @@ export class SamplingCache {
 
       this.logger.debug({ pattern, invalidatedCount }, 'Cache invalidation completed');
       return Success(invalidatedCount);
-
     } catch (error) {
       const errorMessage = `Cache invalidation failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
       this.logger.error({ pattern, error }, errorMessage);
       return Failure(errorMessage);
     }
+  }
+
+  // Get all keys matching a pattern
+  keys(pattern?: string): string[] {
+    const allKeys = Array.from(this.cache.keys());
+
+    if (!pattern) {
+      return allKeys;
+    }
+
+    // Support glob-style patterns
+    const regex = new RegExp(
+      pattern.replace(/\*/g, '.*').replace(/\?/g, '.').replace(/\[/g, '\\[').replace(/\]/g, '\\]'),
+    );
+
+    return allKeys.filter((key) => regex.test(key));
   }
 
   // Clear entire cache
@@ -208,7 +222,6 @@ export class SamplingCache {
 
       this.logger.info({ entriesCleared }, 'Cache cleared');
       return Success(undefined);
-
     } catch (error) {
       const errorMessage = `Cache clear failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
       this.logger.error({ error }, errorMessage);
@@ -237,7 +250,7 @@ export class SamplingCache {
     let hash = 0;
     for (let i = 0; i < contentStr.length; i++) {
       const char = contentStr.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32bit integer
     }
 
@@ -263,25 +276,30 @@ export class SamplingCache {
   }
 
   // Batch operations for performance
-  async setBatch<T>(entries: Array<{
-    key: string;
-    data: T;
-    options?: { ttl?: number; tags?: string[] };
-  }>): Promise<Result<void>> {
+  async setBatch<T>(
+    entries: Array<{
+      key: string;
+      data: T;
+      options?: { ttl?: number; tags?: string[] };
+    }>,
+  ): Promise<Result<void>> {
     try {
       const results = await Promise.all(
-        entries.map(entry => this.set(entry.key, (entry as any).value || (entry as any).data, entry.options)),
+        entries.map((entry) =>
+          this.set(entry.key, (entry as any).value || (entry as any).data, entry.options),
+        ),
       );
 
-      const failures = results.filter(r => !r.ok);
+      const failures = results.filter((r) => !r.ok);
       if (failures.length > 0) {
         return Failure(`Batch set had ${failures.length} failures`);
       }
 
       return Success(undefined);
-
     } catch (error) {
-      return Failure(`Batch set failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return Failure(
+        `Batch set failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -297,9 +315,10 @@ export class SamplingCache {
       }
 
       return Success(results);
-
     } catch (error) {
-      return Failure(`Batch get failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return Failure(
+        `Batch get failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -321,8 +340,7 @@ export class SamplingCache {
   }
 
   private getTotalMemoryUsage(): number {
-    return Array.from(this.cache.values())
-      .reduce((total, entry) => total + entry.metadata.size, 0);
+    return Array.from(this.cache.values()).reduce((total, entry) => total + entry.metadata.size, 0);
   }
 
   private async evictLeastRecentlyUsed(): Promise<void> {
@@ -348,7 +366,7 @@ export class SamplingCache {
 
   private startCleanupTimer(): void {
     this.cleanupTimer = setInterval(() => {
-      this.cleanup().catch(error => {
+      this.cleanup().catch((error) => {
         this.logger.error({ error }, 'Cache cleanup failed');
       });
     }, this.config.cleanupInterval);
@@ -416,7 +434,12 @@ const getGlobalCache = (logger?: Logger): SamplingCache => {
 };
 
 // Utility functions for simple resource management
-export const setResource = async (uri: string, content: unknown, ttl?: number, logger?: Logger): Promise<void> => {
+export const setResource = async (
+  uri: string,
+  content: unknown,
+  ttl?: number,
+  logger?: Logger,
+): Promise<void> => {
   const cache = getGlobalCache(logger);
   const result = await cache.set(uri, content, ttl !== undefined ? { ttl } : {});
   if (!result.ok) {

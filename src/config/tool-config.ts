@@ -32,12 +32,7 @@ export const getToolConfig = (toolName: string): ToolConfig => {
       300000,
       30000,
     ),
-    retries: validateNumber(
-      process.env[`${upperToolName}_RETRIES`] ?? '3',
-      0,
-      10,
-      3,
-    ),
+    retries: validateNumber(process.env[`${upperToolName}_RETRIES`] ?? '3', 0, 10, 3),
     enabled: process.env[`${upperToolName}_ENABLED`] !== 'false',
   };
 };

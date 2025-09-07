@@ -8,62 +8,78 @@
 import type { Logger } from 'pino';
 import { createLogger } from '../lib/logger';
 
-// Import tool creators directly
-import { createAnalyzeRepoTool } from '../tools/analyze-repo';
+// Import tool instances directly
+import { analyzeRepoTool } from '../tools/analyze-repo';
 import { buildImageTool } from '../tools/build-image';
 import { deployApplicationTool } from '../tools/deploy';
-import { createFixDockerfileTool } from '../tools/fix-dockerfile';
-import { createGenerateDockerfileTool } from '../tools/generate-dockerfile';
+import { fixDockerfileTool } from '../tools/fix-dockerfile';
+import { generateDockerfileTool } from '../tools/generate-dockerfile';
 import { generateK8sManifestsTool } from '../tools/generate-k8s-manifests';
-import { createPrepareClusterTool } from '../tools/prepare-cluster';
-import { createPushTool } from '../tools/push';
-import { createResolveBaseImagesTool } from '../tools/resolve-base-images';
-import { createScanTool } from '../tools/scan';
-import { createTagTool } from '../tools/tag';
+import { prepareClusterTool } from '../tools/prepare-cluster';
+import { pushImageTool } from '../tools/push';
+import { resolveBaseImagesTool } from '../tools/resolve-base-images';
+import { scanImageTool } from '../tools/scan';
+import { tagImageTool } from '../tools/tag';
 import { verifyDeploymentTool } from '../tools/verify-deployment';
-import { createWorkflowTool } from '../tools/workflow';
+import { workflowTool } from '../tools/workflow';
 
 /**
  * Simple tool interface - no complex metadata or validation
  */
 export interface Tool {
   name: string;
-  execute: (config: any) => Promise<any>;
-  schema?: any;
+  execute: (
+    config: Record<string, unknown>,
+  ) => Promise<import('../types/core/index.js').Result<unknown>>;
+  schema?: Record<string, unknown>;
 }
 
 /**
  * Create all tools with logger - simple factory pattern
  */
 const createAllTools = (logger: Logger): Record<string, Tool> => {
-  const analyzeRepo = createAnalyzeRepoTool(logger);
-  const buildImage = buildImageTool; // Direct tool object
-  const deploy = deployApplicationTool; // Direct tool object
-  const fixDockerfile = createFixDockerfileTool(logger);
-  const generateDockerfile = createGenerateDockerfileTool(logger);
-  const generateK8s = generateK8sManifestsTool; // Direct tool object
-  const prepareCluster = createPrepareClusterTool(logger);
-  const push = createPushTool(logger);
-  const resolveBaseImages = createResolveBaseImagesTool(logger);
-  const scan = createScanTool(logger);
-  const tag = createTagTool(logger);
-  const verifyDeployment = verifyDeploymentTool; // Direct tool object
-  const workflow = createWorkflowTool(logger);
-
+  // All tools are now direct objects that take logger as second parameter
   return {
-    'analyze-repo': { name: 'analyze-repo', execute: analyzeRepo.execute },
-    'build-image': { name: 'build-image', execute: (config: any) => buildImage.execute(config, logger) },
-    'deploy': { name: 'deploy', execute: (config: any) => deploy.execute(config, logger) },
-    'fix-dockerfile': { name: 'fix-dockerfile', execute: fixDockerfile.execute },
-    'generate-dockerfile': { name: 'generate-dockerfile', execute: generateDockerfile.execute },
-    'generate-k8s-manifests': { name: 'generate-k8s-manifests', execute: (config: any) => generateK8s.execute(config, logger) },
-    'prepare-cluster': { name: 'prepare-cluster', execute: prepareCluster.execute },
-    'push': { name: 'push', execute: push.execute },
-    'resolve-base-images': { name: 'resolve-base-images', execute: resolveBaseImages.execute },
-    'scan': { name: 'scan', execute: scan.execute },
-    'tag': { name: 'tag', execute: tag.execute },
-    'verify-deployment': { name: 'verify-deployment', execute: (config: any) => verifyDeployment.execute(config, logger) },
-    'workflow': { name: 'workflow', execute: workflow.execute },
+    'analyze-repo': {
+      name: 'analyze-repo',
+      execute: (config: any) => analyzeRepoTool.execute(config, logger),
+    },
+    'build-image': {
+      name: 'build-image',
+      execute: (config: any) => buildImageTool.execute(config, logger),
+    },
+    deploy: {
+      name: 'deploy',
+      execute: (config: any) => deployApplicationTool.execute(config, logger),
+    },
+    'fix-dockerfile': {
+      name: 'fix-dockerfile',
+      execute: (config: any) => fixDockerfileTool.execute(config, logger),
+    },
+    'generate-dockerfile': {
+      name: 'generate-dockerfile',
+      execute: (config: any) => generateDockerfileTool.execute(config, logger),
+    },
+    'generate-k8s-manifests': {
+      name: 'generate-k8s-manifests',
+      execute: (config: any) => generateK8sManifestsTool.execute(config, logger),
+    },
+    'prepare-cluster': {
+      name: 'prepare-cluster',
+      execute: (config: any) => prepareClusterTool.execute(config, logger),
+    },
+    push: { name: 'push', execute: (config: any) => pushImageTool.execute(config, logger) },
+    'resolve-base-images': {
+      name: 'resolve-base-images',
+      execute: (config: any) => resolveBaseImagesTool.execute(config, logger),
+    },
+    scan: { name: 'scan', execute: (config: any) => scanImageTool.execute(config, logger) },
+    tag: { name: 'tag', execute: (config: any) => tagImageTool.execute(config, logger) },
+    'verify-deployment': {
+      name: 'verify-deployment',
+      execute: (config: any) => verifyDeploymentTool.execute(config, logger),
+    },
+    workflow: { name: 'workflow', execute: (config: any) => workflowTool.execute(config, logger) },
   };
 };
 
@@ -124,9 +140,12 @@ export const resetTools = (): void => {
  * Simple workflow map - no complex registry
  */
 export const WORKFLOWS = {
-  'containerization': async (repoPath: string, logger: Logger) => {
+  containerization: async (repoPath: string, logger: Logger) => {
     // Simple workflow execution - no complex orchestration
-    const analyzeResult = await getTool('analyze-repo', logger)?.execute({ sessionId: 'temp', repoPath });
+    const analyzeResult = await getTool('analyze-repo', logger)?.execute({
+      sessionId: 'temp',
+      repoPath,
+    });
     if (!analyzeResult?.ok) return analyzeResult;
 
     const dockerfileResult = await getTool('generate-dockerfile', logger)?.execute({
@@ -144,7 +163,7 @@ export const WORKFLOWS = {
     return buildResult;
   },
 
-  'deployment': async (repoPath: string, logger: Logger) => {
+  deployment: async (repoPath: string, logger: Logger) => {
     // Simple deployment workflow - use repoPath for context
     const k8sResult = await getTool('generate-k8s-manifests', logger)?.execute({
       sessionId: 'temp',
@@ -165,4 +184,6 @@ export const WORKFLOWS = {
 /**
  * Get workflow by name
  */
-export const getWorkflow = (name: keyof typeof WORKFLOWS): typeof WORKFLOWS[keyof typeof WORKFLOWS] => WORKFLOWS[name];
+export const getWorkflow = (
+  name: keyof typeof WORKFLOWS,
+): (typeof WORKFLOWS)[keyof typeof WORKFLOWS] => WORKFLOWS[name];

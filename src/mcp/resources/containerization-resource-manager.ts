@@ -22,10 +22,12 @@ export interface EnhancedResource extends Resource {
   /** MCP-native resource properties */
   name: string;
   description?: string | undefined;
-  annotations?: {
-    audience?: string[];
-    priority?: number;
-  } | undefined;
+  annotations?:
+    | {
+        audience?: string[];
+        priority?: number;
+      }
+    | undefined;
 }
 
 /**
@@ -69,7 +71,7 @@ export class EnhancedResourceManager {
       'session-data',
     ];
 
-    categories.forEach(category => {
+    categories.forEach((category) => {
       this.categoryIndex.set(category, new Set());
     });
   }
@@ -115,18 +117,23 @@ export class EnhancedResourceManager {
       this.resourceIndex.set(uri, enhancedResource);
       this.categoryIndex.get(metadata.category)?.add(uri);
 
-      this.logger.info({
-        uri,
-        name: metadata.name,
-        category: metadata.category,
-        audience: metadata.annotations?.audience,
-        priority: metadata.annotations?.priority,
-      }, 'Enhanced resource published');
+      this.logger.info(
+        {
+          uri,
+          name: metadata.name,
+          category: metadata.category,
+          audience: metadata.annotations?.audience,
+          priority: metadata.annotations?.priority,
+        },
+        'Enhanced resource published',
+      );
 
       return Success(uri);
     } catch (error) {
       this.logger.error({ error, uri }, 'Failed to publish enhanced resource');
-      return Failure(`Failed to publish enhanced resource: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to publish enhanced resource: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -162,16 +169,21 @@ export class EnhancedResourceManager {
         });
       }
 
-      this.logger.debug({
-        category,
-        resourceCount: resources.length,
-        totalIndexed: this.resourceIndex.size,
-      }, 'Listed resources');
+      this.logger.debug(
+        {
+          category,
+          resourceCount: resources.length,
+          totalIndexed: this.resourceIndex.size,
+        },
+        'Listed resources',
+      );
 
       return Success({ resources });
     } catch (error) {
       this.logger.error({ error, category }, 'Failed to list resources');
-      return Failure(`Failed to list resources: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to list resources: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -191,25 +203,33 @@ export class EnhancedResourceManager {
 
       // Convert to MCP format
       const mcpResource: ReadResourceResult = {
-        contents: [{
-          uri: resource.value.uri,
-          mimeType: resource.value.mimeType,
-          text: typeof resource.value.content === 'string'
-            ? resource.value.content
-            : JSON.stringify(resource.value.content, null, 2),
-        }],
+        contents: [
+          {
+            uri: resource.value.uri,
+            mimeType: resource.value.mimeType,
+            text:
+              typeof resource.value.content === 'string'
+                ? resource.value.content
+                : JSON.stringify(resource.value.content, null, 2),
+          },
+        ],
       };
 
-      this.logger.debug({
-        uri,
-        mimeType: resource.value.mimeType,
-        size: this.getContentSize(resource.value.content),
-      }, 'Resource read');
+      this.logger.debug(
+        {
+          uri,
+          mimeType: resource.value.mimeType,
+          size: this.getContentSize(resource.value.content),
+        },
+        'Resource read',
+      );
 
       return Success(mcpResource);
     } catch (error) {
       this.logger.error({ error, uri }, 'Failed to read resource');
-      return Failure(`Failed to read resource: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to read resource: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -238,18 +258,22 @@ export class EnhancedResourceManager {
 
         // Apply filters
         if (filters) {
-          if (filters.audience && (!resource.annotations?.audience ||
-              !resource.annotations.audience.includes(filters.audience))) {
+          if (
+            filters.audience &&
+            (!resource.annotations?.audience ||
+              !resource.annotations.audience.includes(filters.audience))
+          ) {
             continue;
           }
 
-          if (filters.priority !== undefined &&
-              (resource.annotations?.priority || 0) < filters.priority) {
+          if (
+            filters.priority !== undefined &&
+            (resource.annotations?.priority || 0) < filters.priority
+          ) {
             continue;
           }
 
-          if (filters.namePattern &&
-              !new RegExp(filters.namePattern).test(resource.name)) {
+          if (filters.namePattern && !new RegExp(filters.namePattern).test(resource.name)) {
             continue;
           }
         }
@@ -267,17 +291,22 @@ export class EnhancedResourceManager {
       // Sort by priority (highest first)
       resources.sort((a, b) => (b.annotations?.priority || 0) - (a.annotations?.priority || 0));
 
-      this.logger.debug({
-        category,
-        filters,
-        resultCount: resources.length,
-        totalInCategory: categoryUris.size,
-      }, 'Filtered resources by category');
+      this.logger.debug(
+        {
+          category,
+          filters,
+          resultCount: resources.length,
+          totalInCategory: categoryUris.size,
+        },
+        'Filtered resources by category',
+      );
 
       return Success(resources);
     } catch (error) {
       this.logger.error({ error, category, filters }, 'Failed to get resources by category');
-      return Failure(`Failed to get resources by category: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to get resources by category: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -311,9 +340,10 @@ export class EnhancedResourceManager {
 
         // Content matching (expensive - only do if needed)
         if (matches && query.content) {
-          const contentStr = typeof resource.content === 'string'
-            ? resource.content
-            : JSON.stringify(resource.content);
+          const contentStr =
+            typeof resource.content === 'string'
+              ? resource.content
+              : JSON.stringify(resource.content);
 
           if (!new RegExp(query.content, 'i').test(contentStr)) {
             matches = false;
@@ -339,16 +369,21 @@ export class EnhancedResourceManager {
         return b.createdAt.getTime() - a.createdAt.getTime();
       });
 
-      this.logger.debug({
-        query,
-        resultCount: matchingResources.length,
-        searchedCount: candidateUris.length,
-      }, 'Searched resources');
+      this.logger.debug(
+        {
+          query,
+          resultCount: matchingResources.length,
+          searchedCount: candidateUris.length,
+        },
+        'Searched resources',
+      );
 
       return Success(matchingResources);
     } catch (error) {
       this.logger.error({ error, query }, 'Failed to search resources');
-      return Failure(`Failed to search resources: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to search resources: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -403,12 +438,17 @@ export class EnhancedResourceManager {
         errors++;
       }
 
-      this.logger.info({ cleaned, errors, remaining: this.resourceIndex.size }, 'Maintenance completed');
+      this.logger.info(
+        { cleaned, errors, remaining: this.resourceIndex.size },
+        'Maintenance completed',
+      );
 
       return Success({ cleaned, errors });
     } catch (error) {
       this.logger.error({ error }, 'Failed to perform maintenance');
-      return Failure(`Failed to perform maintenance: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to perform maintenance: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 

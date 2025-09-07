@@ -27,5 +27,6 @@ export const updateWorkflowState = (
   metadata: { ...current?.metadata, ...updates.metadata },
   completed_steps: updates.completed_steps ?? current?.completed_steps ?? [],
   errors: { ...current?.errors, ...updates.errors },
-  current_step: updates.current_step !== undefined ? updates.current_step : (current?.current_step ?? null),
+  current_step:
+    updates.current_step !== undefined ? updates.current_step : (current?.current_step ?? null),
 });

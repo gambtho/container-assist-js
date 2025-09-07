@@ -81,33 +81,5 @@ export function validateConfig(config: ApplicationConfig): ValidationResult {
 }
 
 /**
- * Configuration helper utilities
- */
-export const ConfigHelpers = {
-  isProduction: (config: ApplicationConfig): boolean => config.server.nodeEnv === 'production',
-  isDevelopment: (config: ApplicationConfig): boolean => config.server.nodeEnv === 'development',
-  isTest: (config: ApplicationConfig): boolean => config.server.nodeEnv === 'test',
-  parseTTL: (ttl: string): number => {
-    const match = ttl.match(/^(\d+)([hms])$/);
-    if (!match?.[1] || !match?.[2]) {
-      throw new Error(`Invalid TTL format: ${ttl}`);
-    }
-    const value = parseInt(match[1]);
-    const unit = match[2];
-
-    switch (unit) {
-      case 'h':
-        return value * 60 * 60 * 1000;
-      case 'm':
-        return value * 60 * 1000;
-      case 's':
-        return value * 1000;
-      default:
-        throw new Error(`Invalid TTL format: ${ttl}`);
-    }
-  },
-};
-
-/**
  * Validate partial configuration (for overrides)
  */

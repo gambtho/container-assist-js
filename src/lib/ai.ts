@@ -53,17 +53,20 @@ interface AIService {
   ping: () => Promise<Result<boolean>>;
 }
 
-export const createAIService = (logger: Logger, _apiKey?: string): AIService => {
+export const createAIService = (logger: Logger): AIService => {
   return {
     /**
      * Generate structured context for MCP host AI to use
      */
     async generate(request: AIRequest): Promise<Result<AIResponse>> {
       try {
-        logger.debug({
-          promptLength: request.prompt.length,
-          contextFields: Object.keys(request.context || {}),
-        }, 'Preparing context for MCP host AI');
+        logger.debug(
+          {
+            promptLength: request.prompt.length,
+            contextFields: Object.keys(request.context || {}),
+          },
+          'Preparing context for MCP host AI',
+        );
 
         // Determine context type and create appropriate guidance
         const contextData = request.context || {};
@@ -72,7 +75,8 @@ export const createAIService = (logger: Logger, _apiKey?: string): AIService => 
 
         // Dockerfile generation context
         if (request.prompt.toLowerCase().includes('dockerfile')) {
-          guidance = 'Generate an optimized Dockerfile following security best practices, using multi-stage builds when appropriate, and creating non-root users';
+          guidance =
+            'Generate an optimized Dockerfile following security best practices, using multi-stage builds when appropriate, and creating non-root users';
           template = `FROM {baseImage}
 WORKDIR /app
 RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001 -G appuser
@@ -83,8 +87,12 @@ USER appuser
         }
 
         // Kubernetes manifest generation context
-        else if (request.prompt.toLowerCase().includes('kubernetes') || request.prompt.toLowerCase().includes('k8s')) {
-          guidance = 'Generate Kubernetes manifests following best practices with proper resource limits, security contexts, and deployment strategies';
+        else if (
+          request.prompt.toLowerCase().includes('kubernetes') ||
+          request.prompt.toLowerCase().includes('k8s')
+        ) {
+          guidance =
+            'Generate Kubernetes manifests following best practices with proper resource limits, security contexts, and deployment strategies';
           template = `apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -109,8 +117,12 @@ spec:
         }
 
         // Code analysis context
-        else if (request.prompt.toLowerCase().includes('analyze') || request.prompt.toLowerCase().includes('repository')) {
-          guidance = 'Analyze the repository structure, identify the primary language and framework, detect dependencies, and suggest appropriate containerization strategies';
+        else if (
+          request.prompt.toLowerCase().includes('analyze') ||
+          request.prompt.toLowerCase().includes('repository')
+        ) {
+          guidance =
+            'Analyze the repository structure, identify the primary language and framework, detect dependencies, and suggest appropriate containerization strategies';
         }
 
         // Create structured response for MCP host AI
@@ -129,12 +141,15 @@ spec:
           },
         };
 
-        logger.info({
-          contextSize: response.metadata.contextSize,
-          dataFields: response.metadata.dataFields.length,
-          hasGuidance: response.metadata.guidance,
-          hasTemplate: response.metadata.template,
-        }, 'Context prepared for MCP host AI');
+        logger.info(
+          {
+            contextSize: response.metadata.contextSize,
+            dataFields: response.metadata.dataFields.length,
+            hasGuidance: response.metadata.guidance,
+            hasTemplate: response.metadata.template,
+          },
+          'Context prepared for MCP host AI',
+        );
 
         return Success(response);
       } catch (error) {

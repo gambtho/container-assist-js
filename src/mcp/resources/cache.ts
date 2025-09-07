@@ -59,7 +59,9 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(undefined);
     } catch (error) {
       this.logger.error({ error, key }, 'Failed to set cache entry');
-      return Failure(`Failed to set cache entry: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to set cache entry: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -83,7 +85,9 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(entry.value);
     } catch (error) {
       this.logger.error({ error, key }, 'Failed to get cache entry');
-      return Failure(`Failed to get cache entry: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to get cache entry: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -94,7 +98,9 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(deleted);
     } catch (error) {
       this.logger.error({ error, key }, 'Failed to delete cache entry');
-      return Failure(`Failed to delete cache entry: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to delete cache entry: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -106,7 +112,9 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(undefined);
     } catch (error) {
       this.logger.error({ error }, 'Failed to clear cache');
-      return Failure(`Failed to clear cache: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to clear cache: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -127,8 +135,57 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(true);
     } catch (error) {
       this.logger.error({ error, key }, 'Failed to check cache entry existence');
-      return Failure(`Failed to check cache entry existence: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to check cache entry existence: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
+  }
+
+  /**
+   * Invalidate entries matching a pattern
+   */
+  async invalidate(
+    pattern: string | { tags?: string[]; keyPattern?: string },
+  ): Promise<Result<number>> {
+    try {
+      let invalidatedCount = 0;
+      const patternStr = typeof pattern === 'string' ? pattern : pattern.keyPattern;
+
+      if (patternStr) {
+        const regex = new RegExp(patternStr);
+        for (const key of this.cache.keys()) {
+          if (regex.test(key)) {
+            this.cache.delete(key);
+            invalidatedCount++;
+          }
+        }
+      }
+
+      this.logger.debug({ pattern, invalidatedCount }, 'Cache entries invalidated');
+      return Success(invalidatedCount);
+    } catch (error) {
+      this.logger.error({ error, pattern }, 'Failed to invalidate cache entries');
+      return Failure(
+        `Failed to invalidate cache entries: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Get all keys matching a pattern
+   */
+  keys(pattern?: string): string[] {
+    const allKeys = Array.from(this.cache.keys());
+
+    if (!pattern) {
+      return allKeys;
+    }
+
+    const regex = new RegExp(
+      pattern.replace(/\*/g, '.*').replace(/\?/g, '.').replace(/\[/g, '\\[').replace(/\]/g, '\\]'),
+    );
+
+    return allKeys.filter((key) => regex.test(key));
   }
 
   /**
@@ -173,7 +230,9 @@ export class MemoryResourceCache implements ResourceCache {
       return Success(cleanedCount);
     } catch (error) {
       this.logger.error({ error }, 'Failed to cleanup expired entries');
-      return Failure(`Failed to cleanup expired entries: ${error instanceof Error ? error.message : String(error)}`);
+      return Failure(
+        `Failed to cleanup expired entries: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 

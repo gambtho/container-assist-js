@@ -9,13 +9,14 @@ export interface Resource {
   metadata?: Record<string, unknown>;
 }
 
-
 export interface ResourceCache {
   set(key: string, value: unknown, ttl?: number): Promise<Result<void>>;
   get(key: string): Promise<Result<unknown>>;
   delete(key: string): Promise<Result<boolean>>;
   clear(): Promise<Result<void>>;
   has(key: string): Promise<Result<boolean>>;
+  invalidate(pattern: string | { tags?: string[]; keyPattern?: string }): Promise<Result<number>>;
+  keys(pattern?: string): string[];
 }
 
 export const URI_SCHEMES = {

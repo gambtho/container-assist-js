@@ -59,14 +59,15 @@ export const createSecurityScanner = (logger: Logger, scannerType?: string): Sec
         // Convert DockerScanResult to ScanResult format
         const result: ScanResult = {
           imageId,
-          vulnerabilities: dockerScanResult.vulnerabilities?.map(v => ({
-            id: v.id || 'unknown',
-            severity: v.severity as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
-            package: v.package,
-            version: v.version,
-            ...(v.fixedVersion && { fixedVersion: v.fixedVersion }),
-            description: v.description || '',
-          })) || [],
+          vulnerabilities:
+            dockerScanResult.vulnerabilities?.map((v) => ({
+              id: v.id || 'unknown',
+              severity: v.severity as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
+              package: v.package,
+              version: v.version,
+              ...(v.fixedVersion && { fixedVersion: v.fixedVersion }),
+              description: v.description || '',
+            })) || [],
           totalVulnerabilities: dockerScanResult.summary?.total || 0,
           criticalCount: dockerScanResult.summary?.critical || 0,
           highCount: dockerScanResult.summary?.high || 0,
@@ -75,12 +76,15 @@ export const createSecurityScanner = (logger: Logger, scannerType?: string): Sec
           scanDate: new Date(dockerScanResult.scanTime || new Date()),
         };
 
-        logger.info({
-          imageId,
-          totalVulnerabilities: result.totalVulnerabilities,
-          criticalCount: result.criticalCount,
-          highCount: result.highCount,
-        }, 'Security scan completed');
+        logger.info(
+          {
+            imageId,
+            totalVulnerabilities: result.totalVulnerabilities,
+            criticalCount: result.criticalCount,
+            highCount: result.highCount,
+          },
+          'Security scan completed',
+        );
 
         return Success(result);
       } catch (error) {

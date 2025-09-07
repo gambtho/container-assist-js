@@ -146,7 +146,7 @@ export const selectTopN = <T>(
 /**
  * Check if early stop conditions are met based on score threshold
  */
-export const checkEarlyStop = <T>(
+const checkEarlyStop = <T>(
   scored: ScoredCandidate<T>[],
   logger: Logger,
 ): ScoredCandidate<T> | null => {
@@ -168,7 +168,7 @@ export const checkEarlyStop = <T>(
 /**
  * Deterministic tie-breaking selection with strategy preference
  */
-export const selectWithTieBreaking = <T>(
+const selectWithTieBreaking = <T>(
   scored: ScoredCandidate<T>[],
   logger: Logger,
 ): ScoredCandidate<T> => {
@@ -220,8 +220,7 @@ export const selectWithTieBreaking = <T>(
   else if (topStrategyIndex !== -1) {
     winner = top;
     reason = 'strategy_known';
-  }
-  else if (secondStrategyIndex !== -1) {
+  } else if (secondStrategyIndex !== -1) {
     winner = second;
     reason = 'strategy_known';
   }
@@ -344,11 +343,15 @@ export const runSampling = async <T>(
       });
     });
 
-    const topScore = scoreResult.value.length > 0 && scoreResult.value[0] ? scoreResult.value[0].score : 0;
+    const topScore =
+      scoreResult.value.length > 0 && scoreResult.value[0] ? scoreResult.value[0].score : 0;
     logSamplingEvent(logger, 'scoring/end', {
       sessionId: context.sessionId,
       topScore,
-      averageScore: scoreResult.value.length > 0 ? scoreResult.value.reduce((sum, c) => sum + c.score, 0) / scoreResult.value.length : 0,
+      averageScore:
+        scoreResult.value.length > 0
+          ? scoreResult.value.reduce((sum, c) => sum + c.score, 0) / scoreResult.value.length
+          : 0,
     });
 
     // Check for early stop condition
@@ -373,7 +376,10 @@ export const runSampling = async <T>(
         winnerId: winner.id,
         winnerScore: winner.score,
         strategy: winner.metadata.strategy,
-        margin: scoreResult.value.length > 1 && scoreResult.value[1] ? winner.score - scoreResult.value[1].score : 0,
+        margin:
+          scoreResult.value.length > 1 && scoreResult.value[1]
+            ? winner.score - scoreResult.value[1].score
+            : 0,
       });
 
       logSamplingEvent(logger, 'end', {
@@ -391,9 +397,10 @@ export const runSampling = async <T>(
         sessionId: context.sessionId,
         error: error instanceof Error ? error.message : 'Unknown selection error',
       });
-      return Failure(`Selection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return Failure(
+        `Selection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
-
   } catch (error) {
     const errorMessage = `Sampling failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
 
@@ -467,7 +474,7 @@ export const runSamplingForTopN = async <T>(
       requestedCount: topN,
       topScore: topResult.value[0]?.score,
       lowestScore: topResult.value[topResult.value.length - 1]?.score,
-      selectedStrategies: topResult.value.map(c => c.metadata.strategy).join(','),
+      selectedStrategies: topResult.value.map((c) => c.metadata.strategy).join(','),
     });
 
     logSamplingEvent(logger, 'multiple/end', {

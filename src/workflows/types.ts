@@ -185,30 +185,3 @@ export interface ToolResult<T = unknown> {
   error?: string;
   metadata?: Record<string, unknown>;
 }
-
-/**
- * Workflow error types
- */
-export enum WorkflowErrorType {
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
-  TOOL_EXECUTION_ERROR = 'TOOL_EXECUTION_ERROR',
-  SESSION_ERROR = 'SESSION_ERROR',
-  INFRASTRUCTURE_ERROR = 'INFRASTRUCTURE_ERROR',
-  TIMEOUT_ERROR = 'TIMEOUT_ERROR',
-  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
-}
-
-/**
- * Workflow error class
- */
-export class WorkflowError extends Error {
-  constructor(
-    message: string,
-    public type: WorkflowErrorType,
-    public step?: string,
-    public details?: unknown,
-  ) {
-    super(message);
-    this.name = 'WorkflowError';
-  }
-}

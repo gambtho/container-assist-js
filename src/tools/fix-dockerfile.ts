@@ -120,14 +120,9 @@ CMD ["npm", "start"]`;
 }
 
 /**
- * Factory function for creating fix-dockerfile tool instances
+ * Fix dockerfile tool instance
  */
-export function createFixDockerfileTool(logger: Logger): {
-  name: string;
-  execute: (config: FixDockerfileConfig) => Promise<Result<FixDockerfileResult>>;
-} {
-  return {
-    name: 'fix-dockerfile',
-    execute: (config: FixDockerfileConfig) => fixDockerfile(config, logger),
-  };
-}
+export const fixDockerfileTool = {
+  name: 'fix-dockerfile',
+  execute: (config: FixDockerfileConfig, logger: Logger) => fixDockerfile(config, logger),
+};

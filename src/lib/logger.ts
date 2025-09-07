@@ -35,76 +35,91 @@ export function createLogger(options: pino.LoggerOptions = {}): pino.Logger {
 // Singleton pattern removed - use createLogger directly
 
 /**
- * Performance timer utility for measuring operation duration
+ * Performance timer interface
  */
-class PerformanceTimer {
-  private startTime: number;
-  private logger: pino.Logger;
-  private operation: string;
-  private context: Record<string, unknown>;
-
-  constructor(logger: pino.Logger, operation: string, context: Record<string, unknown> = {}) {
-    this.logger = logger;
-    this.operation = operation;
-    this.context = context;
-    this.startTime = Date.now();
-
-    this.logger.debug({ operation, ...context }, `Starting ${operation}`);
-  }
-
-  end(additionalContext: Record<string, unknown> = {}): void {
-    const duration = Date.now() - this.startTime;
-
-    this.logger.info(
-      {
-        operation: this.operation,
-        duration_ms: duration,
-        ...this.context,
-        ...additionalContext,
-      },
-      `Completed ${this.operation} in ${duration}ms`,
-    );
-  }
-
-  error(error: unknown, additionalContext: Record<string, unknown> = {}): void {
-    const duration = Date.now() - this.startTime;
-
-    this.logger.error(
-      {
-        operation: this.operation,
-        duration_ms: duration,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        ...this.context,
-        ...additionalContext,
-      },
-      `Failed ${this.operation} after ${duration}ms`,
-    );
-  }
+export interface Timer {
+  end: (additionalContext?: Record<string, unknown>) => void;
+  error: (error: unknown, additionalContext?: Record<string, unknown>) => void;
+  checkpoint: (label: string, additionalContext?: Record<string, unknown>) => number;
 }
 
 /**
- * Create a performance timer for an operation
+ * Create a performance timer for an operation - functional approach
  */
 export function createTimer(
   logger: pino.Logger,
   operation: string,
   context: Record<string, unknown> = {},
-): PerformanceTimer {
-  return new PerformanceTimer(logger, operation, context);
+): Timer {
+  const startTime = Date.now();
+
+  // Log start of operation
+  logger.debug({ operation, ...context }, `Starting ${operation}`);
+
+  return {
+    end(additionalContext: Record<string, unknown> = {}): void {
+      const duration = Date.now() - startTime;
+
+      logger.info(
+        {
+          operation,
+          duration_ms: duration,
+          ...context,
+          ...additionalContext,
+        },
+        `Completed ${operation} in ${duration}ms`,
+      );
+    },
+
+    error(error: unknown, additionalContext: Record<string, unknown> = {}): void {
+      const duration = Date.now() - startTime;
+
+      logger.error(
+        {
+          operation,
+          duration_ms: duration,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          ...context,
+          ...additionalContext,
+        },
+        `Failed ${operation} after ${duration}ms`,
+      );
+    },
+
+    checkpoint(label: string, additionalContext: Record<string, unknown> = {}): number {
+      const elapsed = Date.now() - startTime;
+
+      logger.debug(
+        {
+          operation,
+          checkpoint: label,
+          elapsed_ms: elapsed,
+          ...context,
+          ...additionalContext,
+        },
+        `${operation} checkpoint: ${label} at ${elapsed}ms`,
+      );
+
+      return elapsed;
+    },
+  };
 }
 
 /**
- * Create a child logger with additional context
+ * Simple timer without logging - useful for pure timing
  */
+export function startTimer(): {
+  elapsed: () => number;
+  stop: () => number;
+} {
+  const startTime = Date.now();
 
-/**
- * Helper to create a logger for a specific component
- */
-
-/**
- * Helper to create a logger for a specific tool
- */
+  return {
+    elapsed: () => Date.now() - startTime,
+    stop: () => Date.now() - startTime,
+  };
+}
 
 /**
  * Log a sampling event with structured data
@@ -114,11 +129,14 @@ export function logSamplingEvent(
   event: string,
   data: Record<string, unknown>,
 ): void {
-  logger.info({
-    event_type: 'sampling',
-    event_name: event,
-    ...data,
-  }, `Sampling: ${event}`);
+  logger.info(
+    {
+      event_type: 'sampling',
+      event_name: event,
+      ...data,
+    },
+    `Sampling: ${event}`,
+  );
 }
 
 /**
@@ -127,13 +145,25 @@ export function logSamplingEvent(
 export function logOrchestratorEvent(
   logger: pino.Logger,
   phase: string,
-  event: 'start' | 'end' | 'failure' | 'attempt' | 'patches_applied' | 'scan_result' | 'success' | 'max_attempts' | 'no_improvement',
+  event:
+    | 'start'
+    | 'end'
+    | 'failure'
+    | 'attempt'
+    | 'patches_applied'
+    | 'scan_result'
+    | 'success'
+    | 'max_attempts'
+    | 'no_improvement',
   data?: Record<string, unknown>,
 ): void {
-  logger.info({
-    event_type: 'orchestrator',
-    phase,
-    event,
-    ...data,
-  }, `Orchestrator: ${phase} ${event}`);
+  logger.info(
+    {
+      event_type: 'orchestrator',
+      phase,
+      event,
+      ...data,
+    },
+    `Orchestrator: ${phase} ${event}`,
+  );
 }

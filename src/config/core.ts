@@ -26,7 +26,6 @@ export interface SessionConfig {
   cleanupInterval: number;
 }
 
-
 // Docker Configuration - Essential for containerization
 export interface DockerConfig {
   socketPath: string;

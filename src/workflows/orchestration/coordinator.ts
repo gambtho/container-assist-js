@@ -8,8 +8,16 @@
 
 import { Result } from '../../types/core.js';
 import type { Logger } from 'pino';
-import { runContainerizationWorkflow, runBuildOnlyWorkflow, type WorkflowConfig as SimpleWorkflowConfig } from '../containerization-workflow.js';
-import { runEnhancedWorkflow, runEnhancedBuildWorkflow, type EnhancedWorkflowConfig } from '../orchestrated-workflow.js';
+import {
+  runContainerizationWorkflow,
+  runBuildOnlyWorkflow,
+  type WorkflowConfig as SimpleWorkflowConfig,
+} from '../containerization-workflow.js';
+import {
+  runEnhancedWorkflow,
+  runEnhancedBuildWorkflow,
+  type EnhancedWorkflowConfig,
+} from '../orchestrated-workflow.js';
 
 /**
  * Unified WorkflowCoordinator - supports both simple and enhanced workflows

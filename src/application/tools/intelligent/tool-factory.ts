@@ -6,7 +6,10 @@
  */
 
 import type { Logger } from 'pino';
-import { EnhancedResourceManager, type ResourceCategory } from '../../../mcp/resources/enhanced-resource-manager.js';
+import {
+  EnhancedResourceManager,
+  type ResourceCategory,
+} from '../../../mcp/resources/enhanced-resource-manager.js';
 import { PromptTemplatesManager, type TemplateContext } from './prompt-templates.js';
 import { AIParameterValidator, type ValidationContext } from './ai-parameter-validator.js';
 import type { McpResourceManager } from '../../../mcp/resources/manager.js';
@@ -20,7 +23,6 @@ export interface EnhancedToolsConfig {
   enableAIValidation?: boolean;
   enablePromptTemplates?: boolean;
   enableResourceManagement?: boolean;
-  aiApiKey?: string;
 }
 
 /**
@@ -40,106 +42,120 @@ export interface EnhancedTools {
       description?: string;
       priority?: number;
       audience?: string[];
-    }
+    },
   ) => Promise<Result<string>>;
 
   validateToolParameters: (
     toolName: string,
     parameters: Record<string, unknown>,
-    context?: ValidationContext
+    context?: ValidationContext,
   ) => Promise<Result<import('./ai-parameter-validator.js').ValidationResult>>;
 
   getContextualPrompt: (
     promptName: string,
-    context?: TemplateContext
+    context?: TemplateContext,
   ) => Promise<Result<import('@modelcontextprotocol/sdk/types.js').GetPromptResult>>;
 }
 
 /**
- * Enhanced Tools Factory
+ * Create enhanced tools suite - Pure factory function
  */
-export class EnhancedToolsFactory {
-  private static instance: EnhancedTools | null = null;
+export async function createEnhancedTools(
+  baseResourceManager: McpResourceManager,
+  logger: Logger,
+  config: EnhancedToolsConfig = {},
+): Promise<Result<EnhancedTools>> {
+  try {
+    const enhancedResourceManager = new EnhancedResourceManager(baseResourceManager, logger);
+    const promptTemplates = new PromptTemplatesManager(logger);
+    const aiValidator = new AIParameterValidator(logger);
 
-  /**
-   * Create enhanced tools suite
-   */
-  static async create(
-    baseResourceManager: McpResourceManager,
-    logger: Logger,
-    config: EnhancedToolsConfig = {},
-  ): Promise<Result<EnhancedTools>> {
-    try {
-      const enhancedResourceManager = new EnhancedResourceManager(baseResourceManager, logger);
-      const promptTemplates = new PromptTemplatesManager(logger);
-      const aiValidator = new AIParameterValidator(logger, config.aiApiKey);
+    const tools: EnhancedTools = {
+      resourceManager: enhancedResourceManager,
+      promptTemplates,
+      aiValidator,
 
-      const tools: EnhancedTools = {
-        resourceManager: enhancedResourceManager,
-        promptTemplates,
-        aiValidator,
+      // Convenience method for publishing workflow artifacts
+      async publishWorkflowArtifact(name, content, category, metadata = {}) {
+        const uri = `workflow://${category}/${name}-${Date.now()}`;
 
-        // Convenience method for publishing workflow artifacts
-        async publishWorkflowArtifact(name, content, category, metadata = {}) {
-          const uri = `workflow://${category}/${name}-${Date.now()}`;
+        return await enhancedResourceManager.publishEnhanced(uri, content, {
+          name,
+          description: metadata.description || `${category} artifact: ${name}`,
+          category,
+          annotations: {
+            audience: metadata.audience || ['workflow'],
+            priority: metadata.priority || 1,
+          },
+        });
+      },
 
-          return await enhancedResourceManager.publishEnhanced(
-            uri,
-            content,
-            {
-              name,
-              description: metadata.description || `${category} artifact: ${name}`,
-              category,
-              annotations: {
-                audience: metadata.audience || ['workflow'],
-                priority: metadata.priority || 1,
-              },
-            },
-          );
-        },
+      // Convenience method for validating tool parameters
+      async validateToolParameters(toolName, parameters, context) {
+        return await aiValidator.validateParameters(toolName, parameters, context);
+      },
 
-        // Convenience method for validating tool parameters
-        async validateToolParameters(toolName, parameters, context) {
-          return await aiValidator.validateParameters(toolName, parameters, context);
-        },
+      // Convenience method for getting contextual prompts
+      async getContextualPrompt(promptName, context) {
+        return await promptTemplates.getPrompt(promptName, context);
+      },
+    };
 
-        // Convenience method for getting contextual prompts
-        async getContextualPrompt(promptName, context) {
-          return await promptTemplates.getPrompt(promptName, context);
-        },
-      };
-
-      EnhancedToolsFactory.instance = tools;
-
-      logger.info({
+    logger.info(
+      {
         resourceManagerEnabled: !!config.enableResourceManagement,
         promptTemplatesEnabled: !!config.enablePromptTemplates,
         aiValidationEnabled: !!config.enableAIValidation,
         resourceStats: enhancedResourceManager.getStats(),
         promptStats: promptTemplates.getStats(),
         validatorStats: aiValidator.getStats(),
-      }, 'Enhanced tools suite created');
+      },
+      'Enhanced tools suite created',
+    );
 
-      return Success(tools);
-    } catch (error) {
-      logger.error({ error, config }, 'Failed to create enhanced tools suite');
-      return Failure(`Failed to create enhanced tools: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    return Success(tools);
+  } catch (error) {
+    logger.error({ error, config }, 'Failed to create enhanced tools suite');
+    return Failure(
+      `Failed to create enhanced tools: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+// Application-level singleton management (if needed)
+let enhancedToolsInstance: EnhancedTools | null = null;
+
+/**
+ * Get or create enhanced tools instance (for backward compatibility)
+ */
+export async function getOrCreateEnhancedTools(
+  baseResourceManager: McpResourceManager,
+  logger: Logger,
+  config: EnhancedToolsConfig = {},
+): Promise<Result<EnhancedTools>> {
+  if (enhancedToolsInstance) {
+    return Success(enhancedToolsInstance);
   }
 
-  /**
-   * Get existing enhanced tools instance
-   */
-  static getInstance(): EnhancedTools | null {
-    return EnhancedToolsFactory.instance;
+  const result = await createEnhancedTools(baseResourceManager, logger, config);
+  if (result.ok) {
+    enhancedToolsInstance = result.value;
   }
+  return result;
+}
 
-  /**
-   * Reset the singleton instance (for testing)
-   */
-  static reset(): void {
-    EnhancedToolsFactory.instance = null;
-  }
+/**
+ * Get existing enhanced tools instance (for backward compatibility)
+ */
+export function getEnhancedToolsInstance(): EnhancedTools | null {
+  return enhancedToolsInstance;
+}
+
+/**
+ * Reset the singleton instance (for testing)
+ */
+export function resetEnhancedToolsInstance(): void {
+  enhancedToolsInstance = null;
 }
 
 /**
@@ -168,7 +184,7 @@ export const createEnhancedWorkflowConfig = async (
   maxRemediationAttempts: number;
   aiValidator?: AIParameterValidator;
 }> => {
-  const tools = EnhancedToolsFactory.getInstance();
+  const tools = getEnhancedToolsInstance();
 
   // Environment-based defaults
   const defaults = {
@@ -211,28 +227,5 @@ export const createEnhancedWorkflowConfig = async (
     securityLevel: options.securityLevel ?? envDefaults.securityLevel,
     maxRemediationAttempts: envDefaults.maxRemediationAttempts,
     ...(tools && { aiValidator: tools.aiValidator }),
-  };
-};
-
-/**
- * Get enhanced tools statistics
- */
-export const getEnhancedToolsStats = (): {
-  available: boolean;
-  resources?: ReturnType<EnhancedResourceManager['getStats']>;
-  prompts?: ReturnType<PromptTemplatesManager['getStats']>;
-  validator?: ReturnType<AIParameterValidator['getStats']>;
-} => {
-  const tools = EnhancedToolsFactory.getInstance();
-
-  if (!tools) {
-    return { available: false };
-  }
-
-  return {
-    available: true,
-    resources: tools.resourceManager.getStats(),
-    prompts: tools.promptTemplates.getStats(),
-    validator: tools.aiValidator.getStats(),
   };
 };

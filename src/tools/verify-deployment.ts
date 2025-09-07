@@ -10,6 +10,7 @@ import { createKubernetesClient } from '../lib/kubernetes';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
 import type { WorkflowState } from '../types/session';
+import { DEFAULT_TIMEOUTS } from '../config/defaults';
 
 export interface VerifyDeploymentConfig {
   sessionId: string;
@@ -57,7 +58,7 @@ export interface VerifyDeploymentResult {
  * Check deployment health
  */
 async function checkDeploymentHealth(
-  k8sClient: unknown,
+  k8sClient: any,
   namespace: string,
   deploymentName: string,
   timeout: number,
@@ -69,33 +70,23 @@ async function checkDeploymentHealth(
   message: string;
 }> {
   const startTime = Date.now();
+  const pollInterval = DEFAULT_TIMEOUTS.healthCheck || 5000;
 
   while (Date.now() - startTime < timeout * 1000) {
-    const status = await (
-      k8sClient as {
-        getDeploymentStatus: (
-          ns: string,
-          name: string,
-        ) => Promise<{
-          ready?: boolean;
-          readyReplicas?: number;
-          totalReplicas?: number;
-        }>;
-      }
-    ).getDeploymentStatus(namespace, deploymentName);
+    const statusResult = await k8sClient.getDeploymentStatus(namespace, deploymentName);
 
-    if (status?.ready) {
+    if (statusResult.ok && statusResult.value?.ready) {
       return {
         ready: true,
-        readyReplicas: status.readyReplicas ?? 0,
-        totalReplicas: status.totalReplicas ?? 0,
+        readyReplicas: statusResult.value.readyReplicas ?? 0,
+        totalReplicas: statusResult.value.totalReplicas ?? 0,
         status: 'healthy',
         message: 'Deployment is healthy and ready',
       };
     }
 
-    // Wait before checking again
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    // Wait before checking again using configured interval
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
   }
 
   return {
@@ -110,11 +101,36 @@ async function checkDeploymentHealth(
 /**
  * Check endpoint health
  */
-async function checkEndpointHealth(_url: string): Promise<boolean> {
+async function checkEndpointHealth(url: string): Promise<boolean> {
   try {
-    // In production, make actual HTTP request
-    // For now, mock as healthy
-    return true;
+    // Make HTTP health check request
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUTS.healthCheck || 5000);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'containerization-assist-health-check',
+        },
+      });
+
+      clearTimeout(timeoutId);
+
+      // Consider 2xx and 3xx responses as healthy
+      return response.ok || (response.status >= 300 && response.status < 400);
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+
+      // If it's an abort error, the request timed out
+      if (fetchError.name === 'AbortError') {
+        return false;
+      }
+
+      // For other errors (network issues, etc.), consider unhealthy
+      return false;
+    }
   } catch {
     return false;
   }

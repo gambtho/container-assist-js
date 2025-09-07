@@ -84,6 +84,8 @@ export async function pushImage(
       return Failure(`Failed to push image: ${pushResult.error ?? 'Unknown error'}`);
     }
 
+    const { digest } = pushResult.value;
+
     // Update session with push results
     const currentState = session.workflow_state as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState, {
@@ -92,7 +94,7 @@ export async function pushImage(
         ...(currentState?.metadata ?? {}),
         pushResult: {
           registry,
-          digest: 'sha256:placeholder-digest', // Would come from Docker in real implementation
+          digest,
           pushedTags: [imageTag],
           timestamp: new Date().toISOString(),
         },
@@ -106,14 +108,14 @@ export async function pushImage(
     timer.end({
       imageTag,
       registry,
-      digest: 'sha256:placeholder-digest',
+      digest,
     });
 
     logger.info(
       {
         imageTag,
         registry,
-        digest: 'sha256:placeholder-digest',
+        digest,
       },
       'Image push completed',
     );
@@ -122,7 +124,7 @@ export async function pushImage(
       success: true,
       sessionId,
       registry,
-      digest: 'sha256:placeholder-digest',
+      digest,
       pushedTags: [imageTag],
     });
   } catch (error) {
@@ -134,14 +136,9 @@ export async function pushImage(
 }
 
 /**
- * Factory function for creating push tool instances
+ * Push image tool instance
  */
-export function createPushTool(logger: Logger): {
-  name: string;
-  execute: (config: PushImageConfig) => Promise<Result<PushImageResult>>;
-} {
-  return {
-    name: 'push',
-    execute: (config: PushImageConfig) => pushImage(config, logger),
-  };
-}
+export const pushImageTool = {
+  name: 'push',
+  execute: (config: PushImageConfig, logger: Logger) => pushImage(config, logger),
+};

@@ -7,6 +7,15 @@
 
 import type { CoreConfig, NodeEnv, LogLevel, WorkflowMode, StoreType } from './core';
 
+// Simple logger for config validation - use stderr to avoid interfering with stdout
+const logger = {
+  warn: (message: string) => {
+    if (process.env.NODE_ENV !== 'test') {
+      process.stderr.write(`[CONFIG-WARN] ${message}\n`);
+    }
+  },
+};
+
 /**
  * Parse integer with default value and error handling
  */
@@ -18,7 +27,7 @@ function parseIntWithDefault(
   if (!value) return defaultValue;
   const parsed = parseInt(value, 10);
   if (isNaN(parsed)) {
-    console.warn(`Invalid ${envVarName}: '${value}'. Using default: ${defaultValue}`);
+    logger.warn(`Invalid ${envVarName}: '${value}'. Using default: ${defaultValue}`);
     return defaultValue;
   }
   return parsed;
@@ -49,7 +58,6 @@ export function mapEnvironmentToConfig(): Partial<CoreConfig> {
         ? parseInt(process.env.SESSION_CLEANUP_INTERVAL)
         : 300000,
     },
-
 
     docker: {
       socketPath: process.env.DOCKER_HOST ?? '/var/run/docker.sock',

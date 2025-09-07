@@ -8,14 +8,26 @@
 
 import type { Logger } from 'pino';
 import { Result, Success, Failure } from '../types/core';
-import { runContainerizationWorkflow, runBuildOnlyWorkflow, type WorkflowConfig } from './containerization-workflow';
+import {
+  runContainerizationWorkflow,
+  runBuildOnlyWorkflow,
+  type WorkflowConfig,
+} from './containerization-workflow';
 import { logOrchestratorEvent } from '../lib/logger';
 import { getConfig } from '../config/runtime-config';
-import { generateBestDockerfile, type DockerfileContext, type DockerfileSamplingOptions } from './dockerfile-sampling';
+import {
+  generateBestDockerfile,
+  type DockerfileContext,
+  type DockerfileSamplingOptions,
+} from './dockerfile-sampling';
 import { ORCHESTRATOR_CONFIG } from '../config/orchestrator-config';
 import { buildArtifactUri, ARTIFACT_SCHEMES } from '../mcp/resources/artifact-schemes';
 import type { McpResourceManager } from '../mcp/resources/manager';
-import { AIParameterValidator, type ValidationContext } from '../application/tools/enhanced/ai-parameter-validator';
+import {
+  AIParameterValidator,
+  type ValidationContext,
+} from '../application/tools/enhanced/ai-parameter-validator';
+import { DEFAULT_PORTS } from '../config/defaults';
 
 /**
  * Enhanced workflow configuration
@@ -114,9 +126,9 @@ const scoreResult = (phase: string, data: any, logger: Logger): number => {
         const { critical = 0, high = 0, medium = 0, low = 0 } = data.summary;
         let score = 100;
         score -= critical * 25; // -25 per critical
-        score -= high * 10;     // -10 per high
-        score -= medium * 5;    // -5 per medium
-        score -= low * 1;       // -1 per low
+        score -= high * 10; // -10 per high
+        score -= medium * 5; // -5 per medium
+        score -= low * 1; // -1 per low
         return Math.max(0, score);
       }
       return 50; // Default score if no data
@@ -156,20 +168,25 @@ const publishPhaseArtifacts = async (
     await resourceManager.publish(uri, data);
     publishedArtifacts.push(uri);
 
-    logger?.info({
-      event_type: 'orchestrator',
-      event_name: 'artifact_published',
-      phase,
-      sessionId,
-      uri,
-    }, 'Artifact published');
-
+    logger?.info(
+      {
+        event_type: 'orchestrator',
+        event_name: 'artifact_published',
+        phase,
+        sessionId,
+        uri,
+      },
+      'Artifact published',
+    );
   } catch (error) {
-    logger?.error({
-      phase,
-      sessionId,
-      error: error instanceof Error ? error.message : String(error),
-    }, 'Failed to publish artifact');
+    logger?.error(
+      {
+        phase,
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Failed to publish artifact',
+    );
   }
 
   return publishedArtifacts;
@@ -222,7 +239,12 @@ const generateRemediationPatches = (scanResult: any): string[] => {
 
   // Common remediation strategies
   if (vulnerabilities.critical > 0 || vulnerabilities.high > 2) {
-    patches.push('update_base_image', 'add_security_cleanup', 'remove_package_cache', 'add_nonroot_user');
+    patches.push(
+      'update_base_image',
+      'add_security_cleanup',
+      'remove_package_cache',
+      'add_nonroot_user',
+    );
   }
 
   if (vulnerabilities.medium > 5) {
@@ -266,7 +288,10 @@ RUN rm -rf /var/lib/apt/lists/* \\
       break;
 
     case 'remove_package_cache':
-      remediated = remediated.replace(/RUN\s+npm\s+install(?!\s+--no-cache)/g, 'RUN npm install --no-cache');
+      remediated = remediated.replace(
+        /RUN\s+npm\s+install(?!\s+--no-cache)/g,
+        'RUN npm install --no-cache',
+      );
       remediated = remediated.replace(/RUN\s+pip\s+install/g, 'RUN pip install --no-cache-dir');
       break;
 
@@ -294,7 +319,7 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*`;
         const healthCheck = `
 # Add health check for security monitoring
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
-  CMD curl -f http://localhost:\${PORT:-3000}/health || exit 1`;
+  CMD curl -f http://localhost:\${PORT:-${DEFAULT_PORTS.javascript[0]}}/health || exit 1`;
         remediated = remediated.replace(/(EXPOSE.*)$/m, `$1${healthCheck}`);
       }
       break;
@@ -312,7 +337,12 @@ const runScanRemediation = async (
   sessionId: string,
   logger: Logger,
   config: EnhancedWorkflowConfig,
-): Promise<{ dockerfile: string; successful: boolean; attempts: number; appliedPatches: string[] }> => {
+): Promise<{
+  dockerfile: string;
+  successful: boolean;
+  attempts: number;
+  appliedPatches: string[];
+}> => {
   const maxAttempts = config.maxRemediationAttempts || 3;
   let currentDockerfile = dockerfile;
   let currentScanResult = scanResult;
@@ -400,11 +430,16 @@ const runScanRemediation = async (
     }
   }
 
-  logOrchestratorEvent(logger, 'remediation', attempts >= maxAttempts ? 'max_attempts' : 'no_improvement', {
-    sessionId,
-    attempts,
-    finalVulnerabilities: currentScanResult?.summary || currentScanResult?.vulnerabilities,
-  });
+  logOrchestratorEvent(
+    logger,
+    'remediation',
+    attempts >= maxAttempts ? 'max_attempts' : 'no_improvement',
+    {
+      sessionId,
+      attempts,
+      finalVulnerabilities: currentScanResult?.summary || currentScanResult?.vulnerabilities,
+    },
+  );
 
   return {
     dockerfile: currentDockerfile,
@@ -485,11 +520,14 @@ export const runEnhancedWorkflow = async (
         // Apply AI optimizations if available
         if (validationResult.value.optimizedParameters) {
           const optimizations = validationResult.value.optimizedParameters;
-          logger.info({
-            sessionId,
-            optimizations,
-            suggestions: validationResult.value.suggestions,
-          }, 'AI parameter optimizations applied');
+          logger.info(
+            {
+              sessionId,
+              optimizations,
+              suggestions: validationResult.value.suggestions,
+            },
+            'AI parameter optimizations applied',
+          );
 
           // Update config with optimizations
           Object.assign(config, optimizations);
@@ -501,7 +539,10 @@ export const runEnhancedWorkflow = async (
           hasOptimizations: !!validationResult.value.optimizedParameters,
         });
       } else {
-        logger.warn({ error: validationResult.error }, 'AI validation failed, proceeding with original parameters');
+        logger.warn(
+          { error: validationResult.error },
+          'AI validation failed, proceeding with original parameters',
+        );
       }
     }
 
@@ -543,12 +584,19 @@ export const runEnhancedWorkflow = async (
         enableValidation: true,
       };
 
-      const samplingResult = await generateBestDockerfile(dockerfileContext, samplingOptions, logger);
+      const samplingResult = await generateBestDockerfile(
+        dockerfileContext,
+        samplingOptions,
+        logger,
+      );
       const samplingDuration = Date.now() - samplingStartTime;
 
       if (!samplingResult.ok) {
         result.errors?.push(`Dockerfile sampling failed: ${samplingResult.error}`);
-        logOrchestratorEvent(logger, 'dockerfile-sampling', 'failure', { sessionId, error: samplingResult.error });
+        logOrchestratorEvent(logger, 'dockerfile-sampling', 'failure', {
+          sessionId,
+          error: samplingResult.error,
+        });
         return Success(result);
       }
 
@@ -610,7 +658,12 @@ export const runEnhancedWorkflow = async (
     result.success = baseResult.ok;
 
     // Enhanced features: Remediation loops for scan failures
-    if (config.enableRemediation && result.scanResult && result.dockerfile && !passesScanThresholds(result.scanResult)) {
+    if (
+      config.enableRemediation &&
+      result.scanResult &&
+      result.dockerfile &&
+      !passesScanThresholds(result.scanResult)
+    ) {
       logger.info({ sessionId }, 'Scan failed thresholds, attempting remediation');
 
       const remediationResult = await runScanRemediation(
@@ -631,20 +684,26 @@ export const runEnhancedWorkflow = async (
 
       // Update dockerfile and scan result if remediation was successful
       if (remediationResult.successful) {
-        logger.info({
-          sessionId,
-          attempts: remediationResult.attempts,
-          patches: remediationResult.appliedPatches,
-        }, 'Remediation successful - Dockerfile updated');
+        logger.info(
+          {
+            sessionId,
+            attempts: remediationResult.attempts,
+            patches: remediationResult.appliedPatches,
+          },
+          'Remediation successful - Dockerfile updated',
+        );
 
         result.dockerfile = remediationResult.dockerfile;
         result.success = true;
       } else {
-        logger.warn({
-          sessionId,
-          attempts: remediationResult.attempts,
-          patches: remediationResult.appliedPatches,
-        }, 'Remediation failed - security thresholds not met');
+        logger.warn(
+          {
+            sessionId,
+            attempts: remediationResult.attempts,
+            patches: remediationResult.appliedPatches,
+          },
+          'Remediation failed - security thresholds not met',
+        );
 
         // Still update the dockerfile with applied patches even if not fully successful
         result.dockerfile = remediationResult.dockerfile;
@@ -662,7 +721,11 @@ export const runEnhancedWorkflow = async (
       }
 
       if (result.dockerfile) {
-        result.gateResults!.dockerfile = validatePhaseGate('dockerfile', { content: result.dockerfile }, logger);
+        result.gateResults!.dockerfile = validatePhaseGate(
+          'dockerfile',
+          { content: result.dockerfile },
+          logger,
+        );
       }
 
       if (result.imageId) {
@@ -687,7 +750,11 @@ export const runEnhancedWorkflow = async (
       logger.info('Running enhanced scoring');
 
       if (result.dockerfile) {
-        result.scores!.dockerfile = scoreResult('dockerfile', { content: result.dockerfile }, logger);
+        result.scores!.dockerfile = scoreResult(
+          'dockerfile',
+          { content: result.dockerfile },
+          logger,
+        );
       }
 
       if (result.scanResult) {
@@ -700,22 +767,46 @@ export const runEnhancedWorkflow = async (
       logger.info('Publishing artifacts');
 
       if (result.analysis) {
-        const analysisArtifacts = await publishPhaseArtifacts('analysis', sessionId, result.analysis, config.resourceManager, logger);
+        const analysisArtifacts = await publishPhaseArtifacts(
+          'analysis',
+          sessionId,
+          result.analysis,
+          config.resourceManager,
+          logger,
+        );
         result.artifacts?.push(...analysisArtifacts);
       }
 
       if (result.dockerfile) {
-        const dockerfileArtifacts = await publishPhaseArtifacts('dockerfile', sessionId, { content: result.dockerfile }, config.resourceManager, logger);
+        const dockerfileArtifacts = await publishPhaseArtifacts(
+          'dockerfile',
+          sessionId,
+          { content: result.dockerfile },
+          config.resourceManager,
+          logger,
+        );
         result.artifacts?.push(...dockerfileArtifacts);
       }
 
       if (result.imageId) {
-        const buildArtifacts = await publishPhaseArtifacts('build', sessionId, { imageId: result.imageId }, config.resourceManager, logger);
+        const buildArtifacts = await publishPhaseArtifacts(
+          'build',
+          sessionId,
+          { imageId: result.imageId },
+          config.resourceManager,
+          logger,
+        );
         result.artifacts?.push(...buildArtifacts);
       }
 
       if (result.scanResult) {
-        const scanArtifacts = await publishPhaseArtifacts('scan', sessionId, result.scanResult, config.resourceManager, logger);
+        const scanArtifacts = await publishPhaseArtifacts(
+          'scan',
+          sessionId,
+          result.scanResult,
+          config.resourceManager,
+          logger,
+        );
         result.artifacts?.push(...scanArtifacts);
       }
     } else if (config.enableArtifactPublishing) {
@@ -744,7 +835,6 @@ export const runEnhancedWorkflow = async (
     });
 
     return Success(result);
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     result.errors?.push(errorMessage);
@@ -793,7 +883,6 @@ export const runEnhancedBuildWorkflow = async (
     };
 
     return Success(result);
-
   } catch (error) {
     return Failure(error instanceof Error ? error.message : String(error));
   }

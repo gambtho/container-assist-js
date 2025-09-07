@@ -15,7 +15,7 @@ export const ARTIFACT_SCHEMES = {
   VERIFY: 'verify',
 } as const;
 
-export type ArtifactScheme = typeof ARTIFACT_SCHEMES[keyof typeof ARTIFACT_SCHEMES];
+export type ArtifactScheme = (typeof ARTIFACT_SCHEMES)[keyof typeof ARTIFACT_SCHEMES];
 
 /**
  * Build an artifact URI for a specific stage and session
@@ -66,5 +66,5 @@ export function parseArtifactUri(uri: string): {
  */
 export function isArtifactUri(uri: string): boolean {
   const schemes = Object.values(ARTIFACT_SCHEMES);
-  return schemes.some(scheme => uri.startsWith(`${scheme}://`));
+  return schemes.some((scheme) => uri.startsWith(`${scheme}://`));
 }

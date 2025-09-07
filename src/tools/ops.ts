@@ -202,14 +202,9 @@ async function ops(config: OpsConfig, logger: Logger): Promise<Result<OpsResult>
 }
 
 /**
- * Factory function for creating ops tool instances
+ * Ops tool instance
  */
-export function createOpsTool(logger: Logger): {
-  name: string;
-  execute: (config: OpsConfig) => Promise<Result<OpsResult>>;
-} {
-  return {
-    name: 'ops',
-    execute: (config: OpsConfig) => ops(config, logger),
-  };
-}
+export const opsTool = {
+  name: 'ops',
+  execute: (config: OpsConfig, logger: Logger) => ops(config, logger),
+};

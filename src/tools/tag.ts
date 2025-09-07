@@ -102,14 +102,9 @@ export async function tagImage(
 }
 
 /**
- * Factory function for creating tag tool instances
+ * Tag image tool instance
  */
-export function createTagTool(logger: Logger): {
-  name: string;
-  execute: (config: TagImageConfig) => Promise<Result<TagImageResult>>;
-} {
-  return {
-    name: 'tag',
-    execute: (config: TagImageConfig) => tagImage(config, logger),
-  };
-}
+export const tagImageTool = {
+  name: 'tag',
+  execute: (config: TagImageConfig, logger: Logger) => tagImage(config, logger),
+};

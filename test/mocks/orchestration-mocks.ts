@@ -19,7 +19,7 @@ import type {
 } from '../../lib/sampling.js';
 
 // Mock Resource Manager (MCP dependency) - implements interface methods only
-export const createMockResourceManager = (logger: Logger) => ({
+export const createMockResourceManager = (logger: Logger): ResourceManager => ({
   async publish(uri: string, _content: unknown, ttl?: number): Promise<Result<string>> {
     logger.debug({ uri, ttl }, 'Mock: Publishing resource');
     return Success(uri);
@@ -323,7 +323,8 @@ export const createMockEnhancedTools = (logger: Logger): Record<string, Enhanced
         ok: true,
         content: {
           vulnerabilities,
-          riskScore: vulnerabilities.critical * 10 + vulnerabilities.high * 5 + vulnerabilities.medium * 2 + vulnerabilities.low * 0.5,
+          riskScore: vulnerabilities.critical * 10 + vulnerabilities.high * 5 +
+            vulnerabilities.medium * 2 + vulnerabilities.low * 0.5,
           needsRemediation: vulnerabilities.critical > 0 || vulnerabilities.high > 2,
         },
         resources: {

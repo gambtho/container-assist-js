@@ -39,13 +39,13 @@ export const scanWithTrivy = async (
   options: ScanOptions = {},
 ): Promise<Result<DockerScanResult>> => {
   try {
-    const { severity = 'CRITICAL,HIGH,MEDIUM,LOW', ignoreUnfixed = false, timeout = 120000 } = options;
+    const {
+      severity = 'CRITICAL,HIGH,MEDIUM,LOW',
+      ignoreUnfixed = false,
+      timeout = 120000,
+    } = options;
 
-    const args = [
-      'image',
-      '--format', 'json',
-      '--severity', severity,
-    ];
+    const args = ['image', '--format', 'json', '--severity', severity];
 
     if (ignoreUnfixed) {
       args.push('--ignore-unfixed');
@@ -58,7 +58,9 @@ export const scanWithTrivy = async (
 
     return parseTrivyOutput(stdout, imageName);
   } catch (error) {
-    return Failure(`Trivy scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return Failure(
+      `Trivy scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
   }
 };
 
@@ -71,7 +73,10 @@ export const mockScan = async (imageName: string): Promise<Result<DockerScanResu
   const isNode = imageName.toLowerCase().includes('node');
   const isOld = imageName.includes(':3.7') || imageName.includes('debian:8');
 
-  let critical = 0, high = 0, medium = 0, low = 0;
+  let critical = 0,
+    high = 0,
+    medium = 0,
+    low = 0;
   const vulnerabilities: Array<{
     id?: string;
     severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
@@ -118,7 +123,7 @@ export const mockScan = async (imageName: string): Promise<Result<DockerScanResu
     });
   }
 
-  await new Promise(resolve => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 100));
 
   return Success({
     vulnerabilities,
@@ -166,7 +171,11 @@ const parseTrivyOutput = (output: string, imageName: string): Result<DockerScanR
       description?: string;
     }> = [];
     let total = 0;
-    let critical = 0, high = 0, medium = 0, low = 0, unknown = 0;
+    let critical = 0,
+      high = 0,
+      medium = 0,
+      low = 0,
+      unknown = 0;
 
     if (trivyResult.Results) {
       for (const result of trivyResult.Results) {
@@ -177,17 +186,32 @@ const parseTrivyOutput = (output: string, imageName: string): Result<DockerScanR
               package: vuln.PkgName || 'unknown',
               version: vuln.InstalledVersion || 'unknown',
               fixedVersion: vuln.FixedVersion,
-              severity: (vuln.Severity?.toUpperCase() || 'UNKNOWN') as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN',
+              severity: (vuln.Severity?.toUpperCase() || 'UNKNOWN') as
+                | 'CRITICAL'
+                | 'HIGH'
+                | 'MEDIUM'
+                | 'LOW'
+                | 'UNKNOWN',
               description: vuln.Description || vuln.Title,
             });
 
             total++;
             switch (vuln.Severity?.toLowerCase()) {
-              case 'critical': critical++; break;
-              case 'high': high++; break;
-              case 'medium': medium++; break;
-              case 'low': low++; break;
-              default: unknown++; break;
+              case 'critical':
+                critical++;
+                break;
+              case 'high':
+                high++;
+                break;
+              case 'medium':
+                medium++;
+                break;
+              case 'low':
+                low++;
+                break;
+              default:
+                unknown++;
+                break;
             }
           }
         }
@@ -204,6 +228,8 @@ const parseTrivyOutput = (output: string, imageName: string): Result<DockerScanR
       },
     });
   } catch (error) {
-    return Failure(`Failed to parse Trivy output: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return Failure(
+      `Failed to parse Trivy output: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
   }
 };

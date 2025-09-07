@@ -39,14 +39,14 @@ export const ORCHESTRATOR_CONFIG = {
 
   // Build size limits
   BUILD_SIZE_LIMITS: {
-    sanityFactor: 1.25,  // Build should not be more than 25% larger than best candidate
-    rejectFactor: 2.5,   // Reject if more than 2.5x larger
+    sanityFactor: 1.25, // Build should not be more than 25% larger than best candidate
+    rejectFactor: 2.5, // Reject if more than 2.5x larger
   },
 
   // Verification timeouts
   VERIFY_TIMEOUTS: {
-    readySeconds: 300,   // 5 minutes for container to be ready
-    totalSeconds: 600,   // 10 minutes total timeout
+    readySeconds: 300, // 5 minutes for container to be ready
+    totalSeconds: 600, // 10 minutes total timeout
   },
 
   STAGES: {
@@ -86,7 +86,9 @@ export type OrchestratorConfig = typeof ORCHESTRATOR_CONFIG;
 /**
  * Helper to get stage configuration
  */
-export function getStageConfig(stage: keyof typeof ORCHESTRATOR_CONFIG.STAGES): typeof ORCHESTRATOR_CONFIG.STAGES[keyof typeof ORCHESTRATOR_CONFIG.STAGES] {
+export function getStageConfig(
+  stage: keyof typeof ORCHESTRATOR_CONFIG.STAGES,
+): (typeof ORCHESTRATOR_CONFIG.STAGES)[keyof typeof ORCHESTRATOR_CONFIG.STAGES] {
   return ORCHESTRATOR_CONFIG.STAGES[stage];
 }
 

@@ -150,7 +150,6 @@ export type WorkflowState = {
   stage?: string;
 };
 
-
 // Simple session filter interface
 export interface SessionFilter {
   includeMetadata?: boolean;

@@ -431,5 +431,6 @@ export async function generateK8sManifests(
  */
 export const generateK8sManifestsTool = {
   name: 'generate-k8s-manifests',
-  execute: (config: GenerateK8sManifestsConfig, logger: Logger) => generateK8sManifests(config, logger),
+  execute: (config: GenerateK8sManifestsConfig, logger: Logger) =>
+    generateK8sManifests(config, logger),
 };

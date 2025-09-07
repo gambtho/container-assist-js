@@ -9,6 +9,7 @@ import { createAIService } from '../lib/ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
+import { getDefaultPort } from '../config/defaults';
 
 /**
  * Configuration for Dockerfile generation
@@ -224,15 +225,16 @@ ${getBuildCommands(analysis, 'single')}
 `;
   }
 
-  // Add ports
-  const ports = analysis.ports ?? [3000];
+  // Add ports - use defaults if not specified
+  const defaultPort = getDefaultPort(analysis.language || 'javascript');
+  const ports = analysis.ports && analysis.ports.length > 0 ? analysis.ports : [defaultPort];
   ports.forEach((port: number) => {
     dockerfile += `EXPOSE ${port}\n`;
   });
 
   // Add health check if requested
   if (options.includeHealthcheck) {
-    const primaryPort = ports[0] ?? 3000;
+    const primaryPort = ports[0] ?? defaultPort;
     dockerfile += `
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
@@ -326,17 +328,21 @@ export async function generateDockerfile(
           ports: analysisResult.ports,
           optimization,
           multistage,
-          baseImage: config.baseImage ?? getRecommendedBaseImage(analysisResult.language ?? 'unknown'),
+          baseImage:
+            config.baseImage ?? getRecommendedBaseImage(analysisResult.language ?? 'unknown'),
           generatedContent: dockerfileContent,
         },
       });
 
       if (aiResponse.ok) {
-        logger.debug({
-          contextSize: aiResponse.value.metadata.contextSize,
-          hasGuidance: aiResponse.value.metadata.guidance,
-          hasTemplate: aiResponse.value.metadata.template,
-        }, 'Context prepared for MCP host AI');
+        logger.debug(
+          {
+            contextSize: aiResponse.value.metadata.contextSize,
+            hasGuidance: aiResponse.value.metadata.guidance,
+            hasTemplate: aiResponse.value.metadata.template,
+          },
+          'Context prepared for MCP host AI',
+        );
 
         // Store the context in workflow state for MCP host to access
         const currentWorkflowState = session.workflow_state as WorkflowState | undefined;
@@ -417,14 +423,9 @@ export async function generateDockerfile(
 }
 
 /**
- * Factory function for creating generate-dockerfile tool instances
+ * Generate dockerfile tool instance
  */
-export function createGenerateDockerfileTool(logger: Logger): {
-  name: string;
-  execute: (config: GenerateDockerfileConfig) => Promise<Result<GenerateDockerfileResult>>;
-} {
-  return {
-    name: 'generate-dockerfile',
-    execute: (config: GenerateDockerfileConfig) => generateDockerfile(config, logger),
-  };
-}
+export const generateDockerfileTool = {
+  name: 'generate-dockerfile',
+  execute: (config: GenerateDockerfileConfig, logger: Logger) => generateDockerfile(config, logger),
+};
