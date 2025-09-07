@@ -18,6 +18,7 @@ import type {
   ToolParameters,
   ToolResult,
 } from '../../../types/ai-service.js';
+import type { AIEnhancementService } from '../../ai/enhancement-service.js';
 
 // Extended Tool interface for intelligent capabilities
 export interface Tool extends BaseTool {
@@ -79,7 +80,7 @@ export function withAIValidation(aiService: AIService, sessionManager: SessionMa
 }
 
 /**
- * Add AI result analysis to a tool
+ * Add AI result analysis to a tool (Legacy - for backward compatibility)
  */
 export function withAIAnalysis(aiService: AIService, sessionManager: SessionManager) {
   return <T extends Tool>(tool: T): T => ({
@@ -124,6 +125,57 @@ export function withAIAnalysis(aiService: AIService, sessionManager: SessionMana
             aiAnalyzed: true,
           },
         });
+      }
+
+      return result;
+    },
+  });
+}
+
+/**
+ * Add centralized AI enhancement to a tool (Modern - using centralized service)
+ */
+export function withCentralizedAI(aiEnhancementService: AIEnhancementService) {
+  return <T extends Tool>(tool: T): T => ({
+    ...tool,
+    execute: async (params: ToolParameters, logger: Logger) => {
+      const result = await tool.execute(params, logger);
+
+      // Only enhance successful results when AI is requested
+      if (!result.ok || params.enableAI === false || !aiEnhancementService.isAvailable()) {
+        return result;
+      }
+
+      try {
+        const enhancementResult = await aiEnhancementService.enhanceTool(tool.name, result.value, {
+          metadata: (params.context || {}) as Record<string, unknown>,
+          requirements: {
+            securityLevel: params.securityLevel as any,
+            optimization: params.optimization as any,
+            environment: params.environment as any,
+          },
+        });
+
+        if (enhancementResult.ok && enhancementResult.value.enhanced) {
+          const enhancement = enhancementResult.value;
+
+          return Success({
+            ...result.value,
+            aiInsights: enhancement.insights,
+            aiRecommendations: enhancement.recommendations,
+            aiWarnings: enhancement.warnings,
+            metadata: {
+              ...result.value.metadata,
+              aiEnhanced: true,
+              aiProvider: enhancement.metadata.aiProvider,
+              enhancementType: enhancement.metadata.enhancementType,
+              processingTime: enhancement.metadata.processingTime,
+              confidence: enhancement.metadata.confidence,
+            },
+          });
+        }
+      } catch (error) {
+        logger.warn({ tool: tool.name, error }, 'Centralized AI enhancement failed');
       }
 
       return result;
@@ -301,14 +353,14 @@ export function withProgressReporting() {
     executeEnhanced: async (params: ToolParameters, context: ToolContext) => {
       const { progressReporter } = context;
 
-      void progressReporter?.(0, `Starting ${tool.name}...`);
-      void progressReporter?.(30, `Executing ${tool.name}...`);
+      void progressReporter?.({ progress: 0 });
+      void progressReporter?.({ progress: 30 });
 
       const result = tool.executeEnhanced
         ? await tool.executeEnhanced(params, context)
         : await tool.execute(params, context.logger);
 
-      void progressReporter?.(100, 'Complete');
+      void progressReporter?.({ progress: 100 });
 
       return result;
     },
@@ -396,7 +448,7 @@ export const enhanceForAI = <T extends Tool>(
 };
 
 /**
- * Create production-ready tool with all enhancements
+ * Create production-ready tool with all enhancements (Legacy)
  */
 export const enhanceForProduction = <T extends Tool>(
   tool: T,
@@ -417,30 +469,84 @@ export const enhanceForProduction = <T extends Tool>(
   return pipe(...enhancers)(tool);
 };
 
-/** @deprecated Use enhanceWithDefaults, enhanceForAI, or enhanceForProduction instead */
-export function createIntelligentTool<T extends Tool>(
+/**
+ * Create standardized production tool with centralized AI enhancement
+ */
+export const createProductionTool = <T extends Tool>(
   tool: T,
-  options: {
-    aiService?: AIService;
-    sessionManager?: SessionManager;
+  config: {
+    logger: Logger;
+    aiEnhancementService?: AIEnhancementService;
     metricsCollector?: MetricsCollector;
-    logger?: Logger;
+    sessionManager?: SessionManager;
     retry?: { attempts?: number; delay?: number; backoff?: boolean };
-    enableProgress?: boolean;
+  },
+): T => {
+  const enhancers = [withLogging(config.logger)];
+
+  // Add metrics if available
+  if (config.metricsCollector) {
+    enhancers.push(withMetrics(config.metricsCollector));
+  }
+
+  // Add retry with default settings
+  const retryConfig = config.retry || { attempts: 3, delay: 1000, backoff: true };
+  enhancers.push(withRetry(retryConfig));
+
+  // Add session tracking if available
+  if (config.sessionManager) {
+    enhancers.push(withSessionTracking(config.sessionManager));
+  }
+
+  // Add centralized AI enhancement if available
+  if (config.aiEnhancementService) {
+    enhancers.push(withCentralizedAI(config.aiEnhancementService));
+  }
+
+  return pipe(...enhancers)(tool);
+};
+
+/**
+ * Create enhanced tool with all modern capabilities
+ */
+export const createEnhancedTool = <T extends Tool>(
+  baseTool: T,
+  config: {
+    logger: Logger;
+    aiEnhancementService?: AIEnhancementService;
+    metricsCollector?: MetricsCollector;
+    sessionManager?: SessionManager;
+    enableRetry?: boolean;
+    enableProgressReporting?: boolean;
     enableCancellation?: boolean;
-  } = {},
-): T {
-  // Fallback to new API for backward compatibility
-  if (options.aiService && options.sessionManager && options.logger) {
-    return enhanceForAI(tool, options.aiService, options.sessionManager, options.logger);
+  },
+): T => {
+  let enhanced = baseTool;
+
+  // Apply enhancements in order
+  enhanced = pipe(
+    withLogging(config.logger),
+    ...(config.metricsCollector ? [withMetrics(config.metricsCollector)] : []),
+    ...(config.enableRetry ? [withRetry({ attempts: 3, delay: 1000, backoff: true })] : []),
+    ...(config.sessionManager ? [withSessionTracking(config.sessionManager)] : []),
+    ...(config.aiEnhancementService ? [withCentralizedAI(config.aiEnhancementService)] : []),
+  )(enhanced);
+
+  // Apply intelligent tool enhancements if requested
+  if (config.enableProgressReporting || config.enableCancellation) {
+    const intelligentTool = enhanced as IntelligentTool;
+
+    if (config.enableProgressReporting) {
+      enhanced = withProgressReporting()(intelligentTool) as T;
+    }
+
+    if (config.enableCancellation) {
+      enhanced = withCancellation()(intelligentTool) as T;
+    }
   }
 
-  if (options.logger) {
-    return enhanceForProduction(tool, options.logger, options.metricsCollector, options.retry);
-  }
-
-  return tool;
-}
+  return enhanced;
+};
 
 // Helper functions
 function applyOptimizations(params: ToolParameters, suggestions: string[]): ToolParameters {

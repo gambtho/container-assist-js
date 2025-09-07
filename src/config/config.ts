@@ -3,6 +3,7 @@
  */
 
 import type { ApplicationConfig } from './types';
+import { DEFAULT_NETWORK, DEFAULT_TIMEOUTS, getDefaultPort } from './defaults';
 
 /**
  * Create default configuration with sensible defaults
@@ -10,11 +11,13 @@ import type { ApplicationConfig } from './types';
  */
 function createDefaultConfig(): ApplicationConfig {
   return {
+    logLevel: 'info',
+    workspaceDir: process.cwd(),
     server: {
       nodeEnv: 'development',
       logLevel: 'info',
-      port: 3000,
-      host: 'localhost',
+      port: getDefaultPort('javascript'),
+      host: DEFAULT_NETWORK.host,
     },
     session: {
       store: 'memory',
@@ -22,52 +25,7 @@ function createDefaultConfig(): ApplicationConfig {
       maxSessions: 1000,
       persistencePath: './data/sessions.db',
       persistenceInterval: 60000, // 1min
-      cleanupInterval: 300000, // 5min
-    },
-    docker: {
-      socketPath: '/var/run/docker.sock',
-      registry: 'docker.io',
-      host: 'localhost',
-      port: 2375,
-      timeout: 30000,
-      apiVersion: '1.41',
-      buildArgs: {},
-    },
-    kubernetes: {
-      kubeconfig: '~/.kube/config',
-      namespace: 'default',
-      context: 'default',
-      timeout: 30000,
-      dryRun: false,
-    },
-    workflow: {
-      mode: 'interactive',
-      autoRetry: true,
-      maxRetries: 3,
-      retryDelayMs: 1000,
-      parallelSteps: false,
-    },
-
-    mcp: {
-      storePath: './data/sessions.db',
-      sessionTTL: '24h',
-      maxSessions: 100,
-      enableMetrics: true,
-      enableEvents: true,
-    },
-    workspace: {
-      workspaceDir: process.cwd(),
-      tempDir: './tmp',
-      cleanupOnExit: true,
-    },
-    logging: {
-      level: 'info',
-      format: 'pretty',
-      destination: 'console',
-      filePath: './logs/app.log',
-      maxFileSize: '10MB',
-      maxFiles: 5,
-      enableColors: true,
+      cleanupInterval: DEFAULT_TIMEOUTS.cacheCleanup,
     },
   };
 }

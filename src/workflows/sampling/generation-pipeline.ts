@@ -3,16 +3,17 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../types/core';
+import { Success, Failure, isFail, type Result } from '../../types/core';
+import { DEFAULT_TIMEOUTS, getDefaultPort } from '../../config/defaults';
 import type {
   SamplingConfig,
   SamplingResult,
   DockerfileContext,
   DockerfileVariant,
-  ScoredVariant,
   ScoringCriteria,
 } from './types';
 import { StrategyEngine } from './strategy-engine';
+import { SDKPromptRegistry } from '../../mcp/prompts/sdk-prompt-registry.js';
 import { VariantScorer, DEFAULT_SCORING_CRITERIA } from './scorer';
 import { analyzeRepo } from '../../tools/analyze-repo';
 
@@ -58,8 +59,12 @@ export class SamplingValidator {
       return Failure('Variant count must be between 1 and 10');
     }
 
-    if (config.timeout && (config.timeout < 5000 || config.timeout > 300000)) {
-      return Failure('Timeout must be between 5 seconds and 5 minutes');
+    const minTimeout = 5000; // 5 seconds
+    const maxTimeout = DEFAULT_TIMEOUTS.dockerBuild; // 5 minutes
+    if (config.timeout && (config.timeout < minTimeout || config.timeout > maxTimeout)) {
+      return Failure(
+        `Timeout must be between ${minTimeout / 1000} seconds and ${maxTimeout / 1000 / 60} minutes`,
+      );
     }
 
     return Success(undefined);
@@ -122,8 +127,11 @@ export class VariantGenerationPipeline {
   private strategyEngine: StrategyEngine;
   private scorer: VariantScorer;
 
-  constructor(private logger: Logger) {
-    this.strategyEngine = new StrategyEngine(logger);
+  constructor(
+    private logger: Logger,
+    promptRegistry?: SDKPromptRegistry,
+  ) {
+    this.strategyEngine = new StrategyEngine(logger, promptRegistry);
     this.scorer = new VariantScorer(logger);
   }
 
@@ -193,11 +201,11 @@ export class VariantGenerationPipeline {
       const criteria = await this.prepareScoringCriteria(config.criteria, context);
 
       const scoredVariantsResult = await this.scorer.scoreVariants(variants, criteria);
-      if (!scoredVariantsResult.ok) {
+      if (isFail(scoredVariantsResult)) {
         return Failure(`Variant scoring failed: ${scoredVariantsResult.error}`);
       }
 
-      const scoredVariants = this.combineVariantsWithScores(variants, scoredVariantsResult.value);
+      const scoredVariants = scoredVariantsResult.value;
       const scoringEnd = Date.now();
 
       // Step 4: Select best variant
@@ -228,8 +236,8 @@ export class VariantGenerationPipeline {
         {
           sessionId: config.sessionId,
           totalVariants: result.variants.length,
-          bestVariant: result.bestVariant.id,
-          bestScore: result.bestVariant.score.total,
+          bestVariant: result.bestVariant?.id ?? 'none',
+          bestScore: result.bestVariant?.score?.total ?? 0,
           totalDuration: endTime - startTime,
         },
         'Dockerfile sampling completed successfully',
@@ -279,11 +287,15 @@ export class VariantGenerationPipeline {
         repoPath: config.repoPath,
         analysis: {
           language: analysis.language || 'javascript',
-          framework: analysis.framework,
+          ...(analysis.framework && { framework: analysis.framework }),
           packageManager: this.detectPackageManager(analysis),
-          dependencies: analysis.dependencies || [],
+          dependencies: Array.isArray(analysis.dependencies)
+            ? analysis.dependencies.map((dep: any) =>
+                typeof dep === 'string' ? dep : dep.name || String(dep),
+              )
+            : [],
           buildTools: this.extractBuildTools(analysis),
-          testFramework: analysis.testFramework,
+          ...(analysis.framework && { testFramework: analysis.framework }),
           hasDatabase: this.detectDatabaseUsage(analysis),
           ports: this.extractPorts(analysis),
           environmentVars: this.extractEnvironmentVars(analysis),
@@ -291,8 +303,7 @@ export class VariantGenerationPipeline {
         constraints: {
           targetEnvironment: this.determineEnvironment(config),
           securityLevel: this.determineSecurityLevel(config),
-          maxImageSize: config.constraints?.maxImageSize,
-          buildTimeLimit: config.timeout,
+          ...(config.timeout && { buildTimeLimit: config.timeout }),
         },
       };
 
@@ -321,32 +332,6 @@ export class VariantGenerationPipeline {
     // Use environment-based preset if no custom criteria
     const environment = context?.constraints.targetEnvironment || 'production';
     return this.scorer.getScoringPreset(environment);
-  }
-
-  /**
-   * Combine variants with their scores
-   */
-  private combineVariantsWithScores(
-    variants: DockerfileVariant[],
-    scores: Array<{
-      total: number;
-      breakdown: any;
-      reasons: string[];
-      warnings: string[];
-      recommendations: string[];
-    }>,
-  ): ScoredVariant[] {
-    return variants
-      .map((variant, index) => ({
-        ...variant,
-        score: scores[index],
-        rank: 0, // Will be set by scorer
-      }))
-      .sort((a, b) => b.score.total - a.score.total)
-      .map((variant, index) => ({
-        ...variant,
-        rank: index + 1,
-      }));
   }
 
   // Helper methods for context building
@@ -413,18 +398,9 @@ export class VariantGenerationPipeline {
 
     // Default ports based on language/framework
     if (ports.length === 0) {
-      const language = analysis.language || '';
-      if (language.includes('node') || language.includes('javascript')) {
-        ports.push(3000);
-      } else if (language.includes('python')) {
-        ports.push(8000);
-      } else if (language.includes('java')) {
-        ports.push(8080);
-      } else if (language.includes('go')) {
-        ports.push(8080);
-      } else {
-        ports.push(3000);
-      }
+      const language = analysis.language || 'javascript';
+      const defaultPort = getDefaultPort(language);
+      ports.push(defaultPort);
     }
 
     return ports.slice(0, 3); // Limit to first 3 ports
@@ -453,7 +429,8 @@ export class VariantGenerationPipeline {
     // Add common defaults
     if (Object.keys(envVars).length === 0) {
       envVars['NODE_ENV'] = 'production';
-      envVars['PORT'] = '3000';
+      const defaultPort = getDefaultPort(analysis.language || 'javascript');
+      envVars['PORT'] = defaultPort.toString();
     }
 
     return envVars;

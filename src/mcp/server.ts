@@ -14,6 +14,8 @@ import {
   ReadResourceRequestSchema,
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
+  McpError,
+  ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from 'pino';
 import { createLogger } from '../lib/logger.js';
@@ -26,9 +28,12 @@ import {
   getAllWorkflows,
   getRegistryStats,
 } from './registry.js';
-import { McpResourceManager } from './resources/manager.js';
-import { ContainerizationResourceManager } from './resources/containerization-resource-manager.js';
-import { PromptTemplatesManager } from '../application/tools/intelligent/ai-prompts.js';
+import {
+  createSDKResourceManager,
+  createResourceContext,
+  type SDKResourceManager,
+} from './resources/manager.js';
+import { SDKPromptRegistry } from './prompts/sdk-prompt-registry.js';
 import { DEFAULT_CACHE } from '../config/defaults.js';
 import { extendServerCapabilities } from './server-extensions.js';
 import type { MCPServer as IMCPServer, MCPServerOptions, MCPRequest, MCPResponse } from './types';
@@ -44,26 +49,32 @@ export class ContainerizationMCPServer implements IMCPServer {
   private logger: Logger;
   // No longer need registry wrapper - use direct functions
   private _sessionManager: ReturnType<typeof createSessionManager>;
-  private resourceManager: ContainerizationResourceManager;
-  private promptTemplates: PromptTemplatesManager;
+  private resourceManager: SDKResourceManager;
+  private promptRegistry: SDKPromptRegistry;
   private isRunning: boolean = false;
 
   constructor(logger?: Logger, options: MCPServerOptions = {}) {
     this.logger = logger ?? createLogger({ name: 'mcp-server' });
-    ensureInitialized(this.logger);
     this._sessionManager = createSessionManager(this.logger);
 
-    const baseResourceManager = new McpResourceManager(
+    const resourceContext = createResourceContext(
       {
         defaultTtl: DEFAULT_CACHE.defaultTtl,
         maxResourceSize: DEFAULT_CACHE.maxFileSize,
         cacheConfig: { defaultTtl: DEFAULT_CACHE.defaultTtl },
       },
       this.logger,
+      undefined, // Use default cache
     );
-    this.resourceManager = new ContainerizationResourceManager(baseResourceManager, this.logger);
+    this.resourceManager = createSDKResourceManager(resourceContext);
 
-    this.promptTemplates = new PromptTemplatesManager(this.logger);
+    this.promptRegistry = new SDKPromptRegistry(this.logger);
+
+    // Initialize tools and workflows with prompt registry access
+    ensureInitialized(this.logger, {
+      promptRegistry: this.promptRegistry,
+      sessionManager: this._sessionManager,
+    });
 
     this.server = new Server(
       {
@@ -142,27 +153,18 @@ export class ContainerizationMCPServer implements IMCPServer {
         const tool = getTool(name);
         if (!tool) {
           this.logger.error({ tool: name }, 'Tool not found');
-
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify(
-                  {
-                    error: `Tool or workflow not found: ${name}`,
-                  },
-                  null,
-                  2,
-                ),
-              },
-            ],
-            isError: true,
-          };
+          throw new McpError(ErrorCode.MethodNotFound, `Tool or workflow not found: ${name}`);
         }
 
         this.logger.debug({ tool: name, args }, 'Executing tool');
 
-        const result = await tool.execute(args ?? {}, this.logger);
+        // Pass MCP context including prompt registry to tools that need it
+        const mcpContext = {
+          promptRegistry: this.promptRegistry,
+          resourceManager: this.resourceManager,
+        };
+
+        const result = await tool.execute(args ?? {}, this.logger, mcpContext);
 
         if ('ok' in result) {
           if (result.ok) {
@@ -175,21 +177,7 @@ export class ContainerizationMCPServer implements IMCPServer {
               ],
             };
           } else {
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: JSON.stringify(
-                    {
-                      error: result.error,
-                    },
-                    null,
-                    2,
-                  ),
-                },
-              ],
-              isError: true,
-            };
+            throw new McpError(ErrorCode.InternalError, result.error);
           }
         }
 
@@ -211,22 +199,17 @@ export class ContainerizationMCPServer implements IMCPServer {
           'Tool execution failed',
         );
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  error: error instanceof Error ? error.message : 'Unknown error occurred',
-                  tool: name,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-          isError: true,
-        };
+        // Re-throw MCP errors as-is
+        if (error instanceof McpError) {
+          throw error;
+        }
+
+        // Convert other errors to MCP errors
+        throw new McpError(
+          ErrorCode.InternalError,
+          error instanceof Error ? error.message : 'Unknown error occurred',
+          { tool: name },
+        );
       }
     });
 
@@ -291,24 +274,13 @@ export class ContainerizationMCPServer implements IMCPServer {
 
       try {
         const category = request.params?.cursor as string; // Optional category filter
-        const listResult = await this.promptTemplates.listPrompts(category);
+        const listResult = await this.promptRegistry.listPrompts(category);
 
-        if (!listResult.ok) {
-          this.logger.error({ error: listResult.error }, 'Failed to list prompts');
-          return {
-            prompts: [],
-            nextCursor: undefined,
-          };
-        }
-
-        this.logger.info({ count: listResult.value.prompts.length }, 'Returning prompt list');
-        return listResult.value;
+        this.logger.info({ count: listResult.prompts.length }, 'Returning prompt list');
+        return listResult;
       } catch (error) {
         this.logger.error({ error }, 'Prompt listing failed');
-        return {
-          prompts: [],
-          nextCursor: undefined,
-        };
+        throw new McpError(ErrorCode.InternalError, 'Failed to list prompts');
       }
     });
 
@@ -318,42 +290,20 @@ export class ContainerizationMCPServer implements IMCPServer {
       this.logger.info({ name, args: promptArgs }, 'Received prompt get request');
 
       try {
-        // Extract context from arguments if provided
-        const context =
-          promptArgs && Object.keys(promptArgs).length > 0
-            ? {
-                repositoryPath: promptArgs.repositoryPath as string,
-                language: promptArgs.language as string,
-                framework: promptArgs.framework as string,
-                securityLevel: promptArgs.securityLevel as 'basic' | 'enhanced' | 'strict',
-                environment: promptArgs.environment as 'development' | 'staging' | 'production',
-              }
-            : undefined;
-
-        const getResult = await this.promptTemplates.getPrompt(name, context);
-
-        if (!getResult.ok) {
-          this.logger.error({ name, error: getResult.error }, 'Failed to get prompt');
-          return {
-            name,
-            description: getResult.error,
-            arguments: [],
-          };
-        }
+        const getResult = await this.promptRegistry.getPrompt(name, promptArgs);
 
         this.logger.debug(
           {
             name,
-            argumentCount: Array.isArray(getResult.value.arguments)
-              ? getResult.value.arguments.length
-              : 0,
+            argumentCount: Array.isArray(getResult.arguments) ? getResult.arguments.length : 0,
+            messageCount: Array.isArray(getResult.messages) ? getResult.messages.length : 0,
           },
           'Prompt retrieved',
         );
-        return getResult.value;
+        return getResult;
       } catch (error) {
         this.logger.error({ name, error }, 'Prompt get failed');
-        throw error;
+        throw new McpError(ErrorCode.MethodNotFound, `Prompt not found: ${name}`);
       }
     });
 
@@ -499,27 +449,27 @@ export class ContainerizationMCPServer implements IMCPServer {
   } {
     const stats = getRegistryStats();
     const resourceStats = this.resourceManager.getStats();
-    const promptStats = this.promptTemplates.getStats();
+    const promptStats = this.promptRegistry.getPromptsByCategory('').length; // Get total count
     return {
       running: this.isRunning,
       tools: stats.tools,
       workflows: stats.workflows,
       resources: resourceStats.total,
-      prompts: promptStats.total,
+      prompts: promptStats,
     };
   }
 
   /**
    * Get the enhanced resource manager
    */
-  getResourceManager(): ContainerizationResourceManager {
+  getResourceManager(): SDKResourceManager {
     return this.resourceManager;
   }
 
   /**
-   * Get the prompt templates manager
+   * Get the SDK prompt registry
    */
-  getPromptTemplatesManager(): PromptTemplatesManager {
-    return this.promptTemplates;
+  getPromptRegistry(): SDKPromptRegistry {
+    return this.promptRegistry;
   }
 }

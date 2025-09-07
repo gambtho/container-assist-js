@@ -11,7 +11,11 @@ import type {
   ScoringCriteria,
   ScoreDetails,
 } from './types';
-import { createAIService } from '../../lib/ai';
+import { getBaseImageRecommendations } from '../../lib/base-images';
+import { DEFAULT_NETWORK, DEFAULT_CONTAINER, getDefaultPort } from '../../config/defaults';
+import { createMCPHostAI, type MCPHostAI } from '../../lib/mcp-host-ai';
+import { SDKPromptRegistry } from '../../mcp/prompts/sdk-prompt-registry.js';
+import { AIEnhancementService } from '../../application/ai/enhancement-service.js';
 
 /**
  * Base strategy implementation with common functionality
@@ -21,9 +25,22 @@ abstract class BaseSamplingStrategy implements SamplingStrategy {
   abstract description: string;
   abstract optimization: 'size' | 'security' | 'performance' | 'balanced';
 
-  protected aiService = createAIService(this.logger);
+  protected mcpHostAI: MCPHostAI;
+  protected promptRegistry: SDKPromptRegistry;
+  protected aiEnhancementService: AIEnhancementService;
 
-  constructor(protected logger: Logger) {}
+  constructor(
+    protected logger: Logger,
+    promptRegistry?: SDKPromptRegistry,
+  ) {
+    this.mcpHostAI = createMCPHostAI(logger);
+    this.promptRegistry = promptRegistry || new SDKPromptRegistry(logger);
+    this.aiEnhancementService = new AIEnhancementService(
+      this.mcpHostAI,
+      this.promptRegistry,
+      logger,
+    );
+  }
 
   abstract generateVariant(
     context: DockerfileContext,
@@ -120,7 +137,7 @@ abstract class BaseSamplingStrategy implements SamplingStrategy {
     };
   }
 
-  protected generateScoringReasons(variant: DockerfileVariant, scores: any): string[] {
+  protected generateScoringReasons(_variant: DockerfileVariant, scores: any): string[] {
     const reasons: string[] = [];
 
     if (scores.security > 70) reasons.push('Strong security practices detected');
@@ -142,7 +159,7 @@ abstract class BaseSamplingStrategy implements SamplingStrategy {
     return warnings;
   }
 
-  protected generateRecommendations(variant: DockerfileVariant, scores: any): string[] {
+  protected generateRecommendations(_variant: DockerfileVariant, scores: any): string[] {
     const recommendations: string[] = [];
 
     if (scores.security < 60) recommendations.push('Add non-root user and security hardening');
@@ -169,25 +186,39 @@ export class SecurityFirstStrategy extends BaseSamplingStrategy {
     logger: Logger,
   ): Promise<Result<DockerfileVariant>> {
     try {
-      const aiRequest = {
-        prompt: `Generate a security-focused Dockerfile for ${context.analysis.language} application`,
-        context: {
-          language: context.analysis.language,
-          framework: context.analysis.framework,
-          securityLevel: context.constraints.securityLevel,
-          environment: context.constraints.targetEnvironment,
-        },
-      };
+      // Generate base Dockerfile
+      const baseImage = this.selectSecureBaseImage(context.analysis.language);
+      const dockerfileContent = this.generateSecureDockerfile(context, baseImage);
 
-      const aiResult = await this.aiService.generate(aiRequest);
-      if (!aiResult.ok) {
-        return Failure(`AI context generation failed: ${aiResult.error}`);
+      // Use centralized AI enhancement service for strategy optimization
+      let aiEnhanced = false;
+      if (this.aiEnhancementService.isAvailable()) {
+        const enhancementResult = await this.aiEnhancementService.enhanceStrategy(
+          'security',
+          {
+            analysis: context.analysis,
+            dockerfile: dockerfileContent,
+            baseImage,
+          },
+          {
+            securityLevel: context.constraints.securityLevel,
+            optimization: 'security',
+            environment: context.constraints.targetEnvironment,
+          },
+        );
+
+        if (enhancementResult.ok && enhancementResult.value.enhanced) {
+          aiEnhanced = true;
+          logger.debug(
+            { processingTime: enhancementResult.value.metadata.processingTime },
+            'Security strategy enhanced with AI',
+          );
+        }
       }
 
-      const baseImage = this.selectSecureBaseImage(context.analysis.language);
       const variant: DockerfileVariant = {
         id: `security-${Date.now()}`,
-        content: this.generateSecureDockerfile(context, baseImage),
+        content: dockerfileContent,
         strategy: this.name,
         metadata: {
           baseImage,
@@ -196,11 +227,15 @@ export class SecurityFirstStrategy extends BaseSamplingStrategy {
           estimatedSize: '< 200MB',
           buildComplexity: 'medium',
           securityFeatures: ['non-root', 'minimal-attack-surface', 'security-updates'],
+          aiEnhanced,
         },
         generated: new Date(),
       };
 
-      logger.info({ variant: variant.id }, 'Security-first variant generated');
+      logger.info(
+        { variant: variant.id, aiEnhanced: variant.metadata.aiEnhanced },
+        'Security-first variant generated',
+      );
       return Success(variant);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -209,20 +244,16 @@ export class SecurityFirstStrategy extends BaseSamplingStrategy {
   }
 
   private selectSecureBaseImage(language: string): string {
-    const secureImages = {
-      javascript: 'node:18-alpine',
-      typescript: 'node:18-alpine',
-      python: 'python:3.11-alpine',
-      java: 'openjdk:17-alpine',
-      go: 'golang:1.21-alpine',
-      rust: 'rust:1.75-alpine',
-    };
-    return secureImages[language as keyof typeof secureImages] || 'alpine:latest';
+    const recommendations = getBaseImageRecommendations({
+      language,
+      preference: 'security',
+    });
+    return recommendations.primary;
   }
 
   private generateSecureDockerfile(context: DockerfileContext, baseImage: string): string {
     const { language, packageManager, ports } = context.analysis;
-    const primaryPort = ports[0] || 3000;
+    const primaryPort = ports[0] || getDefaultPort(language);
 
     return `# Security-focused Dockerfile for ${language}
 FROM ${baseImage}
@@ -258,7 +289,7 @@ EXPOSE ${primaryPort}
 
 # Add healthcheck
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
-    CMD wget --no-verbose --tries=1 --spider http://localhost:${primaryPort}/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://${DEFAULT_NETWORK.host}:${primaryPort}${DEFAULT_CONTAINER.healthCheckPath} || exit 1
 
 # Use dumb-init for proper signal handling
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
@@ -296,9 +327,36 @@ export class PerformanceStrategy extends BaseSamplingStrategy {
     logger: Logger,
   ): Promise<Result<DockerfileVariant>> {
     try {
+      // Generate base Dockerfile
+      const dockerfileContent = this.generatePerformanceDockerfile(context);
+
+      // Use centralized AI enhancement service for strategy optimization
+      let aiEnhanced = false;
+      if (this.aiEnhancementService.isAvailable()) {
+        const enhancementResult = await this.aiEnhancementService.enhanceStrategy(
+          'performance',
+          {
+            analysis: context.analysis,
+            dockerfile: dockerfileContent,
+          },
+          {
+            optimization: 'performance',
+            environment: context.constraints?.targetEnvironment,
+          },
+        );
+
+        if (enhancementResult.ok && enhancementResult.value.enhanced) {
+          aiEnhanced = true;
+          logger.debug(
+            { processingTime: enhancementResult.value.metadata.processingTime },
+            'Performance strategy enhanced with AI',
+          );
+        }
+      }
+
       const variant: DockerfileVariant = {
         id: `performance-${Date.now()}`,
-        content: this.generatePerformanceDockerfile(context),
+        content: dockerfileContent,
         strategy: this.name,
         metadata: {
           baseImage: this.selectPerformanceBaseImage(context.analysis.language),
@@ -307,11 +365,15 @@ export class PerformanceStrategy extends BaseSamplingStrategy {
           estimatedSize: '< 300MB',
           buildComplexity: 'high',
           securityFeatures: ['non-root'],
+          aiEnhanced,
         },
         generated: new Date(),
       };
 
-      logger.info({ variant: variant.id }, 'Performance variant generated');
+      logger.info(
+        { variant: variant.id, aiEnhanced: variant.metadata.aiEnhanced },
+        'Performance variant generated',
+      );
       return Success(variant);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -320,21 +382,17 @@ export class PerformanceStrategy extends BaseSamplingStrategy {
   }
 
   private selectPerformanceBaseImage(language: string): string {
-    const performanceImages = {
-      javascript: 'node:18-slim',
-      typescript: 'node:18-slim',
-      python: 'python:3.11-slim',
-      java: 'openjdk:17-slim',
-      go: 'golang:1.21',
-      rust: 'rust:1.75',
-    };
-    return performanceImages[language as keyof typeof performanceImages] || 'ubuntu:22.04';
+    const recommendations = getBaseImageRecommendations({
+      language,
+      preference: 'performance',
+    });
+    return recommendations.primary;
   }
 
   private generatePerformanceDockerfile(context: DockerfileContext): string {
     const { language, packageManager, ports } = context.analysis;
     const baseImage = this.selectPerformanceBaseImage(language);
-    const primaryPort = ports[0] || 3000;
+    const primaryPort = ports[0] || getDefaultPort(language);
 
     return `# Performance-optimized multi-stage Dockerfile
 # Build stage
@@ -375,13 +433,11 @@ CMD ["${this.getOptimizedStartCommand(language)}"]`;
   }
 
   private getProductionImage(language: string): string {
-    const images = {
-      javascript: 'node:18-slim',
-      typescript: 'node:18-slim',
-      python: 'python:3.11-slim',
-      java: 'openjdk:17-jre-slim',
-    };
-    return images[language as keyof typeof images] || 'node:18-slim';
+    const recommendations = getBaseImageRecommendations({
+      language,
+      preference: 'performance',
+    });
+    return recommendations.primary;
   }
 
   private getBuildCommand(language: string, packageManager: string): string {
@@ -422,9 +478,36 @@ export class SizeOptimizedStrategy extends BaseSamplingStrategy {
     logger: Logger,
   ): Promise<Result<DockerfileVariant>> {
     try {
+      // Generate base Dockerfile
+      const dockerfileContent = this.generateSizeOptimizedDockerfile(context);
+
+      // Use centralized AI enhancement service for strategy optimization
+      let aiEnhanced = false;
+      if (this.aiEnhancementService.isAvailable()) {
+        const enhancementResult = await this.aiEnhancementService.enhanceStrategy(
+          'size',
+          {
+            analysis: context.analysis,
+            dockerfile: dockerfileContent,
+          },
+          {
+            optimization: 'size',
+            environment: context.constraints?.targetEnvironment,
+          },
+        );
+
+        if (enhancementResult.ok && enhancementResult.value.enhanced) {
+          aiEnhanced = true;
+          logger.debug(
+            { processingTime: enhancementResult.value.metadata.processingTime },
+            'Size optimization strategy enhanced with AI',
+          );
+        }
+      }
+
       const variant: DockerfileVariant = {
         id: `size-${Date.now()}`,
-        content: this.generateSizeOptimizedDockerfile(context),
+        content: dockerfileContent,
         strategy: this.name,
         metadata: {
           baseImage: this.selectMinimalBaseImage(context.analysis.language),
@@ -433,11 +516,15 @@ export class SizeOptimizedStrategy extends BaseSamplingStrategy {
           estimatedSize: '< 100MB',
           buildComplexity: 'high',
           securityFeatures: ['distroless', 'minimal-attack-surface'],
+          aiEnhanced,
         },
         generated: new Date(),
       };
 
-      logger.info({ variant: variant.id }, 'Size-optimized variant generated');
+      logger.info(
+        { variant: variant.id, aiEnhanced: variant.metadata.aiEnhanced },
+        'Size-optimized variant generated',
+      );
       return Success(variant);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -461,11 +548,15 @@ export class SizeOptimizedStrategy extends BaseSamplingStrategy {
 
   private generateSizeOptimizedDockerfile(context: DockerfileContext): string {
     const { language, packageManager: _packageManager, ports } = context.analysis;
-    const primaryPort = ports[0] || 3000;
+    const primaryPort = ports[0] || getDefaultPort(language);
+    const baseImage = getBaseImageRecommendations({
+      language,
+      preference: 'size',
+    }).primary;
 
     return `# Size-optimized Dockerfile using distroless
 # Build stage
-FROM node:18-alpine AS builder
+FROM ${baseImage} AS builder
 
 WORKDIR /app
 
@@ -508,15 +599,18 @@ ${language === 'typescript' ? 'CMD ["dist/index.js"]' : 'CMD ["index.js"]'}`;
 export class StrategyEngine {
   private strategies: Map<string, SamplingStrategy> = new Map();
 
-  constructor(private logger: Logger) {
+  constructor(
+    private logger: Logger,
+    private promptRegistry?: SDKPromptRegistry,
+  ) {
     this.registerDefaultStrategies();
   }
 
   private registerDefaultStrategies(): void {
     const strategies = [
-      new SecurityFirstStrategy(this.logger),
-      new PerformanceStrategy(this.logger),
-      new SizeOptimizedStrategy(this.logger),
+      new SecurityFirstStrategy(this.logger, this.promptRegistry),
+      new PerformanceStrategy(this.logger, this.promptRegistry),
+      new SizeOptimizedStrategy(this.logger, this.promptRegistry),
     ];
 
     strategies.forEach((strategy) => {

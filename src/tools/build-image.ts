@@ -215,7 +215,7 @@ export async function buildImage(
 
     // Update session with build result
     const currentState = session as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState, {
+    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       build_result: {
         success: true,
         imageId: buildResult.value.imageId ?? '',

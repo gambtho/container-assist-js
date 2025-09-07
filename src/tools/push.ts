@@ -88,7 +88,7 @@ export async function pushImage(
 
     // Update session with push results
     const currentState = session.workflow_state as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState, {
+    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       completed_steps: [...(currentState?.completed_steps ?? []), 'push'],
       metadata: {
         ...(currentState?.metadata ?? {}),

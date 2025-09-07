@@ -7,6 +7,7 @@
 
 import { createSessionManager } from '../lib/session';
 import { createTimer, type Logger } from '../lib/logger';
+import { getRecommendedBaseImage } from '../lib/base-images';
 import { Success, Failure, type Result } from '../types/core';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
 import { DEFAULT_PORTS } from '../config/defaults';
@@ -66,7 +67,8 @@ async function fixDockerfile(
     logger.info({ hasError: !!buildError }, 'Analyzing Dockerfile for issues');
 
     // Generate optimized Dockerfile based on analysis
-    const fixedDockerfile = `FROM node:18-alpine
+    const baseImage = getRecommendedBaseImage('javascript'); // Default to javascript for now
+    const fixedDockerfile = `FROM ${baseImage}
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
@@ -83,7 +85,7 @@ CMD ["npm", "start"]`;
 
     // Update session with fixed Dockerfile
     const currentState = session.workflow_state as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState, {
+    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       dockerfile_result: {
         content: fixedDockerfile,
         path: './Dockerfile',

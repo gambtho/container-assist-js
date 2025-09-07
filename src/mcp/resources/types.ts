@@ -1,12 +1,33 @@
 import { Result } from '../../types/core.js';
 
+export type ResourceCategory =
+  | 'dockerfile'
+  | 'k8s-manifest'
+  | 'scan-result'
+  | 'build-artifact'
+  | 'deployment-status'
+  | 'session-data';
+
 export interface Resource {
   uri: string;
   content: unknown;
   mimeType: string;
   createdAt: Date;
   expiresAt?: Date;
-  metadata?: Record<string, unknown>;
+  metadata?: {
+    size?: number;
+    scheme?: string;
+    category?: ResourceCategory;
+    [key: string]: unknown;
+  };
+  // Enhanced MCP-native fields
+  name?: string;
+  description?: string;
+  annotations?: {
+    audience?: string[];
+    priority?: number;
+    tags?: string[];
+  };
 }
 
 export interface ResourceCache {

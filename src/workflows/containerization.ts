@@ -15,6 +15,7 @@ import { buildImage } from '../tools/build-image';
 import { scanImage } from '../tools/scan';
 import { tagImage } from '../tools/tag';
 import { isFail } from '../types/core';
+import { getRecommendedBaseImage } from '../lib/base-images';
 import { createSessionManager } from '../lib/session';
 import { createTimer, createLogger, type Logger } from '../lib/logger';
 import type {
@@ -85,13 +86,16 @@ export async function runContainerizationWorkflow(
     if (isFail(analysisResult)) {
       analyzeStep.status = 'failed';
       analyzeStep.error = `Analysis failed: ${analysisResult.error}`;
+      const endTime = new Date();
       return {
         success: false,
         sessionId,
         error: analyzeStep.error,
         metadata: {
           steps: context.steps,
-          endTime: new Date(),
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
         },
       };
     }
@@ -117,7 +121,9 @@ export async function runContainerizationWorkflow(
     const dockerfileResult = await generateDockerfile(
       {
         sessionId,
-        baseImage: analysis.recommendations?.baseImage || 'node:18-alpine',
+        baseImage:
+          analysis.recommendations?.baseImage ||
+          getRecommendedBaseImage(analysis.language || 'javascript'),
         optimization: true,
         multistage: true,
         securityHardening: true,
@@ -369,7 +375,7 @@ export async function runContainerizationWorkflow(
     return {
       success: true,
       sessionId,
-      results: {
+      data: {
         ...(build.imageId && { imageId: build.imageId }),
         ...(tag.tags && { imageTags: tag.tags }),
         ...(dockerfile.path && { dockerfilePath: dockerfile.path }),

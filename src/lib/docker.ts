@@ -4,7 +4,7 @@
 
 import Docker from 'dockerode';
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../types/core.js';
+import { Success, Failure, type Result } from '../types/core';
 import type { DockerBuildOptions, DockerBuildResult } from '../types/docker';
 
 interface DockerPushResult {
@@ -37,11 +37,13 @@ export const createDockerClient = (logger: Logger): DockerClient => {
   return {
     async buildImage(options: DockerBuildOptions): Promise<Result<DockerBuildResult>> {
       try {
+        logger.debug({ options }, 'Starting Docker build');
         const stream = await docker.buildImage(options.context, {
           t: Array.isArray(options.tags) ? options.tags[0] : options.tags,
           dockerfile: options.dockerfile,
           buildargs: options.buildArgs,
         });
+        logger.debug('Docker buildImage call completed, got stream');
 
         interface DockerBuildEvent {
           stream?: string;
@@ -68,6 +70,7 @@ export const createDockerClient = (logger: Logger): DockerClient => {
           success: true,
         };
 
+        logger.debug({ buildResult }, 'Docker build completed successfully');
         return Success(buildResult);
       } catch (error) {
         const errorMessage = `Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`;

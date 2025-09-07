@@ -43,7 +43,15 @@ describe('Docker Client', () => {
     };
 
     MockDocker.mockImplementation(() => mockDockerInstance);
+    
+    // Clear all mocks before creating client
+    jest.clearAllMocks();
+    
     dockerClient = createDockerClient(mockLogger);
+    
+    // Verify client was created properly
+    expect(dockerClient).toBeDefined();
+    expect(typeof dockerClient.buildImage).toBe('function');
   });
 
   afterEach(() => {
@@ -59,6 +67,7 @@ describe('Docker Client', () => {
         buildArgs: { NODE_ENV: 'production' }
       };
 
+      // Mock the successful flow
       const mockStream = {};
       const mockBuildResult = [
         { stream: 'Step 1/5 : FROM node:16' },
@@ -68,15 +77,18 @@ describe('Docker Client', () => {
       mockDockerInstance.buildImage.mockResolvedValue(mockStream);
       mockModem.followProgress.mockImplementation((stream, callback, onProgress) => {
         // Simulate progress events
-        onProgress({ stream: 'Building...' });
-        onProgress({ stream: 'Step 1/5 : FROM node:16' });
+        if (onProgress) {
+          onProgress({ stream: 'Building...' });
+          onProgress({ stream: 'Step 1/5 : FROM node:16' });
+        }
         
-        // Complete the build
+        // Call callback immediately and synchronously
         callback(null, mockBuildResult);
       });
 
       const result = await dockerClient.buildImage(buildOptions);
 
+      expect(result).toBeDefined();
       expect(result.ok).toBe(true);
       expect(result.value.imageId).toBe('sha256:abc123def456');
       expect(result.value.tags).toEqual(['test-image:latest']);

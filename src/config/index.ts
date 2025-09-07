@@ -64,6 +64,24 @@ export const config = {
     level: process.env.LOG_LEVEL || 'info',
     format: process.env.LOG_FORMAT || 'json',
   },
+
+  orchestrator: {
+    defaultCandidates: parseInt(process.env.DEFAULT_CANDIDATES || '3'),
+    maxCandidates: parseInt(process.env.MAX_CANDIDATES || '5'),
+    earlyStopThreshold: parseInt(process.env.EARLY_STOP_THRESHOLD || '90'),
+    tiebreakMargin: parseInt(process.env.TIEBREAK_MARGIN || '5'),
+
+    scanThresholds: {
+      critical: parseInt(process.env.SCAN_CRITICAL_THRESHOLD || '0'),
+      high: parseInt(process.env.SCAN_HIGH_THRESHOLD || '2'),
+      medium: parseInt(process.env.SCAN_MEDIUM_THRESHOLD || '10'),
+    },
+
+    buildSizeLimits: {
+      sanityFactor: parseFloat(process.env.BUILD_SANITY_FACTOR || '1.25'),
+      rejectFactor: parseFloat(process.env.BUILD_REJECT_FACTOR || '2.5'),
+    },
+  },
 } as const;
 
 /**

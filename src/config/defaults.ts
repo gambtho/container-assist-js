@@ -49,6 +49,24 @@ export const DEFAULT_CACHE = {
 } as const;
 
 /**
+ * Default network configuration
+ */
+export const DEFAULT_NETWORK = {
+  host: 'localhost',
+  loopback: '127.0.0.1',
+  dockerHost: '0.0.0.0',
+} as const;
+
+/**
+ * Default container configuration
+ */
+export const DEFAULT_CONTAINER = {
+  healthCheckPath: '/health',
+  maxImageSize: '2GB',
+  buildTimeLimit: 600000, // 10 minutes
+} as const;
+
+/**
  * Get default port for a given language
  */
 export function getDefaultPort(language: string): number {

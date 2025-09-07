@@ -1,4 +1,4 @@
-import { Success, Failure, type Result } from '../types/core.js';
+import { Success, Failure, type Result } from '../types/core';
 import type { Logger } from 'pino';
 import type { ProgressReporter } from '../mcp/server-extensions.js';
 
@@ -307,7 +307,7 @@ export const executeWorkflow = async (
     }
 
     // Plan workflow steps
-    void progressReporter?.(5, 'Planning workflow steps...');
+    void progressReporter?.({ progress: 5, message: 'Planning workflow steps...' });
     const steps = await planWorkflowSteps(workflowType, params, sessionId, sessionManager);
 
     if (steps.length === 0) {
@@ -332,7 +332,10 @@ export const executeWorkflow = async (
       if (!step) continue;
       const progressPercent = 10 + (i / steps.length) * 80;
 
-      void progressReporter?.(progressPercent, step.description || `Executing ${step.toolName}...`);
+      void progressReporter?.({
+        progress: progressPercent,
+        message: step.description || `Executing ${step.toolName}...`,
+      });
 
       // Check for cancellation
       if (signal?.aborted) {
@@ -348,8 +351,13 @@ export const executeWorkflow = async (
           sessionId: sessionId || 'default',
           signal: signal || new AbortController().signal,
           logger: logger.child({ step: step.toolName }),
-          progressReporter: (p: number, m?: string) =>
-            progressReporter?.(progressPercent + (p * 0.8) / steps.length, m) || Promise.resolve(),
+          progressReporter: async (progress) => {
+            await progressReporter?.({
+              progress: progressPercent + (progress.progress * 0.8) / steps.length,
+              message: progress.message,
+              total: progress.total,
+            });
+          },
         } as WorkflowContext,
         results,
       );
@@ -397,7 +405,7 @@ export const executeWorkflow = async (
       }
     }
 
-    void progressReporter?.(95, 'Finalizing workflow...');
+    void progressReporter?.({ progress: 95, message: 'Finalizing workflow...' });
 
     // Get final session state for recommendations
     const finalSessionState =
@@ -445,7 +453,7 @@ export const executeWorkflow = async (
       },
     };
 
-    void progressReporter?.(100, 'Workflow complete');
+    void progressReporter?.({ progress: 100, message: 'Workflow complete' });
 
     logger.info(
       {
@@ -517,35 +525,6 @@ export const getWorkflowDetails = async (
     estimatedDuration: steps.length * 30, // Rough estimate in seconds
   };
 };
-
-/** @deprecated Use individual functions executeWorkflow, listAvailableWorkflows, getWorkflowDetails */
-export const createIntelligentOrchestrator = (
-  toolFactory: any,
-  aiService: any,
-  sessionManager: any,
-  _logger: Logger,
-): {
-  executeWorkflow: (
-    workflowType: string,
-    params: any,
-    context: WorkflowContext,
-  ) => Promise<Result<WorkflowResult>>;
-  listWorkflows: () => Array<{ name: string; description: string; steps: string[] }>;
-  getWorkflowDetails: (
-    workflowType: string,
-    sessionId?: string,
-  ) => Promise<{
-    workflowType: string;
-    steps: Array<{ name: string; description?: string; required: boolean }>;
-    estimatedDuration: number;
-  }>;
-} => ({
-  executeWorkflow: (workflowType: string, params: any, context: WorkflowContext) =>
-    executeWorkflow(workflowType, params, context, toolFactory, aiService, sessionManager),
-  listWorkflows: listAvailableWorkflows,
-  getWorkflowDetails: (workflowType: string, sessionId?: string) =>
-    getWorkflowDetails(workflowType, sessionId, sessionManager),
-});
 
 // Export types
 export type { WorkflowStep, WorkflowContext, WorkflowResult };

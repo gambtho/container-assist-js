@@ -15,6 +15,10 @@ import { generateBestDockerfile } from './dockerfile-sampling';
 
 export interface WorkflowConfig {
   enableSampling?: boolean;
+  enablePerspectives?: boolean;
+  analysisPerspective?: 'comprehensive' | 'security-focused' | 'performance-focused';
+  securityFocus?: boolean;
+  performanceFocus?: boolean;
   maxVulnerabilityLevel?: 'low' | 'medium' | 'high' | 'critical';
   enableAutoRemediation?: boolean;
   buildArgs?: Record<string, string>;
@@ -61,17 +65,23 @@ export const runContainerizationWorkflow = async (
   };
 
   try {
-    // Step 1: Analyze repository
+    // Step 1: Analyze repository (with optional sampling)
     logger.info('Step 1: Analyzing repository');
-    const analysis = await analyzeRepo(
-      {
-        sessionId,
-        repoPath,
-        depth: 3,
-        includeTests: false,
-      },
-      logger,
-    );
+    const analysisConfig = {
+      sessionId,
+      repoPath,
+      depth: 3,
+      includeTests: false,
+      // Enable analysis perspectives if configured
+      ...(config.enablePerspectives && {
+        usePerspectives: true,
+        ...(config.analysisPerspective && { perspective: config.analysisPerspective }),
+        ...(config.securityFocus !== undefined && { securityFocus: config.securityFocus }),
+        ...(config.performanceFocus !== undefined && { performanceFocus: config.performanceFocus }),
+      }),
+    };
+
+    const analysis = await analyzeRepo(analysisConfig, logger);
 
     if (!analysis.ok) {
       return Failure(`Analysis failed: ${analysis.error}`);
@@ -209,8 +219,20 @@ export const runBuildOnlyWorkflow = async (
   logger.info({ repoPath, sessionId }, 'Starting build-only workflow');
 
   try {
-    // Analyze first
-    const analysis = await analyzeRepo({ sessionId, repoPath }, logger);
+    // Analyze first (with optional sampling)
+    const analysisConfig = {
+      sessionId,
+      repoPath,
+      // Enable analysis perspectives if configured
+      ...(config.enablePerspectives && {
+        usePerspectives: true,
+        ...(config.analysisPerspective && { perspective: config.analysisPerspective }),
+        ...(config.securityFocus !== undefined && { securityFocus: config.securityFocus }),
+        ...(config.performanceFocus !== undefined && { performanceFocus: config.performanceFocus }),
+      }),
+    };
+
+    const analysis = await analyzeRepo(analysisConfig, logger);
     if (!analysis.ok) {
       return Failure(`Analysis failed: ${analysis.error}`);
     }

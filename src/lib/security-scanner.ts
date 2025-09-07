@@ -1,14 +1,14 @@
 /**
- * Security Scanner - Class-based Implementation
+ * Security Scanner - Type Definitions Only
  *
- * Provides security scanning capabilities for Docker images and filesystems
- * using Trivy as the underlying scanner
+ * Type definitions for security scanning functionality.
+ * The actual implementation uses the functional approach in scanner.ts
  */
 
 import type { Logger } from 'pino';
 import { Result, Success, Failure, isFail } from '../types/core';
 
-// Type definitions expected by tests
+// Type definitions expected by tests and other components
 export interface ScanOptions {
   minSeverity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   skipUnfixed?: boolean;
@@ -64,6 +64,27 @@ export interface SecurityReport {
     riskScore: number;
     highestSeverity: string;
   };
+}
+
+/**
+ * Functional scan implementation for Docker images
+ * Simple mock implementation for development
+ */
+export async function scanImage(
+  imageId: string,
+  options: ScanOptions,
+  logger: Logger,
+): Promise<Result<ScanResult>> {
+  logger.info({ imageId, options }, 'Mock security scan');
+
+  // Mock implementation - replace with actual scanner integration
+  const result: ScanResult = {
+    vulnerabilities: [],
+    summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, unknown: 0 },
+    passed: true,
+  };
+
+  return Success(result);
 }
 
 interface CommandExecutor {

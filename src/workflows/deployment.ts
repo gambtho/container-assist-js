@@ -14,6 +14,7 @@ import { generateK8sManifests } from '../tools/generate-k8s-manifests';
 import { pushImage } from '../tools/push';
 import { deployApplication } from '../tools/deploy';
 import { verifyDeployment } from '../tools/verify-deployment';
+import { isFail } from '../types/core';
 import { createSessionManager } from '../lib/session';
 import { createTimer, createLogger, type Logger } from '../lib/logger';
 import type {
@@ -163,7 +164,7 @@ export async function runDeploymentWorkflow(
       logger,
     );
 
-    if (!manifestResult.ok) {
+    if (isFail(manifestResult)) {
       generateStep.status = 'failed';
       generateStep.error = `Manifest generation failed: ${manifestResult.error}`;
       const endTime = new Date();

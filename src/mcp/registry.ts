@@ -4,10 +4,10 @@
 
 import type { Logger } from 'pino';
 import { createLogger } from '../lib/logger.js';
-import { Success } from '../types/core.js';
+import { Success } from '../types/core';
 import {
   createToolRegistry,
-  createAIToolRegistry,
+  createEnhancedToolRegistry,
 } from '../application/tools/intelligent/ai-tool-factory.js';
 import { containerizationWorkflow } from '../workflows/containerization.js';
 import { deploymentWorkflow } from '../workflows/deployment.js';
@@ -119,6 +119,165 @@ const toolSchemas: Record<string, any> = {
     },
     required: [],
   },
+  // Analysis sampling tools
+  'analysis-sampling': {
+    type: 'object',
+    properties: {
+      sessionId: { type: 'string' },
+      repoPath: { type: 'string' },
+      language: { type: 'string' },
+      framework: { type: 'string' },
+      dependencies: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            version: { type: 'string' },
+            type: { type: 'string' },
+          },
+          required: ['name', 'type'],
+        },
+      },
+      ports: { type: 'array', items: { type: 'number' } },
+      depth: { type: 'number' },
+      includeTests: { type: 'boolean' },
+      securityFocus: { type: 'boolean' },
+      performanceFocus: { type: 'boolean' },
+      strategies: { type: 'array', items: { type: 'string' } },
+      criteria: { type: 'object' },
+    },
+    required: ['sessionId', 'repoPath', 'language'],
+  },
+  'analysis-compare': {
+    type: 'object',
+    properties: {
+      sessionId: { type: 'string' },
+      variants: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            strategy: { type: 'string' },
+            analysis: {
+              type: 'object',
+              properties: {
+                language: { type: 'string' },
+                framework: { type: 'string' },
+                dependencies: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string' },
+                      version: { type: 'string' },
+                      type: { type: 'string' },
+                    },
+                    required: ['name', 'type'],
+                  },
+                },
+                recommendations: { type: 'array', items: { type: 'string' } },
+                securityIssues: { type: 'array', items: { type: 'string' } },
+                performanceIssues: { type: 'array', items: { type: 'string' } },
+              },
+              required: ['language', 'dependencies', 'recommendations'],
+            },
+            metadata: {
+              type: 'object',
+              properties: {
+                confidence: { type: 'number' },
+                executionTime: { type: 'number' },
+                timestamp: { type: 'string' },
+              },
+              required: ['confidence', 'executionTime', 'timestamp'],
+            },
+          },
+          required: ['strategy', 'analysis', 'metadata'],
+        },
+      },
+      criteria: { type: 'object' },
+    },
+    required: ['sessionId', 'variants'],
+  },
+  'analysis-validate': {
+    type: 'object',
+    properties: {
+      sessionId: { type: 'string' },
+      variant: {
+        type: 'object',
+        properties: {
+          strategy: { type: 'string' },
+          analysis: {
+            type: 'object',
+            properties: {
+              language: { type: 'string' },
+              framework: { type: 'string' },
+              dependencies: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    version: { type: 'string' },
+                    type: { type: 'string' },
+                  },
+                  required: ['name', 'type'],
+                },
+              },
+              recommendations: { type: 'array', items: { type: 'string' } },
+              securityIssues: { type: 'array', items: { type: 'string' } },
+              performanceIssues: { type: 'array', items: { type: 'string' } },
+            },
+            required: ['language', 'dependencies', 'recommendations'],
+          },
+          metadata: {
+            type: 'object',
+            properties: {
+              confidence: { type: 'number' },
+              executionTime: { type: 'number' },
+              timestamp: { type: 'string' },
+            },
+            required: ['confidence', 'executionTime', 'timestamp'],
+          },
+        },
+        required: ['strategy', 'analysis', 'metadata'],
+      },
+    },
+    required: ['sessionId', 'variant'],
+  },
+  'analysis-strategies': {
+    type: 'object',
+    properties: {
+      sessionId: { type: 'string' },
+      includeDescription: { type: 'boolean' },
+    },
+    required: ['sessionId'],
+  },
+  // Analysis perspectives tools
+  'enhanced-analysis': {
+    type: 'object',
+    properties: {
+      sessionId: { type: 'string' },
+      repoPath: { type: 'string' },
+      perspective: {
+        type: 'string',
+        enum: ['comprehensive', 'security-focused', 'performance-focused'],
+      },
+      depth: { type: 'number' },
+      includeTests: { type: 'boolean' },
+      securityFocus: { type: 'boolean' },
+      performanceFocus: { type: 'boolean' },
+    },
+    required: ['sessionId', 'repoPath'],
+  },
+  'perspectives-list': {
+    type: 'object',
+    properties: {
+      sessionId: { type: 'string' },
+      includeDetails: { type: 'boolean' },
+    },
+    required: ['sessionId'],
+  },
 };
 
 /**
@@ -126,13 +285,16 @@ const toolSchemas: Record<string, any> = {
  */
 export const initializeTools = (
   logger?: Logger,
-  config?: { aiService?: any; sessionManager?: any },
+  config?: { aiService?: any; sessionManager?: any; promptRegistry?: any },
 ): void => {
   const log = logger ?? createLogger({ name: 'mcp-registry' });
 
   // Create tool registry using functional composition
   const baseRegistry = config?.aiService
-    ? createAIToolRegistry(log, config.aiService, config.sessionManager)
+    ? createEnhancedToolRegistry(log, {
+        mcpHostAI: config.aiService,
+        promptRegistry: config.promptRegistry,
+      })
     : createToolRegistry(log);
 
   // Clear existing registry
@@ -144,10 +306,16 @@ export const initializeTools = (
       name: tool.name,
       description: `${tool.name} tool`,
       schema: toolSchemas[name] || { type: 'object', properties: {}, required: [] },
-      execute: async (params: object, toolLogger: Logger) => {
+      execute: async (
+        params: object,
+        toolLogger: Logger,
+        context?: import('./types.js').MCPContext,
+      ) => {
+        // Pass context to tools that support it (like sampling tools)
         const result = await tool.execute(
           params as Record<string, unknown>,
           toolLogger || log.child({ component: 'tool' }),
+          context,
         );
         // Ensure result is wrapped in Result type if it's not already
         if (result && typeof result === 'object' && 'ok' in result) {
@@ -250,7 +418,7 @@ let initialized = false;
  */
 export const ensureInitialized = (
   logger?: Logger,
-  config?: { aiService?: any; sessionManager?: any },
+  config?: { aiService?: any; sessionManager?: any; promptRegistry?: any },
 ): void => {
   if (!initialized) {
     initializeTools(logger, config);

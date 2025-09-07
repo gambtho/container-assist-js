@@ -231,7 +231,7 @@ export class DockerfileAnalyzer {
   private analyzeSizeOptimization(
     content: string,
     lines: string[],
-    _variant: DockerfileVariant,
+    variant: DockerfileVariant,
   ): SizeAnalysis {
     const lowerContent = content.toLowerCase();
     let score = 0;
@@ -631,10 +631,14 @@ export class VariantScorer {
 
     if (candidates.length === 0) {
       this.logger.warn('No variants meet selection constraints');
-      return scoredVariants[0]; // Return best overall if constraints too strict
+      return scoredVariants[0] || null; // Return best overall if constraints too strict
     }
 
     const selected = candidates[0];
+    if (!selected) {
+      return null;
+    }
+
     this.logger.info(
       {
         variant: selected.id,

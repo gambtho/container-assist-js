@@ -6,13 +6,18 @@
 
 import type { Logger } from 'pino';
 import type { Result } from './core.js';
+import type { MCPContext } from '../mcp/types.js';
 
 // Base tool interface
 export interface Tool {
   name: string;
   description?: string;
   schema?: Record<string, unknown>;
-  execute: (params: Record<string, unknown>, logger: Logger) => Promise<Result<any>>;
+  execute: (
+    params: Record<string, unknown>,
+    logger: Logger,
+    context?: MCPContext,
+  ) => Promise<Result<any>>;
 }
 
 // Tool-specific parameter types

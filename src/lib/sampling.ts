@@ -1,11 +1,4 @@
-// Core sampling types
-interface Candidate<T> {
-  id: string;
-  content: T;
-  metadata: CandidateMetadata;
-  generatedAt: Date;
-}
-
+// Sampling types - keeping only what's exported and needed
 export interface CandidateMetadata {
   strategy: string;
   source: string;
@@ -15,22 +8,6 @@ export interface CandidateMetadata {
   securityRating?: number;
 }
 
-// Sampling configuration
-interface SamplingConfig {
-  maxCandidates: number;
-  defaultWeights: Record<string, number>;
-  timeout: number;
-  cacheConfig: {
-    ttl: number;
-    maxSize: number;
-  };
-  validation: {
-    enabled: boolean;
-    failFast: boolean;
-  };
-}
-
-// Scoring criteria definitions
 export interface ScoringCriteria {
   buildTime: number;
   imageSize: number;
@@ -38,14 +15,5 @@ export interface ScoringCriteria {
   bestPractices: number;
   maintenance: number;
   performance: number;
-  [key: string]: number; // Allow index signature for compatibility
+  [key: string]: number;
 }
-
-const DEFAULT_SCORING_WEIGHTS: ScoringCriteria = {
-  buildTime: 0.2,
-  imageSize: 0.15,
-  security: 0.3,
-  bestPractices: 0.15,
-  maintenance: 0.1,
-  performance: 0.1,
-};

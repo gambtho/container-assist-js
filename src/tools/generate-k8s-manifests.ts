@@ -8,7 +8,7 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../lib/session';
-import { createAIService } from '../lib/ai';
+import { createMCPHostAI, createPromptTemplate } from '../lib/mcp-host-ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
@@ -280,7 +280,7 @@ export async function generateK8sManifests(
     const sessionManager = createSessionManager(logger);
 
     // Create AI service
-    const aiService = createAIService(logger);
+    const mcpHostAI = createMCPHostAI(logger);
 
     // Get session
     const session = await sessionManager.get(sessionId);
@@ -347,23 +347,30 @@ export async function generateK8sManifests(
       resourceList.push({ kind: 'HorizontalPodAutoscaler', name: `${appName}-hpa`, namespace });
     }
 
-    // Use AI to enhance manifests (when available)
+    // Request AI enhancement from MCP host (when available)
     try {
-      const aiResponse = await aiService.generate({
-        prompt: `Generate optimized Kubernetes manifests for ${appName} application in ${environment} environment`,
-        context: {
+      if (mcpHostAI.isAvailable()) {
+        const aiPrompt = createPromptTemplate('kubernetes', {
           appName,
           namespace,
           environment,
+          replicas: config.replicas,
+          resources: config.resources,
           manifests,
-        },
-      });
+        });
 
-      if (aiResponse.ok) {
-        logger.debug('AI enhancement would be applied here');
+        const aiResponse = await mcpHostAI.submitPrompt(aiPrompt, {
+          toolName: 'generate-k8s-manifests',
+          generatedManifests: manifests,
+          environment,
+        });
+
+        if (aiResponse.ok) {
+          logger.debug('AI enhancement requested from MCP host for K8s manifests');
+        }
       }
     } catch (error) {
-      logger.debug({ error }, 'AI enhancement skipped');
+      logger.debug({ error }, 'MCP host AI enhancement request failed');
     }
 
     // Convert manifests to YAML string
@@ -380,7 +387,7 @@ export async function generateK8sManifests(
 
     // Update session with K8s manifests
     const currentState = session.workflow_state as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState, {
+    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       k8s_result: {
         manifests: resourceList.map((r) => ({
           kind: r.kind,

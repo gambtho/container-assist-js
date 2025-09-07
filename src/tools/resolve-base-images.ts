@@ -10,6 +10,7 @@ import { createTimer, type Logger } from '../lib/logger';
 import { createDockerRegistryClient } from '../lib/docker-registry';
 import { Success, Failure, type Result } from '../types/core';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
+import { getSuggestedBaseImages, getRecommendedBaseImage } from '../lib/base-images';
 
 export interface ResolveBaseImagesConfig {
   sessionId: string;
@@ -36,25 +37,6 @@ export interface BaseImageRecommendation {
   rationale: string;
   securityConsiderations?: string[];
   performanceNotes?: string[];
-}
-
-/**
- * Get suggested images based on language and framework
- */
-function getSuggestedImages(language: string, _framework?: string): string[] {
-  const suggestions: Record<string, string[]> = {
-    javascript: ['node:18-alpine', 'node:18-slim', 'node:18'],
-    typescript: ['node:18-alpine', 'node:18-slim', 'node:18'],
-    python: ['python:3.11-alpine', 'python:3.11-slim', 'python:3.11'],
-    go: ['golang:1.21-alpine', 'golang:1.21', 'scratch'],
-    java: ['openjdk:17-alpine', 'openjdk:17-slim', 'eclipse-temurin:17'],
-    rust: ['rust:alpine', 'rust:slim', 'rust:latest'],
-    ruby: ['ruby:3.2-alpine', 'ruby:3.2-slim', 'ruby:3.2'],
-    php: ['php:8.2-fpm-alpine', 'php:8.2-apache', 'php:8.2-cli'],
-  };
-
-  const langKey = language.toLowerCase();
-  return suggestions[langKey] ?? ['alpine:latest', 'ubuntu:22.04', 'debian:12-slim'];
 }
 
 /**
@@ -93,10 +75,10 @@ async function resolveBaseImages(
     }
 
     const language = analysisResult?.language ?? 'unknown';
-    const suggestedImages = getSuggestedImages(language, analysisResult?.framework);
+    const suggestedImages = getSuggestedBaseImages(language, analysisResult?.framework);
 
     // Select primary image based on environment and security level
-    let primaryImage = suggestedImages[0] ?? 'node:18-alpine'; // Default fallback
+    let primaryImage = suggestedImages[0] ?? getRecommendedBaseImage(language); // Default fallback
     if (targetEnvironment === 'production' && securityLevel === 'high') {
       // Prefer alpine or slim images for production with high security
       primaryImage =
@@ -146,7 +128,7 @@ async function resolveBaseImages(
 
     // Update session with recommendation
     const currentState = session.workflow_state as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState, {
+    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       completed_steps: [...(currentState?.completed_steps ?? []), 'resolve-base-images'],
       metadata: {
         ...(currentState?.metadata ?? {}),

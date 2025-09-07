@@ -5,6 +5,16 @@
 
 import type { Logger } from 'pino';
 import type { Result } from '../types/core';
+import type { SDKPromptRegistry } from './prompts/sdk-prompt-registry.js';
+import type { SDKResourceManager } from './resources/manager.js';
+
+/**
+ * MCP Context provided to tools during execution
+ */
+export interface MCPContext {
+  promptRegistry?: SDKPromptRegistry;
+  resourceManager?: SDKResourceManager;
+}
 
 /**
  * MCP Tool definition
@@ -12,7 +22,7 @@ import type { Result } from '../types/core';
 export interface MCPTool {
   name: string;
   description: string;
-  execute: (params: object, logger: Logger) => Promise<Result<unknown>>;
+  execute: (params: object, logger: Logger, context?: MCPContext) => Promise<Result<unknown>>;
   schema: {
     type: string;
     properties?: Record<string, object>;

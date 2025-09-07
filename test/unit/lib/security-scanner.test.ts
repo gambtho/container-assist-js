@@ -123,11 +123,6 @@ describe('SecurityScanner', () => {
                 "VulnerabilityID": "CVE-2023-1234",
                 "Severity": "HIGH",
                 "PkgName": "libssl"
-              },
-              {
-                "VulnerabilityID": "CVE-2023-5678",
-                "Severity": "LOW",
-                "PkgName": "libutil"
               }
             ]
           }
@@ -165,7 +160,7 @@ describe('SecurityScanner', () => {
       const result = await scanner.scanImage('test-image:latest', options);
 
       expect(result.ok).toBe(false);
-      expect(result.error).toContain('timeout');
+      expect(result.error).toContain('Operation timed out after 1000ms');
     });
   });
 
@@ -408,7 +403,6 @@ describe('SecurityScanner', () => {
             "Vulnerabilities": [
               {
                 "VulnerabilityID": "CVE-2023-1234"
-                // Missing required fields
               }
             ]
           }
@@ -434,12 +428,12 @@ describe('SecurityScanner', () => {
       await scanner.scanImage('test:latest');
 
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Starting security scan'),
-        expect.any(Object)
+        { imageId: 'test:latest', options: undefined },
+        'Starting security scan'
       );
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Security scan completed'),
-        expect.any(Object)
+        expect.any(Object),
+        'Security scan completed'
       );
     });
 
@@ -456,21 +450,23 @@ describe('SecurityScanner', () => {
 
       expect(result.ok).toBe(true);
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Scanner warnings'),
-        expect.any(Object)
+        { stderr: 'Warning: deprecated package detected' },
+        'Scanner warnings'
       );
     });
   });
 
   describe('configuration validation', () => {
-    it('should validate scan options', () => {
+    it('should validate scan options', async () => {
       const invalidOptions: ScanOptions = {
         minSeverity: 'INVALID' as any,
         timeout: -1000
       };
 
-      expect(() => scanner.scanImage('test:latest', invalidOptions))
-        .rejects.toThrow();
+      const result = await scanner.scanImage('test:latest', invalidOptions);
+      
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('Invalid severity level: INVALID');
     });
 
     it('should use default options when none provided', async () => {

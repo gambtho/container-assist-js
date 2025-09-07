@@ -5,7 +5,15 @@
  */
 
 import type { TestCase, MCPTestRunner, TestResult } from '../../infrastructure/test-runner.js';
-import { ARTIFACT_SCHEMES } from '../../../../src/mcp/resources/artifact-schemes.js';
+
+// Test-only artifact schemes constants
+const ARTIFACT_SCHEMES = {
+  SESSION: 'session',
+  DOCKERFILE: 'dockerfile',
+  ANALYSIS: 'analysis',
+  SCAN: 'scan',
+  BUILD: 'build', // Added for test compatibility
+} as const;
 
 export const createArtifactTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();

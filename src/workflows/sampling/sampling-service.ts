@@ -14,6 +14,7 @@ import type {
 } from './types';
 import { VariantGenerationPipeline } from './generation-pipeline';
 import { DEFAULT_SCORING_CRITERIA } from './scorer';
+import { SDKPromptRegistry } from '../../mcp/prompts/sdk-prompt-registry.js';
 
 /**
  * High-level sampling service that provides the main API for Dockerfile sampling
@@ -21,8 +22,11 @@ import { DEFAULT_SCORING_CRITERIA } from './scorer';
 export class SamplingService {
   private pipeline: VariantGenerationPipeline;
 
-  constructor(private logger: Logger) {
-    this.pipeline = new VariantGenerationPipeline(logger);
+  constructor(
+    private logger: Logger,
+    promptRegistry?: SDKPromptRegistry,
+  ) {
+    this.pipeline = new VariantGenerationPipeline(logger, promptRegistry);
   }
 
   /**
@@ -42,10 +46,11 @@ export class SamplingService {
         enableCaching: true,
         timeout: 60000,
         criteria: this.buildScoringCriteria(options),
-        constraints: options.optimization
-          ? { preferredOptimization: options.optimization }
-          : undefined,
       };
+
+      if (options.optimization) {
+        samplingConfig.constraints = { preferredOptimization: options.optimization };
+      }
 
       const result = await this.pipeline.generateSampledDockerfiles(samplingConfig);
 
@@ -142,8 +147,7 @@ export class SamplingService {
 
       // Score all variants
       const scoringCriteria = criteria || DEFAULT_SCORING_CRITERIA;
-      const pipeline = new VariantGenerationPipeline(this.logger);
-      const scorer = (pipeline as any).scorer;
+      const scorer = (this.pipeline as any).scorer;
 
       const scoredResult = await scorer.scoreVariants(variants, scoringCriteria);
       if (!scoredResult.ok) {
@@ -215,8 +219,7 @@ export class SamplingService {
         generated: new Date(),
       };
 
-      const pipeline = new VariantGenerationPipeline(this.logger);
-      const scorer = (pipeline as any).scorer;
+      const scorer = (this.pipeline as any).scorer;
 
       const scoredResult = await scorer.scoreVariants(
         [variant],
@@ -266,7 +269,7 @@ export class SamplingService {
 
     if (fromLine) {
       const parts = fromLine.trim().split(/\s+/);
-      if (parts.length >= 2) {
+      if (parts.length >= 2 && parts[1]) {
         return parts[1];
       }
     }
@@ -280,6 +283,13 @@ export class SamplingService {
     tradeoffs: Record<string, string[]>;
   } {
     const best = scoredVariants[0];
+    if (!best) {
+      return {
+        summary: 'No variants available',
+        advantages: {},
+        tradeoffs: {},
+      };
+    }
     const summary = `Best variant: ${best.id} (${best.strategy}) with score ${best.score.total}/100`;
 
     const advantages: Record<string, string[]> = {};

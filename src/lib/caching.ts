@@ -34,7 +34,7 @@ export interface CacheStats {
 /**
  * Cache Manager with in-memory and disk persistence support
  */
-class CacheManager {
+export class CacheManager {
   private cache = new Map<string, CacheEntry>();
   private cacheDir: string;
   private options: Required<CacheOptions>;
@@ -51,7 +51,7 @@ class CacheManager {
       maxSize: options.maxSize ?? 1000,
       persistToDisk: options.persistToDisk ?? true,
     };
-    this.logger = logger;
+    this.logger = logger!;
   }
 
   /**
@@ -332,7 +332,10 @@ class CacheManager {
 
       const failures = results.filter((r) => !r.ok);
       if (failures.length > 0) {
-        return Failure(`Batch set failed: ${failures[0].error}`);
+        const firstFailure = failures[0];
+        if (firstFailure && !firstFailure.ok) {
+          return Failure(`Batch set failed: ${firstFailure.error}`);
+        }
       }
 
       return Success(undefined);
@@ -412,10 +415,15 @@ class CacheManager {
         return Success({ data: null });
       }
 
-      return Success({
+      const result: { data: any; metadata?: Record<string, any> } = {
         data: entry.value,
-        metadata: entry.metadata,
-      });
+      };
+
+      if (entry.metadata !== undefined) {
+        result.metadata = entry.metadata;
+      }
+
+      return Success(result);
     } catch (error) {
       return Failure(
         `Cache get with metadata failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -520,7 +528,7 @@ class CacheManager {
             // Try to restore original key format
             const keyMatch = file.match(/^(.+)\.json$/);
             if (keyMatch) {
-              const originalKey = keyMatch[1].replace(/_/g, ':');
+              const originalKey = keyMatch[1]!.replace(/_/g, ':');
               this.cache.set(originalKey, entry);
             }
           }

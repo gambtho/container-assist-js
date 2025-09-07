@@ -23,6 +23,9 @@ export const dockerfileSampling = {
       criteria?: Partial<ScoringCriteria>;
     },
     logger: Logger,
+    context?:
+      | import('../mcp/types.js').MCPContext
+      | import('../mcp/server-extensions.js').ToolContext,
   ): Promise<Result<any>> => {
     try {
       logger.info(
@@ -34,7 +37,15 @@ export const dockerfileSampling = {
         'Starting Dockerfile sampling',
       );
 
-      const samplingService = new SamplingService(logger);
+      // Enhanced progress tracking
+      const toolContext = context as import('../mcp/server-extensions.js').ToolContext;
+      await toolContext?.progressUpdater?.(5, 'Initializing sampling service...');
+
+      // Use prompt registry from MCP context if available, otherwise create default
+      const mcpContext = context as import('../mcp/types.js').MCPContext;
+      const samplingService = new SamplingService(logger, mcpContext?.promptRegistry);
+
+      await toolContext?.progressUpdater?.(15, 'Configuring sampling strategy...');
 
       const samplingConfig: SamplingConfig = {
         sessionId: config.sessionId,
@@ -47,13 +58,17 @@ export const dockerfileSampling = {
         timeout: 120000, // 2 minutes for sampling
       };
 
+      await toolContext?.progressUpdater?.(30, 'Generating variants...', config.variantCount || 5);
       const result = await samplingService.generateVariants(samplingConfig);
+      await toolContext?.progressUpdater?.(80, 'Analyzing and scoring variants...');
 
       if (!result.ok) {
         return Failure(`Sampling failed: ${result.error}`);
       }
 
       const samplingResult = result.value;
+
+      await toolContext?.progressUpdater?.(95, 'Finalizing results...');
 
       logger.info(
         {
@@ -64,6 +79,8 @@ export const dockerfileSampling = {
         },
         'Dockerfile sampling completed',
       );
+
+      await toolContext?.progressUpdater?.(100, 'Sampling complete');
 
       return Success({
         sessionId: samplingResult.sessionId,
@@ -127,6 +144,7 @@ export const dockerfileCompare = {
       criteria?: Partial<ScoringCriteria>;
     },
     logger: Logger,
+    context?: import('../mcp/types.js').MCPContext,
   ): Promise<Result<any>> => {
     try {
       logger.info(
@@ -141,7 +159,9 @@ export const dockerfileCompare = {
         return Failure('At least 2 Dockerfiles are required for comparison');
       }
 
-      const samplingService = new SamplingService(logger);
+      // Use prompt registry from MCP context if available, otherwise create default
+      const mcpContext = context as import('../mcp/types.js').MCPContext;
+      const samplingService = new SamplingService(logger, mcpContext?.promptRegistry);
 
       const result = await samplingService.compareDockerfiles(
         config.dockerfiles,
@@ -214,6 +234,7 @@ export const dockerfileValidate = {
       criteria?: Partial<ScoringCriteria>;
     },
     logger: Logger,
+    context?: import('../mcp/types.js').MCPContext,
   ): Promise<Result<any>> => {
     try {
       logger.info(
@@ -228,7 +249,9 @@ export const dockerfileValidate = {
         return Failure('Dockerfile content is required');
       }
 
-      const samplingService = new SamplingService(logger);
+      // Use prompt registry from MCP context if available, otherwise create default
+      const mcpContext = context as import('../mcp/types.js').MCPContext;
+      const samplingService = new SamplingService(logger, mcpContext?.promptRegistry);
 
       const result = await samplingService.validateDockerfile(
         config.content,
@@ -300,6 +323,7 @@ export const dockerfileBest = {
       optimization?: 'size' | 'security' | 'performance' | 'balanced';
     },
     logger: Logger,
+    context?: import('../mcp/types.js').MCPContext,
   ): Promise<Result<any>> => {
     try {
       logger.info(
@@ -312,7 +336,9 @@ export const dockerfileBest = {
         'Generating best Dockerfile via sampling',
       );
 
-      const samplingService = new SamplingService(logger);
+      // Use prompt registry from MCP context if available, otherwise create default
+      const mcpContext = context as import('../mcp/types.js').MCPContext;
+      const samplingService = new SamplingService(logger, mcpContext?.promptRegistry);
 
       const options: SamplingOptions = {
         environment: config.environment || 'production',
@@ -380,11 +406,17 @@ export const dockerfileBest = {
  */
 export const samplingStrategies = {
   name: 'sampling-strategies',
-  execute: async (_config: { sessionId?: string }, logger: Logger): Promise<Result<any>> => {
+  execute: async (
+    _config: { sessionId?: string },
+    logger: Logger,
+    context?: import('../mcp/types.js').MCPContext,
+  ): Promise<Result<any>> => {
     try {
       logger.info('Retrieving available sampling strategies');
 
-      const samplingService = new SamplingService(logger);
+      // Use prompt registry from MCP context if available, otherwise create default
+      const mcpContext = context as import('../mcp/types.js').MCPContext;
+      const samplingService = new SamplingService(logger, mcpContext?.promptRegistry);
       const strategies = samplingService.getAvailableStrategies();
 
       return Success({

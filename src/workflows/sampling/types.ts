@@ -44,6 +44,7 @@ export interface DockerfileVariant {
     estimatedSize: string;
     buildComplexity: 'low' | 'medium' | 'high';
     securityFeatures: string[];
+    aiEnhanced?: boolean;
   };
   generated: Date;
 }

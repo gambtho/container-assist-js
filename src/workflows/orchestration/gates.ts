@@ -6,7 +6,7 @@
 
 import { Result, Success, Failure } from '../../types/core.js';
 import type { Logger } from 'pino';
-import { ORCHESTRATOR_CONFIG } from '../../config/orchestrator-config.js';
+import { config } from '../../config/index.js';
 
 /**
  * Gate validation result
@@ -124,7 +124,7 @@ export class StageGates {
    */
   async checkScanGate(scanResult: ScanResult): Promise<Result<GateResult>> {
     const { critical, high, medium } = scanResult.vulnerabilities;
-    const thresholds = ORCHESTRATOR_CONFIG.SCAN_THRESHOLDS;
+    const thresholds = config.orchestrator.scanThresholds;
 
     const violations = [];
     if (critical > thresholds.critical) {
@@ -188,8 +188,8 @@ export class StageGates {
     // Size comparison if we have a reference
     if (bestCandidateSize && bestCandidateSize > 0) {
       const ratio = buildResult.size / bestCandidateSize;
-      const sanityLimit = ORCHESTRATOR_CONFIG.BUILD_SIZE_LIMITS.sanityFactor;
-      const rejectLimit = ORCHESTRATOR_CONFIG.BUILD_SIZE_LIMITS.rejectFactor;
+      const sanityLimit = config.orchestrator.buildSizeLimits.sanityFactor;
+      const rejectLimit = config.orchestrator.buildSizeLimits.rejectFactor;
 
       if (ratio > rejectLimit) {
         this.logger.error({ ratio, limit: rejectLimit }, 'Build gate failed: excessive size');

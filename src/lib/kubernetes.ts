@@ -7,7 +7,7 @@
 
 import * as k8s from '@kubernetes/client-node';
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../types/core.js';
+import { Success, Failure, type Result } from '../types/core';
 
 interface KubernetesClient {
   applyManifest: (manifest: any, namespace?: string) => Promise<Result<void>>;

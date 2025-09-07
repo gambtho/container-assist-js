@@ -90,6 +90,8 @@ export interface DeploymentWorkflowParams {
     name: string;
     replicas?: number;
     port?: number;
+    serviceType?: 'ClusterIP' | 'NodePort' | 'LoadBalancer';
+    registry?: string;
     env?: Record<string, string>;
     resources?: {
       requests?: { cpu?: string; memory?: string };
@@ -102,19 +104,25 @@ export interface DeploymentWorkflowResult {
   success: boolean;
   sessionId: string;
   error?: string;
-  data?: {
-    namespace: string;
+  results?: {
     deploymentName: string;
-    serviceName: string;
-    resources: Array<{
-      kind: string;
+    namespace: string;
+    endpoints?: string[];
+    service: {
       name: string;
-      namespace: string;
-    }>;
-    status?: {
+      type: string;
+    };
+    pods: Array<{
+      name: string;
       ready: boolean;
-      replicas: number;
-      availableReplicas: number;
+      status: string;
+      restarts: number;
+    }>;
+    verificationStatus: {
+      deployment: boolean;
+      service: boolean;
+      endpoints: boolean;
+      health: boolean;
     };
   };
   metadata: {

@@ -134,7 +134,7 @@ export async function scanImage(
 
     // Update session with scan results
     const currentState = session.workflow_state as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState, {
+    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       scan_result: {
         success: passed,
         vulnerabilities: dockerScanResult.vulnerabilities?.map((v) => ({

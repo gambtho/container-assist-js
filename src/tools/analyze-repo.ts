@@ -8,17 +8,27 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../lib/session';
-import { createAIService } from '../lib/ai';
+import { getRecommendedBaseImage } from '../lib/base-images';
+import { createMCPHostAI } from '../lib/mcp-host-ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
 import { DEFAULT_PORTS } from '../config/defaults';
+import {
+  enhanceAnalysisWithPerspective,
+  selectBestPerspective,
+  type AnalysisPerspective,
+} from './analysis-perspectives';
 
 export interface AnalyzeRepoConfig {
   sessionId: string;
   repoPath: string;
   depth?: number;
   includeTests?: boolean;
+  usePerspectives?: boolean;
+  perspective?: AnalysisPerspective;
+  securityFocus?: boolean;
+  performanceFocus?: boolean;
 }
 
 export interface AnalyzeRepoResult {
@@ -323,24 +333,6 @@ async function checkDockerFiles(repoPath: string): Promise<{
 }
 
 /**
- * Get recommended base image
- */
-function getRecommendedBaseImage(language: string, _framework?: string): string {
-  const recommendations: Record<string, string> = {
-    javascript: 'node:18-alpine',
-    typescript: 'node:18-alpine',
-    python: 'python:3.11-slim',
-    java: 'openjdk:17-alpine',
-    go: 'golang:1.21-alpine',
-    rust: 'rust:alpine',
-    ruby: 'ruby:3.2-alpine',
-    php: 'php:8.2-fpm-alpine',
-  };
-
-  return recommendations[language] ?? 'alpine:latest';
-}
-
-/**
  * Get security recommendations
  */
 function getSecurityRecommendations(
@@ -397,7 +389,7 @@ export async function analyzeRepo(
     const sessionManager = createSessionManager(logger);
 
     // Create AI service
-    const aiService = createAIService(logger);
+    const aiService = createMCPHostAI(logger);
 
     // Get or create session
     const session = await sessionManager.get(sessionId);
@@ -417,20 +409,18 @@ export async function analyzeRepo(
     // Get AI insights
     let aiInsights: string | undefined;
     try {
-      const aiResponse = await aiService.generate({
-        prompt: `Analyze repository structure for ${languageInfo.language} project`,
-        context: {
+      const aiResponse = await aiService.submitPrompt(
+        `Analyze repository structure for ${languageInfo.language} project`,
+        {
           language: languageInfo.language,
           framework: frameworkInfo?.framework,
           hasDependencies: dependencies.length > 0,
           hasDocker: dockerInfo.hasDockerfile,
         },
-      });
+      );
 
       if (aiResponse.ok) {
-        // Extract insights from the structured context
-        aiInsights =
-          aiResponse.value.context.guidance || 'Analysis completed using AI context preparation';
+        aiInsights = aiResponse.value || 'Analysis completed using MCP host AI';
       }
     } catch (error) {
       logger.debug({ error }, 'AI analysis skipped');
@@ -479,7 +469,7 @@ export async function analyzeRepo(
 
     // Update session with analysis result
     const currentState = session as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState, {
+    const updatedWorkflowState = updateWorkflowState(currentState || {}, {
       analysis_result: {
         language: languageInfo.language,
         ...(languageInfo.version && { language_version: languageInfo.version }),
@@ -515,6 +505,37 @@ export async function analyzeRepo(
     });
 
     await sessionManager.update(sessionId, updatedWorkflowState);
+
+    // Apply perspective enhancement if requested
+    if (config.usePerspectives) {
+      const selectedPerspective =
+        config.perspective ||
+        selectBestPerspective(result, {
+          ...(config.securityFocus !== undefined && { securityFocus: config.securityFocus }),
+          ...(config.performanceFocus !== undefined && {
+            performanceFocus: config.performanceFocus,
+          }),
+        });
+
+      const enhancedResult = enhanceAnalysisWithPerspective(result, selectedPerspective, logger);
+      if (enhancedResult.ok) {
+        timer.end({ language: languageInfo.language, perspective: selectedPerspective });
+        logger.info(
+          {
+            language: languageInfo.language,
+            perspective: selectedPerspective,
+          },
+          'Repository analysis completed with perspective',
+        );
+
+        return Success(enhancedResult.value);
+      } else {
+        logger.warn(
+          { error: enhancedResult.error },
+          'Perspective enhancement failed, returning base analysis',
+        );
+      }
+    }
 
     timer.end({ language: languageInfo.language });
     logger.info({ language: languageInfo.language }, 'Repository analysis completed');

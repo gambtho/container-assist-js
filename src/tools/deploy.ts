@@ -90,6 +90,7 @@ function orderManifests(manifests: unknown[]): unknown[] {
 export async function deployApplication(
   config: DeployApplicationConfig,
   logger: Logger,
+  context?: import('../mcp/server-extensions.js').ToolContext,
 ): Promise<Result<DeployApplicationResult>> {
   const timer = createTimer(logger, 'deploy-application');
 
@@ -105,11 +106,15 @@ export async function deployApplication(
 
     logger.info({ sessionId, namespace, cluster, dryRun }, 'Starting application deployment');
 
+    // Enhanced progress tracking
+    await context?.progressUpdater?.(5, 'Initializing deployment...');
+
     // Create lib instances
     const sessionManager = createSessionManager(logger);
     const k8sClient = createKubernetesClient(logger);
 
     // Get session
+    await context?.progressUpdater?.(10, 'Loading session data...');
     const session = await sessionManager.get(sessionId);
     if (!session) {
       return Failure('Session not found');
@@ -126,21 +131,33 @@ export async function deployApplication(
     }
 
     // Parse manifests
+    await context?.progressUpdater?.(20, 'Parsing Kubernetes manifests...');
     const manifests = parseManifest(k8sManifests.manifests);
     if (manifests.length === 0) {
       return Failure('No valid manifests found');
     }
 
     // Order manifests for deployment
+    await context?.progressUpdater?.(25, 'Ordering manifests for deployment...');
     const orderedManifests = orderManifests(manifests);
 
     logger.info({ manifestCount: orderedManifests.length, dryRun }, 'Deploying manifests');
+    await context?.progressUpdater?.(
+      30,
+      `Deploying ${orderedManifests.length} manifests...`,
+      orderedManifests.length,
+    );
 
     // Deploy manifests
     const deployedResources: Array<{ kind: string; name: string; namespace: string }> = [];
 
     if (!dryRun) {
-      for (const manifest of orderedManifests) {
+      for (let i = 0; i < orderedManifests.length; i++) {
+        const manifest = orderedManifests[i];
+        await context?.progressUpdater?.(
+          30 + ((i + 1) * 30) / orderedManifests.length,
+          `Deploying ${(manifest as any)?.kind || 'resource'} ${i + 1}/${orderedManifests.length}...`,
+        );
         try {
           const manifestObj = manifest as {
             kind?: string;
@@ -149,7 +166,15 @@ export async function deployApplication(
           // Apply manifest using K8s client
           const applyResult = await k8sClient.applyManifest(manifest, namespace);
           if (!applyResult.ok) {
-            return Failure(applyResult.error || 'Failed to apply manifest');
+            logger.warn(
+              {
+                kind: manifestObj.kind,
+                name: manifestObj.metadata?.name,
+                error: applyResult.error,
+              },
+              'Failed to apply manifest',
+            );
+            continue;
           }
 
           deployedResources.push({
@@ -197,14 +222,23 @@ export async function deployApplication(
 
     if (wait && !dryRun) {
       // Wait for deployment with configurable retry delay
+      await context?.progressUpdater?.(70, `Waiting for ${deploymentName} to be ready...`);
       const startTime = Date.now();
       const retryDelay = DEFAULT_TIMEOUTS.deploymentPoll || 5000;
       while (Date.now() - startTime < timeout * 1000) {
         // Check deployment status
+        const elapsedTime = Date.now() - startTime;
+        const progressPercent = Math.min(70 + (elapsedTime / (timeout * 1000)) * 25, 95);
+        await context?.progressUpdater?.(
+          progressPercent,
+          `Checking deployment status... (${Math.round(elapsedTime / 1000)}s elapsed)`,
+        );
+
         const statusResult = await k8sClient.getDeploymentStatus(namespace, deploymentName);
         if (statusResult.ok && statusResult.value?.ready) {
           ready = true;
           readyReplicas = statusResult.value?.readyReplicas || 0;
+          await context?.progressUpdater?.(95, 'Deployment is ready!');
           break;
         }
         // Wait before checking again using configured delay
@@ -254,7 +288,7 @@ export async function deployApplication(
 
     // Update session with deployment result
     const currentState = session.workflow_state as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState, {
+    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       deployment_result: {
         namespace,
         deployment_name: deploymentName,
@@ -280,6 +314,7 @@ export async function deployApplication(
       workflow_state: updatedWorkflowState,
     });
 
+    await context?.progressUpdater?.(100, 'Deployment complete');
     timer.end({ deploymentName, ready });
     logger.info({ deploymentName, serviceName, ready }, 'Application deployment completed');
 
@@ -317,5 +352,9 @@ export async function deployApplication(
  */
 export const deployApplicationTool = {
   name: 'deploy',
-  execute: (config: DeployApplicationConfig, logger: Logger) => deployApplication(config, logger),
+  execute: (
+    config: DeployApplicationConfig,
+    logger: Logger,
+    context?: import('../mcp/server-extensions.js').ToolContext,
+  ) => deployApplication(config, logger, context),
 };

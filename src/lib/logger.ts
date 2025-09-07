@@ -105,21 +105,3 @@ export function createTimer(
     },
   };
 }
-
-/**
- * Log sampling events for debugging
- */
-function logSamplingEvent(
-  logger: pino.Logger,
-  event: string,
-  context: Record<string, unknown> = {},
-): void {
-  logger.debug(
-    {
-      event_type: 'sampling',
-      event,
-      ...context,
-    },
-    `Sampling: ${event}`,
-  );
-}

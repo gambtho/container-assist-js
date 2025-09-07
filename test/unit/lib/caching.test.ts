@@ -173,7 +173,7 @@ describe('CacheManager', () => {
 
       expect(result.ok).toBe(true);
       expect(mockFs.writeFile).toHaveBeenCalledWith(
-        path.join(cacheDir, expect.stringContaining(key)),
+        expect.stringContaining(`${cacheDir}/persist-key`),
         expect.any(String)
       );
     });
@@ -209,8 +209,8 @@ describe('CacheManager', () => {
 
       expect(result.ok).toBe(true);
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to load cache entry'),
-        expect.any(Object)
+        { file: 'corrupt-key.json', error: expect.any(SyntaxError) },
+        'Failed to load cache entry'
       );
     });
 
@@ -484,12 +484,12 @@ describe('CacheManager', () => {
       await cacheManager.get('log-key');
 
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Cache set'),
-        expect.any(Object)
+        { key: 'log-key', ttl: 3600000 },
+        'Cache set'
       );
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Cache hit'),
-        expect.any(Object)
+        { key: 'log-key' },
+        'Cache hit'
       );
     });
   });

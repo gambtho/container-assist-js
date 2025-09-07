@@ -10,10 +10,7 @@ import {
   runBuildOnlyWorkflow,
   type WorkflowConfig as ContainerizationWorkflowConfig,
 } from '../containerization-workflow.js';
-import {
-  createIntelligentOrchestrator,
-  type WorkflowContext,
-} from '../intelligent-orchestration.js';
+import { executeWorkflow, type WorkflowContext } from '../intelligent-orchestration.js';
 
 /**
  * Execute containerization workflow for a repository
@@ -61,13 +58,6 @@ export const executeEnhancedWorkflow = async (
     ContainerizationWorkflowConfig & { toolFactory?: any; aiService?: any; sessionManager?: any }
   >,
 ): Promise<Result<any>> => {
-  const orchestrator = createIntelligentOrchestrator(
-    config?.toolFactory || null,
-    config?.aiService || null,
-    config?.sessionManager || null,
-    logger,
-  );
-
   const context: WorkflowContext = {
     sessionId: (config as any)?.sessionId,
     logger,
@@ -78,7 +68,7 @@ export const executeEnhancedWorkflow = async (
     ...config,
   };
 
-  return orchestrator.executeWorkflow(workflowType, params, context);
+  return executeWorkflow(workflowType, params, context, config?.toolFactory);
 };
 
 /**

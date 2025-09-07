@@ -5,11 +5,12 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../lib/session';
-import { createAIService } from '../lib/ai';
+import { createMCPHostAI, createPromptTemplate } from '../lib/mcp-host-ai';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core';
 import { updateWorkflowState, type WorkflowState } from '../types/workflow-state';
-import { getDefaultPort } from '../config/defaults';
+import { getDefaultPort, DEFAULT_NETWORK, DEFAULT_CONTAINER } from '../config/defaults';
+import { getRecommendedBaseImage } from '../lib/base-images';
 
 /**
  * Configuration for Dockerfile generation
@@ -64,20 +65,6 @@ export interface GenerateDockerfileResult {
  * @param language - Programming language detected in repository
  * @returns Recommended Docker base image
  */
-function getRecommendedBaseImage(language: string): string {
-  const recommendations: Record<string, string> = {
-    javascript: 'node:18-alpine',
-    typescript: 'node:18-alpine',
-    python: 'python:3.11-slim',
-    java: 'openjdk:17-alpine',
-    go: 'golang:1.21-alpine',
-    rust: 'rust:alpine',
-    ruby: 'ruby:3.2-alpine',
-    php: 'php:8.2-fpm-alpine',
-  };
-
-  return recommendations[language] ?? 'alpine:latest';
-}
 
 /**
  * Get build commands for different languages
@@ -238,7 +225,7 @@ ${getBuildCommands(analysis, 'single')}
     dockerfile += `
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${primaryPort}/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://${DEFAULT_NETWORK.host}:${primaryPort}${DEFAULT_CONTAINER.healthCheckPath} || exit 1
 `;
   }
 
@@ -287,8 +274,8 @@ export async function generateDockerfile(
     // Create lib instances
     const sessionManager = createSessionManager(logger);
 
-    // Create AI service
-    const aiService = createAIService(logger);
+    // Create MCP Host AI service
+    const mcpHostAI = createMCPHostAI(logger);
 
     // Get session
     const session = await sessionManager.get(sessionId);
@@ -316,48 +303,49 @@ export async function generateDockerfile(
     // Generate Dockerfile content
     const dockerfileContent = generateOptimizedDockerfile(analysisResult, config);
 
-    // Prepare structured context for MCP host AI (when available)
+    // Request AI enhancement from MCP host (when available)
     const processedContent = dockerfileContent;
     try {
-      const aiResponse = await aiService.generate({
-        prompt: `Generate optimized Dockerfile for ${analysisResult.language} project with ${analysisResult.framework || 'no framework'}`,
-        context: {
+      if (mcpHostAI.isAvailable()) {
+        const aiPrompt = createPromptTemplate('dockerfile', {
           language: analysisResult.language,
           framework: analysisResult.framework,
           dependencies: analysisResult.dependencies,
           ports: analysisResult.ports,
           optimization,
           multistage,
+          securityHardening,
           baseImage:
             config.baseImage ?? getRecommendedBaseImage(analysisResult.language ?? 'unknown'),
           generatedContent: dockerfileContent,
-        },
-      });
-
-      if (aiResponse.ok) {
-        logger.debug(
-          {
-            contextSize: aiResponse.value.metadata.contextSize,
-            hasGuidance: aiResponse.value.metadata.guidance,
-            hasTemplate: aiResponse.value.metadata.template,
-          },
-          'Context prepared for MCP host AI',
-        );
-
-        // Store the context in workflow state for MCP host to access
-        const currentWorkflowState = session.workflow_state as WorkflowState | undefined;
-        const updatedContext = updateWorkflowState(currentWorkflowState, {
-          metadata: {
-            ...(currentWorkflowState?.metadata ?? {}),
-            ai_context: aiResponse.value.context,
-          },
         });
-        await sessionManager.update(sessionId, {
-          workflow_state: updatedContext,
+
+        const aiResponse = await mcpHostAI.submitPrompt(aiPrompt, {
+          toolName: 'generate-dockerfile',
+          baseDockerfile: dockerfileContent,
+          optimizations: { optimization, multistage, securityHardening },
         });
+
+        if (aiResponse.ok) {
+          logger.debug('AI enhancement requested from MCP host for Dockerfile generation');
+
+          // Store AI request info in workflow state for reference
+          const currentWorkflowState = session.workflow_state as WorkflowState | undefined;
+          const updatedContext = updateWorkflowState(currentWorkflowState ?? {}, {
+            metadata: {
+              ...(currentWorkflowState?.metadata ?? {}),
+              ai_enhancement_requested: true,
+              ai_request_type: 'dockerfile-generation',
+              timestamp: new Date().toISOString(),
+            },
+          });
+          await sessionManager.update(sessionId, {
+            workflow_state: updatedContext,
+          });
+        }
       }
     } catch (error) {
-      logger.debug({ error }, 'AI context preparation skipped');
+      logger.debug({ error }, 'MCP host AI enhancement request failed');
     }
 
     // Determine output path
@@ -381,7 +369,7 @@ export async function generateDockerfile(
 
     // Update session with Dockerfile result
     const currentState = session.workflow_state as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState, {
+    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       dockerfile_result: {
         content: processedContent,
         path: dockerfilePath,
