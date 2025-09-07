@@ -18,7 +18,7 @@ import type { Resource } from './types.js';
 /**
  * Enhanced resource types for MCP integration
  */
-export interface EnhancedResource extends Resource {
+export interface ContainerizationResource extends Resource {
   /** MCP-native resource properties */
   name: string;
   description?: string | undefined;
@@ -44,15 +44,15 @@ export type ResourceCategory =
 /**
  * Enhanced Resource Manager with MCP SDK integration
  */
-export class EnhancedResourceManager {
+export class ContainerizationResourceManager {
   private baseManager: McpResourceManager;
-  private resourceIndex: Map<string, EnhancedResource> = new Map();
+  private resourceIndex: Map<string, ContainerizationResource> = new Map();
   private categoryIndex: Map<ResourceCategory, Set<string>> = new Map();
   private logger: Logger;
 
   constructor(baseManager: McpResourceManager, logger: Logger) {
     this.baseManager = baseManager;
-    this.logger = logger.child({ component: 'EnhancedResourceManager' });
+    this.logger = logger.child({ component: 'ContainerizationResourceManager' });
 
     // Initialize category indices
     this.initializeCategoryIndices();
@@ -106,7 +106,7 @@ export class EnhancedResourceManager {
         return Failure('Failed to read published resource');
       }
 
-      const enhancedResource: EnhancedResource = {
+      const enhancedResource: ContainerizationResource = {
         ...baseResource.value,
         name: metadata.name,
         description: metadata.description,
@@ -243,14 +243,14 @@ export class EnhancedResourceManager {
       priority?: number;
       namePattern?: string;
     },
-  ): Promise<Result<EnhancedResource[]>> {
+  ): Promise<Result<ContainerizationResource[]>> {
     try {
       const categoryUris = this.categoryIndex.get(category);
       if (!categoryUris) {
         return Success([]);
       }
 
-      const resources: EnhancedResource[] = [];
+      const resources: ContainerizationResource[] = [];
 
       for (const uri of categoryUris) {
         const resource = this.resourceIndex.get(uri);
@@ -318,9 +318,9 @@ export class EnhancedResourceManager {
     content?: string;
     category?: ResourceCategory;
     tags?: string[];
-  }): Promise<Result<EnhancedResource[]>> {
+  }): Promise<Result<ContainerizationResource[]>> {
     try {
-      const matchingResources: EnhancedResource[] = [];
+      const matchingResources: ContainerizationResource[] = [];
 
       // Get candidate URIs
       const candidateUris = query.category

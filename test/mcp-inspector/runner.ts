@@ -19,7 +19,7 @@ import { createArtifactTests } from './suites/resources/artifact-tests.js';
 import { createRemediationTests } from './suites/remediation/loop-tests.js';
 
 async function main() {
-  console.log('🧪 MCP Inspector Test Suite - Team Gamma');
+  console.log('🧪 MCP Inspector Test Suite');
   console.log('==========================================\n');
 
   const testRunner = new MCPTestRunner('./scripts/mcp-start.sh');

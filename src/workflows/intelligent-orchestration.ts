@@ -1,9 +1,7 @@
-import type { Result } from '../types/core/index.js';
-import { Success, Failure } from '../types/core/index.js';
+import { Success, Failure, type Result } from '../types/core/index.js';
 import type { Logger } from 'pino';
-import type { ProgressReporter } from '../mcp/enhanced-server.js';
+import type { ProgressReporter } from '../mcp/server-extensions.js';
 
-// Workflow step definition
 type WorkflowStep = {
   toolName: string;
   parameters: any;
@@ -12,7 +10,6 @@ type WorkflowStep = {
   condition?: (previousResults: any[]) => boolean;
 };
 
-// Workflow context
 type WorkflowContext = {
   sessionId?: string;
   progressReporter?: ProgressReporter;
@@ -20,7 +17,6 @@ type WorkflowContext = {
   logger: Logger;
 };
 
-// Workflow result
 type WorkflowResult = {
   workflowType: string;
   completedSteps: string[];
@@ -31,7 +27,6 @@ type WorkflowResult = {
   metadata?: any;
 };
 
-// Workflow step planning with functional approach
 const planWorkflowSteps = async (
   workflowType: string,
   params: any,
@@ -40,11 +35,9 @@ const planWorkflowSteps = async (
 ): Promise<WorkflowStep[]> => {
   const sessionState = sessionId ? await sessionManager.getState(sessionId) : undefined;
 
-  // Simple rule-based workflow planning
   if (workflowType === 'containerization') {
     const steps: WorkflowStep[] = [];
 
-    // Step 1: Analyze repository if not done
     if (!sessionState?.completed_steps?.includes('analyze-repo')) {
       steps.push({
         toolName: 'analyze-repo',
@@ -54,7 +47,6 @@ const planWorkflowSteps = async (
       });
     }
 
-    // Step 2: Generate Dockerfile
     steps.push({
       toolName: 'generate-dockerfile',
       parameters: { ...params, sessionId },
@@ -62,7 +54,6 @@ const planWorkflowSteps = async (
       required: true,
     });
 
-    // Step 3: Build image if requested
     if (params.buildImage !== false) {
       steps.push({
         toolName: 'build-image',
@@ -71,7 +62,6 @@ const planWorkflowSteps = async (
         required: false,
       });
 
-      // Step 4: Scan image if requested
       if (params.scanImage !== false) {
         steps.push({
           toolName: 'scan',
@@ -290,7 +280,11 @@ export const createIntelligentOrchestrator = (
   aiService: any,
   sessionManager: any,
   logger: Logger,
-) => ({
+): {
+  executeWorkflow: (workflowType: string, params: any, context: WorkflowContext) => Promise<Result<WorkflowResult>>;
+  listWorkflows: () => Array<{ name: string; description: string; steps: string[] }>;
+  getWorkflowDetails: (workflowType: string, sessionId?: string) => Promise<{ workflowType: string; steps: Array<{ name: string; description?: string; required: boolean }>; estimatedDuration: number }>;
+} => ({
   async executeWorkflow(
     workflowType: string,
     params: any,
@@ -309,7 +303,7 @@ export const createIntelligentOrchestrator = (
       }
 
       // Plan workflow steps
-      progressReporter?.(5, 'Planning workflow steps...');
+      void progressReporter?.(5, 'Planning workflow steps...');
       const steps = await planWorkflowSteps(workflowType, params, sessionId, sessionManager);
 
       if (steps.length === 0) {
@@ -334,7 +328,7 @@ export const createIntelligentOrchestrator = (
         if (!step) continue;
         const progressPercent = 10 + (i / steps.length) * 80;
 
-        progressReporter?.(progressPercent, step.description || `Executing ${step.toolName}...`);
+        void progressReporter?.(progressPercent, step.description || `Executing ${step.toolName}...`);
 
         // Check for cancellation
         if (signal?.aborted) {
@@ -351,7 +345,7 @@ export const createIntelligentOrchestrator = (
             signal,
             logger: logger.child({ step: step.toolName }),
             progressReporter: (p: number, m?: string) =>
-              progressReporter?.(progressPercent + (p * 0.8) / steps.length, m),
+              progressReporter?.(progressPercent + (p * 0.8) / steps.length, m) || Promise.resolve(),
           },
           results,
         );
@@ -399,7 +393,7 @@ export const createIntelligentOrchestrator = (
         }
       }
 
-      progressReporter?.(95, 'Finalizing workflow...');
+      void progressReporter?.(95, 'Finalizing workflow...');
 
       // Get final session state for recommendations
       const finalSessionState = sessionId ? await sessionManager.getState(sessionId) : undefined;
@@ -446,7 +440,7 @@ export const createIntelligentOrchestrator = (
         },
       };
 
-      progressReporter?.(100, 'Workflow complete');
+      void progressReporter?.(100, 'Workflow complete');
 
       logger.info(
         {
@@ -505,5 +499,4 @@ export const createIntelligentOrchestrator = (
 });
 
 // Export types
-export type IntelligentOrchestrator = ReturnType<typeof createIntelligentOrchestrator>;
 export type { WorkflowStep, WorkflowContext, WorkflowResult };

@@ -9,7 +9,6 @@ import * as os from 'os';
 import { createTimer, type Logger } from '../lib/logger';
 import { Success, Failure, type Result } from '../types/core/index';
 
-// Ping functionality
 interface PingConfig {
   message?: string;
 }
@@ -68,7 +67,6 @@ async function ping(config: PingConfig, logger: Logger): Promise<Result<PingResu
   }
 }
 
-// Server Status functionality
 interface ServerStatusConfig {
   details?: boolean;
 }
@@ -121,12 +119,10 @@ async function serverStatus(
     const usedMem = totalMem - freeMem;
     const memPercentage = Math.round((usedMem / totalMem) * 100);
 
-    // Get CPU info
     const cpus = os.cpus();
     const loadAverage = os.loadavg();
 
-    // Count migrated tools (we know we have 12 migrated now)
-    const migratedToolCount = 12; // Will be 14 when complete
+    const migratedToolCount = 12;
 
     const status: ServerStatusResult = {
       success: true,
@@ -149,7 +145,7 @@ async function serverStatus(
         hostname: os.hostname(),
       },
       tools: {
-        count: 14, // Total tools to migrate
+        count: 14,
         migrated: migratedToolCount,
       },
     };

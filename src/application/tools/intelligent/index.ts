@@ -1,11 +1,11 @@
 /**
- * Enhanced Tools Module Exports
- * Central export point for all enhanced tool functionality
+ * Intelligent Tools Module Exports
+ * Central export point for all intelligent tool functionality
  */
 
 // Tool types and guards
-export { isEnhancedTool } from './intelligent-tool-wrapper.js';
-export type { EnhancedTool } from './intelligent-tool-wrapper.js';
+export { isIntelligentTool } from './tool-wrapper.js';
+export type { IntelligentTool } from './tool-wrapper.js';
 
 // Tool Enhancers (new functional approach)
 export {
@@ -18,9 +18,9 @@ export {
   withProgressReporting,
   withCancellation,
   composeEnhancers,
-  createEnhancedTool,
-} from './tool-enhancers.js';
-export type { Tool } from './tool-enhancers.js';
+  createIntelligentTool,
+} from './tool-capabilities.js';
+export type { Tool } from './tool-capabilities.js';
 
 // Intelligent Tool Factory (new functional approach)
 export {
@@ -33,21 +33,21 @@ export {
   createScannerWithAI,
   createWorkflowExecutorWithAI,
   createBaseTools,
-  createAIEnhancedTools,
-  createEnhancedToolRegistry,
-} from './intelligent-factory.js';
-export type { ToolRegistry } from './intelligent-factory.js';
+  createAIPoweredTools,
+  createIntelligentToolRegistry,
+} from './ai-tool-factory.js';
+export type { ToolRegistry } from './ai-tool-factory.js';
 
-// Enhanced Tools Factory (existing)
+// Intelligent Tools Factory (existing)
 export {
-  createEnhancedTools,
-  getOrCreateEnhancedTools,
-  getEnhancedToolsInstance,
-  resetEnhancedToolsInstance,
-  createEnhancedWorkflowConfig,
-} from './factory.js';
-export type { EnhancedTools, EnhancedToolsConfig } from './factory.js';
+  createIntelligentTools,
+  getOrCreateIntelligentTools,
+  getIntelligentToolsInstance,
+  resetIntelligentToolsInstance,
+  createContainerizationWorkflowConfig,
+} from './tool-factory.js';
+export type { IntelligentTools, IntelligentToolsConfig } from './tool-factory.js';
 
-// Other enhanced components (if they exist)
-export * from './prompt-templates.js';
+// Other intelligent components (if they exist)
+export * from './ai-prompts.js';
 export * from './ai-parameter-validator.js';

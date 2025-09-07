@@ -20,12 +20,10 @@ import { createLogger } from '../lib/logger';
 import { createSessionManager } from '../lib/session';
 import { getMCPRegistry } from './registry';
 import { McpResourceManager } from './resources/manager.js';
-import { EnhancedResourceManager } from './resources/enhanced-resource-manager.js';
-import { PromptTemplatesManager } from '../application/tools/enhanced/prompt-templates.js';
+import { ContainerizationResourceManager } from './resources/containerization-resource-manager.js';
+import { PromptTemplatesManager } from '../application/tools/intelligent/ai-prompts.js';
 import { DEFAULT_CACHE } from '../config/defaults.js';
-import { enhanceServer } from './enhanced-server.js';
-// Workflows are registered via the registry
-// Workflows are now registered via the registry
+import { extendServerCapabilities } from './server-extensions.js';
 import type { MCPServer as IMCPServer, MCPServerOptions, MCPRequest, MCPResponse } from './types';
 
 /**
@@ -38,8 +36,8 @@ export class ContainerizationMCPServer implements IMCPServer {
   private transport: StdioServerTransport;
   private logger: Logger;
   private registry: ReturnType<typeof getMCPRegistry>;
-  private _sessionManager: ReturnType<typeof createSessionManager>; // For future session-aware tool execution
-  private resourceManager: EnhancedResourceManager;
+  private _sessionManager: ReturnType<typeof createSessionManager>;
+  private resourceManager: ContainerizationResourceManager;
   private promptTemplates: PromptTemplatesManager;
   private isRunning: boolean = false;
 
@@ -48,7 +46,6 @@ export class ContainerizationMCPServer implements IMCPServer {
     this.registry = getMCPRegistry(this.logger);
     this._sessionManager = createSessionManager(this.logger);
 
-    // Initialize resource management with centralized defaults
     const baseResourceManager = new McpResourceManager(
       {
         defaultTtl: DEFAULT_CACHE.defaultTtl,
@@ -57,12 +54,10 @@ export class ContainerizationMCPServer implements IMCPServer {
       },
       this.logger,
     );
-    this.resourceManager = new EnhancedResourceManager(baseResourceManager, this.logger);
+    this.resourceManager = new ContainerizationResourceManager(baseResourceManager, this.logger);
 
-    // Initialize prompt templates
     this.promptTemplates = new PromptTemplatesManager(this.logger);
 
-    // Initialize MCP server
     this.server = new Server(
       {
         name: options.name ?? 'containerization-assist',
@@ -83,28 +78,20 @@ export class ContainerizationMCPServer implements IMCPServer {
       },
     );
 
-    // Initialize stdio transport
     this.transport = new StdioServerTransport();
 
-    // Setup request handlers
     this.setupHandlers();
 
-    // Enhance server with progress reporting and cancellation support
-    enhanceServer(this);
+    extendServerCapabilities(this);
   }
 
-  /**
-   * Setup MCP request handlers
-   */
   private setupHandlers(): void {
-    // Handle tool listing requests
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       this.logger.debug('Received tools/list request');
 
       const tools = this.registry.getAllTools();
       const workflows = this.registry.getAllWorkflowObjects();
 
-      // Combine tools and workflows
       const allItems = [
         ...tools.map((tool) => ({
           name: tool.name,
@@ -123,14 +110,12 @@ export class ContainerizationMCPServer implements IMCPServer {
       return { tools: allItems };
     });
 
-    // Handle tool execution requests
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
 
       this.logger.info({ tool: name }, 'Received tool execution request');
 
       try {
-        // Check if it's a workflow first
         const workflow = this.registry.getWorkflow(name);
         if (workflow) {
           this.logger.debug({ workflow: name }, 'Executing workflow');
@@ -147,7 +132,6 @@ export class ContainerizationMCPServer implements IMCPServer {
           };
         }
 
-        // Check if it's a tool
         const tool = this.registry.getTool(name);
         if (!tool) {
           this.logger.error({ tool: name }, 'Tool not found');
@@ -169,12 +153,10 @@ export class ContainerizationMCPServer implements IMCPServer {
           };
         }
 
-        // Execute the tool
         this.logger.debug({ tool: name, args }, 'Executing tool');
 
         const result = await tool.execute(args ?? {}, this.logger);
 
-        // Handle Result type from tools
         if ('ok' in result) {
           if (result.ok) {
             return {
@@ -513,7 +495,7 @@ export class ContainerizationMCPServer implements IMCPServer {
   /**
    * Get the enhanced resource manager
    */
-  getResourceManager(): EnhancedResourceManager {
+  getResourceManager(): ContainerizationResourceManager {
     return this.resourceManager;
   }
 

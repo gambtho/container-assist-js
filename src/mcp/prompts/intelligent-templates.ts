@@ -1,5 +1,4 @@
-import type { Result } from '../../types/core/index.js';
-import { Success, Failure } from '../../types/core/index.js';
+import { Success, Failure, type Result } from '../../types/core/index.js';
 import type { Prompt } from '@modelcontextprotocol/sdk/types.js';
 
 // AI context for prompt enhancement

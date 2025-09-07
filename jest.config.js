@@ -6,6 +6,78 @@ export default {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   extensionsToTreatAsEsm: ['.ts'],
+  
+  // Multiple test configurations for different test types
+  projects: [
+    {
+      displayName: 'unit',
+      testMatch: ['**/test/unit/**/*.test.ts'],
+      testTimeout: 10000,
+      setupFilesAfterEnv: ['<rootDir>/test/setup/unit-setup.ts'],
+      transform: {
+        '^.+\\.tsx?$': [
+          'ts-jest',
+          {
+            useESM: true,
+            tsconfig: {
+              module: 'ES2022',
+              moduleResolution: 'bundler',
+              target: 'ES2022',
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+              isolatedModules: true
+            },
+          },
+        ],
+      },
+    },
+    {
+      displayName: 'integration',
+      testMatch: ['**/test/integration/**/*.test.ts'],
+      testTimeout: 60000,
+      setupFilesAfterEnv: ['<rootDir>/test/setup/integration-setup.ts'],
+      transform: {
+        '^.+\\.tsx?$': [
+          'ts-jest',
+          {
+            useESM: true,
+            tsconfig: {
+              module: 'ES2022',
+              moduleResolution: 'bundler',
+              target: 'ES2022',
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+              isolatedModules: true
+            },
+          },
+        ],
+      },
+    },
+    {
+      displayName: 'e2e',
+      testMatch: ['**/test/e2e/**/*.test.ts'],
+      testTimeout: 120000,
+      setupFilesAfterEnv: ['<rootDir>/test/setup/e2e-setup.ts'],
+      transform: {
+        '^.+\\.tsx?$': [
+          'ts-jest',
+          {
+            useESM: true,
+            tsconfig: {
+              module: 'ES2022',
+              moduleResolution: 'bundler',
+              target: 'ES2022',
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+              isolatedModules: true
+            },
+          },
+        ],
+      },
+    },
+  ],
+  
+  // Global configuration
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',
@@ -26,10 +98,6 @@ export default {
   maxWorkers: '50%',  // Use half of available CPU cores
   cache: true,
   cacheDirectory: '<rootDir>/node_modules/.cache/jest',
-  testMatch: [
-    '**/test/**/*.test.ts',
-    '**/test/**/*.spec.ts',
-  ],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
@@ -38,9 +106,37 @@ export default {
     '!src/**/index.ts',
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
+  coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 75,
+      lines: 80,
+      statements: 80
+    },
+    './src/tools/': {
+      branches: 85,
+      functions: 90,
+      lines: 90,
+      statements: 90
+    },
+    './src/workflows/': {
+      branches: 80,
+      functions: 85,
+      lines: 85,
+      statements: 85
+    }
+  },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {
+    // Handle .js imports and map them to .ts
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+    
+    // Test fixtures and helpers
+    '^@fixtures/(.*)$': '<rootDir>/test/fixtures/$1',
+    '^@helpers/(.*)$': '<rootDir>/test/helpers/$1',
+    '^@mocks/(.*)$': '<rootDir>/test/mocks/$1',
+    
     // Handle specific .js imports and map them to .ts
     // Infrastructure logger fix for test setup (exact path from test/setup.ts)
     '^\\.\\.\/src\/infrastructure\/logger\\.js$': '<rootDir>/src/infrastructure/logger.ts',
@@ -110,6 +206,10 @@ export default {
   
   // Fail fast for development
   bail: false,  // Continue running tests to get full picture
+  
+  // Global setup and teardown  
+  globalSetup: '<rootDir>/test/setup/global-setup.ts',
+  globalTeardown: '<rootDir>/test/setup/global-teardown.ts',
   
   // Setup files
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],

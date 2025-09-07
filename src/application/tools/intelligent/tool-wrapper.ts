@@ -1,12 +1,12 @@
 /**
  * Legacy tool wrapper interface
- * Kept for type compatibility only - use tool-enhancers.ts for new code
+ * Kept for type compatibility only - use tool-capabilities.ts for new code
  */
 
 import type { Result } from '../../../types/core/index.js';
 import type { Logger } from 'pino';
 
-export interface EnhancedTool {
+export interface IntelligentTool {
   name: string;
   description: string;
   schema?: any;
@@ -15,6 +15,8 @@ export interface EnhancedTool {
 }
 
 // Type guard for enhanced tools
-export const isEnhancedTool = (tool: any): tool is EnhancedTool & { executeEnhanced: Function } => {
+export const isIntelligentTool = (
+  tool: any,
+): tool is IntelligentTool & { executeEnhanced: (params: any, context: any) => Promise<Result<any>> } => {
   return tool && typeof tool.executeEnhanced === 'function';
 };

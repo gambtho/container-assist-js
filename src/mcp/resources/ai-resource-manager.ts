@@ -1,5 +1,4 @@
-import type { Result } from '../../types/core/index.js';
-import { Success, Failure } from '../../types/core/index.js';
+import { Success, Failure, type Result } from '../../types/core/index.js';
 import type { McpResourceManager as ResourceManager } from './manager.js';
 import type { Resource } from '@modelcontextprotocol/sdk/types.js';
 
@@ -11,7 +10,7 @@ type AIContext = {
 };
 
 // Enhanced resource with AI insights
-type EnhancedResource = Resource & {
+type AIResource = Resource & {
   aiAnnotations?: {
     insights?: string[];
     optimizations?: string[];
@@ -32,7 +31,7 @@ const enhanceResourceContent = async (
   resource: Resource,
   context: AIContext | undefined,
   aiService: any,
-): Promise<EnhancedResource> => {
+): Promise<AIResource> => {
   if (!shouldEnhanceWithAI(resource.uri) || !context) {
     return resource;
   }
@@ -50,7 +49,7 @@ const enhanceResourceContent = async (
   }
 
   // Add AI annotations to resource
-  const enhanced: EnhancedResource = {
+  const enhanced: AIResource = {
     ...resource,
     aiAnnotations: {
       insights: aiResult.value.insights,
@@ -83,7 +82,7 @@ const enhanceResourceContent = async (
 };
 
 // Enhanced URI schemes for intelligent resources
-export const EnhancedUriSchemes = {
+export const ResourceUriSchemes = {
   repository: 'repository://', // repository://sessionId/analysis
   dockerfile: 'dockerfile://', // dockerfile://sessionId/generated
   manifest: 'manifest://', // manifest://sessionId/k8s-deployment
@@ -98,7 +97,7 @@ export const EnhancedUriSchemes = {
 const parseEnhancedUri = (
   uri: string,
 ): { scheme: string; sessionId?: string; resourceType?: string } => {
-  for (const [key, scheme] of Object.entries(EnhancedUriSchemes)) {
+  for (const [key, scheme] of Object.entries(ResourceUriSchemes)) {
     if (uri.startsWith(scheme)) {
       const path = uri.substring(scheme.length);
       const parts = path.split('/');
@@ -118,7 +117,7 @@ const generateSessionResource = async (
   uri: string,
   sessionManager: any,
   aiService: any,
-): Promise<Result<EnhancedResource | null>> => {
+): Promise<Result<AIResource | null>> => {
   const { scheme, sessionId, resourceType } = parseEnhancedUri(uri);
 
   if (!sessionId) {
@@ -173,7 +172,7 @@ const generateSessionResource = async (
       return Success(null);
   }
 
-  const resource: EnhancedResource = {
+  const resource: AIResource = {
     uri,
     name: `${scheme}/${resourceType || 'default'}`,
     description: `Session resource: ${scheme}`,
@@ -191,23 +190,23 @@ const generateSessionResource = async (
   return Success(await enhanceResourceContent(resource, { sessionId }, aiService));
 };
 
-export class EnhancedResourceManager {
+export class AIResourceManager {
   constructor(
     private baseManager: ResourceManager,
     private aiService: any,
     private sessionManager: any,
   ) {}
 
-  async readWithAI(uri: string, context?: AIContext): Promise<Result<EnhancedResource | null>> {
+  async readWithAI(uri: string, context?: AIContext): Promise<Result<AIResource | null>> {
     // Check if this is a session-based resource
-    if (Object.values(EnhancedUriSchemes).some((scheme) => uri.startsWith(scheme))) {
+    if (Object.values(ResourceUriSchemes).some((scheme) => uri.startsWith(scheme))) {
       return generateSessionResource(uri, this.sessionManager, this.aiService);
     }
 
     // Read from base manager
     const readResult = await this.baseManager.read(uri);
     if (!readResult.ok) {
-      return readResult as Result<EnhancedResource | null>;
+      return readResult as Result<AIResource | null>;
     }
 
     if (!readResult.value) {
@@ -222,14 +221,14 @@ export class EnhancedResourceManager {
     return Success(enhancedResource);
   }
 
-  async listWithAI(context?: AIContext): Promise<Result<EnhancedResource[]>> {
+  async listWithAI(context?: AIContext): Promise<Result<AIResource[]>> {
     const listResult = await this.baseManager.list();
     if (!listResult.ok) {
-      return listResult as Result<EnhancedResource[]>;
+      return listResult as Result<AIResource[]>;
     }
 
     // Add session-based resources if context is provided
-    const resources: EnhancedResource[] = [...listResult.value];
+    const resources: AIResource[] = [...listResult.value];
 
     if (context?.sessionId) {
       const sessionState = await this.sessionManager.getState(context.sessionId);
@@ -238,7 +237,7 @@ export class EnhancedResourceManager {
         // Add available session resources
         if (sessionState.analysis_result) {
           resources.push({
-            uri: `${EnhancedUriSchemes.repository}${context.sessionId}/analysis`,
+            uri: `${ResourceUriSchemes.repository}${context.sessionId}/analysis`,
             name: 'Repository Analysis',
             description: 'AI-enhanced repository analysis results',
             mimeType: 'application/json',
@@ -247,7 +246,7 @@ export class EnhancedResourceManager {
 
         if (sessionState.generated_dockerfile) {
           resources.push({
-            uri: `${EnhancedUriSchemes.dockerfile}${context.sessionId}/generated`,
+            uri: `${ResourceUriSchemes.dockerfile}${context.sessionId}/generated`,
             name: 'Generated Dockerfile',
             description: 'AI-optimized Dockerfile',
             mimeType: 'text/plain',
@@ -256,7 +255,7 @@ export class EnhancedResourceManager {
 
         if (sessionState.scan_results) {
           resources.push({
-            uri: `${EnhancedUriSchemes.scan}${context.sessionId}/report`,
+            uri: `${ResourceUriSchemes.scan}${context.sessionId}/report`,
             name: 'Security Scan Report',
             description: 'Vulnerability analysis with AI insights',
             mimeType: 'application/json',
@@ -265,7 +264,7 @@ export class EnhancedResourceManager {
 
         if (sessionState.workflow_state) {
           resources.push({
-            uri: `${EnhancedUriSchemes.workflow}${context.sessionId}/state`,
+            uri: `${ResourceUriSchemes.workflow}${context.sessionId}/state`,
             name: 'Workflow State',
             description: 'Current workflow execution state',
             mimeType: 'application/json',
@@ -336,13 +335,13 @@ export class EnhancedResourceManager {
 }
 
 // Factory function for creating enhanced resource manager
-export const createEnhancedResourceManager = (
+export const createAIResourceManager = (
   baseManager: ResourceManager,
   aiService: any,
   sessionManager: any,
-): EnhancedResourceManager => {
-  return new EnhancedResourceManager(baseManager, aiService, sessionManager);
+): AIResourceManager => {
+  return new AIResourceManager(baseManager, aiService, sessionManager);
 };
 
 // Export types
-export type { EnhancedResource, AIContext };
+export type { AIResource, AIContext };

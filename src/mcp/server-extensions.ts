@@ -2,8 +2,7 @@ import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from 'pino';
 import { CancelledError } from './errors.js';
 // import type { ContainerizationMCPServer } from './server.js';
-import type { Result } from '../types/core/index.js';
-import { Failure } from '../types/core/index.js';
+import { Failure, type Result } from '../types/core/index.js';
 
 // Functional approach with composable utilities
 export type ProgressReporter = (progress: number, message?: string) => Promise<void>;
@@ -49,9 +48,9 @@ const executeWithContext = async (
     }
 
     // Fallback to standard execution
-    progressReporter?.(50, `Executing ${tool.name}...`);
+    void progressReporter?.(50, `Executing ${tool.name}...`);
     const result = await tool.execute(args, logger);
-    progressReporter?.(100, 'Complete');
+    void progressReporter?.(100, 'Complete');
 
     return result;
   } catch (error: any) {
@@ -62,7 +61,7 @@ const executeWithContext = async (
   }
 };
 
-export const enhanceServer = (server: any) => {
+export const extendServerCapabilities = (server: any): any => {
   // Replace the tool call handler with enhanced version
   server.server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
     const { name, arguments: args } = request.params;

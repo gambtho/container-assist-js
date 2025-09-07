@@ -5,11 +5,10 @@
  * instead of using wrapper classes or inheritance.
  */
 
-import type { Result } from '../../../types/core/index.js';
 import type { Logger } from 'pino';
-import { Success, Failure } from '../../../types/core/index.js';
+import { Success, Failure, type Result } from '../../../types/core/index.js';
 import { CancelledError } from '../../../mcp/errors.js';
-import type { ToolContext } from '../../../mcp/enhanced-server.js';
+import type { ToolContext } from '../../../mcp/server-extensions.js';
 import { pipe } from '../../../lib/composition.js';
 
 export interface Tool {
@@ -19,7 +18,7 @@ export interface Tool {
   execute: (params: any, logger: Logger) => Promise<Result<any>>;
 }
 
-export interface EnhancedTool extends Tool {
+export interface IntelligentTool extends Tool {
   executeEnhanced?: (params: any, context: ToolContext) => Promise<Result<any>>;
 }
 
@@ -170,7 +169,9 @@ export function withMetrics(metricsCollector?: any) {
 /**
  * Add retry logic to a tool
  */
-export function withRetry(options: { attempts?: number; delay?: number; backoff?: boolean } = {}) {
+export function withRetry(
+  options: { attempts?: number; delay?: number; backoff?: boolean } = {},
+): <T extends Tool>(tool: T) => T {
   const { attempts = 3, delay = 1000, backoff = true } = options;
 
   return <T extends Tool>(tool: T): T => ({
@@ -286,19 +287,19 @@ export function withSessionTracking(sessionManager: any) {
  * Add progress reporting to a tool
  */
 export function withProgressReporting() {
-  return <T extends EnhancedTool>(tool: T): T => ({
+  return <T extends IntelligentTool>(tool: T): T => ({
     ...tool,
     executeEnhanced: async (params: any, context: ToolContext) => {
       const { progressReporter } = context;
 
-      progressReporter?.(0, `Starting ${tool.name}...`);
-      progressReporter?.(30, `Executing ${tool.name}...`);
+      void progressReporter?.(0, `Starting ${tool.name}...`);
+      void progressReporter?.(30, `Executing ${tool.name}...`);
 
       const result = tool.executeEnhanced
         ? await tool.executeEnhanced(params, context)
         : await tool.execute(params, context.logger);
 
-      progressReporter?.(100, 'Complete');
+      void progressReporter?.(100, 'Complete');
 
       return result;
     },
@@ -309,7 +310,7 @@ export function withProgressReporting() {
  * Add cancellation support to a tool
  */
 export function withCancellation() {
-  return <T extends EnhancedTool>(tool: T): T => ({
+  return <T extends IntelligentTool>(tool: T): T => ({
     ...tool,
     executeEnhanced: async (params: any, context: ToolContext) => {
       const { signal } = context;
@@ -320,7 +321,7 @@ export function withCancellation() {
       }
 
       // Set up cancellation listener
-      const checkCancellation = () => {
+      const checkCancellation = (): void => {
         if (signal?.aborted) {
           throw new CancelledError();
         }
@@ -354,7 +355,7 @@ export function composeEnhancers<T extends Tool>(
 /**
  * Create a fully enhanced tool with all features
  */
-export function createEnhancedTool<T extends Tool>(
+export function createIntelligentTool<T extends Tool>(
   tool: T,
   options: {
     aiService?: any;

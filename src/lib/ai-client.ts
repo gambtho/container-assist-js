@@ -1,8 +1,6 @@
 import type { Logger } from 'pino';
-import type { Result } from '../types/core/index.js';
-import { Success, Failure } from '../types/core/index.js';
+import { Success, Failure, type Result } from '../types/core/index.js';
 
-// Functional AI service with composable utilities
 type AIRequest = {
   sessionId?: string;
   toolName?: string;
@@ -105,12 +103,19 @@ spec:
   return '';
 };
 
+/**
+ * Intelligent AI service that provides context-aware generation
+ * for containerization tools using session state and history
+ */
 export class IntelligentAIService {
   constructor(
-    private readonly _logger: Logger,
+    private readonly logger: Logger,
     private sessionManager: any,
   ) {}
 
+  /**
+   * Generate AI response with full session context and tool history
+   */
   async generateWithContext(request: AIRequest): Promise<Result<any>> {
     try {
       const context = await buildContextForTool(request, this.sessionManager);
@@ -155,7 +160,6 @@ Context:
 Provide validation results and optimization suggestions.
 `;
 
-    // Prepare structured context for Claude Code AI to process
     const contextResponse = await this.generateWithContext({
       prompt: validationPrompt,
       sessionId: context.sessionId || '',
@@ -165,7 +169,6 @@ Provide validation results and optimization suggestions.
 
     if (!contextResponse.ok) return contextResponse as Result<ValidationResult>;
 
-    // Return validation based on structured analysis rules
     return Success({
       isValid: this.validateBasicParams(toolName, params),
       suggestions: this.generateSuggestions(toolName, params, context),
@@ -230,7 +233,7 @@ Provide insights and optimization suggestions.
     if (!contextResponse.ok) return contextResponse;
 
     return Success({
-      enhancedContent: request.content, // Keep original content for now
+      enhancedContent: request.content,
       insights: this.generateResourceInsights(request.uri, request.content, request.schema),
       optimizations: this.suggestResourceOptimizations(request.uri, request.content),
     });
@@ -244,7 +247,6 @@ Provide insights and optimization suggestions.
   }): Promise<Result<any>> {
     const { template, arguments: args, context, sessionState } = request;
 
-    // Build messages based on template and context
     const messages = [
       {
         role: 'system',
@@ -256,7 +258,6 @@ Provide insights and optimization suggestions.
       },
     ];
 
-    // Add context-aware guidance
     if (context && sessionState?.analysis_result) {
       messages.push({
         role: 'assistant',
@@ -275,7 +276,6 @@ Provide insights and optimization suggestions.
   }
 
   private validateBasicParams(toolName: string, params: any): boolean {
-    // Basic validation that doesn't require AI
     const toolRequiredParams: Record<string, string[]> = {
       'analyze-repo': ['repoPath'],
       'generate-dockerfile': [],
@@ -292,7 +292,6 @@ Provide insights and optimization suggestions.
   private generateSuggestions(toolName: string, params: any, context: ToolContext): string[] {
     const suggestions: string[] = [];
 
-    // Context-aware suggestions
     if (toolName === 'generate-dockerfile' && !params.baseImage && context.repositoryPath) {
       suggestions.push('Consider specifying a base image for optimal compatibility');
     }
@@ -471,6 +470,11 @@ Provide insights and optimization suggestions.
   }
 }
 
-// Export factory function for functional approach
-export const createIntelligentAIService = (logger: Logger, sessionManager: any) =>
+/**
+ * Create an intelligent AI service instance
+ * @param logger - Logger instance for service operations
+ * @param sessionManager - Session manager for context and history
+ * @returns IntelligentAIService instance
+ */
+export const createIntelligentAIService = (logger: Logger, sessionManager: any): IntelligentAIService =>
   new IntelligentAIService(logger, sessionManager);

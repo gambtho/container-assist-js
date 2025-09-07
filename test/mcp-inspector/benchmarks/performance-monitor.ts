@@ -1,6 +1,5 @@
 /**
  * Performance Monitoring and Benchmarking Framework
- * Team Gamma - Testing Infrastructure
  */
 
 export interface PerformanceBenchmark {

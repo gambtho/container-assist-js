@@ -15,4 +15,4 @@ export type {
 // Existing workflows
 export * from './dockerfile-sampling.js';
 export * from './functional-sampling.js';
-export * from './orchestrated-workflow.js';
+export * from './containerization-workflow.js';

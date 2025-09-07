@@ -264,20 +264,20 @@ async function detectKubernetes(timeout: number = DEFAULT_TIMEOUT): Promise<Envi
  * Detect AI service availability (simplified check)
  */
 async function detectAi(): Promise<EnvironmentCapabilities['ai']> {
-  // Check for AI service configuration
+  // Check for AI service configuration (MCP-based only)
   const aiServiceUrl = process.env.AI_SERVICE_URL;
-  const aiApiKey = process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY;
 
-  if (aiServiceUrl || aiApiKey) {
+  if (aiServiceUrl) {
     return {
       available: true,
-      service: aiServiceUrl ? 'custom' : 'api-key-based'
+      service: 'custom'
     };
   }
 
+  // MCP SDK provides AI capabilities through the host
   return {
-    available: false,
-    error: 'No AI service configuration found'
+    available: true,
+    service: 'mcp-host'
   };
 }
 

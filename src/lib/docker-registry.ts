@@ -142,7 +142,9 @@ export async function getImageMetadata(
 /**
  * Create Docker registry client
  */
-export function createDockerRegistryClient(logger: Logger) {
+export function createDockerRegistryClient(logger: Logger): {
+  getImageMetadata: (imageName: string, tag: string) => Promise<ImageMetadata>;
+} {
   return {
     getImageMetadata: (imageName: string, tag: string) => getImageMetadata(imageName, tag, logger),
   };

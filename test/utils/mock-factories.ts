@@ -489,7 +489,6 @@ export function createMockConfig(overrides?: Partial<ApplicationConfig>): Applic
     },
     aiServices: {
       ai: {
-        apiKey: 'test-key',
         model: 'test-model',
         baseUrl: 'http://localhost:8080',
         timeout: 5000,
