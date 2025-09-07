@@ -153,23 +153,6 @@ export function updateWorkflowState(
   return { ...state, ...updates };
 }
 
-// ===== DOCKER TYPES =====
-
-export interface DockerConfig {
-  host?: string;
-  port?: number;
-  protocol?: 'http' | 'https';
-  socketPath?: string;
-}
-
-// ===== KUBERNETES TYPES =====
-
-export interface KubernetesConfig {
-  kubeconfig?: string;
-  context?: string;
-  namespace?: string;
-}
-
 // ===== AI SERVICE TYPES =====
 
 export interface AIService {
@@ -217,13 +200,4 @@ export interface AIAnalysis {
     processingTime: number;
     model?: string;
   };
-}
-
-// ===== MOCK CONFIG TYPES =====
-
-export interface MockConfig {
-  enabled: boolean;
-  scenarios?: Record<string, any>;
-  delay?: number;
-  failureRate?: number;
 }

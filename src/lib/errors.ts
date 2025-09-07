@@ -173,40 +173,6 @@ export function isContainerizationError(error: unknown): error is Containerizati
 }
 
 /**
- * Convert any error to a ContainerizationError
- */
-export function toContainerizationError(
-  error: unknown,
-  defaultCode: ErrorCode = ErrorCodes.INTERNAL_ERROR,
-  context?: Record<string, unknown>,
-): ContainerizationError {
-  if (isContainerizationError(error)) {
-    return error;
-  }
-
-  if (error instanceof Error) {
-    return new ContainerizationError(error.message, defaultCode, context, error);
-  }
-
-  return new ContainerizationError(String(error), defaultCode, context);
-}
-
-/**
- * Execute an async function and convert errors to ContainerizationError
- */
-export async function executeWithErrorHandling<T>(
-  fn: () => Promise<T>,
-  errorCode: ErrorCode = ErrorCodes.INTERNAL_ERROR,
-  context?: Record<string, unknown>,
-): Promise<T> {
-  try {
-    return await fn();
-  } catch (error) {
-    throw toContainerizationError(error, errorCode, context);
-  }
-}
-
-/**
  * Convert ContainerizationError to Result type (for MCP boundaries)
  */
 export function errorToResult(error: ContainerizationError): { ok: false; error: string } {

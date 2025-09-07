@@ -92,10 +92,6 @@ export function createConfig(): typeof config {
   return config;
 }
 
-export function getConfig(): typeof config {
-  return config;
-}
-
 export function logConfigSummaryIfDev(logger?: {
   info: (message: string, data?: any) => void;
 }): void {

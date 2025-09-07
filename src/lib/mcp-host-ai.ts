@@ -312,31 +312,3 @@ ${baseContext}
 Please provide helpful recommendations and insights.`;
   }
 };
-
-/**
- * Check if a response indicates that MCP host AI processing is needed
- */
-export const isAIAssistanceResponse = (response: string): boolean => {
-  try {
-    const parsed = JSON.parse(response);
-    return parsed.type === 'ai-completion-request';
-  } catch {
-    // Legacy format check
-    return response.startsWith('[AI-ASSISTANCE-NEEDED]');
-  }
-};
-
-/**
- * Parse an AI completion request from a response
- */
-export const parseAICompletionRequest = (response: string): MCPAIResponse | null => {
-  try {
-    const parsed = JSON.parse(response);
-    if (parsed.type === 'ai-completion-request') {
-      return parsed as MCPAIResponse;
-    }
-  } catch {
-    // Not a valid AI completion request
-  }
-  return null;
-};
