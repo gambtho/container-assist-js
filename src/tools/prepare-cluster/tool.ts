@@ -5,10 +5,10 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { createSessionManager } from '@lib/session';
-import { createKubernetesClient } from '@lib/kubernetes';
-import { createTimer, type Logger } from '@lib/logger';
-import { Success, Failure, type Result, type WorkflowState } from '@types';
+import { createSessionManager } from '../../lib/session';
+import { createKubernetesClient } from '../../lib/kubernetes';
+import { createTimer, type Logger } from '../../lib/logger';
+import { Success, Failure, type Result, type WorkflowState } from '../../domain/types';
 
 export interface PrepareClusterConfig {
   sessionId: string;

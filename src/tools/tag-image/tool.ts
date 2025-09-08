@@ -5,10 +5,16 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { createSessionManager } from '@lib/session';
-import { createDockerClient } from '@lib/docker';
-import { createTimer, type Logger } from '@lib/logger';
-import { Success, Failure, type Result, type TagImageParams, type WorkflowState } from '@types';
+import { createSessionManager } from '../../lib/session';
+import { createDockerClient } from '../../lib/docker';
+import { createTimer, type Logger } from '../../lib/logger';
+import {
+  Success,
+  Failure,
+  type Result,
+  type TagImageParams,
+  type WorkflowState,
+} from '../../domain/types';
 
 export interface TagImageConfig extends TagImageParams {
   sessionId: string;

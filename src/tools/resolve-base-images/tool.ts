@@ -5,11 +5,17 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { createSessionManager, type SessionManager } from '@lib/session';
-import { createTimer, type Logger } from '@lib/logger';
-import { createDockerRegistryClient } from '@lib/docker';
-import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
-import { getSuggestedBaseImages, getRecommendedBaseImage } from '@lib/base-images';
+import { createSessionManager, type SessionManager } from '../../lib/session';
+import { createTimer, type Logger } from '../../lib/logger';
+import { createDockerRegistryClient } from '../../lib/docker';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../../domain/types';
+import { getSuggestedBaseImages, getRecommendedBaseImage } from '../../lib/base-images';
 
 interface ResolveBaseImagesContext {
   sessionManager?: SessionManager;

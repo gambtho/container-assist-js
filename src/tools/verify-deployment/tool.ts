@@ -5,11 +5,11 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { createSessionManager } from '@lib/session';
-import { createKubernetesClient, type KubernetesClient } from '@lib/kubernetes';
-import { createTimer, type Logger } from '@lib/logger';
-import { Success, Failure, type Result } from '@types';
-import { DEFAULT_TIMEOUTS } from '@config/defaults';
+import { createSessionManager } from '../../lib/session';
+import { createKubernetesClient, type KubernetesClient } from '../../lib/kubernetes';
+import { createTimer, type Logger } from '../../lib/logger';
+import { Success, Failure, type Result } from '../../domain/types';
+import { DEFAULT_TIMEOUTS } from '../../config/defaults';
 
 export interface VerifyDeploymentConfig {
   sessionId: string;

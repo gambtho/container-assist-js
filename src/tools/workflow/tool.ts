@@ -5,9 +5,9 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { createSessionManager } from '@lib/session';
-import { createTimer, type Logger } from '@lib/logger';
-import { Success, Failure, type Result, type Tool } from '@types';
+import { createSessionManager } from '../../lib/session';
+import { createTimer, type Logger } from '../../lib/logger';
+import { Success, Failure, type Result, type Tool } from '../../domain/types';
 
 // Export specific workflow tool configuration
 export interface WorkflowToolConfig {
