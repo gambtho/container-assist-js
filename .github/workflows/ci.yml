@@ -172,6 +172,7 @@ jobs:
         run: |
           test -f dist/src/cli/cli.js || (echo "CLI build missing" && exit 1)
           test -f dist/src/mcp/server.js || (echo "Main export missing" && exit 1)
+          test -f dist/src/index.js || (echo "Index export missing" && exit 1)
           # Skip type definitions check as they may fail due to TS errors
           test -f dist/src/mcp/server.d.ts || echo "Warning: Type definitions missing (expected during development)"
 
@@ -293,6 +294,13 @@ jobs:
         with:
           name: dist-node-${{ env.NODE_VERSION }}
           path: dist/
+
+      - name: Ensure index.js exists
+        run: |
+          if [ ! -f dist/src/index.js ]; then
+            echo "Index file missing from artifacts, rebuilding..."
+            npm run build:fast
+          fi
 
       - name: Test MCP server startup
         run: |

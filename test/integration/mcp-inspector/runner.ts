@@ -4,19 +4,19 @@
  * MCP Inspector Testing Infrastructure
  */
 
-import { MCPTestRunner } from './infrastructure/test-runner.js';
-import { createBasicToolTests } from './suites/tool-validation/basic-tool-tests.js';
-import { createComprehensiveToolTests } from './suites/tool-validation/comprehensive-tool-tests.js';
-import { createErrorHandlingTests } from './suites/edge-cases/error-handling-tests.js';
-import { createSamplingValidationTests } from './suites/sampling-validation/sampling-tests.js';
-import { createResourceManagementTests } from './suites/resource-management/resource-tests.js';
-import { createLoadTestingTests } from './suites/load-testing/concurrent-tests.js';
-import { createIntegrationFlowTests } from './suites/integration-flows/workflow-tests.js';
-import { createOrchestratorEventTests } from './suites/orchestrator/event-flow-tests.js';
-import { createPhaseGateTests } from './suites/orchestrator/phase-gate-tests.js';
-import { createSamplingDecisionTests } from './suites/sampling/decision-tests.js';
-import { createArtifactTests } from './suites/resources/artifact-tests.js';
-import { createRemediationTests } from './suites/remediation/loop-tests.js';
+import { MCPTestRunner } from './infrastructure/test-runner';
+import { createBasicToolTests } from './suites/tool-validation/basic-tool-tests';
+import { createComprehensiveToolTests } from './suites/tool-validation/comprehensive-tool-tests';
+import { createErrorHandlingTests } from './suites/edge-cases/error-handling-tests';
+import { createSamplingValidationTests } from './suites/sampling-validation/sampling-tests';
+import { createResourceManagementTests } from './suites/resource-management/resource-tests';
+import { createLoadTestingTests } from './suites/load-testing/concurrent-tests';
+import { createIntegrationFlowTests } from './suites/integration-flows/workflow-tests';
+import { createOrchestratorEventTests } from './suites/orchestrator/event-flow-tests';
+import { createPhaseGateTests } from './suites/orchestrator/phase-gate-tests';
+import { createSamplingDecisionTests } from './suites/sampling/decision-tests';
+import { createArtifactTests } from './suites/resources/artifact-tests';
+import { createRemediationTests } from './suites/remediation/loop-tests';
 
 async function main() {
   console.log('🧪 MCP Inspector Test Suite');
