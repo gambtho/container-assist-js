@@ -8,6 +8,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
 import { generateDockerfileSchema } from '@tools/generate-dockerfile/schema';
 import { buildImageSchema } from '@tools/build-image/schema';
@@ -217,6 +218,15 @@ export class MCPServer {
         this.deps.logger.info({ tool: name }, 'Executing tool via McpServer handler');
 
         try {
+          // Ensure sessionId is provided - generate a unique one if missing
+          if (!params.sessionId) {
+            params.sessionId = randomUUID();
+            this.deps.logger.debug(
+              { sessionId: params.sessionId },
+              'Generated new session ID for tool execution',
+            );
+          }
+
           // Execute tool function directly
           const toolFunction = toolFunctions[name as keyof typeof toolFunctions];
           if (!toolFunction) {
@@ -288,8 +298,15 @@ export class MCPServer {
         const workflowParams = {
           ...params,
           projectPath: params.repoPath || this.deps.config.workspace.workspaceDir,
-          sessionId: params.sessionId || 'default',
+          sessionId: params.sessionId || randomUUID(),
         };
+
+        if (!params.sessionId) {
+          this.deps.logger.debug(
+            { sessionId: workflowParams.sessionId },
+            'Generated new session ID for containerization workflow',
+          );
+        }
 
         const result = await containerizationWorkflow.execute(workflowParams, this.deps.logger, {
           deps: this.deps,
@@ -315,8 +332,15 @@ export class MCPServer {
         this.deps.logger.info({ workflow: 'deployment' }, 'Executing deployment workflow');
 
         // Map MCP schema params to workflow params
+        const generatedSessionId = params.sessionId || randomUUID();
+        if (!params.sessionId) {
+          this.deps.logger.debug(
+            { sessionId: generatedSessionId },
+            'Generated new session ID for deployment workflow',
+          );
+        }
         const workflowParams = {
-          sessionId: params.sessionId || 'default',
+          sessionId: generatedSessionId,
           imageId: params.imageId || 'latest',
           clusterConfig: {
             namespace: params.namespace || this.deps.config.kubernetes.namespace,
