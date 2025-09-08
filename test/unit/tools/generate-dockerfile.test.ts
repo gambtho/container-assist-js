@@ -21,14 +21,12 @@ jest.mock('node:fs', () => ({
 const mockSessionManager = {
   create: jest.fn().mockResolvedValue({
     sessionId: 'test-session-123',
-    workflow_state: {
-      analysis_result: {
-        language: 'javascript',
-        framework: 'express',
-        mainFile: 'server.js',
-        packageManager: 'npm',
-        hasTests: true,
-      },
+    analysis_result: {
+      language: 'javascript',
+      framework: 'express',
+      mainFile: 'server.js',
+      packageManager: 'npm',
+      hasTests: true,
     },
     metadata: {},
     completed_steps: [],
@@ -100,15 +98,13 @@ describe('generateDockerfile', () => {
       // Mock session with analysis results
       mockSessionManager.get.mockResolvedValue({
         sessionId: 'test-session-123',
-        workflow_state: {
-          analysis_result: {
-            language: 'javascript',
-            framework: 'express',
-            mainFile: 'server.js',
-            packageManager: 'npm',
-            hasTests: true,
-            dependencies: ['express', 'cors', 'helmet'],
-          },
+        analysis_result: {
+          language: 'javascript',
+          framework: 'express',
+          mainFile: 'server.js',
+          packageManager: 'npm',
+          hasTests: true,
+          dependencies: ['express', 'cors', 'helmet'],
         },
         repo_path: '/test/repo',
         metadata: {},
@@ -134,14 +130,13 @@ describe('generateDockerfile', () => {
       // Need more than 5 dependencies for multi-stage to trigger
       mockSessionManager.get.mockResolvedValue({
         sessionId: 'test-session-123',
-        workflow_state: {
-          analysis_result: {
-            language: 'javascript',
-            framework: 'express',
-            mainFile: 'server.js',
-            packageManager: 'npm',
-            hasTests: true,
-            dependencies: [
+        analysis_result: {
+          language: 'javascript',
+          framework: 'express',
+          mainFile: 'server.js',
+          packageManager: 'npm',
+          hasTests: true,
+          dependencies: [
               { name: 'express' },
               { name: 'cors' },
               { name: 'helmet' },
@@ -149,7 +144,6 @@ describe('generateDockerfile', () => {
               { name: 'bcrypt' },
               { name: 'jsonwebtoken' },
             ],
-          },
         },
         repo_path: '/test/repo',
         metadata: {},
@@ -218,13 +212,11 @@ describe('generateDockerfile', () => {
     it('should generate Python Dockerfile', async () => {
       mockSessionManager.get.mockResolvedValue({
         sessionId: 'test-session-123',
-        workflow_state: {
-          analysis_result: {
-            language: 'python',
-            framework: 'flask',
-            mainFile: 'app.py',
-            packageManager: 'pip',
-          },
+        analysis_result: {
+          language: 'python',
+          framework: 'flask',
+          mainFile: 'app.py',
+          packageManager: 'pip',
         },
         repo_path: '/test/repo',
       });
@@ -242,13 +234,11 @@ describe('generateDockerfile', () => {
     it('should generate Java Dockerfile', async () => {
       mockSessionManager.get.mockResolvedValue({
         sessionId: 'test-session-123',
-        workflow_state: {
-          analysis_result: {
-            language: 'java',
-            build_system: { type: 'maven' },
-            mainFile: 'Application.java',
-            dependencies: [],
-          },
+        analysis_result: {
+          language: 'java',
+          build_system: { type: 'maven' },
+          mainFile: 'Application.java',
+          dependencies: [],
         },
         repo_path: '/test/repo',
         metadata: {},
@@ -267,11 +257,9 @@ describe('generateDockerfile', () => {
     it('should generate Go Dockerfile', async () => {
       mockSessionManager.get.mockResolvedValue({
         sessionId: 'test-session-123',
-        workflow_state: {
-          analysis_result: {
-            language: 'go',
-            mainFile: 'main.go',
-          },
+        analysis_result: {
+          language: 'go',
+          mainFile: 'main.go',
         },
         repo_path: '/test/repo',
       });
@@ -291,7 +279,6 @@ describe('generateDockerfile', () => {
     it('should return error when no analysis results found', async () => {
       mockSessionManager.get.mockResolvedValue({
         sessionId: 'test-session-123',
-        workflow_state: {},
         metadata: {},
       });
 
@@ -306,11 +293,9 @@ describe('generateDockerfile', () => {
     it('should handle file write errors', async () => {
       mockSessionManager.get.mockResolvedValue({
         sessionId: 'test-session-123',
-        workflow_state: {
-          analysis_result: {
-            language: 'javascript',
-            framework: 'express',
-          },
+        analysis_result: {
+          language: 'javascript',
+          framework: 'express',
         },
         repo_path: '/test/repo',
       });
@@ -330,11 +315,9 @@ describe('generateDockerfile', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
         sessionId: 'test-session-123',
-        workflow_state: {
-          analysis_result: {
-            language: 'javascript',
-            framework: 'express',
-          },
+        analysis_result: {
+          language: 'javascript',
+          framework: 'express',
         },
         repo_path: '/test/repo',
       });
@@ -377,12 +360,15 @@ describe('generateDockerfile', () => {
   });
 
   describe('Session management', () => {
-    it('should create new session if not exists', async () => {
+    it('should return error if session does not exist', async () => {
       mockSessionManager.get.mockResolvedValue(null);
 
-      await generateDockerfile(config, mockLogger);
+      const result = await generateDockerfile(config, mockLogger);
 
-      expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('Session test-session-123 not found');
+      }
     });
   });
 });

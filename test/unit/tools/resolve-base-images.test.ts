@@ -62,14 +62,12 @@ describe('resolveBaseImagesTool', () => {
   let config: ResolveBaseImagesConfig;
   const mockSession = {
     id: 'test-session',
-    workflow_state: {
-      analysis_result: {
-        language: 'javascript',
-        framework: 'react',
-      },
-      completed_steps: ['analyze-repo'],
-      metadata: {},
+    analysis_result: {
+      language: 'javascript',
+      framework: 'react',
     },
+    completed_steps: ['analyze-repo'],
+    metadata: {},
   };
 
   const mockImageMetadata = {
@@ -155,12 +153,9 @@ describe('resolveBaseImagesTool', () => {
     it('should handle Python applications', async () => {
       const sessionWithPython = {
         ...mockSession,
-        workflow_state: {
-          ...mockSession.workflow_state,
-          analysis_result: {
-            language: 'python',
-            framework: 'flask',
-          },
+        analysis_result: {
+          language: 'python',
+          framework: 'flask',
         },
       };
       mockSessionManager.get.mockResolvedValue(sessionWithPython);
@@ -222,10 +217,9 @@ describe('resolveBaseImagesTool', () => {
     it('should fail when no analysis result available', async () => {
       const sessionWithoutAnalysis = {
         ...mockSession,
-        workflow_state: {
-          completed_steps: [],
-          metadata: {},
-        },
+        analysis_result: undefined,
+        completed_steps: [],
+        metadata: {},
       };
       mockSessionManager.get.mockResolvedValue(sessionWithoutAnalysis);
 
@@ -285,11 +279,8 @@ describe('resolveBaseImagesTool', () => {
     it('should handle images without tags', async () => {
       const sessionWithUnknown = {
         ...mockSession,
-        workflow_state: {
-          ...mockSession.workflow_state,
-          analysis_result: {
-            language: 'unknown',
-          },
+        analysis_result: {
+          language: 'unknown',
         },
       };
       mockSessionManager.get.mockResolvedValue(sessionWithUnknown);

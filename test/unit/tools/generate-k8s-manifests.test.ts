@@ -97,11 +97,10 @@ describe('generateK8sManifests', () => {
   describe('Basic Manifest Generation', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0', 'myapp:latest'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0', 'myapp:latest'],
+},
         repo_path: '/test/repo',
       });
     });
@@ -172,11 +171,10 @@ describe('generateK8sManifests', () => {
   describe('Deployment Configuration', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
     });
@@ -232,11 +230,10 @@ describe('generateK8sManifests', () => {
   describe('Service Configuration', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
     });
@@ -277,11 +274,10 @@ describe('generateK8sManifests', () => {
   describe('Ingress Configuration', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
     });
@@ -331,11 +327,10 @@ describe('generateK8sManifests', () => {
   describe('Horizontal Pod Autoscaler Configuration', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
     });
@@ -394,11 +389,10 @@ describe('generateK8sManifests', () => {
   describe('Warnings Generation', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
     });
@@ -476,11 +470,10 @@ describe('generateK8sManifests', () => {
   describe('File Operations', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
     });
@@ -499,11 +492,10 @@ describe('generateK8sManifests', () => {
 
     it('should use current directory when repo_path is not available', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: null,
       });
 
@@ -522,11 +514,10 @@ describe('generateK8sManifests', () => {
   describe('Session Management', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
     });
@@ -581,11 +572,10 @@ describe('generateK8sManifests', () => {
 
     it('should handle filesystem errors', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
 
@@ -601,11 +591,10 @@ describe('generateK8sManifests', () => {
 
     it('should handle file write errors', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
 
@@ -621,11 +610,10 @@ describe('generateK8sManifests', () => {
 
     it('should handle AI service failures gracefully', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
 
@@ -644,11 +632,10 @@ describe('generateK8sManifests', () => {
   describe('YAML Generation', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
     });

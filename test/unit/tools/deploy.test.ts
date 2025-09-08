@@ -169,11 +169,10 @@ spec:
     beforeEach(() => {
       // Session with K8s manifests
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          k8s_manifests: {
-            manifests: sampleManifests,
-          },
-        },
+        
+k8s_manifests: {
+  manifests: sampleManifests,
+},
         repo_path: '/test/repo',
       });
 
@@ -311,11 +310,10 @@ spec:
     beforeEach(() => {
       // Use the existing sampleManifests which are properly handled by the YAML mock
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          k8s_manifests: {
-            manifests: sampleManifests,
-          },
-        },
+        
+k8s_manifests: {
+  manifests: sampleManifests,
+},
         repo_path: '/test/repo',
       });
 
@@ -351,11 +349,10 @@ spec:
       const manifestsWithLB = sampleManifests.replace('type: ClusterIP', 'type: LoadBalancer');
       
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          k8s_manifests: {
-            manifests: manifestsWithLB,
-          },
-        },
+        
+k8s_manifests: {
+  manifests: manifestsWithLB,
+},
         repo_path: '/test/repo',
       });
 
@@ -403,11 +400,10 @@ spec:
 `;
 
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          k8s_manifests: {
-            manifests: manifestsWithIngress,
-          },
-        },
+        
+k8s_manifests: {
+  manifests: manifestsWithIngress,
+},
         repo_path: '/test/repo',
       });
 
@@ -469,11 +465,10 @@ spec:
 
     it('should return error when manifests are empty', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          k8s_manifests: {
-            manifests: '',
-          },
-        },
+        
+k8s_manifests: {
+  manifests: '',
+},
         repo_path: '/test/repo',
       });
 
@@ -488,11 +483,10 @@ spec:
 
     it('should handle Kubernetes client failures gracefully', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          k8s_manifests: {
-            manifests: sampleManifests,
-          },
-        },
+        
+k8s_manifests: {
+  manifests: sampleManifests,
+},
         repo_path: '/test/repo',
       });
 
@@ -508,11 +502,10 @@ spec:
 
     it('should handle deployment status check failures', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          k8s_manifests: {
-            manifests: sampleManifests,
-          },
-        },
+        
+k8s_manifests: {
+  manifests: sampleManifests,
+},
         repo_path: '/test/repo',
       });
 
@@ -534,11 +527,10 @@ spec:
 
     it('should handle timeout during deployment wait', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          k8s_manifests: {
-            manifests: sampleManifests,
-          },
-        },
+        
+k8s_manifests: {
+  manifests: sampleManifests,
+},
         repo_path: '/test/repo',
       });
 
@@ -564,11 +556,10 @@ spec:
 
     it('should handle exceptions during deployment process', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          k8s_manifests: {
-            manifests: sampleManifests,
-          },
-        },
+        
+k8s_manifests: {
+  manifests: sampleManifests,
+},
         repo_path: '/test/repo',
       });
 
@@ -592,11 +583,10 @@ spec:
 
     it('should handle session update failures', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          k8s_manifests: {
-            manifests: sampleManifests,
-          },
-        },
+        
+k8s_manifests: {
+  manifests: sampleManifests,
+},
         repo_path: '/test/repo',
       });
 
@@ -619,11 +609,10 @@ spec:
   describe('Configuration Options', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          k8s_manifests: {
-            manifests: sampleManifests,
-          },
-        },
+        
+k8s_manifests: {
+  manifests: sampleManifests,
+},
         repo_path: '/test/repo',
       });
 

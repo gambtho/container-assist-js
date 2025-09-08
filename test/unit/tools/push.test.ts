@@ -67,12 +67,11 @@ describe('pushImage', () => {
     beforeEach(() => {
       // Session with tagged images
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:v1.0', 'myapp:latest'],
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['myapp:v1.0', 'myapp:latest'],
+},
         repo_path: '/test/repo',
       });
 
@@ -140,12 +139,11 @@ describe('pushImage', () => {
 
     it('should handle image tags without explicit tag (defaults to latest)', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp'], // No explicit tag
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['myapp'], // No explicit tag
+},
         repo_path: '/test/repo',
       });
 
@@ -162,12 +160,11 @@ describe('pushImage', () => {
 
     it('should push the first tag when multiple tags exist', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:v2.0', 'myapp:latest', 'myapp:stable'],
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['myapp:v2.0', 'myapp:latest', 'myapp:stable'],
+},
         repo_path: '/test/repo',
       });
 
@@ -184,12 +181,11 @@ describe('pushImage', () => {
 
     it('should handle complex image names with repositories', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['registry.example.com/myorg/myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['registry.example.com/myorg/myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
 
@@ -207,12 +203,11 @@ describe('pushImage', () => {
   describe('Registry Configuration', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
 
@@ -295,12 +290,11 @@ describe('pushImage', () => {
 
     it('should return error when build result has no tags', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: [],
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: [],
+},
         repo_path: '/test/repo',
       });
 
@@ -314,12 +308,11 @@ describe('pushImage', () => {
 
     it('should return error when build result has invalid tags', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: [null, undefined, ''] as any[], // Invalid tags
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: [null, undefined, ''] as any[], // Invalid tags
+},
         repo_path: '/test/repo',
       });
 
@@ -333,12 +326,11 @@ describe('pushImage', () => {
 
     it('should return error for malformed image tags', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: [''], // Empty tag
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: [''], // Empty tag
+},
         repo_path: '/test/repo',
       });
 
@@ -353,12 +345,11 @@ describe('pushImage', () => {
 
     it('should handle Docker client push failures', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
 
@@ -376,12 +367,11 @@ describe('pushImage', () => {
 
     it('should handle Docker client push errors without error message', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
 
@@ -399,12 +389,11 @@ describe('pushImage', () => {
 
     it('should handle exceptions during push process', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
 
@@ -422,12 +411,11 @@ describe('pushImage', () => {
 
     it('should handle session update failures', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:v1.0'],
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['myapp:v1.0'],
+},
         repo_path: '/test/repo',
       });
 
@@ -456,33 +444,26 @@ describe('pushImage', () => {
 
       for (const testCase of testCases) {
         mockSessionManager.get.mockResolvedValue({
-          workflow_state: {
-            build_result: {
-              imageId: 'sha256:mock-image-id',
-              tags: [testCase.input],
-            },
+          build_result: {
+            imageId: 'sha256:mock-image-id',
+            tags: [testCase.input],
           },
           repo_path: '/test/repo',
         });
-
         mockDockerClient.pushImage.mockResolvedValue(createSuccessResult({
-          digest: 'sha256:abc123def456',
+digest: 'sha256:abc123def456',
         }));
-
         const result = await pushImage(config, mockLogger);
-
         expect(result.ok).toBe(true);
         expect(mockDockerClient.pushImage).toHaveBeenCalledWith(
-          testCase.expectedRepo,
-          testCase.expectedTag
+testCase.expectedRepo,
+testCase.expectedTag
         );
-
         // Reset mocks for next iteration
         jest.clearAllMocks();
         mockSessionManager.update.mockResolvedValue(true);
       }
     });
-
     it('should correctly parse complex repository tags', async () => {
       const testCases = [
         {
@@ -504,47 +485,39 @@ describe('pushImage', () => {
 
       for (const testCase of testCases) {
         mockSessionManager.get.mockResolvedValue({
-          workflow_state: {
-            build_result: {
-              imageId: 'sha256:mock-image-id',
-              tags: [testCase.input],
-            },
+          build_result: {
+            imageId: 'sha256:mock-image-id',
+            tags: [testCase.input],
           },
           repo_path: '/test/repo',
         });
-
         mockDockerClient.pushImage.mockResolvedValue(createSuccessResult({
-          digest: 'sha256:abc123def456',
+digest: 'sha256:abc123def456',
         }));
-
         const result = await pushImage(config, mockLogger);
-
         expect(result.ok).toBe(true);
         expect(mockDockerClient.pushImage).toHaveBeenCalledWith(
-          testCase.expectedRepo,
-          testCase.expectedTag
+testCase.expectedRepo,
+testCase.expectedTag
         );
-
         // Reset mocks for next iteration
         jest.clearAllMocks();
         mockSessionManager.update.mockResolvedValue(true);
       }
     });
   });
-
   describe('Session State Management', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:v1.0'],
-          },
-          completed_steps: ['analyze', 'build'],
-          metadata: {
-            existingData: 'preserved',
-          },
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['myapp:v1.0'],
+},
+completed_steps: ['analyze', 'build'],
+metadata: {
+  existingData: 'preserved',
+},
         repo_path: '/test/repo',
       });
 
@@ -578,13 +551,12 @@ describe('pushImage', () => {
 
     it('should handle workflow state without existing completed_steps', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:v1.0'],
-          },
-          // No completed_steps array
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['myapp:v1.0'],
+},
+// No completed_steps array
         repo_path: '/test/repo',
       });
 
@@ -603,13 +575,12 @@ describe('pushImage', () => {
 
     it('should handle workflow state without existing metadata', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:v1.0'],
-          },
-          // No metadata object
-        },
+        
+build_result: {
+  imageId: 'sha256:mock-image-id',
+  tags: ['myapp:v1.0'],
+},
+// No metadata object
         repo_path: '/test/repo',
       });
 
