@@ -197,6 +197,7 @@ jobs:
         uses: peter-evans/find-comment@v3
         id: find-comment
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: 'github-actions[bot]'
           body-includes: '## 🛡️ Code Quality Report'
@@ -204,6 +205,7 @@ jobs:
       - name: Create or update comment
         uses: peter-evans/create-or-update-comment@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
           body-path: pr_comment.md

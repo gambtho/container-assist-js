@@ -1,0 +1,23 @@
+{
+  "timestamp": "2025-09-07T02:35:32.117Z",
+  "tasksExecuted": [
+    "Cleanup (0 items, 3ms)",
+    "Fixture Updates (0 updated, 6850ms)",
+    "Expected Output Validation (1ms)",
+    "Performance Baselines (0 updated, 15780ms)"
+  ],
+  "warnings": [
+    "Invalid expected output structure: node-express-basic.json",
+    "Repository analysis benchmark failed: Command failed: echo '{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"analyze_repository\",\"arguments\":{\"repoPath\":\".\"}},\"id\":1}' | timeout 15s node dist/apps/cli.js"
+  ],
+  "errors": [
+    "Fixture compilation failed: Command failed: npx tsc --noEmit /home/tng/workspace/containerization-assist-js/test/fixtures/repositories/index.ts",
+    "Jest configuration invalid: require is not defined"
+  ],
+  "statistics": {
+    "fixturesUpdated": 0,
+    "baselinesUpdated": 0,
+    "artifactsCleanedUp": 0,
+    "performanceTests": 0
+  }
+}

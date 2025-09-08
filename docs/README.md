@@ -1,36 +1,40 @@
-# Documentation
+# Containerization Assistant Documentation
 
-Welcome to the containerization-assist-js documentation. This directory contains all project documentation organized by category.
+Welcome to the Containerization Assistant MCP Server documentation.
 
-## 📚 Documentation Structure
+## Quick Navigation
 
-### [Guides](./guides/)
-Comprehensive guides for working with the project:
-- **[testing.md](./guides/testing.md)** - Complete testing guide (unit, integration, CI/CD)
-- **[quality-management.md](./guides/quality-management.md)** - Code quality, linting, and technical debt management
+- **[Getting Started](./getting-started.md)** - Installation, setup, and first containerization
+- **[Development Guide](./development.md)** - Development setup, testing, and contribution guidelines  
+- **[Architecture](./architecture.md)** - System design, MCP features, and API reference
 
-### [Reference](./reference/)
-Technical reference documentation:
-- **[ai-architecture.md](./reference/ai-architecture.md)** - AI system architecture and tool design
+## Overview
 
-## 🚀 Quick Links
+The Containerization Assistant is a Model Context Protocol (MCP) server that provides AI-powered containerization workflows with Docker and Kubernetes support. It offers 14 tools organized using a co-location pattern for analyzing, building, scanning, and deploying containerized applications.
 
-- **Getting Started**: See the main [README.md](../README.md)
-- **Contributing**: Check [development/contributing.md](./development/contributing.md) (if needed)
-- **API Reference**: View generated TypeDocs (run `npm run docs:build`)
+### Key Features
 
-## 📝 Documentation Standards
+- 🐳 **Docker Integration**: Build, scan, and deploy container images
+- ☸️ **Kubernetes Support**: Generate manifests and deploy applications
+- 🤖 **AI-Powered**: Intelligent Dockerfile generation and optimization
+- 🔄 **Workflow Orchestration**: Complete containerization pipelines
+- 📊 **Progress Tracking**: Real-time progress updates via MCP
+- 🔒 **Security Scanning**: Built-in vulnerability scanning with Trivy
 
-All documentation in this project follows these conventions:
-- **File Naming**: Lowercase with hyphens (`my-document.md`)
-- **Folder Structure**: Organized by purpose (guides, reference, development)
-- **Cross-References**: Use relative paths for internal links
-- **Headers**: Start with H1 (`#`) for document title
-- **Code Blocks**: Include language hints for syntax highlighting
+## Quick Start
 
-## 🔍 Finding Information
+```bash
+# Install as MCP server
+npm install -g @thgamble/containerization-assist-mcp
 
-- **Commands & Scripts**: See main [README.md](../README.md#commands)
-- **Testing Procedures**: See [guides/testing.md](./guides/testing.md)
-- **Quality Gates**: See [guides/quality-management.md](./guides/quality-management.md)
-- **AI Tools**: See [reference/ai-architecture.md](./reference/ai-architecture.md)
+# Run with MCP Inspector
+npx @modelcontextprotocol/inspector containerization-assist-mcp start
+```
+
+For detailed setup instructions, see the [Getting Started Guide](./getting-started.md).
+
+## Project Links
+
+- **Main README**: [../README.md](../README.md) - Project overview and commands
+- **CLAUDE.md**: [../CLAUDE.md](../CLAUDE.md) - Guidelines for Claude Code development
+- **GitHub Repository**: [github.com/gambtho/container-assist-js](https://github.com/gambtho/container-assist-js)

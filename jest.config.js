@@ -6,6 +6,174 @@ export default {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   extensionsToTreatAsEsm: ['.ts'],
+  
+  // Multiple test configurations for different test types
+  projects: [
+    {
+      displayName: 'unit',
+      testMatch: ['<rootDir>/test/unit/**/*.test.ts'],
+      setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/unit-setup.ts'],
+      testEnvironment: 'node',
+      coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
+      moduleNameMapper: {
+        '^@app/(.*)$': '<rootDir>/src/app/$1',
+        '^@config/(.*)$': '<rootDir>/src/config/$1',
+        '^@domain/(.*)$': '<rootDir>/src/domain/$1',
+        '^@infrastructure/(.*)$': '<rootDir>/src/infrastructure/$1',
+        '^@lib/(.*)$': '<rootDir>/src/lib/$1',
+        '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
+        '^@tools/(.*)$': '<rootDir>/src/tools/$1',
+        '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
+        '^@resources/(.*)$': '<rootDir>/src/resources/$1',
+        '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+        '^@types$': '<rootDir>/src/domain/types',
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+        // Test support mappings
+        '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+        '^@test/utilities/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+        '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
+      },
+      transform: {
+        '^.+\\.tsx?$': [
+          'ts-jest',
+          {
+            useESM: true,
+            tsconfig: {
+              module: 'ES2022',
+              moduleResolution: 'bundler',
+              target: 'ES2022',
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+              isolatedModules: true
+            },
+          },
+        ],
+      },
+    },
+    {
+      displayName: 'integration',
+      testMatch: ['<rootDir>/test/integration/**/*.test.ts'],
+      setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/integration-setup.ts'],
+      testEnvironment: 'node',
+      moduleNameMapper: {
+        '^@app/(.*)$': '<rootDir>/src/app/$1',
+        '^@config/(.*)$': '<rootDir>/src/config/$1',
+        '^@domain/(.*)$': '<rootDir>/src/domain/$1',
+        '^@infrastructure/(.*)$': '<rootDir>/src/infrastructure/$1',
+        '^@lib/(.*)$': '<rootDir>/src/lib/$1',
+        '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
+        '^@tools/(.*)$': '<rootDir>/src/tools/$1',
+        '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
+        '^@resources/(.*)$': '<rootDir>/src/resources/$1',
+        '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+        '^@types$': '<rootDir>/src/domain/types',
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+        '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+        '^@test/utilities/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+        '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
+      },
+      transform: {
+        '^.+\\.tsx?$': [
+          'ts-jest',
+          {
+            useESM: true,
+            tsconfig: {
+              module: 'ES2022',
+              moduleResolution: 'bundler',
+              target: 'ES2022',
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+              isolatedModules: true
+            },
+          },
+        ],
+      },
+    },
+    {
+      displayName: 'e2e',
+      testMatch: ['<rootDir>/test/e2e/**/*.test.ts'],
+      setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/e2e-setup.ts'],
+      testEnvironment: 'node',
+      maxWorkers: 1,
+      moduleNameMapper: {
+        '^@app/(.*)$': '<rootDir>/src/app/$1',
+        '^@config/(.*)$': '<rootDir>/src/config/$1',
+        '^@domain/(.*)$': '<rootDir>/src/domain/$1',
+        '^@infrastructure/(.*)$': '<rootDir>/src/infrastructure/$1',
+        '^@lib/(.*)$': '<rootDir>/src/lib/$1',
+        '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
+        '^@tools/(.*)$': '<rootDir>/src/tools/$1',
+        '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
+        '^@resources/(.*)$': '<rootDir>/src/resources/$1',
+        '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+        '^@types$': '<rootDir>/src/domain/types',
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+        '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+        '^@test/utilities/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+        '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
+      },
+      transform: {
+        '^.+\\.tsx?$': [
+          'ts-jest',
+          {
+            useESM: true,
+            tsconfig: {
+              module: 'ES2022',
+              moduleResolution: 'bundler',
+              target: 'ES2022',
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+              isolatedModules: true
+            },
+          },
+        ],
+      },
+    },
+    {
+      displayName: 'performance',
+      testMatch: [
+        '<rootDir>/test/performance/**/*.test.ts',
+        '<rootDir>/test/performance/**/*.perf.test.ts'
+      ],
+      testEnvironment: 'node',
+      setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/performance.ts'],
+      moduleNameMapper: {
+        '^@app/(.*)$': '<rootDir>/src/app/$1',
+        '^@config/(.*)$': '<rootDir>/src/config/$1',
+        '^@domain/(.*)$': '<rootDir>/src/domain/$1',
+        '^@infrastructure/(.*)$': '<rootDir>/src/infrastructure/$1',
+        '^@lib/(.*)$': '<rootDir>/src/lib/$1',
+        '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
+        '^@tools/(.*)$': '<rootDir>/src/tools/$1',
+        '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
+        '^@resources/(.*)$': '<rootDir>/src/resources/$1',
+        '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+        '^@types$': '<rootDir>/src/domain/types',
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+        '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+        '^@test/utilities/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+        '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
+      },
+      transform: {
+        '^.+\\.tsx?$': [
+          'ts-jest',
+          {
+            useESM: true,
+            tsconfig: {
+              module: 'ES2022',
+              moduleResolution: 'bundler',
+              target: 'ES2022',
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+              isolatedModules: true
+            },
+          },
+        ],
+      },
+    },
+  ],
+  
+  // Global configuration
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',
@@ -22,14 +190,15 @@ export default {
       },
     ],
   },
+  
+  // Transform ESM packages
+  transformIgnorePatterns: [
+    'node_modules/(?!(@kubernetes/client-node)/)'
+  ],
   // Performance optimizations
   maxWorkers: '50%',  // Use half of available CPU cores
   cache: true,
   cacheDirectory: '<rootDir>/node_modules/.cache/jest',
-  testMatch: [
-    '**/test/**/*.test.ts',
-    '**/test/**/*.spec.ts',
-  ],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
@@ -38,9 +207,74 @@ export default {
     '!src/**/index.ts',
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
+  coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
+  coverageThreshold: {
+    global: {
+      branches: 7,
+      functions: 18,
+      lines: 8,
+      statements: 9
+    },
+    './src/mcp/': {
+      branches: 14,
+      functions: 22,
+      lines: 20,
+      statements: 19
+    },
+    './src/tools/': {
+      branches: 51,
+      functions: 55,
+      lines: 62,
+      statements: 62
+    },
+    './src/workflows/': {
+      branches: 0,
+      functions: 0,
+      lines: 0,
+      statements: 0
+    },
+    './src/lib/': {
+      branches: 22,
+      functions: 41,
+      lines: 39,
+      statements: 39
+    }
+  },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {
+    // Path aliases from tsconfig
+    '^@app/(.*)$': '<rootDir>/src/app/$1',
+    '^@config/(.*)$': '<rootDir>/src/config/$1',
+    '^@domain/(.*)$': '<rootDir>/src/domain/$1',
+    '^@lib/(.*)$': '<rootDir>/src/lib/$1',
+    '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
+    '^@tools/(.*)$': '<rootDir>/src/tools/$1',
+    '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
+    '^@resources/(.*)$': '<rootDir>/src/resources/$1',
+    '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+    '^@types$': '<rootDir>/src/domain/types',
+    
+    // Handle .js imports and map them to .ts
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+    
+    // ESM modules that need special handling
+    '@kubernetes/client-node': '@kubernetes/client-node',
+    
+    // Core types mapping from different locations
+    '^\\.\\./core/types\\.js$': '<rootDir>/src/domain/types.ts',
+    '^\\./core/types\\.js$': '<rootDir>/src/domain/types.ts',
+    '^\\.\\./\\.\\./core/types\\.js$': '<rootDir>/src/domain/types.ts',
+    
+    // Test support mappings
+    '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+    '^@test/utilities/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+    '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
+    
+    // Legacy test mappings (for backward compatibility during migration)
+    '^@fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+    '^@helpers/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+    '^@mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
+    
     // Handle specific .js imports and map them to .ts
     // Infrastructure logger fix for test setup (exact path from test/setup.ts)
     '^\\.\\.\/src\/infrastructure\/logger\\.js$': '<rootDir>/src/infrastructure/logger.ts',
@@ -88,12 +322,21 @@ export default {
     // Helper imports
     '^\\.\/helper\\.js$': './helper.ts',
     '^\\.\\.\/helper\\.js$': '../helper.ts',
+    
+    // MCP resources - map .js imports to .ts files (specific patterns)
+    '^\\.\\.\/\\.\\.\/src\/mcp\/resources\/(.*)\\.js$': '<rootDir>/src/mcp/resources/$1.ts',
+    '^\\.\\.\/\\.\\.\/src\/mcp\/events\/(.*)\\.js$': '<rootDir>/src/mcp/events/$1.ts',
+    '^\\.\\.\/\\.\\.\/\\.\\.\/src\/workflows\/(.*)\\.js$': '<rootDir>/src/workflows/$1.ts',
+    '^\\.\\.\/\\.\\.\/types\/core\\.js$': '<rootDir>/src/types/core.ts',
+    '^\\.\/types\\.js$': '<rootDir>/src/mcp/resources/types.ts',
+    '^\\.\/uri-schemes\\.js$': '<rootDir>/src/mcp/resources/uri-schemes.ts',
+    '^\\.\/cache\\.js$': '<rootDir>/src/mcp/resources/cache.ts',
   },
   roots: ['<rootDir>/src', '<rootDir>/test'],
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],
   
   // Timeout handling for different test types
-  testTimeout: 30000,  // Default 30s (reduced from 60s)
+  testTimeout: 30000,  // Default 30s
   
   // Better error reporting
   verbose: false,  // Reduce noise for CI
@@ -101,6 +344,10 @@ export default {
   
   // Fail fast for development
   bail: false,  // Continue running tests to get full picture
+  
+  // Global setup and teardown  
+  globalSetup: '<rootDir>/test/__support__/setup/global-setup.ts',
+  globalTeardown: '<rootDir>/test/__support__/setup/global-teardown.ts',
   
   // Setup files
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],

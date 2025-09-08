@@ -1,0 +1,306 @@
+/**
+ * Unit Tests: Fix Dockerfile Tool
+ * Tests the fix dockerfile tool functionality with ToolContext
+ */
+
+import { jest } from '@jest/globals';
+import { fixDockerfileTool, type FixDockerfileConfig } from '../../../src/tools/fix-dockerfile/tool';
+import { createMockLogger, createSuccessResult, createFailureResult } from '../../__support__/utilities/mock-infrastructure';
+import type { ToolContext, SamplingRequest, SamplingResponse, PromptWithMessages } from '../../../src/mcp/context/types';
+import { promises as fs } from 'node:fs';
+
+// Mock fs promises
+jest.mock('node:fs', () => ({
+  promises: {
+    readFile: jest.fn(),
+    writeFile: jest.fn(),
+    access: jest.fn(),
+  },
+}));
+
+// Mock lib modules
+const mockSessionManager = {
+  create: jest.fn().mockResolvedValue({
+    sessionId: 'test-session-123',
+    workflow_state: {},
+    metadata: {},
+    completed_steps: [],
+    errors: {},
+    current_step: null,
+    createdAt: '2025-09-08T11:12:40.362Z',
+    updatedAt: '2025-09-08T11:12:40.362Z'
+  }),
+  get: jest.fn(),
+  update: jest.fn(),
+};
+
+const mockMCPHostAI = {
+  analyzeContent: jest.fn(),
+  fixContent: jest.fn(),
+};
+
+// Create mock ToolContext
+function createMockToolContext(
+  responses: Record<string, string> = {},
+  shouldFail = false
+): ToolContext {
+  return {
+    sampling: {
+      createMessage: jest.fn().mockImplementation(async (request: SamplingRequest) => {
+        if (shouldFail) {
+          throw new Error('Sampling failed');
+        }
+        
+        const response: SamplingResponse = {
+          role: 'assistant',
+          content: [{ 
+            type: 'text', 
+            text: responses.defaultResponse || `FROM node:18-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --production\nCOPY . .\nUSER node\nCMD ["node", "server.js"]` 
+          }],
+          metadata: {
+            model: 'test-model',
+            usage: { inputTokens: 100, outputTokens: 200, totalTokens: 300 }
+          }
+        };
+        return response;
+      })
+    },
+    getPrompt: jest.fn().mockImplementation(async (name: string, args?: Record<string, unknown>) => {
+      if (shouldFail) {
+        throw new Error('Prompt not found');
+      }
+      
+      const prompt: PromptWithMessages = {
+        description: `Mock prompt for ${name}`,
+        messages: [{
+          role: 'user',
+          content: [{ type: 'text', text: `Fix this dockerfile with args: ${JSON.stringify(args)}` }]
+        }]
+      };
+      return prompt;
+    }),
+    signal: undefined,
+    progress: undefined
+  };
+}
+
+const mockTimer = {
+  end: jest.fn(),
+  error: jest.fn(),
+};
+
+jest.mock('@lib/session', () => ({
+  createSessionManager: jest.fn(() => mockSessionManager),
+}));
+
+// Legacy mcp-host-ai module removed - using ToolContext pattern now
+
+// Mock the text processing utilities
+jest.mock('@lib/text-processing', () => ({
+  stripFencesAndNoise: jest.fn((text: string) => {
+    // Simple mock that removes code fences
+    return text.replace(/```[a-z]*\n?/gi, '').replace(/```$/g, '').trim();
+  }),
+  isValidDockerfileContent: jest.fn((content: string) => {
+    return content.includes('FROM ');
+  }),
+}));
+
+jest.mock('@lib/logger', () => ({
+  createTimer: jest.fn(() => mockTimer),
+}));
+
+describe('fixDockerfileTool', () => {
+  let mockLogger: ReturnType<typeof createMockLogger>;
+  let config: FixDockerfileConfig;
+
+  beforeEach(() => {
+    mockLogger = createMockLogger();
+    config = {
+      sessionId: 'test-session-123',
+      error: 'Failed to build Docker image',
+      dockerfile: 'FROM node:latest\nCOPY . .\nRUN npm install\nCMD node server.js',
+    };
+
+    // Reset all mocks
+    jest.clearAllMocks();
+    mockSessionManager.update.mockResolvedValue(true);
+    // Mock AI responses (legacy - for fallback compatibility)
+    mockMCPHostAI.isAvailable = jest.fn().mockReturnValue(true);
+    mockMCPHostAI.submitPrompt = jest.fn().mockResolvedValue({
+      ok: true,
+      value: '```dockerfile\nFROM node:18-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --production\nCOPY . .\nUSER node\nCMD ["node", "server.js"]\n```',
+    });
+  });
+
+  describe('Successful Dockerfile fixing', () => {
+    beforeEach(() => {
+      mockSessionManager.get.mockResolvedValue({
+        sessionId: 'test-session-123',
+        results: {
+          dockerfile_result: {
+            content: 'FROM node:latest\nCOPY . .\nRUN npm install',
+          },
+          build_result: {
+            error: 'npm install failed',
+          },
+        },
+        workflow_state: {
+          analysis_result: {
+            language: 'javascript',
+            framework: 'express'
+          }
+        },
+        metadata: {},
+      });
+    });
+
+    it('should successfully fix Dockerfile issues with AI context', async () => {
+      const mockContext = createMockToolContext();
+      const result = await fixDockerfileTool.execute(config, mockLogger, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.ok).toBe(true);
+        expect(result.value.sessionId).toBe('test-session-123');
+        expect(result.value.dockerfile).toContain('FROM');
+        expect(result.value.aiUsed).toBe(true);
+        expect(result.value.generationMethod).toBe('AI');
+        expect(result.value.fixes).toBeDefined();
+        expect(Array.isArray(result.value.fixes)).toBe(true);
+      }
+    });
+
+    it('should successfully fix Dockerfile issues without context (fallback)', async () => {
+      const result = await fixDockerfileTool.execute(config, mockLogger);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.ok).toBe(true);
+        expect(result.value.sessionId).toBe('test-session-123');
+        expect(result.value.dockerfile).toContain('FROM');
+        expect(result.value.aiUsed).toBe(false);
+        expect(result.value.generationMethod).toBe('fallback');
+        expect(result.value.fixes).toBeDefined();
+        expect(Array.isArray(result.value.fixes)).toBe(true);
+      }
+    });
+
+    it('should fix Dockerfile from session with AI context', async () => {
+      const mockContext = createMockToolContext();
+      // Don't provide dockerfile in config, should use from session
+      const sessionConfig = { sessionId: 'test-session-123' };
+      
+      const result = await fixDockerfileTool.execute(sessionConfig, mockLogger, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.dockerfile).toContain('FROM');
+        expect(result.value.aiUsed).toBe(true);
+        expect(result.value.fixes).toBeDefined();
+        expect(Array.isArray(result.value.fixes)).toBe(true);
+      }
+    });
+
+    it('should update session with fix results', async () => {
+      const mockContext = createMockToolContext();
+      await fixDockerfileTool.execute(config, mockLogger, mockContext);
+
+      expect(mockSessionManager.update).toHaveBeenCalledWith(
+        'test-session-123',
+        expect.objectContaining({
+          workflow_state: expect.objectContaining({
+            dockerfile_result: expect.objectContaining({
+              content: expect.any(String),
+              path: './Dockerfile',
+            }),
+            completed_steps: expect.arrayContaining(['fix-dockerfile']),
+            metadata: expect.objectContaining({
+              dockerfile_fixed: true,
+              dockerfile_fixes: expect.any(Array),
+            }),
+          }),
+        })
+      );
+    });
+  });
+
+
+  describe('Error handling', () => {
+    it('should return error when no Dockerfile found', async () => {
+      mockSessionManager.get.mockResolvedValue({
+        sessionId: 'test-session-123',
+        results: {},
+        metadata: {},
+      });
+      
+      const noDockerfileConfig = { sessionId: 'test-session-123' };
+      const mockContext = createMockToolContext();
+
+      const result = await fixDockerfileTool.execute(noDockerfileConfig, mockLogger, mockContext);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('No Dockerfile found');
+      }
+    });
+
+    it('should handle AI failures with fallback', async () => {
+      const mockContext = createMockToolContext({}, true); // Should fail
+      
+      const result = await fixDockerfileTool.execute(config, mockLogger, mockContext);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Should fallback to rule-based fix
+        expect(result.value.dockerfile).toContain('FROM');
+        expect(result.value.aiUsed).toBe(false);
+        expect(result.value.generationMethod).toBe('fallback');
+      }
+    });
+
+    it('should work without context at all (legacy mode)', async () => {
+      const result = await fixDockerfileTool.execute(config, mockLogger);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Should use rule-based fixes
+        expect(result.value.dockerfile).toContain('FROM');
+        expect(result.value.aiUsed).toBe(false);
+        expect(result.value.generationMethod).toBe('fallback');
+      }
+    });
+  });
+
+
+  describe('Session management', () => {
+    it('should create new session if not exists', async () => {
+      mockSessionManager.get.mockResolvedValue(null);
+      const mockContext = createMockToolContext();
+
+      await fixDockerfileTool.execute(config, mockLogger, mockContext);
+
+      expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
+    });
+    
+    it('should work with AI context and proper prompt integration', async () => {
+      const mockContext = createMockToolContext();
+      
+      const result = await fixDockerfileTool.execute(config, mockLogger, mockContext);
+      
+      expect(result.ok).toBe(true);
+      expect(mockContext.getPrompt).toHaveBeenCalledWith('fix-dockerfile', expect.objectContaining({
+        dockerfileContent: expect.any(String),
+        buildError: 'Failed to build Docker image'
+      }));
+      expect(mockContext.sampling.createMessage).toHaveBeenCalledWith(expect.objectContaining({
+        messages: expect.any(Array),
+        includeContext: 'thisServer',
+        modelPreferences: expect.objectContaining({
+          hints: [{ name: 'code' }]
+        }),
+        maxTokens: 2048
+      }));
+    });
+  });
+});

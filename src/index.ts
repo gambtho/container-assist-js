@@ -1,6 +1,2 @@
-/**
- * Main entry point for ContainerizationAssist MCP Server
- */
-
-export { ContainerizationAssistMCPServer } from '../apps/server';
-export type { ApplicationConfig } from './config/index';
+export * from './mcp/server.js';
+export { MCPServer as default } from './mcp/server.js';
