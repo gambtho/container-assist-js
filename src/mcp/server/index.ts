@@ -5,15 +5,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  ListResourcesRequestSchema,
-  ReadResourceRequestSchema,
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
-  McpError,
-  ErrorCode,
-  type ProgressToken,
-} from '@modelcontextprotocol/sdk/types.js';
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
@@ -30,12 +22,15 @@ import { prepareClusterSchema } from '@tools/prepare-cluster/schema';
 import { opsToolSchema } from '@tools/ops/schema';
 import { generateK8sManifestsSchema } from '@tools/generate-k8s-manifests/schema';
 import { verifyDeploymentSchema } from '@tools/verify-deployment/schema';
-import { containerizationWorkflowSchema, deploymentWorkflowSchema } from '@mcp/server/schemas';
+import {
+  containerizationWorkflowSchema,
+  deploymentWorkflowSchema,
+  toolSchemas as zodToolSchemas,
+} from '@mcp/server/schemas';
 import { containerizationWorkflow } from '@workflows/containerization';
 import { deploymentWorkflow } from '@workflows/deployment';
 import type { Tool } from '@types';
 import { getContainerStatus, type Deps } from '@app/container';
-import { createProgressReporter, type ProgressNotifier } from '@mcp/server/progress';
 
 // Import tool functions
 import { analyzeRepo } from '@tools/analyze-repo';
@@ -118,15 +113,22 @@ export class MCPServer {
       },
       {
         capabilities: {
-          resources: {},
-          prompts: {},
-          tools: {},
+          resources: {
+            subscribe: false,
+            listChanged: false,
+          },
+          prompts: {
+            listChanged: false,
+          },
+          tools: {
+            listChanged: false,
+          },
         },
       },
     );
 
     this.transport = new StdioServerTransport();
-    this.setupHandlers();
+    // Don't setup handlers in constructor - do it before connecting
   }
 
   private setupHandlers(): void {
@@ -136,55 +138,48 @@ export class MCPServer {
     // Register workflows as tools
     this.registerWorkflowTools();
 
-    // Resource handlers with SDK patterns
-    (this.server as any).server.setRequestHandler(
-      ListResourcesRequestSchema,
-      async (request: any) => {
-        const cursor = request.params?.cursor;
-        const result = await this.deps.resourceManager.listResources(cursor);
+    // Register a simple status resource
+    this.server.resource(
+      'status',
+      'containerization://status',
+      {
+        title: 'Container Status',
+        description: 'Current status of the containerization system',
+      },
+      async () => {
+        const status = getContainerStatus(this.deps, this.isRunning);
+        return {
+          contents: [
+            {
+              uri: 'containerization://status',
+              mimeType: 'application/json',
+              text: JSON.stringify(status, null, 2),
+            },
+          ],
+        };
+      },
+    );
 
-        if (!result.ok) {
-          return { resources: [] };
+    // Register a prompt
+    this.server.prompt(
+      'dockerfile-generation',
+      'Generate Dockerfile for application',
+      {
+        language: z.string().describe('Programming language'),
+        framework: z.string().optional().describe('Application framework'),
+      },
+      async (params) => {
+        try {
+          const result = await this.deps.promptRegistry.getPrompt('dockerfile-generation', params);
+          return result;
+        } catch (error) {
+          throw new McpError(
+            ErrorCode.MethodNotFound,
+            error instanceof Error ? error.message : 'Prompt not found: dockerfile-generation',
+          );
         }
-
-        return result.value;
       },
     );
-
-    (this.server as any).server.setRequestHandler(
-      ReadResourceRequestSchema,
-      async (request: any) => {
-        const { uri } = request.params;
-        const result = await this.deps.resourceManager.readResource(uri);
-
-        if (!result.ok) {
-          throw new McpError(ErrorCode.InvalidRequest, result.error);
-        }
-
-        return result.value;
-      },
-    );
-
-    // Prompt handlers with SDK-native patterns
-    (this.server as any).server.setRequestHandler(
-      ListPromptsRequestSchema,
-      async (_request: any) => {
-        return await this.deps.promptRegistry.listPrompts();
-      },
-    );
-
-    (this.server as any).server.setRequestHandler(GetPromptRequestSchema, async (request: any) => {
-      const { name, arguments: args = {} } = request.params;
-
-      try {
-        return await this.deps.promptRegistry.getPrompt(name, args);
-      } catch (error) {
-        throw new McpError(
-          ErrorCode.MethodNotFound,
-          error instanceof Error ? error.message : `Prompt not found: ${name}`,
-        );
-      }
-    });
 
     this.deps.logger.info('SDK-native handlers configured');
   }
@@ -193,14 +188,16 @@ export class MCPServer {
    * Register all tools using McpServer's tool() method
    */
   private registerAllTools(): void {
-    // Register each tool directly with the McpServer using schemas
-    for (const [name, schema] of Object.entries(toolSchemas)) {
+    // Register each tool directly with the McpServer using JSON schemas
+    for (const [name, _schema] of Object.entries(toolSchemas)) {
       // Skip workflow schemas as they're handled separately
       if (name === 'containerization' || name === 'deployment') {
         continue;
       }
 
-      const toolShape = schema?.shape || {};
+      // Get the Zod schema shape for this tool
+      const zodSchema = zodToolSchemas[name as keyof typeof zodToolSchemas];
+      const schemaShape = zodSchema?.shape || {};
 
       // Also register with toolRegistry for compatibility with existing code
       const toolFunction = toolFunctions[name as keyof typeof toolFunctions];
@@ -215,27 +212,11 @@ export class MCPServer {
         this.deps.toolRegistry.registerTool(toolObject);
       }
 
-      this.server.tool(name, toolShape, async (params: any, extras: any) => {
-        const progressToken = extras.progressToken; // May be available in request metadata
-
+      // Use the SDK's tool() method with Zod shape (SDK handles conversion)
+      this.server.tool(name, `${name} tool`, schemaShape, async (params: any) => {
         this.deps.logger.info({ tool: name }, 'Executing tool via McpServer handler');
 
         try {
-          // Create progress reporter using the helper
-          const progressNotifier: ProgressNotifier = {
-            sendProgress: (token, progress) => this.sendProgress(token, progress),
-          };
-          const reportProgress = createProgressReporter(
-            progressToken,
-            progressNotifier,
-            this.deps.logger,
-          );
-
-          await reportProgress(0, `Starting ${name}...`);
-
-          // Parameters are already validated by Zod schema
-          await reportProgress(20, 'Parameters validated');
-
           // Execute tool function directly
           const toolFunction = toolFunctions[name as keyof typeof toolFunctions];
           if (!toolFunction) {
@@ -244,11 +225,8 @@ export class MCPServer {
 
           const result = await toolFunction(params, this.deps.logger);
 
-          await reportProgress(90, 'Processing results...');
-
           if ('ok' in result) {
             if (result.ok) {
-              await reportProgress(100, 'Complete');
               return {
                 content: [
                   {
@@ -262,7 +240,6 @@ export class MCPServer {
             }
           }
 
-          await reportProgress(100, 'Complete');
           return {
             content: [
               {
@@ -296,24 +273,16 @@ export class MCPServer {
    * Register workflow tools using McpServer's tool() method
    */
   private registerWorkflowTools(): void {
-    // Register containerization workflow with schema
+    // Register containerization workflow with Zod shape
     this.server.tool(
       'containerization',
-      toolSchemas.containerization?.shape || {},
-      async (params, extras) => {
-        const abortSignal = extras.signal;
-        const progressToken = (extras as any).progressToken;
-
-        const progressNotifier: ProgressNotifier = {
-          sendProgress: (token, progress) => this.sendProgress(token, progress),
-        };
-        const reportProgress = createProgressReporter(
-          progressToken,
-          progressNotifier,
-          this.deps.logger,
+      'Containerization workflow',
+      containerizationWorkflowSchema.shape,
+      async (params) => {
+        this.deps.logger.info(
+          { workflow: 'containerization' },
+          'Executing containerization workflow',
         );
-
-        await reportProgress(10, 'Initializing containerization workflow...');
 
         // Map MCP schema params to workflow params
         const workflowParams = {
@@ -323,10 +292,8 @@ export class MCPServer {
         };
 
         const result = await containerizationWorkflow.execute(workflowParams, this.deps.logger, {
-          abortSignal,
           deps: this.deps,
         });
-        await reportProgress(100, 'Complete');
 
         return {
           content: [
@@ -339,79 +306,44 @@ export class MCPServer {
       },
     );
 
-    // Register deployment workflow with schema
-    this.server.tool('deployment', toolSchemas.deployment?.shape || {}, async (params, extras) => {
-      const abortSignal = extras.signal;
-      const progressToken = (extras as any).progressToken;
+    // Register deployment workflow with Zod shape
+    this.server.tool(
+      'deployment',
+      'Deployment workflow',
+      deploymentWorkflowSchema.shape,
+      async (params) => {
+        this.deps.logger.info({ workflow: 'deployment' }, 'Executing deployment workflow');
 
-      const progressNotifier: ProgressNotifier = {
-        sendProgress: (token, progress) => this.sendProgress(token, progress),
-      };
-      const reportProgress = createProgressReporter(
-        progressToken,
-        progressNotifier,
-        this.deps.logger,
-      );
-
-      await reportProgress(10, 'Initializing deployment workflow...');
-
-      // Map MCP schema params to workflow params
-      const workflowParams = {
-        sessionId: params.sessionId || 'default',
-        imageId: params.imageId || 'latest',
-        clusterConfig: {
-          namespace: params.namespace || this.deps.config.kubernetes.namespace,
-          context: params.clusterType || 'default',
-        },
-        deploymentOptions: {
-          name: 'deployment',
-          replicas: 1,
-        },
-      };
-
-      const result = await deploymentWorkflow.execute(workflowParams, this.deps.logger, {
-        abortSignal,
-        deps: this.deps,
-      });
-      await reportProgress(100, 'Complete');
-
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(result, null, 2),
+        // Map MCP schema params to workflow params
+        const workflowParams = {
+          sessionId: params.sessionId || 'default',
+          imageId: params.imageId || 'latest',
+          clusterConfig: {
+            namespace: params.namespace || this.deps.config.kubernetes.namespace,
+            context: params.clusterType || 'default',
           },
-        ],
-      };
-    });
+          deploymentOptions: {
+            name: 'deployment',
+            replicas: 1,
+          },
+        };
+
+        const result = await deploymentWorkflow.execute(workflowParams, this.deps.logger, {
+          deps: this.deps,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      },
+    );
 
     this.deps.logger.info('Workflow tools registered with McpServer');
-  }
-
-  /**
-   * Send progress notification using underlying server
-   */
-  private async sendProgress(
-    token: ProgressToken,
-    progress: {
-      progress: number;
-      message?: string;
-      total?: number;
-    },
-  ): Promise<void> {
-    if (!token) return; // No progress token provided
-
-    try {
-      await (this.server as any).server.notification({
-        method: 'notifications/progress',
-        params: {
-          progressToken: token,
-          ...progress,
-        },
-      });
-    } catch (error) {
-      this.deps.logger.warn({ error, token }, 'Failed to send progress notification');
-    }
   }
 
   /**
@@ -453,12 +385,16 @@ export class MCPServer {
     }
 
     try {
-      this.deps.logger.debug('Connecting transport and starting server...');
+      this.deps.logger.info('Starting MCP server connection...');
+
+      // Setup handlers before connecting
+      this.setupHandlers();
 
       // Connect the transport to the server
-      // The SDK server will automatically handle the initialize request
       await this.server.connect(this.transport);
       this.isRunning = true;
+
+      this.deps.logger.info('MCP server connection established successfully');
 
       // Get current status from container for consistent logging
       const status = getContainerStatus(this.deps, this.isRunning);

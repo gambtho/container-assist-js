@@ -112,7 +112,10 @@ export async function runContainerizationWorkflow(
     });
 
     // Step 1: Analyze repository
-    const analyzeStep = steps[0]!;
+    const analyzeStep = steps[0];
+    if (!analyzeStep) {
+      throw new Error('Analyze step not found');
+    }
     analyzeStep.status = 'running';
     analyzeStep.startTime = new Date();
     context.currentStep = analyzeStep.name;
@@ -151,7 +154,10 @@ export async function runContainerizationWorkflow(
     context.artifacts.set('analysis', analysis);
 
     // Step 2: Generate Dockerfile
-    const generateStep = steps[1]!;
+    const generateStep = steps[1];
+    if (!generateStep) {
+      throw new Error('Generate Dockerfile step not found');
+    }
     generateStep.status = 'running';
     generateStep.startTime = new Date();
     context.currentStep = generateStep.name;
@@ -219,7 +225,10 @@ export async function runContainerizationWorkflow(
     context.artifacts.set('dockerfile', dockerfile);
 
     // Step 3: Build image
-    const buildStep = steps[2]!;
+    const buildStep = steps[2];
+    if (!buildStep) {
+      throw new Error('Build image step not found');
+    }
     buildStep.status = 'running';
     buildStep.startTime = new Date();
     context.currentStep = buildStep.name;
@@ -287,7 +296,10 @@ export async function runContainerizationWorkflow(
     context.artifacts.set('build', build);
 
     // Step 4: Scan image
-    const scanStep = steps[3]!;
+    const scanStep = steps[3];
+    if (!scanStep) {
+      throw new Error('Scan image step not found');
+    }
     scanStep.status = 'running';
     scanStep.startTime = new Date();
     context.currentStep = scanStep.name;
@@ -316,14 +328,14 @@ export async function runContainerizationWorkflow(
     );
 
     // Scan failures are warnings, not workflow failures
-    let scan: any = null;
+    let scan: Record<string, unknown> | null = null;
     if (!scanResult.ok) {
       scanStep.status = 'completed';
       scanStep.error = `Scan completed with warnings: ${scanResult.error}`;
       logger.warn('Image scan found issues');
     } else {
       scanStep.status = 'completed';
-      scan = scanResult.value;
+      scan = scanResult.value as unknown as Record<string, unknown>;
     }
 
     scanStep.endTime = new Date();
@@ -331,7 +343,10 @@ export async function runContainerizationWorkflow(
     context.artifacts.set('scan', scan);
 
     // Step 5: Tag image
-    const tagStep = steps[4]!;
+    const tagStep = steps[4];
+    if (!tagStep) {
+      throw new Error('Tag image step not found');
+    }
     tagStep.status = 'running';
     tagStep.startTime = new Date();
     context.currentStep = tagStep.name;
@@ -340,14 +355,14 @@ export async function runContainerizationWorkflow(
       stage: 'tag-image',
     });
 
-    const tags = buildOptions.tags || [`${analysis.language}:latest`];
+    const tags = buildOptions.tags || [`${analysis.language || 'app'}:latest`];
     logger.info('Tagging image');
 
     const tagResult = await tagImage(
       {
         sessionId,
         tag: tags[0] || 'latest',
-        imageName: build.imageId || `${analysis.language}-app`,
+        imageName: build.imageId || `${analysis.language || 'app'}-app`,
         sourceTag: 'latest',
         targetTag: tags[0] || 'latest',
       },
@@ -425,12 +440,12 @@ export async function runContainerizationWorkflow(
         ...(dockerfile.path && { dockerfilePath: dockerfile.path }),
         ...(scan && {
           scanResults: {
-            vulnerabilities: scan.vulnerabilities,
+            vulnerabilities: (scan.vulnerabilities as unknown[]) || [],
             summary: scan.summary,
           },
         }),
         analysisData: {
-          language: analysis.language,
+          language: analysis.language || 'unknown',
         },
       },
       metadata: {
@@ -490,8 +505,12 @@ export async function runContainerizationWorkflow(
 export const containerizationWorkflow = {
   name: 'containerization-workflow',
   description: 'Complete containerization pipeline from analysis to tagged image',
-  execute: (params: ContainerizationWorkflowParams, logger: Logger, context?: any) =>
-    runContainerizationWorkflow(params, context?.deps || { logger }, context),
+  execute: (
+    params: ContainerizationWorkflowParams,
+    logger: Logger,
+    context?: Record<string, unknown>,
+  ) =>
+    runContainerizationWorkflow(params, (context?.deps as Deps) || ({ logger } as Deps), context),
   schema: {
     type: 'object',
     properties: {

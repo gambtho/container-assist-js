@@ -10,13 +10,7 @@ import { createTimer, type Logger } from '@lib/logger';
 import { updateWorkflowState, type WorkflowState, type Result } from '@types';
 import { createToolProgressReporter } from '@mcp/server/progress';
 import type { ToolContext } from '@tools/types';
-import {
-  DockerError,
-  FileSystemError,
-  SessionError,
-  ErrorCodes,
-  executeAsResult,
-} from '@lib/errors';
+import { DockerError, FileSystemError, ErrorCodes, executeAsResult } from '@lib/errors';
 // Local type for Docker build options
 interface DockerBuildOptions {
   dockerfile?: string;
@@ -63,9 +57,18 @@ async function fileExists(filePath: string): Promise<boolean> {
 /**
  * Prepare build arguments with defaults
  */
+interface SessionWithAnalysis {
+  workflow_state?: {
+    analysis_result?: {
+      language?: string;
+      framework?: string;
+    };
+  };
+}
+
 function prepareBuildArgs(
   buildArgs: Record<string, string> = {},
-  session: unknown,
+  session: SessionWithAnalysis | null | undefined,
 ): Record<string, string> {
   const defaults: Record<string, string> = {
     NODE_ENV: process.env.NODE_ENV ?? 'production',
@@ -74,15 +77,7 @@ function prepareBuildArgs(
   };
 
   // Add session-specific args if available
-  const sessionObj = session as
-    | {
-        workflow_state?: {
-          analysis_result?: { language?: string; framework?: string };
-        };
-      }
-    | null
-    | undefined;
-  const analysisResult = sessionObj?.workflow_state?.analysis_result;
+  const analysisResult = session?.workflow_state?.analysis_result;
   if (analysisResult) {
     if (analysisResult.language) {
       defaults.LANGUAGE = analysisResult.language;
@@ -180,20 +175,22 @@ async function buildImageInternal(
 
     // Get or create session
     await reportProgress(20, 'Loading session');
-    const session = sessionId ? await sessionManager.get(sessionId) : await sessionManager.create();
+    let session = await sessionManager.get(sessionId);
     if (!session) {
-      throw new SessionError(`Session ${sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND, {
-        sessionId,
-      });
+      // Create new session with the specified sessionId
+      session = await sessionManager.create(sessionId);
     }
 
     // Determine paths
-    const sessionState = session as any;
+    const sessionState = session as SessionWithAnalysis & { repo_path?: string };
     const repoPath = sessionState.repo_path ?? buildContext;
     let dockerfilePath = path.resolve(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
-    const generatedPath = sessionState.dockerfile_result?.path;
+    const dockerfileResult = (sessionState as Record<string, unknown>).dockerfile_result as
+      | Record<string, unknown>
+      | undefined;
+    const generatedPath = dockerfileResult?.path as string | undefined;
 
     if (!(await fileExists(dockerfilePath))) {
       // If the specified Dockerfile doesn't exist, check for generated one
@@ -202,10 +199,10 @@ async function buildImageInternal(
         logger.info({ generatedPath, originalPath: dockerfile }, 'Using generated Dockerfile');
       } else {
         // Check if we have Dockerfile content in session
-        const dockerfileContent = sessionState.dockerfile_result?.content;
+        const dockerfileContent = dockerfileResult?.content as string | undefined;
         if (dockerfileContent) {
           // Write the Dockerfile content to generated file
-          dockerfilePath = path.join(repoPath as string, 'Dockerfile.generated');
+          dockerfilePath = path.join(repoPath, 'Dockerfile.generated');
           await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
           logger.info({ dockerfilePath }, 'Created Dockerfile from session content');
         } else {
@@ -223,7 +220,7 @@ async function buildImageInternal(
     const dockerfileContent = await fs.readFile(dockerfilePath, 'utf-8');
 
     // Prepare build arguments
-    const finalBuildArgs = prepareBuildArgs(buildArgs, session);
+    const finalBuildArgs = prepareBuildArgs(buildArgs, session as SessionWithAnalysis);
 
     // Analyze security
     await reportProgress(40, 'Analyzing security');
@@ -268,9 +265,9 @@ async function buildImageInternal(
         success: true,
         imageId: buildResult.value.imageId ?? '',
         tags: buildResult.value.tags || [],
-        size: (buildResult.value as any).size ?? 0,
+        size: (buildResult.value as unknown as { size?: number }).size ?? 0,
         metadata: {
-          layers: (buildResult.value as any).layers,
+          layers: (buildResult.value as unknown as { layers?: number }).layers,
           buildTime,
           logs: buildResult.value.logs,
           securityWarnings,
@@ -293,9 +290,9 @@ async function buildImageInternal(
       sessionId,
       imageId: buildResult.value.imageId,
       tags: buildResult.value.tags || [],
-      size: (buildResult.value as any).size ?? 0,
-      ...((buildResult.value as any).layers !== undefined && {
-        layers: (buildResult.value as any).layers,
+      size: (buildResult.value as unknown as { size?: number }).size ?? 0,
+      ...((buildResult.value as unknown as { layers?: number }).layers !== undefined && {
+        layers: (buildResult.value as unknown as { layers: number }).layers,
       }),
       buildTime,
       logs: buildResult.value.logs,
@@ -327,6 +324,6 @@ export async function buildImage(
  */
 export const buildImageTool = {
   name: 'build-image',
-  execute: (config: BuildImageConfig, logger: Logger, context?: any) =>
+  execute: (config: BuildImageConfig, logger: Logger, context?: ToolContext) =>
     buildImage(config, logger, context),
 };

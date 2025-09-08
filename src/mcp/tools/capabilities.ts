@@ -95,23 +95,35 @@ export function withCentralizedAI(aiAugmentationService: AIAugmentationService) 
         const enhancementResult = await aiAugmentationService.augmentTool(tool.name, result.value, {
           metadata: (params.context || {}) as Record<string, unknown>,
           requirements: {
-            securityLevel: params.securityLevel as any,
-            optimization: params.optimization as any,
-            environment: params.environment as any,
+            ...(params.securityLevel
+              ? { securityLevel: params.securityLevel as 'basic' | 'standard' | 'strict' }
+              : {}),
+            ...(params.optimization
+              ? {
+                  optimization: params.optimization as
+                    | 'security'
+                    | 'performance'
+                    | 'size'
+                    | 'balanced',
+                }
+              : {}),
+            ...(params.environment
+              ? { environment: params.environment as 'development' | 'staging' | 'production' }
+              : {}),
           },
         });
 
         if (enhancementResult.ok && enhancementResult.value.augmented) {
           const aiResult = enhancementResult.value;
 
-          const toolResult = result.value as any;
+          const toolResult = result.value as ToolResult;
           return Success({
             ...toolResult,
             aiInsights: aiResult.insights,
             aiRecommendations: aiResult.recommendations,
             aiWarnings: aiResult.warnings,
             metadata: {
-              ...toolResult.metadata,
+              ...(toolResult.metadata as Record<string, unknown>),
               aiEnhanced: true,
               aiProvider: aiResult.metadata.aiProvider,
               augmentationType: aiResult.metadata.augmentationType,
@@ -154,11 +166,11 @@ export function withMetrics(metricsCollector?: MetricsCollector) {
         );
 
         if (result.ok) {
-          const toolResult = result.value as any;
+          const toolResult = result.value as ToolResult;
           return Success({
             ...toolResult,
             metadata: {
-              ...toolResult.metadata,
+              ...(toolResult.metadata as Record<string, unknown>),
               executionTime: duration,
             },
           });
@@ -272,11 +284,11 @@ export function withSessionTracking(sessionManager: SessionManager) {
         await sessionManager?.trackToolEnd?.(sessionId, tool.name, result);
 
         if (result.ok) {
-          const toolResult = result.value as any;
+          const toolResult = result.value as ToolResult;
           return Success({
             ...toolResult,
             metadata: {
-              ...toolResult.metadata,
+              ...(toolResult.metadata as Record<string, unknown>),
               sessionTracked: true,
             },
           });

@@ -69,7 +69,10 @@ export async function runDeploymentWorkflow(
     });
 
     // Step 1: Prepare cluster
-    const prepareStep = steps[0]!;
+    const prepareStep = steps[0];
+    if (!prepareStep) {
+      throw new Error('Prepare cluster step not found');
+    }
     prepareStep.status = 'running';
     prepareStep.startTime = new Date();
     context.currentStep = prepareStep.name;
@@ -130,7 +133,10 @@ export async function runDeploymentWorkflow(
     context.artifacts.set('cluster', cluster);
 
     // Step 2: Generate K8s manifests
-    const generateStep = steps[1]!;
+    const generateStep = steps[1];
+    if (!generateStep) {
+      throw new Error('Generate manifests step not found');
+    }
     generateStep.status = 'running';
     generateStep.startTime = new Date();
     context.currentStep = generateStep.name;
@@ -209,7 +215,10 @@ export async function runDeploymentWorkflow(
     context.artifacts.set('manifests', manifests);
 
     // Step 3: Push image to registry
-    const pushStep = steps[2]!;
+    const pushStep = steps[2];
+    if (!pushStep) {
+      throw new Error('Push image step not found');
+    }
     pushStep.status = 'running';
     pushStep.startTime = new Date();
     context.currentStep = pushStep.name;
@@ -225,9 +234,9 @@ export async function runDeploymentWorkflow(
       workflow_state: {
         build_result: {
           imageId,
-          tags: [`${deploymentOptions.registry}/${imageId}:latest`],
+          tags: [`${deploymentOptions.registry || 'docker.io'}/${imageId}:latest`],
         },
-      } as any,
+      } as Record<string, unknown>,
     });
 
     const pushResult = await pushImage(
@@ -282,7 +291,10 @@ export async function runDeploymentWorkflow(
     context.artifacts.set('push', push);
 
     // Step 4: Deploy application
-    const deployStep = steps[3]!;
+    const deployStep = steps[3];
+    if (!deployStep) {
+      throw new Error('Deploy application step not found');
+    }
     deployStep.status = 'running';
     deployStep.startTime = new Date();
     context.currentStep = deployStep.name;
@@ -294,10 +306,13 @@ export async function runDeploymentWorkflow(
     logger.info('Deploying application to cluster');
 
     // Update session with manifests for deploy tool
+    const existingSession = sessionManager.get ? await sessionManager.get(sessionId) : null;
+    const existingWorkflowState =
+      (existingSession as unknown as Record<string, unknown>)?.workflow_state || {};
     await sessionManager.update(sessionId, {
       workflow_state: {
-        ...((await sessionManager.get(sessionId))?.workflow_state || {}),
-        manifests: manifests.manifests,
+        ...existingWorkflowState,
+        manifests: (manifests as unknown as Record<string, unknown>).manifests,
       },
     });
 
@@ -356,7 +371,10 @@ export async function runDeploymentWorkflow(
     context.artifacts.set('deployment', deploy);
 
     // Step 5: Verify deployment
-    const verifyStep = steps[4]!;
+    const verifyStep = steps[4];
+    if (!verifyStep) {
+      throw new Error('Verify deployment step not found');
+    }
     verifyStep.status = 'running';
     verifyStep.startTime = new Date();
     context.currentStep = verifyStep.name;
@@ -378,7 +396,7 @@ export async function runDeploymentWorkflow(
       logger,
     );
 
-    let verify: any = null;
+    let verify: Record<string, unknown> | null = null;
     if (!verifyResult.ok) {
       verifyStep.status = 'failed';
       verifyStep.error = `Verification failed: ${verifyResult.error}`;
@@ -386,7 +404,7 @@ export async function runDeploymentWorkflow(
       logger.warn('Deployment verification had issues');
     } else {
       verifyStep.status = 'completed';
-      verify = verifyResult.value;
+      verify = verifyResult.value as unknown as Record<string, unknown>;
     }
 
     verifyStep.endTime = new Date();
@@ -402,8 +420,8 @@ export async function runDeploymentWorkflow(
         completedAt: endTime.toISOString(),
         results: {
           deploymentName: deploymentOptions.name,
-          namespace: cluster.namespace,
-          serviceName: deploy.serviceName,
+          namespace: (cluster as unknown as Record<string, unknown>).namespace,
+          serviceName: (deploy as unknown as Record<string, unknown>).serviceName,
           endpoints: verify?.endpoints,
           replicas: verify?.replicas,
         },
@@ -416,31 +434,40 @@ export async function runDeploymentWorkflow(
     return {
       success: true,
       sessionId,
-      results: {
-        deploymentName: deploymentOptions.name,
-        namespace: cluster.namespace,
-        endpoints: verify?.endpoints,
-        service: {
-          name: deploy.serviceName,
-          type: deploymentOptions.serviceType || 'ClusterIP',
-        },
-        pods: verify
-          ? [
-              {
-                name: `${deploymentOptions.name}-pod`,
-                ready: verify.ready,
-                status: 'Running',
-                restarts: 0,
-              },
-            ]
-          : [],
-        verificationStatus: {
-          deployment: true,
-          service: !!deploy.serviceName,
-          endpoints: verify?.endpoints && verify.endpoints.length > 0,
-          health: !!verify,
-        },
-      },
+      results: (() => {
+        const baseResults = {
+          deploymentName: deploymentOptions.name,
+          namespace: (cluster as unknown as Record<string, unknown>).namespace as string,
+          service: {
+            name: (deploy as unknown as Record<string, unknown>).serviceName as string,
+            type: deploymentOptions.serviceType || 'ClusterIP',
+          },
+          pods: verify
+            ? [
+                {
+                  name: `${deploymentOptions.name}-pod`,
+                  ready: verify?.ready ? Boolean(verify.ready) : false,
+                  status: 'Running',
+                  restarts: 0,
+                },
+              ]
+            : [],
+          verificationStatus: {
+            deployment: true,
+            service: Boolean((deploy as unknown as Record<string, unknown>).serviceName),
+            endpoints: Boolean(
+              verify?.endpoints && Array.isArray(verify.endpoints) && verify.endpoints.length > 0,
+            ),
+            health: Boolean(verify),
+          },
+        };
+
+        if (verify?.endpoints && Array.isArray(verify.endpoints)) {
+          return { ...baseResults, endpoints: verify.endpoints as string[] };
+        }
+
+        return baseResults;
+      })(),
       metadata: {
         startTime: context.metadata.startTime,
         endTime,
@@ -498,8 +525,8 @@ export async function runDeploymentWorkflow(
 export const deploymentWorkflow = {
   name: 'deployment-workflow',
   description: 'Complete deployment pipeline from cluster preparation to verified deployment',
-  execute: (params: DeploymentWorkflowParams, logger: Logger, context?: any) =>
-    runDeploymentWorkflow(params, context?.deps || { logger }, context),
+  execute: (params: DeploymentWorkflowParams, logger: Logger, context?: Record<string, unknown>) =>
+    runDeploymentWorkflow(params, (context?.deps as Deps) || ({ logger } as Deps), context),
   schema: {
     type: 'object',
     properties: {

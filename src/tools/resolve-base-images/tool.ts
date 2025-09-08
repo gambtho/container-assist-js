@@ -5,11 +5,15 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { createSessionManager } from '@lib/session';
+import { createSessionManager, type SessionManager } from '@lib/session';
 import { createTimer, type Logger } from '@lib/logger';
 import { createDockerRegistryClient } from '@lib/docker';
 import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
 import { getSuggestedBaseImages, getRecommendedBaseImage } from '@lib/base-images';
+
+interface ResolveBaseImagesContext {
+  sessionManager?: SessionManager;
+}
 
 export interface ResolveBaseImagesConfig {
   sessionId: string;
@@ -44,7 +48,7 @@ export interface BaseImageRecommendation {
 async function resolveBaseImages(
   config: ResolveBaseImagesConfig,
   logger: Logger,
-  context?: any,
+  context?: ResolveBaseImagesContext,
 ): Promise<Result<BaseImageRecommendation>> {
   const timer = createTimer(logger, 'resolve-base-images');
 
@@ -57,9 +61,10 @@ async function resolveBaseImages(
     const sessionManager = context?.sessionManager || createSessionManager(logger);
 
     // Get or create session
-    const session = sessionId ? await sessionManager.get(sessionId) : await sessionManager.create();
+    let session = await sessionManager.get(sessionId);
     if (!session) {
-      return Failure('Session not found');
+      // Create new session with the specified sessionId
+      session = await sessionManager.create(sessionId);
     }
 
     // Get analysis result from session
@@ -157,6 +162,6 @@ async function resolveBaseImages(
  */
 export const resolveBaseImagesTool = {
   name: 'resolve-base-images',
-  execute: (config: ResolveBaseImagesConfig, logger: Logger, context?: any) =>
+  execute: (config: ResolveBaseImagesConfig, logger: Logger, context?: ResolveBaseImagesContext) =>
     resolveBaseImages(config, logger, context),
 };

@@ -65,13 +65,16 @@ function analyzeVariant(variant: DockerfileVariant): {
 /**
  * Generate scoring reasons based on scores
  */
-function generateScoringReasons(_variant: DockerfileVariant, scores: any): string[] {
+function generateScoringReasons(
+  _variant: DockerfileVariant,
+  scores: Record<string, number>,
+): string[] {
   const reasons: string[] = [];
 
-  if (scores.security > 70) reasons.push('Strong security practices detected');
-  if (scores.performance > 70) reasons.push('Optimized build performance');
-  if (scores.size > 70) reasons.push('Efficient image size optimization');
-  if (scores.maintainability > 70) reasons.push('Good maintainability practices');
+  if ((scores.security ?? 0) > 70) reasons.push('Strong security practices detected');
+  if ((scores.performance ?? 0) > 70) reasons.push('Optimized build performance');
+  if ((scores.size ?? 0) > 70) reasons.push('Efficient image size optimization');
+  if ((scores.maintainability ?? 0) > 70) reasons.push('Good maintainability practices');
 
   return reasons;
 }
@@ -93,14 +96,19 @@ function detectWarnings(variant: DockerfileVariant): string[] {
 /**
  * Generate recommendations based on scores
  */
-function generateRecommendations(_variant: DockerfileVariant, scores: any): string[] {
+function generateRecommendations(
+  _variant: DockerfileVariant,
+  scores: Record<string, number>,
+): string[] {
   const recommendations: string[] = [];
 
-  if (scores.security < 60) recommendations.push('Add non-root user and security hardening');
-  if (scores.performance < 60)
+  if ((scores.security ?? 0) < 60) recommendations.push('Add non-root user and security hardening');
+  if ((scores.performance ?? 0) < 60)
     recommendations.push('Consider multi-stage build for better performance');
-  if (scores.size < 60) recommendations.push('Use smaller base images like Alpine or distroless');
-  if (scores.maintainability < 60) recommendations.push('Add labels and documentation comments');
+  if ((scores.size ?? 0) < 60)
+    recommendations.push('Use smaller base images like Alpine or distroless');
+  if ((scores.maintainability ?? 0) < 60)
+    recommendations.push('Add labels and documentation comments');
 
   return recommendations;
 }
@@ -629,7 +637,7 @@ export class StrategyEngine {
 
   constructor(
     private logger: Logger,
-    _promptRegistry?: any,
+    _promptRegistry?: Record<string, unknown>,
   ) {
     this.registerDefaultStrategies();
   }

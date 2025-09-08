@@ -207,7 +207,7 @@ export interface ValidationResult {
   isValid: boolean;
   errors?: string[];
   warnings?: string[];
-  suggestions?: any[];
+  suggestions?: string[];
 }
 
 export interface AIService {

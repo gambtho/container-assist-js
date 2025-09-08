@@ -49,14 +49,14 @@ export interface AnalysisVariant {
   hasDockerfile: boolean;
   hasDockerCompose: boolean;
   hasKubernetes: boolean;
-  recommendations?: any;
+  recommendations?: string[];
 
   // Extended analysis properties
-  files?: any[];
-  frameworks?: any[];
-  patterns?: any;
-  security?: any;
-  deployment?: any;
+  files?: Array<{ path: string; type: string; content?: string }>;
+  frameworks?: Array<{ name: string; version?: string }>;
+  patterns?: Record<string, unknown>;
+  security?: Record<string, unknown>;
+  deployment?: Record<string, unknown>;
 
   // Sampling metadata
   insights: {
@@ -71,7 +71,7 @@ export interface AnalysisVariant {
   analysisTime: number;
   filesAnalyzed: number;
   generated: Date;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 /**

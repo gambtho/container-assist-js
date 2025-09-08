@@ -44,25 +44,24 @@ async function fixDockerfile(
     // Create lib instances
     const sessionManager = createSessionManager(logger);
 
-    // Get session
-    const session = await sessionManager.get(sessionId);
+    // Get or create session
+    let session = await sessionManager.get(sessionId);
     if (!session) {
-      return Failure('Session not found');
+      // Create new session with the specified sessionId
+      session = await sessionManager.create(sessionId);
     }
 
     // Get the Dockerfile to fix (from session or provided)
-    const workflowState = session.workflow_state as
-      | { dockerfile_result?: { content?: string } }
-      | null
+    const dockerfileResult = session?.results?.dockerfile_result as
+      | { content?: string }
       | undefined;
-    const dockerfileToFix = dockerfile ?? workflowState?.dockerfile_result?.content;
+    const dockerfileToFix = dockerfile ?? dockerfileResult?.content;
     if (!dockerfileToFix) {
       return Failure('No Dockerfile found to fix - run generate_dockerfile first');
     }
 
     // Get build error from session if not provided
-    const sessionState = session as any;
-    const buildResult = sessionState.workflow_state?.build_result as { error?: string } | undefined;
+    const buildResult = session?.results?.build_result as { error?: string } | undefined;
     const buildError = error ?? buildResult?.error;
 
     logger.info({ hasError: !!buildError }, 'Analyzing Dockerfile for issues');
@@ -102,7 +101,9 @@ async function fixDockerfile(
       logger.warn({ error: aiResult.error }, 'MCP AI request failed, using fallback fix');
 
       // Fallback to basic fix if AI is unavailable
-      const analysisResult = sessionState.workflow_state?.analysis_result;
+      const analysisResult = (session.workflow_state as WorkflowState)?.analysis_result as
+        | { language?: string }
+        | undefined;
       const language = analysisResult?.language || 'javascript';
       const baseImage = getRecommendedBaseImage(language);
       const port = DEFAULT_PORTS[language as keyof typeof DEFAULT_PORTS]?.[0] || 3000;
@@ -157,7 +158,9 @@ async function fixDockerfile(
       // Validate that we have a valid Dockerfile
       if (!fixedDockerfile || !fixedDockerfile.includes('FROM')) {
         logger.warn('AI response did not contain valid Dockerfile, using fallback');
-        const analysisResult = sessionState.workflow_state?.analysis_result;
+        const analysisResult = (session.workflow_state as WorkflowState)?.analysis_result as
+          | { language?: string }
+          | undefined;
         const language = analysisResult?.language || 'javascript';
         const baseImage = getRecommendedBaseImage(language);
         const port = DEFAULT_PORTS[language as keyof typeof DEFAULT_PORTS]?.[0] || 3000;

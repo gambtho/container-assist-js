@@ -1,6 +1,7 @@
 import { defineConfig } from 'tsdown';
 import { cp, chmod } from 'fs/promises';
 import { existsSync } from 'fs';
+import { resolve } from 'path';
 
 const isTestBuild = process.env.BUILD_TEST_UTILS === 'true';
 
@@ -16,9 +17,9 @@ const mainEntries = {
 
 const testEntries = {
   // Test utilities for integration scripts (only included when BUILD_TEST_UTILS=true)
-  'test/utils/environment-detector': 'test/utils/environment-detector.ts',
-  'test/utils/integration-test-utils': 'test/utils/integration-test-utils.ts',
-  'test/utils/trivy-scanner-factory': 'test/utils/trivy-scanner-factory.ts'
+  'test/utils/environment-detector': 'test/__support__/utilities/environment-detector.ts',
+  'test/utils/integration-test-utils': 'test/__support__/utilities/integration-test-utils.ts',
+  'test/utils/trivy-scanner-factory': 'test/__support__/utilities/trivy-scanner-factory.ts'
 };
 
 export default defineConfig({
@@ -44,6 +45,20 @@ export default defineConfig({
   esbuildOptions(options) {
     options.tsconfig = './tsconfig.json';
     options.resolveExtensions = ['.ts', '.tsx', '.js', '.jsx'];
+    // Add path alias resolution
+    options.alias = {
+      '@app': resolve('./src/app'),
+      '@mcp': resolve('./src/mcp'),
+      '@tools': resolve('./src/tools'),
+      '@lib': resolve('./src/lib'),
+      '@domain': resolve('./src/domain'),
+      '@infrastructure': resolve('./src/infrastructure'),
+      '@config': resolve('./src/config'),
+      '@prompts': resolve('./src/prompts'),
+      '@resources': resolve('./src/resources'),
+      '@workflows': resolve('./src/workflows'),
+      '@types': resolve('./src/domain/types.ts')
+    };
   },
   
   // External dependencies (not bundled)

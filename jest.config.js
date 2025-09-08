@@ -11,8 +11,8 @@ export default {
   projects: [
     {
       displayName: 'unit',
-      testMatch: ['<rootDir>/test/__tests__/unit/**/*.test.ts'],
-      setupFilesAfterEnv: ['<rootDir>/test/setup/unit-setup.ts'],
+      testMatch: ['<rootDir>/test/unit/**/*.test.ts'],
+      setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/unit-setup.ts'],
       testEnvironment: 'node',
       coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
       moduleNameMapper: {
@@ -28,6 +28,10 @@ export default {
         '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
         '^@types$': '<rootDir>/src/domain/types',
         '^(\\.{1,2}/.*)\\.js$': '$1',
+        // Test support mappings
+        '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+        '^@test/utilities/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+        '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
       },
       transform: {
         '^.+\\.tsx?$': [
@@ -48,8 +52,8 @@ export default {
     },
     {
       displayName: 'integration',
-      testMatch: ['<rootDir>/test/__tests__/integration/**/*.integration.test.ts'],
-      setupFilesAfterEnv: ['<rootDir>/test/setup/integration-setup.ts'],
+      testMatch: ['<rootDir>/test/integration/**/*.test.ts'],
+      setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/integration-setup.ts'],
       testEnvironment: 'node',
       moduleNameMapper: {
         '^@app/(.*)$': '<rootDir>/src/app/$1',
@@ -64,6 +68,9 @@ export default {
         '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
         '^@types$': '<rootDir>/src/domain/types',
         '^(\\.{1,2}/.*)\\.js$': '$1',
+        '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+        '^@test/utilities/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+        '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
       },
       transform: {
         '^.+\\.tsx?$': [
@@ -84,8 +91,8 @@ export default {
     },
     {
       displayName: 'e2e',
-      testMatch: ['<rootDir>/test/__tests__/e2e/**/*.e2e.test.ts'],
-      setupFilesAfterEnv: ['<rootDir>/test/setup/e2e-setup.ts'],
+      testMatch: ['<rootDir>/test/e2e/**/*.test.ts'],
+      setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/e2e-setup.ts'],
       testEnvironment: 'node',
       maxWorkers: 1,
       moduleNameMapper: {
@@ -101,6 +108,9 @@ export default {
         '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
         '^@types$': '<rootDir>/src/domain/types',
         '^(\\.{1,2}/.*)\\.js$': '$1',
+        '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+        '^@test/utilities/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+        '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
       },
       transform: {
         '^.+\\.tsx?$': [
@@ -121,8 +131,12 @@ export default {
     },
     {
       displayName: 'performance',
-      testMatch: ['<rootDir>/test/performance/**/*.perf.test.ts'],
+      testMatch: [
+        '<rootDir>/test/performance/**/*.test.ts',
+        '<rootDir>/test/performance/**/*.perf.test.ts'
+      ],
       testEnvironment: 'node',
+      setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/performance.ts'],
       moduleNameMapper: {
         '^@app/(.*)$': '<rootDir>/src/app/$1',
         '^@config/(.*)$': '<rootDir>/src/config/$1',
@@ -136,6 +150,9 @@ export default {
         '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
         '^@types$': '<rootDir>/src/domain/types',
         '^(\\.{1,2}/.*)\\.js$': '$1',
+        '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+        '^@test/utilities/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+        '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
       },
       transform: {
         '^.+\\.tsx?$': [
@@ -248,10 +265,15 @@ export default {
     '^\\./core/types\\.js$': '<rootDir>/src/domain/types.ts',
     '^\\.\\./\\.\\./core/types\\.js$': '<rootDir>/src/domain/types.ts',
     
-    // Test fixtures and helpers
-    '^@fixtures/(.*)$': '<rootDir>/test/fixtures/$1',
-    '^@helpers/(.*)$': '<rootDir>/test/helpers/$1',
-    '^@mocks/(.*)$': '<rootDir>/test/mocks/$1',
+    // Test support mappings
+    '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+    '^@test/utilities/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+    '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
+    
+    // Legacy test mappings (for backward compatibility during migration)
+    '^@fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
+    '^@helpers/(.*)$': '<rootDir>/test/__support__/utilities/$1',
+    '^@mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
     
     // Handle specific .js imports and map them to .ts
     // Infrastructure logger fix for test setup (exact path from test/setup.ts)
@@ -314,7 +336,7 @@ export default {
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],
   
   // Timeout handling for different test types
-  testTimeout: 30000,  // Default 30s (reduced from 60s)
+  testTimeout: 30000,  // Default 30s
   
   // Better error reporting
   verbose: false,  // Reduce noise for CI
@@ -324,8 +346,8 @@ export default {
   bail: false,  // Continue running tests to get full picture
   
   // Global setup and teardown  
-  globalSetup: '<rootDir>/test/setup/global-setup.ts',
-  globalTeardown: '<rootDir>/test/setup/global-teardown.ts',
+  globalSetup: '<rootDir>/test/__support__/setup/global-setup.ts',
+  globalTeardown: '<rootDir>/test/__support__/setup/global-teardown.ts',
   
   // Setup files
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],

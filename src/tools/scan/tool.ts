@@ -95,9 +95,10 @@ export async function scanImage(
 
     // Get or create session
     await reportProgress(20, 'Loading session');
-    const session = sessionId ? await sessionManager.get(sessionId) : await sessionManager.create();
+    let session = await sessionManager.get(sessionId);
     if (!session) {
-      return Failure('Session not found');
+      // Create new session with the specified sessionId
+      session = await sessionManager.create(sessionId);
     }
 
     const workflowState = session.workflow_state as
@@ -131,17 +132,34 @@ export async function scanImage(
     const scanResult = scanResultWrapper.value;
 
     // Convert ScanResult to DockerScanResult
+    interface ScanResultVulnerability {
+      id?: string;
+      severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+      package?: string;
+      version?: string;
+      description?: string;
+      fixedVersion?: string;
+    }
+
     const dockerScanResult: DockerScanResult = {
-      vulnerabilities: scanResult.vulnerabilities.map((v: any) => {
-        const vuln: any = {
-          id: v.id,
+      vulnerabilities: scanResult.vulnerabilities.map((v: Record<string, unknown>) => {
+        const vuln: ScanResultVulnerability = {
           severity: v.severity as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
-          package: v.package,
-          version: v.version,
-          description: v.description,
         };
+        if (v.id) {
+          vuln.id = v.id as string;
+        }
+        if (v.package) {
+          vuln.package = v.package as string;
+        }
+        if (v.version) {
+          vuln.version = v.version as string;
+        }
+        if (v.description) {
+          vuln.description = v.description as string;
+        }
         if (v.fixedVersion) {
-          vuln.fixedVersion = v.fixedVersion;
+          vuln.fixedVersion = v.fixedVersion as string;
         }
         return vuln;
       }),
@@ -257,6 +275,6 @@ export async function scanImage(
  */
 export const scanImageTool = {
   name: 'scan',
-  execute: (config: ScanImageConfig, logger: Logger, context?: any) =>
+  execute: (config: ScanImageConfig, logger: Logger, context?: ToolContext) =>
     scanImage(config, logger, context),
 };

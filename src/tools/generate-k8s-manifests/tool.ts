@@ -93,14 +93,26 @@ export interface GenerateK8sManifestsResult {
 /**
  * Generate deployment manifest
  */
+interface K8sResource {
+  apiVersion: string;
+  kind: string;
+  metadata: {
+    name: string;
+    namespace: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+  };
+  spec: Record<string, unknown>;
+}
+
 function generateDeployment(config: {
   appName: string;
   namespace: string;
   replicas: number;
   image: string;
   port: number;
-  resources?: object;
-}): object {
+  resources?: Record<string, unknown>;
+}): K8sResource {
   return {
     apiVersion: 'apps/v1',
     kind: 'Deployment',
@@ -151,7 +163,7 @@ function generateService(config: {
   namespace: string;
   port: number;
   serviceType: string;
-}): object {
+}): K8sResource {
   return {
     apiVersion: 'v1',
     kind: 'Service',
@@ -183,7 +195,7 @@ function generateIngress(config: {
   namespace: string;
   host?: string;
   port: number;
-}): object {
+}): K8sResource {
   return {
     apiVersion: 'networking.k8s.io/v1',
     kind: 'Ingress',
@@ -229,7 +241,7 @@ function generateHPA(config: {
   minReplicas: number;
   maxReplicas: number;
   targetCPU: number;
-}): object {
+}): K8sResource {
   return {
     apiVersion: 'autoscaling/v2',
     kind: 'HorizontalPodAutoscaler',
@@ -269,7 +281,7 @@ async function generateAIK8sManifests(
   mcpHostAI: MCPHostAI,
   logger: Logger,
   image: string,
-): Promise<object[]> {
+): Promise<K8sResource[]> {
   try {
     const {
       appName = 'app',
@@ -332,7 +344,7 @@ async function generateAIK8sManifests(
 /**
  * Parse K8s manifests from AI response
  */
-function parseK8sManifestsFromAI(aiResponse: string): object[] {
+function parseK8sManifestsFromAI(aiResponse: string): K8sResource[] {
   try {
     // Look for YAML code blocks first
     const yamlMatch = aiResponse.match(/```(?:yaml|yml)?\n([\s\S]*?)\n```/i);
@@ -341,7 +353,7 @@ function parseK8sManifestsFromAI(aiResponse: string): object[] {
     // Basic YAML parsing - split by document separator
     const documents = yamlContent.split(/^---\s*$/m).filter((doc) => doc.trim());
 
-    const manifests: object[] = [];
+    const manifests: K8sResource[] = [];
 
     for (const doc of documents) {
       const trimmedDoc = doc.trim();
@@ -350,8 +362,8 @@ function parseK8sManifestsFromAI(aiResponse: string): object[] {
       try {
         // Simple YAML to JSON conversion for basic structures
         const manifest = parseYAMLtoJSON(trimmedDoc);
-        if (manifest && typeof manifest === 'object' && (manifest as any).kind) {
-          manifests.push(manifest);
+        if (manifest && typeof manifest === 'object' && manifest.kind) {
+          manifests.push(manifest as K8sResource);
         }
       } catch (parseError) {
         // If YAML parsing fails, skip this document
@@ -369,11 +381,11 @@ function parseK8sManifestsFromAI(aiResponse: string): object[] {
  * Simple YAML to JSON parser for basic K8s manifests
  * Note: This is a simplified parser for demo purposes
  */
-function parseYAMLtoJSON(yamlString: string): object | null {
+function parseYAMLtoJSON(yamlString: string): Partial<K8sResource> | null {
   try {
     // This is a very basic YAML parser - in production you'd use a proper YAML library
     const lines = yamlString.split('\n');
-    const result: any = {};
+    const result: Record<string, unknown> = {};
     let currentObj = result;
 
     for (const line of lines) {
@@ -399,12 +411,13 @@ function parseYAMLtoJSON(yamlString: string): object | null {
           currentObj[key] = value;
         }
       } else {
-        currentObj[key] = {};
-        currentObj = currentObj[key];
+        const newObj: Record<string, unknown> = {};
+        currentObj[key] = newObj;
+        currentObj = newObj;
       }
     }
 
-    return result.kind ? result : null;
+    return result.kind ? (result as Partial<K8sResource>) : null;
   } catch (error) {
     return null;
   }
@@ -413,7 +426,7 @@ function parseYAMLtoJSON(yamlString: string): object | null {
 /**
  * Generate basic manifests (fallback when AI is unavailable)
  */
-function generateBasicManifests(config: GenerateK8sManifestsConfig, image: string): object[] {
+function generateBasicManifests(config: GenerateK8sManifestsConfig, image: string): K8sResource[] {
   const {
     appName = 'app',
     namespace = 'default',
@@ -426,7 +439,7 @@ function generateBasicManifests(config: GenerateK8sManifestsConfig, image: strin
     autoscaling,
   } = config;
 
-  const manifests: object[] = [];
+  const manifests: K8sResource[] = [];
 
   // 1. Deployment
   const deployment = generateDeployment({
@@ -524,10 +537,11 @@ export async function generateK8sManifests(
     // Create AI service
     const mcpHostAI = createMCPHostAI(logger);
 
-    // Get session
-    const session = await sessionManager.get(sessionId);
+    // Get or create session
+    let session = await sessionManager.get(sessionId);
     if (!session) {
-      return Failure('Session not found');
+      // Create new session with the specified sessionId
+      session = await sessionManager.create(sessionId);
     }
 
     // Get build result from session for image tag
@@ -539,7 +553,7 @@ export async function generateK8sManifests(
     const image = config.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
 
     // Generate manifests with AI enhancement when available
-    let manifests: object[];
+    let manifests: K8sResource[];
     let aiGenerated = false;
 
     try {
@@ -566,12 +580,11 @@ export async function generateK8sManifests(
     // Build resource list from manifests
     const resourceList: Array<{ kind: string; name: string; namespace: string }> = [];
     for (const manifest of manifests) {
-      const m = manifest as any;
-      if (m.kind && m.metadata?.name) {
+      if (manifest.kind && manifest.metadata?.name) {
         resourceList.push({
-          kind: m.kind,
-          name: m.metadata.name,
-          namespace: m.metadata.namespace || namespace,
+          kind: manifest.kind,
+          name: manifest.metadata.name,
+          namespace: manifest.metadata.namespace || namespace,
         });
       }
     }
@@ -596,7 +609,7 @@ export async function generateK8sManifests(
     const yaml = manifests.map((m) => JSON.stringify(m, null, 2)).join('\n---\n');
 
     // Write manifests to disk
-    const sessionState = session as any;
+    const sessionState = session as Record<string, unknown> & { repo_path?: string };
     const outputPath = path.join(sessionState.repo_path ?? '.', 'k8s');
     await fs.mkdir(outputPath, { recursive: true });
     const manifestPath = path.join(outputPath, 'manifests.yaml');

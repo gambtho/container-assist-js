@@ -6,11 +6,29 @@
  */
 
 import * as yaml from 'js-yaml';
-import { createSessionManager } from '@lib/session';
+import { createSessionManager, type SessionManager } from '@lib/session';
 import { createKubernetesClient } from '@lib/kubernetes';
 import { createTimer, type Logger } from '@lib/logger';
 import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
 import { DEFAULT_TIMEOUTS } from '@config/defaults';
+
+interface DeployContext {
+  abortSignal?: AbortSignal;
+  progressUpdater?: (progress: number, message: string, total?: number) => Promise<void>;
+  sessionManager?: SessionManager;
+}
+
+interface K8sManifest {
+  apiVersion: string;
+  kind: string;
+  metadata: {
+    name: string;
+    namespace?: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+  };
+  spec?: Record<string, unknown>;
+}
 
 export interface DeployApplicationConfig {
   sessionId: string;
@@ -89,12 +107,12 @@ function orderManifests(manifests: unknown[]): unknown[] {
 export async function deployApplication(
   config: DeployApplicationConfig,
   logger: Logger,
-  context?: any,
+  context?: DeployContext,
 ): Promise<Result<DeployApplicationResult>> {
   const timer = createTimer(logger, 'deploy-application');
 
   // Extract abort signal from context if available
-  const abortSignal = context?.abortSignal as AbortSignal | undefined;
+  const abortSignal = context?.abortSignal;
 
   try {
     const {
@@ -120,11 +138,12 @@ export async function deployApplication(
     const sessionManager = context?.sessionManager || createSessionManager(logger);
     const k8sClient = createKubernetesClient(logger);
 
-    // Get session
+    // Get or create session
     await context?.progressUpdater?.(10, 'Loading session data...');
-    const session = await sessionManager.get(sessionId);
+    let session = await sessionManager.get(sessionId);
     if (!session) {
-      return Failure('Session not found');
+      // Create new session with the specified sessionId
+      session = await sessionManager.create(sessionId);
     }
 
     // Get K8s manifests from session
@@ -168,7 +187,7 @@ export async function deployApplication(
         const manifest = orderedManifests[i];
         await context?.progressUpdater?.(
           30 + ((i + 1) * 30) / orderedManifests.length,
-          `Deploying ${(manifest as any)?.kind || 'resource'} ${i + 1}/${orderedManifests.length}...`,
+          `Deploying ${(manifest as K8sManifest)?.kind || 'resource'} ${i + 1}/${orderedManifests.length}...`,
         );
         try {
           const manifestObj = manifest as {

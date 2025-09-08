@@ -14,7 +14,7 @@ import type { ValidationContext } from '@mcp/tools/validator';
  */
 async function validateSamplingParameters(
   toolName: string,
-  parameters: Record<string, any>,
+  parameters: Record<string, unknown>,
   logger: Logger,
   _context?: import('@mcp/server/types').MCPContext,
 ): Promise<{ isValid: boolean; errors: string[]; warnings: string[] }> {
@@ -24,15 +24,16 @@ async function validateSamplingParameters(
 
     const validationContext: ValidationContext = {
       toolName,
-      repositoryPath: parameters.repoPath,
-      environment: parameters.environment || 'development',
+      repositoryPath: (parameters.repoPath as string) || '',
+      environment:
+        (parameters.environment as 'development' | 'staging' | 'production') || 'development',
       targetType: 'dockerfile',
     };
 
     const validationResult = await aiOrchestrator.validateParameters(
       toolName,
       parameters,
-      validationContext,
+      validationContext as unknown as Record<string, unknown>,
     );
 
     if (validationResult.ok) {
@@ -77,7 +78,7 @@ export const dockerfileSampling = {
     },
     logger: Logger,
     context?: import('@mcp/server/types').MCPContext,
-  ): Promise<Result<any>> => {
+  ): Promise<Result<Record<string, unknown>>> => {
     try {
       logger.info(
         {
@@ -215,7 +216,7 @@ export const dockerfileCompare = {
     },
     logger: Logger,
     context?: import('@mcp/server/types').MCPContext,
-  ): Promise<Result<any>> => {
+  ): Promise<Result<Record<string, unknown>>> => {
     try {
       logger.info(
         {
@@ -324,7 +325,7 @@ export const dockerfileValidate = {
     },
     logger: Logger,
     context?: import('@mcp/server/types').MCPContext,
-  ): Promise<Result<any>> => {
+  ): Promise<Result<Record<string, unknown>>> => {
     try {
       logger.info(
         {
@@ -432,7 +433,7 @@ export const dockerfileBest = {
     },
     logger: Logger,
     context?: import('@mcp/server/types').MCPContext,
-  ): Promise<Result<any>> => {
+  ): Promise<Result<Record<string, unknown>>> => {
     try {
       logger.info(
         {
@@ -537,7 +538,7 @@ export const samplingStrategies = {
     config: { sessionId?: string },
     logger: Logger,
     context?: import('@mcp/server/types').MCPContext,
-  ): Promise<Result<any>> => {
+  ): Promise<Result<Record<string, unknown>>> => {
     try {
       logger.info('Retrieving available sampling strategies');
 

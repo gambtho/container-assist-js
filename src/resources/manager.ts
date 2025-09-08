@@ -83,7 +83,9 @@ export const createResourceContext = (
     'sampling-config',
   ];
   categories.forEach((category) => {
-    context.categoryIndex!.set(category, new Set());
+    if (context.categoryIndex) {
+      context.categoryIndex.set(category, new Set());
+    }
   });
 
   return context;

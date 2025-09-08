@@ -414,10 +414,11 @@ export async function generateDockerfile(
     // Create MCP Host AI service
     const mcpHostAI = createMCPHostAI(logger);
 
-    // Get session
-    const session = await sessionManager.get(sessionId);
+    // Get or create session
+    let session = await sessionManager.get(sessionId);
     if (!session) {
-      return Failure('Session not found');
+      // Create new session with the specified sessionId
+      session = await sessionManager.create(sessionId);
     }
 
     // Get analysis result from session
@@ -472,8 +473,7 @@ export async function generateDockerfile(
     }
 
     // Determine output path
-    const sessionState = session as any;
-    const repoPath = sessionState.repo_path ?? '.';
+    const repoPath = (session?.metadata?.repo_path as string) ?? '.';
     const dockerfilePath = path.join(repoPath, 'Dockerfile');
 
     // Write Dockerfile to disk

@@ -366,7 +366,21 @@ export class Sampler implements SamplerType {
         strategy: 'balanced',
       },
       variants: allVariants,
-      bestVariant: bestVariant!,
+      bestVariant: bestVariant ||
+        allVariants[0] || {
+          id: 'fallback',
+          content: '',
+          strategy: 'balanced',
+          metadata: {
+            baseImage: 'alpine:latest',
+            optimization: 'balanced' as const,
+            features: [],
+            estimatedSize: '0MB',
+            buildComplexity: 'low' as const,
+            securityFeatures: [],
+          },
+          generated: new Date(),
+        },
       context: config.context,
     };
 
@@ -622,9 +636,13 @@ export class Sampler implements SamplerType {
 
     for (let i = 0; i < samples.length; i++) {
       for (let j = i + 1; j < samples.length; j++) {
-        const similarity = this.calculateSimilarity(samples[i]!, samples[j]!);
-        totalSimilarity += similarity;
-        comparisons++;
+        const sample1 = samples[i];
+        const sample2 = samples[j];
+        if (sample1 && sample2) {
+          const similarity = this.calculateSimilarity(sample1, sample2);
+          totalSimilarity += similarity;
+          comparisons++;
+        }
       }
     }
 

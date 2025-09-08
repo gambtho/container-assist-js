@@ -8,7 +8,7 @@
 import { createSessionManager } from '@lib/session';
 import { createDockerClient } from '@lib/docker';
 import { createTimer, type Logger } from '@lib/logger';
-import { Success, Failure, type Result, type TagImageParams } from '@types';
+import { Success, Failure, type Result, type TagImageParams, type WorkflowState } from '@types';
 
 export interface TagImageConfig extends TagImageParams {
   sessionId: string;
@@ -41,19 +41,22 @@ export async function tagImage(
     const dockerClient = createDockerClient(logger);
 
     // Get session using lib session manager
-    const session = await sessionManager.get(sessionId);
+    // Get or create session
+    let session = await sessionManager.get(sessionId);
     if (!session) {
-      return Failure('Session not found');
+      // Create new session with the specified sessionId
+      session = await sessionManager.create(sessionId);
     }
 
-    const sessionState = session;
-    const buildResult = sessionState.build_result as any;
+    const buildResult = (session?.workflow_state as WorkflowState)?.build_result as
+      | { imageId?: string }
+      | undefined;
 
     if (!buildResult?.imageId) {
       return Failure('No built image found in session - run build_image first');
     }
 
-    const source = buildResult.imageId as string;
+    const source = buildResult.imageId;
 
     // Tag image using lib docker client
     // Parse repository and tag from the tag parameter
@@ -75,7 +78,7 @@ export async function tagImage(
     // Update session with tag information using lib session manager
     await sessionManager.update(sessionId, {
       workflow_state: {
-        ...(sessionState.workflow_state || {}),
+        ...(session?.workflow_state || {}),
         build_result: {
           ...buildResult,
           tags,

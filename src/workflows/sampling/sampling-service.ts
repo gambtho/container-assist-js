@@ -78,7 +78,7 @@ export class SamplingService {
       const validationResult = await this.aiOrchestrator.validateParameters(
         'dockerfile-best',
         { ...config, ...options },
-        validationContext,
+        { ...validationContext } as Record<string, unknown>,
       );
 
       if (validationResult.ok && !validationResult.value.isValid) {
@@ -308,8 +308,8 @@ export class SamplingService {
 
     const validationResult = await this.aiOrchestrator.validateParameters(
       'dockerfile-sampling',
-      config,
-      validationContext,
+      config as unknown as Record<string, unknown>,
+      validationContext as unknown as Record<string, unknown>,
     );
 
     if (validationResult.ok && !validationResult.value.isValid) {

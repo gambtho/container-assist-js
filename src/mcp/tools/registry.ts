@@ -24,7 +24,11 @@ export interface SDKToolRegistry {
   registerTool(tool: Tool): void;
   getTool(name: string): Tool | undefined;
   getAllTools(): Tool[];
-  getToolSchemas(): Array<{ name: string; description: string; inputSchema?: any }>;
+  getToolSchemas(): Array<{
+    name: string;
+    description: string;
+    inputSchema?: Record<string, unknown>;
+  }>;
   setupServerHandlers(server: McpServer): void;
 }
 
@@ -58,7 +62,11 @@ export const createSDKToolRegistry = (
       return Array.from(tools.values());
     },
 
-    getToolSchemas(): Array<{ name: string; description: string; inputSchema?: any }> {
+    getToolSchemas(): Array<{
+      name: string;
+      description: string;
+      inputSchema?: Record<string, unknown>;
+    }> {
       return Array.from(tools.values()).map((tool) => ({
         name: tool.name,
         description: tool.description || `${tool.name} tool`,
@@ -76,7 +84,7 @@ export const createSDKToolRegistry = (
       });
 
       // SDK-native tool execution handler
-      server.server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
+      server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { name, arguments: args } = request.params;
         logger.info({ tool: name }, 'SDK registry executing tool');
 

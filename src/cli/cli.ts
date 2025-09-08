@@ -130,8 +130,8 @@ function validateDockerSocket(options: any): { dockerSocket: string; warnings: s
         continue;
       }
 
-      // Only log when not in pure MCP mode
-      if (!process.env.MCP_MODE) {
+      // Only log when not in pure MCP mode or quiet mode
+      if (!process.env.MCP_MODE && !process.env.MCP_QUIET) {
         console.error(`✅ Using Docker socket: ${thisSocket}`);
       }
       dockerSocket = thisSocket;

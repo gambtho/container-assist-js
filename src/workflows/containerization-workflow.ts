@@ -27,13 +27,19 @@ export interface ContainerizationConfig {
   customDockerfile?: string;
 }
 
+// Analysis result interface - using unknown to allow any structure
+type AnalysisResult = Record<string, unknown>;
+
+// Scan result interface - using unknown to allow any structure
+type ScanResult = Record<string, unknown>;
+
 // Specific result for containerization workflow
 export interface ContainerizationResult {
   ok: boolean;
-  analysis?: any;
+  analysis?: AnalysisResult;
   dockerfile?: string;
   imageId?: string;
-  scanResult?: any;
+  scanResult?: ScanResult;
   duration: number;
   errors?: string[];
 }
@@ -89,7 +95,7 @@ export const runContainerizationWorkflow = async (
       return Failure(`Analysis failed: ${analysis.error}`);
     }
 
-    result.analysis = analysis.value;
+    result.analysis = analysis.value as unknown as AnalysisResult;
 
     // Step 2: Generate Dockerfile
     // Strategy selection: sampling generates multiple candidates and picks the best,
@@ -161,11 +167,14 @@ export const runContainerizationWorkflow = async (
       logger.warn({ error: scanResult.error }, 'Image scan failed, but continuing workflow');
       result.errors?.push(`Scan failed: ${scanResult.error}`);
     } else {
-      result.scanResult = scanResult.value;
+      result.scanResult = scanResult.value as unknown as ScanResult;
 
       // Check if scan results are acceptable
-      const { vulnerabilities } = scanResult.value;
-      const criticalIssues = vulnerabilities.critical + vulnerabilities.high;
+      const scanData = scanResult.value as unknown as ScanResult;
+      const vulnerabilities = scanData.vulnerabilities as
+        | { critical?: number; high?: number }
+        | undefined;
+      const criticalIssues = (vulnerabilities?.critical || 0) + (vulnerabilities?.high || 0);
 
       if (criticalIssues > 0 && config.enableAutoRemediation) {
         logger.warn(
@@ -183,7 +192,7 @@ export const runContainerizationWorkflow = async (
         sessionId,
         duration: result.duration,
         imageId: result.imageId,
-        vulnerabilities: result.scanResult?.vulnerabilities?.total || 0,
+        vulnerabilities: (result.scanResult?.vulnerabilities as { total?: number })?.total || 0,
       },
       'Containerization workflow completed successfully',
     );
@@ -192,7 +201,11 @@ export const runContainerizationWorkflow = async (
   } catch (error) {
     result.duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
-    result.errors?.push(errorMessage);
+    if (result.errors) {
+      result.errors.push(errorMessage);
+    } else {
+      result.errors = [errorMessage];
+    }
 
     logger.error(
       {

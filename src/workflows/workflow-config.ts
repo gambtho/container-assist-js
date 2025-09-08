@@ -146,8 +146,8 @@ const WORKFLOW_DEFINITIONS: Record<string, WorkflowDefinition> = {
  */
 export function getWorkflowSteps(
   workflowName: string,
-  params: any,
-  sessionState?: any,
+  params: Record<string, unknown>,
+  sessionState?: Record<string, unknown>,
 ): WorkflowStep[] {
   const definition = WORKFLOW_DEFINITIONS[workflowName];
   if (!definition) {
@@ -159,11 +159,13 @@ export function getWorkflowSteps(
       // Check skip conditions
       if (step.skipIf) {
         switch (step.skipIf) {
-          case 'analysis_completed':
-            if (sessionState?.completed_steps?.includes('analyze-repo')) {
+          case 'analysis_completed': {
+            const completedSteps = sessionState?.completed_steps;
+            if (Array.isArray(completedSteps) && completedSteps.includes('analyze-repo')) {
               return false;
             }
             break;
+          }
           case 'no_build':
             if (params.buildImage === false) {
               return false;
@@ -202,7 +204,10 @@ export function getWorkflow(name: string): WorkflowDefinition | undefined {
 /**
  * Generate workflow recommendations based on results
  */
-export function generateRecommendations(workflowType: string, results: any[]): string[] {
+export function generateRecommendations(
+  workflowType: string,
+  results: Record<string, unknown>[],
+): string[] {
   const recommendations: string[] = [
     'Review generated artifacts for accuracy',
     'Test container functionality before production deployment',
@@ -210,7 +215,12 @@ export function generateRecommendations(workflowType: string, results: any[]): s
 
   switch (workflowType) {
     case 'containerization':
-      if (results.some((r) => r.vulnerabilities?.length > 0)) {
+      if (
+        results.some((r) => {
+          const vulnerabilities = (r as { vulnerabilities?: unknown[] })?.vulnerabilities;
+          return Array.isArray(vulnerabilities) && vulnerabilities.length > 0;
+        })
+      ) {
         recommendations.push('Address security vulnerabilities before deployment');
       }
       recommendations.push('Configure CI/CD pipeline for automated builds');
@@ -229,11 +239,18 @@ export function generateRecommendations(workflowType: string, results: any[]): s
       break;
 
     case 'optimization': {
-      const imageSizes = results.filter((r) => r.imageSize).map((r) => r.imageSize);
+      const imageSizes = results
+        .filter((r) => (r as { imageSize?: unknown }).imageSize)
+        .map((r) => (r as { imageSize?: number }).imageSize as number);
       if (imageSizes.length > 1) {
-        const reduction =
-          ((imageSizes[0] - imageSizes[imageSizes.length - 1]) / imageSizes[0]) * 100;
-        recommendations.push(`Image size reduced by ${reduction.toFixed(1)}% through optimization`);
+        const firstSize = imageSizes[0];
+        const lastSize = imageSizes[imageSizes.length - 1];
+        if (firstSize && lastSize) {
+          const reduction = ((firstSize - lastSize) / firstSize) * 100;
+          recommendations.push(
+            `Image size reduced by ${reduction.toFixed(1)}% through optimization`,
+          );
+        }
       }
       recommendations.push('Consider using distroless images for further size reduction');
       break;

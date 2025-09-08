@@ -603,23 +603,27 @@ export class AnalysisVariantScorer {
 
     // Apply constraints
     if (constraints) {
-      if (constraints.minConfidence) {
-        candidates = candidates.filter((v) => v.confidence >= constraints.minConfidence!);
+      if (constraints.minConfidence !== undefined) {
+        const minConfidence = constraints.minConfidence;
+        candidates = candidates.filter((v) => v.confidence >= minConfidence);
       }
 
-      if (constraints.minCompleteness) {
-        candidates = candidates.filter((v) => v.completeness >= constraints.minCompleteness!);
+      if (constraints.minCompleteness !== undefined) {
+        const minCompleteness = constraints.minCompleteness;
+        candidates = candidates.filter((v) => v.completeness >= minCompleteness);
       }
 
       if (constraints.mustInclude) {
+        const mustInclude = constraints.mustInclude;
         candidates = candidates.filter((v) =>
-          constraints.mustInclude!.every((item) => this.variantIncludesInsight(v, item)),
+          mustInclude.every((item) => this.variantIncludesInsight(v, item)),
         );
       }
 
       if (constraints.mustNotInclude) {
+        const mustNotInclude = constraints.mustNotInclude;
         candidates = candidates.filter(
-          (v) => !constraints.mustNotInclude!.some((item) => this.variantIncludesInsight(v, item)),
+          (v) => !mustNotInclude.some((item) => this.variantIncludesInsight(v, item)),
         );
       }
 
@@ -639,7 +643,11 @@ export class AnalysisVariantScorer {
       return scoredVariants.length > 0 ? (scoredVariants[0] ?? null) : null; // Return best overall if constraints too strict
     }
 
-    const selected = candidates[0]!; // We know candidates.length > 0
+    const selected = candidates[0]; // We know candidates.length > 0 from check above
+    if (!selected) {
+      return null;
+    }
+
     this.logger.info(
       {
         variant: selected.id,
@@ -660,7 +668,7 @@ export class AnalysisVariantScorer {
     return ANALYSIS_SCORING_PRESETS[focus] || DEFAULT_ANALYSIS_SCORING_CRITERIA;
   }
 
-  private generateScoringRecommendations(evaluation: any): string[] {
+  private generateScoringRecommendations(evaluation: AnalysisEvaluation): string[] {
     const recommendations: string[] = [];
 
     if (evaluation.accuracy.score < 70) {
@@ -700,6 +708,13 @@ export class AnalysisVariantScorer {
 }
 
 // Analysis evaluation result interfaces
+interface AnalysisEvaluation {
+  accuracy: AnalysisAccuracyEval;
+  completeness: AnalysisCompletenessEval;
+  relevance: AnalysisRelevanceEval;
+  actionability: AnalysisActionabilityEval;
+}
+
 interface AnalysisAccuracyEval {
   score: number;
   strengths: string[];

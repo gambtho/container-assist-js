@@ -1,13 +1,13 @@
-import { Success, Failure, type Result } from '@types';
+import { Success, Failure, type Result, type Tool } from '@types';
 import type { Logger } from 'pino';
 import type { ProgressReporter } from '@mcp/server/middleware';
 
 type WorkflowStep = {
   toolName: string;
-  parameters: any;
+  parameters: Record<string, unknown>;
   description?: string;
   required?: boolean;
-  condition?: (previousResults: any[]) => boolean;
+  condition?: (previousResults: Record<string, unknown>[]) => boolean;
 };
 
 type WorkflowContext = {
@@ -20,11 +20,11 @@ type WorkflowContext = {
 type WorkflowResult = {
   workflowType: string;
   completedSteps: string[];
-  results: any[];
+  results: Record<string, unknown>[];
   sessionId?: string | undefined;
   recommendations: string[];
   executionTime: number;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 };
 
 /**
@@ -39,11 +39,12 @@ type WorkflowResult = {
  */
 const planWorkflowSteps = async (
   workflowType: string,
-  params: any,
+  params: Record<string, unknown>,
   sessionId: string | undefined,
-  sessionManager: any,
+  sessionManager: { getState?: (sessionId: string) => Promise<{ completed_steps?: string[] }> },
 ): Promise<WorkflowStep[]> => {
-  const sessionState = sessionId ? await sessionManager.getState(sessionId) : undefined;
+  const sessionState =
+    sessionId && sessionManager.getState ? await sessionManager.getState(sessionId) : undefined;
 
   if (workflowType === 'containerization') {
     const steps: WorkflowStep[] = [];
@@ -78,7 +79,10 @@ const planWorkflowSteps = async (
           parameters: { ...params, sessionId },
           description: 'Scanning image for vulnerabilities',
           required: false,
-          condition: (results) => results[results.length - 1]?.imageId !== undefined,
+          condition: (results) => {
+            const lastResult = results[results.length - 1];
+            return lastResult?.imageId !== undefined;
+          },
         });
       }
 
@@ -88,7 +92,10 @@ const planWorkflowSteps = async (
           parameters: { ...params, sessionId },
           description: 'Pushing image to registry',
           required: false,
-          condition: (results) => results[results.length - 1]?.imageId !== undefined,
+          condition: (results) => {
+            const lastResult = results[results.length - 1];
+            return lastResult?.imageId !== undefined;
+          },
         });
       }
     }
@@ -144,7 +151,11 @@ const planWorkflowSteps = async (
         parameters: { ...params, sessionId },
         description: 'Fixing security issues in Dockerfile',
         required: false,
-        condition: (results) => results.some((r) => r.vulnerabilities?.length > 0),
+        condition: (results) =>
+          results.some((r) => {
+            const vulnerabilities = r.vulnerabilities;
+            return Array.isArray(vulnerabilities) && vulnerabilities.length > 0;
+          }),
       },
     ];
   }
@@ -184,10 +195,13 @@ const planWorkflowSteps = async (
 
 const executeWorkflowStep = async (
   step: WorkflowStep,
-  toolFactory: any,
+  toolFactory: {
+    getTool?: (toolName: string) => Tool;
+    [key: string]: Tool | ((toolName: string) => Tool) | undefined;
+  },
   context: WorkflowContext,
-  previousResults: any[],
-): Promise<Result<any>> => {
+  previousResults: Record<string, unknown>[],
+): Promise<Result<Record<string, unknown>>> => {
   const { logger } = context;
 
   // Check step condition
@@ -197,24 +211,42 @@ const executeWorkflowStep = async (
   }
 
   // Get tool from factory
-  const tool = toolFactory.getTool
-    ? toolFactory.getTool(step.toolName)
-    : toolFactory[step.toolName];
+  let tool: Tool | undefined;
+  if (toolFactory.getTool) {
+    tool = toolFactory.getTool(step.toolName);
+  } else {
+    const toolOrFunction = toolFactory[step.toolName];
+    if (typeof toolOrFunction === 'function') {
+      tool = toolOrFunction(step.toolName);
+    } else {
+      tool = toolOrFunction as Tool;
+    }
+  }
 
   if (!tool) {
     return Failure(`Tool not found: ${step.toolName}`);
   }
 
   // Execute with enhanced context if available
-  if (tool.executeEnhanced) {
-    return tool.executeEnhanced(step.parameters, context);
+  const toolWithEnhanced = tool as Tool & {
+    executeEnhanced?: (
+      params: Record<string, unknown>,
+      context: WorkflowContext,
+    ) => Promise<Result<Record<string, unknown>>>;
+  };
+  if (toolWithEnhanced.executeEnhanced) {
+    return toolWithEnhanced.executeEnhanced(step.parameters, context);
   }
 
   // Fallback to standard execution
-  return tool.execute(step.parameters, logger);
+  const result = await tool.execute(step.parameters, logger);
+  return result as Result<Record<string, unknown>>;
 };
 
-const generateWorkflowRecommendations = (workflowType: string, results: any[]): string[] => {
+const generateWorkflowRecommendations = (
+  workflowType: string,
+  results: Record<string, unknown>[],
+): string[] => {
   const recommendations: string[] = [];
 
   // General recommendations
@@ -223,7 +255,12 @@ const generateWorkflowRecommendations = (workflowType: string, results: any[]): 
 
   // Workflow-specific recommendations
   if (workflowType === 'containerization') {
-    if (results.some((r) => r.vulnerabilities?.length > 0)) {
+    if (
+      results.some((r) => {
+        const vulnerabilities = r.vulnerabilities;
+        return Array.isArray(vulnerabilities) && vulnerabilities.length > 0;
+      })
+    ) {
       recommendations.push('Address security vulnerabilities before deployment');
     }
     recommendations.push('Configure CI/CD pipeline for automated builds');
@@ -242,10 +279,16 @@ const generateWorkflowRecommendations = (workflowType: string, results: any[]): 
   }
 
   if (workflowType === 'optimization') {
-    const imageSizes = results.filter((r) => r.imageSize).map((r) => r.imageSize);
+    const imageSizes = results
+      .filter((r) => typeof r.imageSize === 'number')
+      .map((r) => r.imageSize as number);
     if (imageSizes.length > 1) {
-      const reduction = ((imageSizes[0] - imageSizes[imageSizes.length - 1]) / imageSizes[0]) * 100;
-      recommendations.push(`Image size reduced by ${reduction.toFixed(1)}% through optimization`);
+      const first = imageSizes[0];
+      const last = imageSizes[imageSizes.length - 1];
+      if (first && last && first > 0) {
+        const reduction = ((first - last) / first) * 100;
+        recommendations.push(`Image size reduced by ${reduction.toFixed(1)}% through optimization`);
+      }
     }
     recommendations.push('Consider using distroless images for further size reduction');
   }
@@ -255,25 +298,40 @@ const generateWorkflowRecommendations = (workflowType: string, results: any[]): 
 
 const updateSessionWithWorkflowProgress = async (
   sessionId: string,
-  sessionManager: any,
+  sessionManager: {
+    updateWorkflowProgress?: (
+      sessionId: string,
+      progress: Record<string, unknown>,
+    ) => Promise<void>;
+    addCompletedStep?: (sessionId: string, stepName: string) => Promise<void>;
+    storeStepResult?: (
+      sessionId: string,
+      stepName: string,
+      result: Record<string, unknown>,
+    ) => Promise<void>;
+  },
   step: number,
   totalSteps: number,
   stepName: string,
-  result: any,
+  result: Record<string, unknown>,
 ): Promise<void> => {
-  await sessionManager.updateWorkflowProgress(sessionId, {
-    step,
-    totalSteps,
-    currentStep: stepName,
-    result,
-    timestamp: new Date().toISOString(),
-  });
+  if (sessionManager.updateWorkflowProgress) {
+    await sessionManager.updateWorkflowProgress(sessionId, {
+      step,
+      totalSteps,
+      currentStep: stepName,
+      result,
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   // Store completed step
-  await sessionManager.addCompletedStep(sessionId, stepName);
+  if (sessionManager.addCompletedStep) {
+    await sessionManager.addCompletedStep(sessionId, stepName);
+  }
 
   // Store result if significant
-  if (result && !result.skipped) {
+  if (result && !result.skipped && sessionManager.storeStepResult) {
     await sessionManager.storeStepResult(sessionId, stepName, result);
   }
 };
@@ -283,11 +341,28 @@ const updateSessionWithWorkflowProgress = async (
  */
 export const executeWorkflow = async (
   workflowType: string,
-  params: any,
+  params: Record<string, unknown>,
   context: WorkflowContext,
-  toolFactory: any,
-  aiService?: any,
-  sessionManager?: any,
+  toolFactory: {
+    getTool?: (toolName: string) => Tool;
+    [key: string]: Tool | ((toolName: string) => Tool) | undefined;
+  },
+  aiService?: {
+    analyzeResults?: (params: Record<string, unknown>) => Promise<Result<{ nextSteps?: string[] }>>;
+  },
+  sessionManager?: {
+    getState?: (sessionId: string) => Promise<{ completed_steps?: string[] }>;
+    updateWorkflowProgress?: (
+      sessionId: string,
+      progress: Record<string, unknown>,
+    ) => Promise<void>;
+    addCompletedStep?: (sessionId: string, stepName: string) => Promise<void>;
+    storeStepResult?: (
+      sessionId: string,
+      stepName: string,
+      result: Record<string, unknown>,
+    ) => Promise<void>;
+  },
 ): Promise<Result<WorkflowResult>> => {
   const { sessionId, progressReporter, signal, logger } = context;
   const startTime = Date.now();
@@ -303,7 +378,7 @@ export const executeWorkflow = async (
 
     // Plan workflow steps
     void progressReporter?.({ progress: 5, message: 'Planning workflow steps...' });
-    const steps = await planWorkflowSteps(workflowType, params, sessionId, sessionManager);
+    const steps = await planWorkflowSteps(workflowType, params, sessionId, sessionManager || {});
 
     if (steps.length === 0) {
       return Failure(`No steps planned for workflow: ${workflowType}`);
@@ -318,13 +393,16 @@ export const executeWorkflow = async (
       'Workflow execution started',
     );
 
-    const results: any[] = [];
+    const results: Record<string, unknown>[] = [];
     const completedSteps: string[] = [];
 
     // Execute each step
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
-      if (!step) continue;
+      if (!step) {
+        logger.warn(`Step ${i} is undefined, skipping`);
+        continue;
+      }
       const progressPercent = 10 + (i / steps.length) * 80;
 
       void progressReporter?.({
@@ -388,7 +466,7 @@ export const executeWorkflow = async (
       }
 
       // Update session state if available
-      if (sessionId && sessionManager) {
+      if (sessionId && sessionManager?.updateWorkflowProgress) {
         await updateSessionWithWorkflowProgress(
           sessionId,
           sessionManager,
@@ -404,13 +482,13 @@ export const executeWorkflow = async (
 
     // Get final session state for recommendations
     const finalSessionState =
-      sessionId && sessionManager ? await sessionManager.getState(sessionId) : undefined;
+      sessionId && sessionManager?.getState ? await sessionManager.getState(sessionId) : undefined;
 
     // Generate recommendations
     const recommendations = generateWorkflowRecommendations(workflowType, results);
 
     // Add AI insights if available
-    if (aiService && sessionId) {
+    if (aiService?.analyzeResults && sessionId) {
       const aiAnalysis = await aiService.analyzeResults({
         toolName: 'workflow',
         parameters: { workflowType, ...params },
@@ -431,14 +509,14 @@ export const executeWorkflow = async (
       workflowType,
       completedSteps,
       results,
-      sessionId,
+      sessionId: sessionId ?? undefined,
       recommendations: [...new Set(recommendations)], // Remove duplicates
       executionTime,
       metadata: {
         totalSteps: steps.length,
         successfulSteps: completedSteps.length,
-        skippedSteps: results.filter((r) => r.skipped).length,
-        failedSteps: results.filter((r) => r.error).length,
+        skippedSteps: results.filter((r) => Boolean(r.skipped)).length,
+        failedSteps: results.filter((r) => Boolean(r.error)).length,
         aiEnhanced: !!aiService,
         sessionTracked: !!sessionId,
       },
@@ -465,11 +543,25 @@ export const executeWorkflow = async (
 };
 
 // Create a basic orchestrator for compatibility
-export function createMCPAIOrchestrator(logger: Logger, _options?: any) {
+export function createMCPAIOrchestrator(
+  logger: Logger,
+  _options?: Record<string, unknown>,
+): {
+  execute: typeof executeWorkflow;
+  validateParameters: (
+    _toolName: string,
+    _params: Record<string, unknown>,
+    _context?: Record<string, unknown>,
+  ) => Promise<Result<{ isValid: boolean; errors: string[]; warnings: string[] }>>;
+  logger: Logger;
+} {
   return {
     execute: executeWorkflow,
-    validateParameters: async (_toolName: string, _params: any, _context?: any) =>
-      Success({ isValid: true, errors: [], warnings: [] }),
+    validateParameters: async (
+      _toolName: string,
+      _params: Record<string, unknown>,
+      _context?: Record<string, unknown>,
+    ) => Success({ isValid: true, errors: [], warnings: [] }),
     logger,
   };
 }
@@ -478,8 +570,8 @@ export interface MCPAIOrchestrator {
   execute: typeof executeWorkflow;
   validateParameters: (
     toolName: string,
-    params: any,
-    context?: any,
+    params: Record<string, unknown>,
+    context?: Record<string, unknown>,
   ) => Promise<Result<{ isValid: boolean; errors: string[]; warnings: string[] }>>;
   logger: Logger;
 }

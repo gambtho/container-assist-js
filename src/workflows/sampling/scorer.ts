@@ -610,13 +610,15 @@ export class VariantScorer {
 
     // Apply constraints
     if (constraints) {
-      if (constraints.minScore) {
-        candidates = candidates.filter((v) => v.score.total >= constraints.minScore!);
+      if (constraints.minScore !== undefined) {
+        const minScore = constraints.minScore;
+        candidates = candidates.filter((v) => v.score.total >= minScore);
       }
 
-      if (constraints.mustHave) {
+      if (constraints.mustHave && constraints.mustHave.length > 0) {
+        const mustHave = constraints.mustHave;
         candidates = candidates.filter((v) =>
-          constraints.mustHave!.every(
+          mustHave.every(
             (feature) =>
               v.metadata.features.includes(feature) ||
               v.score.reasons.some((reason) =>
@@ -626,7 +628,7 @@ export class VariantScorer {
         );
       }
 
-      if (constraints.mustNotHave) {
+      if (constraints.mustNotHave && constraints.mustNotHave.length > 0) {
         candidates = candidates.filter(
           (v) =>
             !constraints.mustNotHave!.some(

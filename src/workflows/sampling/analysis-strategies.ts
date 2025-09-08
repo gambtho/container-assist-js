@@ -93,10 +93,16 @@ function computeScores(variant: AnalysisVariant): {
   };
 
   const bonus = perspectiveBonus[variant.perspective] || {};
-  accuracy += (bonus as any).accuracy || 0;
-  completeness += (bonus as any).completeness || 0;
-  relevance += (bonus as any).relevance || 0;
-  actionability += (bonus as any).actionability || 0;
+  const typedBonus = bonus as {
+    accuracy?: number;
+    completeness?: number;
+    relevance?: number;
+    actionability?: number;
+  };
+  accuracy += typedBonus.accuracy || 0;
+  completeness += typedBonus.completeness || 0;
+  relevance += typedBonus.relevance || 0;
+  actionability += typedBonus.actionability || 0;
 
   // Normalize to 0-100 scale
   return {
@@ -169,7 +175,12 @@ function identifyStrengths(variant: AnalysisVariant, scores: Record<string, numb
     strengths.push('Clear actionable recommendations provided');
   }
 
-  if (variant.security?.vulnerabilities?.length === 0) {
+  if (
+    variant.security &&
+    'vulnerabilities' in variant.security &&
+    Array.isArray(variant.security.vulnerabilities) &&
+    variant.security.vulnerabilities.length === 0
+  ) {
     strengths.push('No security vulnerabilities detected');
   }
 
@@ -211,7 +222,12 @@ function generateRecommendations(
     recommendations.push('Consider deeper analysis with increased depth parameter');
   }
 
-  if (variant.security?.vulnerabilities?.length > 0) {
+  if (
+    variant.security &&
+    'vulnerabilities' in variant.security &&
+    Array.isArray(variant.security.vulnerabilities) &&
+    variant.security.vulnerabilities.length > 0
+  ) {
     recommendations.push('Address identified security vulnerabilities before deployment');
   }
 
@@ -219,7 +235,7 @@ function generateRecommendations(
     recommendations.push('Define deployment environments and configurations');
   }
 
-  if (variant.perspective === 'performance' && !(variant as any).performance) {
+  if (variant.perspective === 'performance' && !('performance' in variant)) {
     recommendations.push('Add performance metrics and monitoring');
   }
 
@@ -241,8 +257,9 @@ export function createComprehensiveStrategy(logger: Logger): AnalysisStrategy {
       const result = await performBaseAnalysis(context, logger);
       if (!result.ok) return result;
 
+      const baseAnalysis = result.value;
       const variant: AnalysisVariant = {
-        ...(result.value as any),
+        ...(baseAnalysis as any),
         id: `comprehensive-${Date.now()}`,
         strategy: 'comprehensive',
         perspective: 'comprehensive',
@@ -256,7 +273,7 @@ export function createComprehensiveStrategy(logger: Logger): AnalysisStrategy {
         confidence: 85,
         completeness: 90,
         analysisTime: 0,
-        filesAnalyzed: (result.value as any).files?.length || 0,
+        filesAnalyzed: 0, // Will be set from actual file analysis
         generated: new Date(),
       };
 
@@ -283,7 +300,8 @@ export function createSecurityStrategy(logger: Logger): AnalysisStrategy {
       if (!result.ok) return result;
 
       // Enhance with security-specific checks
-      const analysis = { ...(result.value as any) };
+      const baseAnalysis = result.value;
+      const analysis: any = { ...baseAnalysis };
 
       // Check for common security issues
       if (!analysis.security) {
@@ -296,7 +314,8 @@ export function createSecurityStrategy(logger: Logger): AnalysisStrategy {
       // Add security-specific checks
       if (analysis.dependencies) {
         const outdated = analysis.dependencies.filter(
-          (d: any) => d.version && d.latestVersion && d.version !== d.latestVersion,
+          (d: { version?: string; latestVersion?: string }) =>
+            d.version && d.latestVersion && d.version !== d.latestVersion,
         );
         if (outdated.length > 0) {
           analysis.security.recommendations.push(`Update ${outdated.length} outdated dependencies`);
@@ -344,7 +363,8 @@ export function createPerformanceStrategy(logger: Logger): AnalysisStrategy {
       const result = await performBaseAnalysis(context, logger);
       if (!result.ok) return result;
 
-      const analysis = { ...(result.value as any) };
+      const baseAnalysis = result.value;
+      const analysis: any = { ...baseAnalysis };
 
       // Add performance-specific insights
       if (!analysis.performance) {
@@ -359,7 +379,7 @@ export function createPerformanceStrategy(logger: Logger): AnalysisStrategy {
         analysis.performance.buildOptimizations.push('Implement Docker layer caching');
       }
 
-      if (analysis.frameworks?.some((f: any) => f.name === 'Node.js')) {
+      if (analysis.frameworks?.some((f: { name: string }) => f.name === 'Node.js')) {
         analysis.performance.runtimeOptimizations.push('Use Alpine Linux for smaller image size');
         analysis.performance.runtimeOptimizations.push('Enable Node.js cluster mode');
       }
@@ -408,7 +428,8 @@ export function createArchitectureStrategy(logger: Logger): AnalysisStrategy {
       const result = await performBaseAnalysis(context, logger);
       if (!result.ok) return result;
 
-      const analysis = { ...(result.value as any) };
+      const baseAnalysis = result.value;
+      const analysis: any = { ...baseAnalysis };
 
       // Enhance with architecture insights
       if (!analysis.architecture) {
@@ -469,7 +490,8 @@ export function createDeploymentStrategy(logger: Logger): AnalysisStrategy {
       const result = await performBaseAnalysis(context, logger);
       if (!result.ok) return result;
 
-      const analysis = { ...(result.value as any) };
+      const baseAnalysis = result.value;
+      const analysis: any = { ...baseAnalysis };
 
       // Enhance with deployment insights
       if (!analysis.deployment) {
@@ -481,12 +503,14 @@ export function createDeploymentStrategy(logger: Logger): AnalysisStrategy {
       }
 
       // Add deployment recommendations
-      if (!analysis.files?.some((f: any) => f.path.includes('Dockerfile'))) {
+      if (!analysis.files?.some((f: { path: string }) => f.path.includes('Dockerfile'))) {
         analysis.deployment.recommendations.push('Create Dockerfile for containerization');
       }
 
       if (
-        !analysis.files?.some((f: any) => f.path.includes('k8s') || f.path.includes('kubernetes'))
+        !analysis.files?.some(
+          (f: { path: string }) => f.path.includes('k8s') || f.path.includes('kubernetes'),
+        )
       ) {
         analysis.deployment.recommendations.push('Add Kubernetes manifests for orchestration');
       }

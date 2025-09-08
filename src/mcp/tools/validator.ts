@@ -29,7 +29,7 @@ export interface ValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
-  suggestions?: Record<string, any>;
+  suggestions?: Record<string, unknown>;
   confidence: number;
   metadata: {
     validationTime: number;
@@ -42,10 +42,10 @@ export interface ValidationResult {
  * Parameter suggestions response compatible with MCP patterns
  */
 export interface ParameterSuggestions {
-  suggestions: Record<string, any>;
+  suggestions: Record<string, unknown>;
   confidence: number;
   reasoning: string;
-  alternatives: Record<string, any[]>;
+  alternatives: Record<string, unknown[]>;
   metadata: {
     generationTime: number;
     aiProvider: string;
@@ -72,7 +72,7 @@ export class AIParameterValidator {
    */
   async validateParameters(
     toolName: string,
-    parameters: Record<string, any>,
+    parameters: Record<string, unknown>,
     context?: ValidationContext,
   ): Promise<Result<ValidationResult>> {
     const startTime = Date.now();
@@ -113,14 +113,14 @@ export class AIParameterValidator {
    */
   async suggestParameters(
     toolName: string,
-    partialParameters: Record<string, any>,
+    partialParameters: Record<string, unknown>,
     context?: ValidationContext,
   ): Promise<Result<ParameterSuggestions>> {
     this.logger.info({ toolName }, 'AI parameter suggestions requested');
 
     try {
-      const suggestions: Record<string, any> = {};
-      const alternatives: Record<string, any[]> = {};
+      const suggestions: Record<string, unknown> = {};
+      const alternatives: Record<string, unknown[]> = {};
 
       // Basic suggestions based on tool requirements
       if (toolName === 'generate-dockerfile') {
@@ -209,7 +209,7 @@ export class AIParameterValidator {
    */
   private performBasicValidation(
     toolName: string,
-    parameters: Record<string, any>,
+    parameters: Record<string, unknown>,
     context?: ValidationContext,
   ): ValidationResult {
     const errors: string[] = [];
@@ -242,7 +242,11 @@ export class AIParameterValidator {
         errors.push('imageName is required for image building');
       }
       const dockerNameRegex = /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*$/;
-      if (parameters.imageName && !dockerNameRegex.test(parameters.imageName)) {
+      if (
+        parameters.imageName &&
+        typeof parameters.imageName === 'string' &&
+        !dockerNameRegex.test(parameters.imageName)
+      ) {
         errors.push('imageName must follow Docker naming conventions');
       }
     }
@@ -254,7 +258,11 @@ export class AIParameterValidator {
         if (context.securityLevel === 'basic') {
           warnings.push('Consider using enhanced or strict security level for production');
         }
-        if (parameters.replicas && parameters.replicas < 2) {
+        if (
+          parameters.replicas &&
+          typeof parameters.replicas === 'number' &&
+          parameters.replicas < 2
+        ) {
           warnings.push('Consider using multiple replicas for production deployments');
         }
       }
@@ -289,20 +297,25 @@ export class AIParameterValidator {
    */
   private async performAIValidation(
     toolName: string,
-    parameters: Record<string, any>,
+    parameters: Record<string, unknown>,
     context?: ValidationContext,
   ): Promise<Result<ValidationResult>> {
     try {
       // Use prompt registry for validation prompts
-      await this.promptRegistry!.getPrompt('parameter-validation', {
-        toolName,
-        parameters: JSON.stringify(parameters, null, 2),
-        context: context ? JSON.stringify(context, null, 2) : undefined,
-        validationRules: this.getValidationRules(toolName),
-      });
+      if (this.promptRegistry) {
+        await this.promptRegistry.getPrompt('parameter-validation', {
+          toolName,
+          parameters: JSON.stringify(parameters, null, 2),
+          context: context ? JSON.stringify(context, null, 2) : undefined,
+          validationRules: this.getValidationRules(toolName),
+        });
+      }
 
       // Submit to AI service for analysis
-      const aiResult = await this.aiAugmentationService!.analyzeResult(
+      if (!this.aiAugmentationService) {
+        return Failure('AI augmentation service not available');
+      }
+      const aiResult = await this.aiAugmentationService.analyzeResult(
         parameters,
         'general', // Use 'general' instead of 'validation'
         { toolName, context },
@@ -344,7 +357,11 @@ export class AIParameterValidator {
   /**
    * Parse AI validation result into ValidationResult format
    */
-  private parseAIValidationResult(aiResult: any): ValidationResult {
+  private parseAIValidationResult(aiResult: {
+    insights?: string[];
+    recommendations?: string[];
+    metadata?: { confidence?: number };
+  }): ValidationResult {
     const insights = aiResult.insights || [];
     const recommendations = aiResult.recommendations || [];
 

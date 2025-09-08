@@ -56,7 +56,7 @@ export async function generateBestDockerfile(
     const validationResult = await aiOrchestrator.validateParameters(
       'generateBestDockerfile',
       { ...config, ...options },
-      validationContext,
+      validationContext as unknown as Record<string, unknown>,
     );
 
     if (validationResult.ok && !validationResult.value.isValid) {

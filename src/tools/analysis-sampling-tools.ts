@@ -175,8 +175,8 @@ export async function analysisSamplingTool(
         recommendations: sampling.bestVariant.insights.keyFindings.concat(
           sampling.bestVariant.insights.deploymentReadiness,
         ),
-        ...(sampling.bestVariant.recommendations?.securityNotes && {
-          securityIssues: sampling.bestVariant.recommendations.securityNotes,
+        ...(sampling.bestVariant.recommendations && {
+          securityIssues: sampling.bestVariant.recommendations,
         }),
         score: sampling.bestVariant.score.total,
       },
@@ -240,6 +240,15 @@ export async function analysisCompareTool(
       id: `variant-${index}`,
       strategy: v.strategy,
       perspective: 'comprehensive' as const,
+      sessionId: config.sessionId,
+      language: v.analysis.language,
+      ...(v.analysis.framework && { framework: v.analysis.framework }),
+      dependencies: v.analysis.dependencies,
+      ports: [],
+      hasDockerfile: false,
+      hasDockerCompose: false,
+      hasKubernetes: false,
+      recommendations: v.analysis.recommendations,
       insights: {
         keyFindings: [],
         riskAssessments: [],
@@ -252,19 +261,6 @@ export async function analysisCompareTool(
       analysisTime: v.metadata?.executionTime ?? 0,
       filesAnalyzed: 10,
       generated: new Date(v.metadata?.timestamp ?? Date.now()),
-      // From AnalyzeRepoResult
-      ok: true,
-      sessionId: config.sessionId,
-      language: v.analysis.language,
-      ...(v.analysis.framework && { framework: v.analysis.framework }),
-      dependencies: v.analysis.dependencies,
-      ports: [],
-      hasDockerfile: false,
-      hasDockerCompose: false,
-      hasKubernetes: false,
-      recommendations: {
-        ...(v.analysis.securityIssues && { securityNotes: v.analysis.securityIssues }),
-      },
       metadata: {
         repoPath: '',
         depth: 1,
@@ -362,11 +358,7 @@ export async function analysisValidateTool(
       hasDockerfile: false,
       hasDockerCompose: false,
       hasKubernetes: false,
-      recommendations: {
-        ...(config.variant.analysis.securityIssues && {
-          securityNotes: config.variant.analysis.securityIssues,
-        }),
-      },
+      recommendations: config.variant.analysis.securityIssues || [],
       metadata: {
         repoPath: '',
         depth: 1,

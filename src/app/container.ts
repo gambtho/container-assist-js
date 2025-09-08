@@ -16,7 +16,7 @@ import {
 } from '@resources/manager';
 import { createSDKToolRegistry, type SDKToolRegistry } from '@mcp/tools/registry';
 import { AIAugmentationService } from '@lib/ai/ai-service';
-import type { MCPHostAI } from '@lib/mcp-host-ai';
+import { createMCPHostAI, type MCPHostAI } from '@lib/mcp-host-ai';
 import type { AIService } from '@types';
 import { createAppConfig, type AppConfig } from '@config/app-config';
 
@@ -111,11 +111,12 @@ export function createContainer(
       return createSDKResourceManager(resourceContext);
     })();
 
-  // Create AI services if enabled
-  const mcpHostAI = depsOverrides.mcpHostAI ?? configOverrides.ai?.mcpHostAI;
+  const mcpHostAI =
+    depsOverrides.mcpHostAI ?? configOverrides.ai?.mcpHostAI ?? createMCPHostAI(logger);
+
   const aiAugmentationService =
     depsOverrides.aiAugmentationService ??
-    (mcpHostAI ? new AIAugmentationService(mcpHostAI, promptRegistry, logger) : undefined);
+    new AIAugmentationService(mcpHostAI, promptRegistry, logger);
 
   // Create tool registry
   const toolRegistry =
@@ -128,8 +129,8 @@ export function createContainer(
     promptRegistry,
     resourceManager,
     toolRegistry,
-    ...(mcpHostAI && { mcpHostAI }),
-    ...(aiAugmentationService && { aiAugmentationService }),
+    mcpHostAI,
+    aiAugmentationService,
   };
 
   logger.info(
@@ -255,16 +256,21 @@ export function checkContainerHealth(deps: Deps): {
   services: Record<string, boolean>;
   details?: Record<string, unknown>;
 } {
-  const services = {
+  const requiredServices = {
     logger: deps.logger !== undefined,
     sessionManager: deps.sessionManager !== undefined,
     promptRegistry: deps.promptRegistry !== undefined,
     resourceManager: deps.resourceManager !== undefined,
     toolRegistry: deps.toolRegistry !== undefined,
-    aiAugmentationService: deps.aiAugmentationService !== undefined,
   };
 
-  const healthy = Object.values(services).every(Boolean);
+  const optionalServices = {
+    aiAugmentationService: deps.aiAugmentationService !== undefined,
+    mcpHostAI: deps.mcpHostAI !== undefined,
+  };
+
+  const services = { ...requiredServices, ...optionalServices };
+  const healthy = Object.values(requiredServices).every(Boolean);
 
   const details = {
     toolCount: deps.toolRegistry.tools.size,

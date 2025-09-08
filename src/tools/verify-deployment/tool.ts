@@ -6,7 +6,7 @@
  */
 
 import { createSessionManager } from '@lib/session';
-import { createKubernetesClient } from '@lib/kubernetes';
+import { createKubernetesClient, type KubernetesClient } from '@lib/kubernetes';
 import { createTimer, type Logger } from '@lib/logger';
 import { Success, Failure, type Result } from '@types';
 import { DEFAULT_TIMEOUTS } from '@config/defaults';
@@ -57,7 +57,7 @@ export interface VerifyDeploymentResult {
  * Check deployment health
  */
 async function checkDeploymentHealth(
-  k8sClient: any,
+  k8sClient: KubernetesClient,
   namespace: string,
   deploymentName: string,
   timeout: number,
@@ -159,10 +159,11 @@ export async function verifyDeployment(
     const sessionManager = createSessionManager(logger);
     const k8sClient = createKubernetesClient(logger);
 
-    // Get session
-    const session = await sessionManager.get(sessionId);
+    // Get or create session
+    let session = await sessionManager.get(sessionId);
     if (!session) {
-      return Failure('Session not found');
+      // Create new session with the specified sessionId
+      session = await sessionManager.create(sessionId);
     }
 
     // Get deployment info from session or config
@@ -229,15 +230,37 @@ export async function verifyDeployment(
           : 'unknown';
 
     // Update session with verification results
-    const sessionState = (session as any).workflow_state || {};
     const updatedWorkflowState = {
       sessionId: session.sessionId,
-      createdAt: session.createdAt || new Date(),
-      updatedAt: new Date(),
-      ...sessionState,
-      completed_steps: [...(sessionState.completed_steps || []), 'verify-deployment'],
+      currentStep: 'verify-deployment',
+      progress: 100,
+      results: {
+        ...session.results,
+        deployment_result: {
+          deploymentName,
+          namespace,
+          ready: health.ready,
+          readyReplicas: health.readyReplicas,
+          endpoints,
+          status: {
+            readyReplicas: health.readyReplicas,
+            totalReplicas: health.totalReplicas,
+            conditions: [
+              {
+                type: 'Available',
+                status: health.ready ? 'True' : 'False',
+                message: health.message,
+              },
+            ],
+          },
+        },
+      },
       metadata: {
-        ...(sessionState.metadata || {}),
+        ...session.metadata,
+        completed_steps: [
+          ...((session.metadata?.completed_steps as string[]) || []),
+          'verify-deployment',
+        ],
         verification_result: {
           namespace,
           deploymentName,

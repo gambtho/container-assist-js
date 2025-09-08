@@ -44,7 +44,11 @@ export function createToolProgressReporter(
     // Report to MCP server if available
     if (server && progressToken) {
       try {
-        await (server as any).sendNotification('notifications/progress', {
+        await (
+          server as unknown as {
+            sendNotification: (type: string, data: Record<string, unknown>) => Promise<void>;
+          }
+        ).sendNotification('notifications/progress', {
           progressToken: progressToken.id,
           progress: progressData.progress,
           total: 100,

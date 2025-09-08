@@ -36,10 +36,40 @@ export interface PrepareClusterResult {
   warnings?: string[];
 }
 
+interface K8sClientAdapter {
+  ping(): Promise<boolean>;
+  namespaceExists(namespace: string): Promise<boolean>;
+  applyManifest(
+    manifest: Record<string, unknown>,
+    namespace?: string,
+  ): Promise<{ success: boolean; error?: string }>;
+  checkIngressController(): Promise<boolean>;
+  checkPermissions(namespace: string): Promise<boolean>;
+}
+
+function createK8sClientAdapter(
+  k8sClient: ReturnType<typeof createKubernetesClient>,
+): K8sClientAdapter {
+  return {
+    ping: () => k8sClient.ping(),
+    namespaceExists: (namespace: string) => k8sClient.namespaceExists(namespace),
+    applyManifest: async (manifest: Record<string, unknown>, namespace?: string) => {
+      const result = await k8sClient.applyManifest(manifest, namespace);
+      if (result.ok) {
+        return { success: true };
+      } else {
+        return { success: false, error: result.error };
+      }
+    },
+    checkIngressController: () => k8sClient.checkIngressController(),
+    checkPermissions: (namespace: string) => k8sClient.checkPermissions(namespace),
+  };
+}
+
 /**
  * Check cluster connectivity
  */
-async function checkConnectivity(k8sClient: any, logger: Logger): Promise<boolean> {
+async function checkConnectivity(k8sClient: K8sClientAdapter, logger: Logger): Promise<boolean> {
   try {
     const connected = await k8sClient.ping();
     logger.debug({ connected }, 'Cluster connectivity check');
@@ -53,7 +83,11 @@ async function checkConnectivity(k8sClient: any, logger: Logger): Promise<boolea
 /**
  * Check namespace exists
  */
-async function checkNamespace(k8sClient: any, namespace: string, logger: Logger): Promise<boolean> {
+async function checkNamespace(
+  k8sClient: K8sClientAdapter,
+  namespace: string,
+  logger: Logger,
+): Promise<boolean> {
   try {
     const exists = await k8sClient.namespaceExists(namespace);
     logger.debug({ namespace, exists }, 'Checking namespace');
@@ -67,7 +101,11 @@ async function checkNamespace(k8sClient: any, namespace: string, logger: Logger)
 /**
  * Create namespace if needed
  */
-async function createNamespace(k8sClient: any, namespace: string, logger: Logger): Promise<void> {
+async function createNamespace(
+  k8sClient: K8sClientAdapter,
+  namespace: string,
+  logger: Logger,
+): Promise<void> {
   try {
     const namespaceManifest = {
       apiVersion: 'v1',
@@ -92,7 +130,11 @@ async function createNamespace(k8sClient: any, namespace: string, logger: Logger
 /**
  * Setup RBAC if needed
  */
-async function setupRbac(k8sClient: any, namespace: string, logger: Logger): Promise<void> {
+async function setupRbac(
+  k8sClient: K8sClientAdapter,
+  namespace: string,
+  logger: Logger,
+): Promise<void> {
   try {
     // Create service account
     const serviceAccount = {
@@ -118,7 +160,10 @@ async function setupRbac(k8sClient: any, namespace: string, logger: Logger): Pro
 /**
  * Check for ingress controller
  */
-async function checkIngressController(k8sClient: any, logger: Logger): Promise<boolean> {
+async function checkIngressController(
+  k8sClient: K8sClientAdapter,
+  logger: Logger,
+): Promise<boolean> {
   try {
     const hasIngress = await k8sClient.checkIngressController();
     logger.debug({ hasIngress }, 'Checking for ingress controller');
@@ -153,12 +198,14 @@ export async function prepareCluster(
 
     // Create lib instances
     const sessionManager = createSessionManager(logger);
-    const k8sClient = createKubernetesClient(logger);
+    const k8sClientRaw = createKubernetesClient(logger);
+    const k8sClient = createK8sClientAdapter(k8sClientRaw);
 
-    // Get session
-    const session = await sessionManager.get(sessionId);
+    // Get or create session
+    let session = await sessionManager.get(sessionId);
     if (!session) {
-      return Failure('Session not found');
+      // Create new session with the specified sessionId
+      session = await sessionManager.create(sessionId);
     }
 
     const warnings: string[] = [];

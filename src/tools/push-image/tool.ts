@@ -43,10 +43,11 @@ export async function pushImage(
     const sessionManager = createSessionManager(logger);
     const dockerClient = createDockerClient(logger);
 
-    // Get session using lib session manager
-    const session = await sessionManager.get(sessionId);
+    // Get or create session using lib session manager
+    let session = await sessionManager.get(sessionId);
     if (!session) {
-      return Failure('Session not found');
+      // Create new session with the specified sessionId
+      session = await sessionManager.create(sessionId);
     }
 
     const workflowState = session.workflow_state as

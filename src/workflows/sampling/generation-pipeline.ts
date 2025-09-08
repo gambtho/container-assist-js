@@ -29,7 +29,7 @@ export class VariantGenerationPipeline {
     promptRegistry?: PromptRegistry,
     aiOrchestrator?: MCPAIOrchestrator,
   ) {
-    this.strategyEngine = new StrategyEngine(logger, promptRegistry);
+    this.strategyEngine = new StrategyEngine(logger, promptRegistry ? {} : undefined);
     this.scorer = new VariantScorer(logger);
     this.aiOrchestrator =
       aiOrchestrator ||
@@ -46,7 +46,7 @@ export class VariantGenerationPipeline {
       // Step 0: AI-enhanced parameter validation
       const aiValidationResult = await this.aiOrchestrator.validateParameters(
         'dockerfile-sampling',
-        config,
+        config as unknown as Record<string, unknown>,
         {
           toolName: 'dockerfile-sampling',
           environment: config.environment || 'development',
