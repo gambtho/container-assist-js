@@ -22,6 +22,7 @@ import {
   parseInstructions,
 } from '../../lib/text-processing';
 import type { ToolContext } from '../../mcp/context/types';
+import type { ExtendedToolContext } from '../shared-types';
 
 /**
  * Configuration for Dockerfile generation
@@ -319,11 +320,19 @@ async function processDockerfileResponse(response: string): Promise<
   }>
 > {
   try {
+    console.error('[DEBUG] Raw AI response:', response);
+
     // Strip code fences and clean the response
     const cleaned = stripFencesAndNoise(response);
 
+    console.error('[DEBUG] Cleaned response:', cleaned);
+    console.error('[DEBUG] Response length:', cleaned.length);
+    console.error('[DEBUG] First 100 chars:', cleaned.substring(0, 100));
+
     // Validate Dockerfile format
     if (!isValidDockerfileContent(cleaned)) {
+      console.error('[DEBUG] Validation failed - no FROM instruction found');
+      console.error('[DEBUG] Full cleaned content:', cleaned);
       throw new Error('Invalid Dockerfile format - missing FROM instruction');
     }
 
@@ -477,7 +486,7 @@ ${options.customInstructions}
 export async function generateDockerfile(
   config: GenerateDockerfileConfig,
   logger: Logger,
-  context?: ToolContext,
+  context?: ExtendedToolContext,
 ): Promise<Result<GenerateDockerfileResult>> {
   const timer = createTimer(logger, 'generate-dockerfile');
 
@@ -487,25 +496,72 @@ export async function generateDockerfile(
     logger.info({ sessionId, optimization, multistage }, 'Generating Dockerfile');
 
     // Create lib instances
-    const sessionManager = createSessionManager(logger);
+    const sharedSessionManager =
+      context && 'sessionManager' in context ? context.sessionManager : null;
+    logger.info(
+      {
+        sessionId,
+        hasContext: !!context,
+        hasSharedSessionManager: !!sharedSessionManager,
+        contextKeys: context ? Object.keys(context) : [],
+      },
+      'Session manager setup for generate-dockerfile',
+    );
+    const sessionManager = sharedSessionManager || createSessionManager(logger);
 
     // Get or create session
-    let session = await sessionManager.get(sessionId);
+    const session = await sessionManager.get(sessionId);
+    logger.info(
+      {
+        sessionId,
+        sessionExists: !!session,
+        sessionType: typeof session,
+        sessionKeys: session ? Object.keys(session) : [],
+        hasAnalysisResult: !!(session as any)?.analysis_result,
+        analysisLanguage: (session as any)?.analysis_result?.language,
+      },
+      'Retrieved session in generate-dockerfile',
+    );
+
     if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
+      // Don't create a new session - analyze-repo must be run first
+      logger.error({ sessionId }, 'No session found - analyze-repo must be run first');
+      return Failure(
+        `Session ${sessionId} not found. You must run analyze-repo first with the same sessionId.`,
+      );
     }
 
-    // Get analysis result from session
-    const workflowState = session.workflow_state as
-      | {
-          analysis_result?: RepoAnalysis;
-        }
-      | null
-      | undefined;
+    // Get analysis result from session (it's directly on the WorkflowState)
+    const workflowState = session as WorkflowState & {
+      analysis_result?: RepoAnalysis;
+    };
     const analysisResult = workflowState?.analysis_result;
+
+    logger.info(
+      {
+        sessionId,
+        hasWorkflowState: !!workflowState,
+        workflowStateKeys: workflowState ? Object.keys(workflowState) : [],
+        hasAnalysisResult: !!analysisResult,
+        analysisResultKeys: analysisResult ? Object.keys(analysisResult) : [],
+        language: analysisResult?.language,
+        framework: analysisResult?.framework,
+      },
+      'Analysis result check',
+    );
+
     if (!analysisResult) {
-      return Failure('Repository must be analyzed first - run analyze_repo');
+      logger.error(
+        {
+          sessionId,
+          sessionKeys: session ? Object.keys(session) : [],
+          sessionData: JSON.stringify(session, null, 2),
+        },
+        'No analysis result found in session',
+      );
+      return Failure(
+        `Repository must be analyzed first. Please run 'analyze-repo' with sessionId '${sessionId}' and repoPath before running 'generate-dockerfile'. Alternatively, use the 'containerization' workflow which handles the complete pipeline automatically.`,
+      );
     }
 
     // Generate Dockerfile content - try AI first if context available, then fallback
@@ -515,17 +571,19 @@ export async function generateDockerfile(
       baseImage: string | null;
       instructions: Array<{ instruction: string; content: string }>;
     }>;
+    const isToolContext = context && 'sampling' in context && 'getPrompt' in context;
 
-    if (context) {
+    if (isToolContext && context) {
       // Try AI generation using new ToolContext pattern
       try {
         logger.debug('Using AI-enhanced Dockerfile generation with ToolContext');
+        const toolContext = context as ToolContext;
 
         // 1. Build normalized arguments
         const argsFromAnalysis = buildArgsFromAnalysis(analysisResult);
 
         // 2. Get prompt with arguments
-        const { description, messages } = await context.getPrompt(
+        const { description, messages } = await toolContext.getPrompt(
           'generate-dockerfile',
           argsFromAnalysis,
         );
@@ -540,7 +598,7 @@ export async function generateDockerfile(
         );
 
         // 3. Single sampling call with proper configuration
-        const response = await context.sampling.createMessage({
+        const response = await toolContext.sampling.createMessage({
           messages,
           includeContext: 'thisServer',
           modelPreferences: {
@@ -552,12 +610,27 @@ export async function generateDockerfile(
 
         // Extract text from response content array
         const responseText = response.content
-          .filter((c) => c.type === 'text')
-          .map((c) => c.text)
+          .filter((c: { type: string; text?: string }) => c.type === 'text')
+          .map((c: { type: string; text?: string }) => c.text || '')
           .join('\n')
           .trim();
 
-        logger.debug({ responseLength: responseText.length }, 'Received AI response');
+        logger.debug(
+          {
+            responseLength: responseText.length,
+            responsePreview: responseText.substring(0, 200),
+            hasContent: !!responseText,
+            contentType: typeof response.content,
+            contentLength: response.content?.length,
+          },
+          'Received AI response',
+        );
+
+        // Check if the response is an error message from sampling or empty
+        if (!responseText || responseText.startsWith('Sampling failed:')) {
+          logger.warn('AI response was empty or failed, using fallback');
+          throw new Error(`AI sampling failed or empty: ${responseText || 'no content'}`);
+        }
 
         // 4. Process response
         dockerfileResult = await processDockerfileResponse(responseText);
@@ -585,7 +658,7 @@ export async function generateDockerfile(
 
     // Store AI generation info in workflow state
     if (aiUsed) {
-      const currentWorkflowState = session.workflow_state as WorkflowState | undefined;
+      const currentWorkflowState = session as WorkflowState | undefined;
       const updatedContext = updateWorkflowState(currentWorkflowState ?? {}, {
         metadata: {
           ...(currentWorkflowState?.metadata ?? {}),
@@ -619,7 +692,7 @@ export async function generateDockerfile(
     }
 
     // Update session with Dockerfile result
-    const currentState = session.workflow_state as WorkflowState | undefined;
+    const currentState = session as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       dockerfile_result: {
         content: processedContent,

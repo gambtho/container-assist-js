@@ -6,6 +6,7 @@
  */
 
 import { createSessionManager } from '../../lib/session';
+import type { ExtendedToolContext } from '../shared-types';
 import { createTimer, type Logger } from '../../lib/logger';
 import { getRecommendedBaseImage } from '../../lib/base-images';
 import {
@@ -212,7 +213,7 @@ async function applyRuleBasedFixes(
 async function fixDockerfile(
   config: FixDockerfileConfig,
   logger: Logger,
-  context?: ToolContext,
+  context?: ExtendedToolContext,
 ): Promise<Result<FixDockerfileResult>> {
   const timer = createTimer(logger, 'fix-dockerfile');
 
@@ -221,8 +222,10 @@ async function fixDockerfile(
 
     logger.info({ sessionId, hasContext: !!context }, 'Starting Dockerfile fix');
 
-    // Create lib instances
-    const sessionManager = createSessionManager(logger);
+    // Create lib instances - use shared sessionManager from context if available
+    const sessionManager =
+      (context && 'sessionManager' in context && context.sessionManager) ||
+      createSessionManager(logger);
 
     // Get or create session
     let session = await sessionManager.get(sessionId);
@@ -245,9 +248,8 @@ async function fixDockerfile(
     const buildError = error ?? buildResult?.error;
 
     // Get analysis context
-    const analysisResult = (session.workflow_state as WorkflowState)?.analysis_result as
-      | { language?: string; framework?: string }
-      | undefined;
+    const analysisResult = (session as WorkflowState & { analysis_result?: unknown })
+      ?.analysis_result as { language?: string; framework?: string } | undefined;
     const language = analysisResult?.language;
     const framework = analysisResult?.framework;
 
@@ -257,9 +259,11 @@ async function fixDockerfile(
     let fixes: string[] = [];
     let aiUsed = false;
     let generationMethod: 'AI' | 'fallback' = 'fallback';
+    const isToolContext = context && 'sampling' in context && 'getPrompt' in context;
 
     // Try AI-enhanced fix if context is available
-    if (context) {
+    if (isToolContext && context) {
+      const toolContext = context as ToolContext;
       const aiResult = await attemptAIFix(
         dockerfileToFix,
         buildError,
@@ -267,7 +271,7 @@ async function fixDockerfile(
         language,
         framework,
         undefined, // Could include analysis summary in future
-        context,
+        toolContext,
         logger,
       );
 
@@ -300,7 +304,7 @@ async function fixDockerfile(
     }
 
     // Update session with fixed Dockerfile
-    const currentState = session.workflow_state as WorkflowState | undefined;
+    const currentState = session as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       dockerfile_result: {
         content: fixedDockerfile,

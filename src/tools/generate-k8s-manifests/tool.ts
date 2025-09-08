@@ -8,6 +8,7 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../../lib/session';
+import type { ExtendedToolContext } from '../shared-types';
 import { createTimer, type Logger } from '../../lib/logger';
 import {
   Success,
@@ -600,7 +601,7 @@ function generateWarnings(config: GenerateK8sManifestsConfig): string[] {
 export async function generateK8sManifests(
   config: GenerateK8sManifestsConfig,
   logger: Logger,
-  context?: ToolContext,
+  context?: ExtendedToolContext,
 ): Promise<Result<GenerateK8sManifestsResult>> {
   const timer = createTimer(logger, 'generate-k8s-manifests');
 
@@ -615,7 +616,9 @@ export async function generateK8sManifests(
     logger.info({ sessionId, appName, namespace, environment }, 'Generating Kubernetes manifests');
 
     // Create lib instances
-    const sessionManager = createSessionManager(logger);
+    const sessionManager =
+      (context && 'sessionManager' in context && context.sessionManager) ||
+      createSessionManager(logger);
 
     // Get or create session
     let session = await sessionManager.get(sessionId);
@@ -625,10 +628,7 @@ export async function generateK8sManifests(
     }
 
     // Get build result from session for image tag
-    const workflowState = session.workflow_state as
-      | { build_result?: { tags?: string[] } }
-      | null
-      | undefined;
+    const workflowState = session as { build_result?: { tags?: string[] } } | null | undefined;
     const buildResult = workflowState?.build_result;
     const image = config.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
 
@@ -636,10 +636,12 @@ export async function generateK8sManifests(
     let manifests: K8sResource[];
     let aiGenerated = false;
 
+    const isToolContext = context && 'sampling' in context && 'getPrompt' in context;
     try {
-      if (context) {
+      if (isToolContext && context) {
         logger.debug('Using AI-enhanced K8s manifest generation');
-        manifests = await generateAIK8sManifests(config, context, logger, image);
+        const toolContext = context as ToolContext;
+        manifests = await generateAIK8sManifests(config, toolContext, logger, image);
         aiGenerated = manifests.length > 0;
       } else {
         logger.debug('Using basic K8s manifest generation (no AI context)');
@@ -671,7 +673,7 @@ export async function generateK8sManifests(
 
     // Store AI generation info in workflow state
     if (aiGenerated) {
-      const currentState = session.workflow_state as WorkflowState | undefined;
+      const currentState = session as WorkflowState | undefined;
       const updatedContext = updateWorkflowState(currentState ?? {}, {
         metadata: {
           ...(currentState?.metadata ?? {}),
@@ -699,7 +701,7 @@ export async function generateK8sManifests(
     const warnings = generateWarnings(config);
 
     // Update session with K8s manifests
-    const currentState = session.workflow_state as WorkflowState | undefined;
+    const currentState = session as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       k8s_result: {
         manifests: resourceList.map((r) => ({

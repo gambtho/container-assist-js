@@ -74,7 +74,7 @@ async function resolveBaseImages(
     }
 
     // Get analysis result from session
-    const workflowState = session.workflow_state as
+    const workflowState = session as
       | {
           analysis_result?: { language?: string; framework?: string };
         }
@@ -138,7 +138,7 @@ async function resolveBaseImages(
     };
 
     // Update session with recommendation
-    const currentState = session.workflow_state as WorkflowState | undefined;
+    const currentState = session as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       completed_steps: [...(currentState?.completed_steps ?? []), 'resolve-base-images'],
       metadata: {

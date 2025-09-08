@@ -24,6 +24,7 @@ import { promises as fs } from 'node:fs';
 import { createSessionManager } from '../../lib/session';
 import { getRecommendedBaseImage } from '../../lib/base-images';
 import type { ToolContext } from '../../mcp/context/types';
+import type { ExtendedToolContext } from '../shared-types';
 import { createTimer, type Logger } from '../../lib/logger';
 import {
   Success,
@@ -376,7 +377,7 @@ function getSecurityRecommendations(
 export async function analyzeRepo(
   config: AnalyzeRepoConfig,
   logger: Logger,
-  context?: ToolContext,
+  context?: ExtendedToolContext,
 ): Promise<Result<AnalyzeRepoResult>> {
   const timer = createTimer(logger, 'analyze-repo');
 
@@ -392,16 +393,38 @@ export async function analyzeRepo(
       return Failure(validation.error ?? 'Invalid repository path');
     }
 
-    // Create lib instances
-    const sessionManager = createSessionManager(logger);
+    // Create lib instances - use shared sessionManager from context if available
+    const sharedSessionManager =
+      context && 'sessionManager' in context ? context.sessionManager : null;
+    logger.info(
+      {
+        sessionId,
+        hasContext: !!context,
+        hasSharedSessionManager: !!sharedSessionManager,
+        contextKeys: context ? Object.keys(context) : [],
+      },
+      'Session manager setup',
+    );
+    const sessionManager = sharedSessionManager || createSessionManager(logger);
 
     // AI enhancement available through context parameter
+    const isToolContext = context && 'sampling' in context && 'getPrompt' in context;
 
     // Get or create session
-    const session = await sessionManager.get(sessionId);
+    let session = await sessionManager.get(sessionId);
+    logger.info(
+      {
+        sessionId,
+        sessionExists: !!session,
+        sessionKeys: session ? Object.keys(session) : [],
+      },
+      'Retrieved session state',
+    );
+
     if (!session) {
       // Create new session
-      await sessionManager.create(sessionId);
+      logger.info({ sessionId }, 'Creating new session');
+      session = await sessionManager.create(sessionId);
     }
 
     // Perform analysis
@@ -414,11 +437,12 @@ export async function analyzeRepo(
 
     // Get AI insights using ToolContext if available
     let aiInsights: string | undefined;
-    if (context) {
+    if (isToolContext && context) {
       try {
         logger.debug('Using AI to enhance repository analysis');
+        const toolContext = context as ToolContext;
 
-        const { description, messages } = await context.getPrompt('enhance-repo-analysis', {
+        const { description, messages } = await toolContext.getPrompt('enhance-repo-analysis', {
           language: languageInfo.language,
           framework: frameworkInfo?.framework,
           buildSystem: buildSystemRaw?.type,
@@ -438,7 +462,7 @@ export async function analyzeRepo(
 
         logger.debug({ description, messageCount: messages.length }, 'Got prompt from registry');
 
-        const aiResponse = await context.sampling.createMessage({
+        const aiResponse = await toolContext.sampling.createMessage({
           messages,
           includeContext: 'thisServer',
           modelPreferences: { hints: [{ name: 'analysis' }] },
@@ -446,8 +470,10 @@ export async function analyzeRepo(
         });
 
         const responseText = aiResponse.content
-          .filter((c) => c.type === 'text' && typeof c.text === 'string')
-          .map((c) => c.text)
+          .filter(
+            (c: { type: string; text?: string }) => c.type === 'text' && typeof c.text === 'string',
+          )
+          .map((c: { type: string; text?: string }) => c.text || '')
           .join('\n')
           .trim();
 
@@ -543,7 +569,30 @@ export async function analyzeRepo(
       completed_steps: [...(currentState?.completed_steps ?? []), 'analyze-repo'],
     });
 
+    logger.info(
+      {
+        sessionId,
+        analysisResultKeys: Object.keys(updatedWorkflowState.analysis_result || {}),
+        completedSteps: updatedWorkflowState.completed_steps,
+      },
+      'Updating session with analysis result',
+    );
+
     await sessionManager.update(sessionId, updatedWorkflowState);
+
+    // Verify the update
+    const verifySession = await sessionManager.get(sessionId);
+    logger.info(
+      {
+        sessionId,
+        updateSuccessful: !!verifySession,
+        hasAnalysisResult: !!(verifySession as any)?.analysis_result,
+        analysisLanguage: (verifySession as any)?.analysis_result?.language,
+        verifySessionKeys: verifySession ? Object.keys(verifySession) : [],
+        isSharedManager: !!sharedSessionManager,
+      },
+      'Verified session update',
+    );
 
     // Apply perspective enhancement if requested
     if (config.usePerspectives) {

@@ -107,10 +107,7 @@ export async function scanImage(
       session = await sessionManager.create(sessionId);
     }
 
-    const workflowState = session.workflow_state as
-      | { build_result?: { imageId?: string } }
-      | null
-      | undefined;
+    const workflowState = session as { build_result?: { imageId?: string } } | null | undefined;
     const buildResult = workflowState?.build_result;
 
     if (!buildResult?.imageId) {
@@ -209,7 +206,7 @@ export async function scanImage(
 
     await reportProgress('Updating scan results', 80);
     // Update session with scan results
-    const currentState = session.workflow_state as WorkflowState | undefined;
+    const currentState = session as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       scan_result: {
         success: passed,

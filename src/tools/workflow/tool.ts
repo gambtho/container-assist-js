@@ -6,6 +6,7 @@
  */
 
 import { createSessionManager } from '../../lib/session';
+import type { ExtendedToolContext } from '../shared-types';
 import { createTimer, type Logger } from '../../lib/logger';
 import { Success, Failure, type Result, type Tool } from '../../domain/types';
 
@@ -155,7 +156,6 @@ import { generateK8sManifestsTool } from '@tools/generate-k8s-manifests';
 import { verifyDeploymentTool } from '@tools/verify-deployment';
 
 // Import proper ToolContext from MCP middleware since that's what deploy tool uses
-import type { ToolContext } from '@mcp/server/middleware';
 
 // Define ResolveBaseImagesContext interface locally
 interface ResolveBaseImagesContext {
@@ -182,12 +182,20 @@ const toolMap: Record<string, Tool> = {
   'build-image': {
     name: 'build-image',
     execute: (params: Record<string, unknown>, logger: Logger, context?: unknown) =>
-      buildImageTool.execute(castParams(params), logger, context as ToolContext | undefined),
+      buildImageTool.execute(
+        castParams(params),
+        logger,
+        context as Parameters<typeof buildImageTool.execute>[2],
+      ),
   },
   'scan-image': {
     name: 'scan-image',
     execute: (params: Record<string, unknown>, logger: Logger, context?: unknown) =>
-      scanImageTool.execute(castParams(params), logger, context as ToolContext | undefined),
+      scanImageTool.execute(
+        castParams(params),
+        logger,
+        context as Parameters<typeof scanImageTool.execute>[2],
+      ),
   },
   'push-image': {
     name: 'push-image',
@@ -221,7 +229,11 @@ const toolMap: Record<string, Tool> = {
   deploy: {
     name: 'deploy',
     execute: (params: Record<string, unknown>, logger: Logger, context?: unknown) =>
-      deployApplicationTool.execute(castParams(params), logger, context as ToolContext | undefined),
+      deployApplicationTool.execute(
+        castParams(params),
+        logger,
+        context as Parameters<typeof deployApplicationTool.execute>[2],
+      ),
   },
   'generate-k8s-manifests': {
     name: 'generate-k8s-manifests',
@@ -322,6 +334,7 @@ async function executeStep(
 async function workflow(
   config: WorkflowToolConfig,
   logger: Logger,
+  context?: ExtendedToolContext,
 ): Promise<Result<WorkflowToolResult>> {
   const timer = createTimer(logger, 'workflow');
   const startedAt = new Date().toISOString();
@@ -329,8 +342,10 @@ async function workflow(
   try {
     const { repoPath, workflowType = 'full', automated = false, options = {} } = config;
 
-    // Create or get session
-    const sessionManager = createSessionManager(logger);
+    // Create or get session - use shared sessionManager from context if available
+    const sessionManager =
+      (context && 'sessionManager' in context && context.sessionManager) ||
+      createSessionManager(logger);
     let sessionId = config.sessionId;
 
     if (!sessionId) {
@@ -535,6 +550,7 @@ async function getWorkflowStatus(
  */
 export const workflowTool = {
   name: 'workflow',
-  execute: (config: WorkflowToolConfig, logger: Logger) => workflow(config, logger),
+  execute: (config: WorkflowToolConfig, logger: Logger, context?: ExtendedToolContext) =>
+    workflow(config, logger, context),
   getStatus: (sessionId: string, logger: Logger) => getWorkflowStatus(sessionId, logger),
 };

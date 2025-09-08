@@ -105,6 +105,13 @@ export async function runContainerizationWorkflow(
       throw new Error('Workflow aborted before start');
     }
 
+    // Create or get session
+    let session = await sessionManager.get(sessionId);
+    if (!session) {
+      logger.info({ sessionId }, 'Creating new session for containerization workflow');
+      session = await sessionManager.create(sessionId);
+    }
+
     // Update session
     await sessionManager.update(sessionId, {
       status: 'analyzing',
