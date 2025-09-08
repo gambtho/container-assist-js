@@ -7,11 +7,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import type { Logger } from 'pino';
 import type { ToolContext, SamplingResponse } from '../context/types';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { type Tool } from '../../domain/types';
 import { analyzeRepoSchema } from '../../tools/analyze-repo/schema';
 import { generateDockerfileSchema } from '../../tools/generate-dockerfile/schema';
 import { buildImageSchema } from '../../tools/build-image/schema';
@@ -186,29 +184,16 @@ export class MCPServer {
       const zodSchema = zodToolSchemas[name as keyof typeof zodToolSchemas];
       const schemaShape = zodSchema?.shape || {};
 
-      // Also register with toolRegistry for compatibility with existing code
-      const toolFunction = toolFunctions[name as keyof typeof toolFunctions];
-      if (toolFunction) {
-        const toolObject: Tool = {
-          name,
-          description: `${name} tool`,
-          execute: async (params: any, logger: Logger, context?: any) => {
-            // Ensure context includes the shared sessionManager
-            const fullContext = {
-              sessionManager: this.deps.sessionManager,
-              promptRegistry: this.deps.promptRegistry,
-              deps: this.deps,
-              ...context,
-            };
-            return await toolFunction(params, logger, fullContext);
-          },
-        };
-        this.deps.toolRegistry.registerTool(toolObject);
-      }
-
       // Use the SDK's tool() method with Zod shape (SDK handles conversion)
       this.server.tool(name, `${name} tool`, schemaShape, async (params: any) => {
-        this.deps.logger.info({ tool: name }, 'Executing tool via McpServer handler');
+        this.deps.logger.info(
+          {
+            tool: name,
+            hasSharedSessionManager: !!this.deps.sessionManager,
+            sessionManagerType: typeof this.deps.sessionManager,
+          },
+          'Executing tool via McpServer handler',
+        );
 
         try {
           // Ensure sessionId is provided - generate a unique one if missing
@@ -279,21 +264,43 @@ export class MCPServer {
             },
             async getPrompt(name: string, args?: Record<string, unknown>) {
               const prompt = await deps.promptRegistry.getPrompt(name, args || {});
+
+              // Extract text from the content object
+              const messageContent = prompt.messages[0]?.content;
+              let textContent = '';
+
+              if (typeof messageContent === 'string') {
+                textContent = messageContent;
+              } else if (
+                messageContent &&
+                typeof messageContent === 'object' &&
+                'text' in messageContent
+              ) {
+                textContent = String(messageContent.text);
+              } else {
+                deps.logger.warn({ messageContent }, 'Unexpected message content format');
+                textContent = JSON.stringify(messageContent);
+              }
+
               return {
                 description: prompt.description ?? 'Generated prompt',
                 messages: [
                   {
                     role: 'user',
-                    content: [
-                      { type: 'text', text: prompt.messages[0]?.content?.toString() || '' },
-                    ],
+                    content: [{ type: 'text', text: textContent }],
                   },
                 ],
               };
             },
           };
 
-          const result = await toolFunction(params, this.deps.logger, context);
+          // Add sessionManager to the context so tools can share session state
+          const extendedContext = {
+            ...context,
+            sessionManager: this.deps.sessionManager,
+          };
+
+          const result = await toolFunction(params, this.deps.logger, extendedContext);
 
           if ('ok' in result) {
             if (result.ok) {
@@ -334,8 +341,8 @@ export class MCPServer {
     }
 
     this.deps.logger.info(
-      { count: this.deps.toolRegistry.tools.size },
-      'Tools registered with McpServer',
+      { count: Object.keys(toolSchemas).length - 2 }, // -2 for containerization and deployment workflows
+      'Tools registered with McpServer SDK',
     );
   }
 
@@ -482,27 +489,6 @@ export class MCPServer {
   }
 
   /**
-   * Register a tool with Zod schema
-   */
-  public registerTool<T extends z.ZodType>(
-    name: string,
-    schema: T,
-    handler: (params: z.infer<T>, logger: Logger) => Promise<any>,
-  ): void {
-    const tool: Tool = {
-      name,
-      description: `${name} tool`,
-      execute: async (params: any, logger: Logger) => {
-        const validated = schema.parse(params);
-        return await handler(validated, logger);
-      },
-    };
-
-    this.deps.toolRegistry.registerTool(tool);
-    this.deps.logger.info({ tool: name }, 'Tool registered with Zod schema');
-  }
-
-  /**
    * Start the server
    */
   async start(): Promise<void> {
@@ -590,10 +576,15 @@ export class MCPServer {
    * Get list of available tools with their descriptions
    */
   getTools(): Array<{ name: string; description: string }> {
-    return this.deps.toolRegistry.getAllTools().map((tool) => ({
-      name: tool.name,
-      description: tool.description || `${tool.name} tool`,
+    const tools = Object.keys(toolSchemas).map((name) => ({
+      name,
+      description: `${name} tool`,
     }));
+
+    // Add workflow tools
+    const workflowTools = this.getWorkflows();
+
+    return [...tools, ...workflowTools];
   }
 
   /**

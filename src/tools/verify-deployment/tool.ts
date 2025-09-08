@@ -6,6 +6,7 @@
  */
 
 import { createSessionManager } from '../../lib/session';
+import type { ExtendedToolContext } from '../shared-types';
 import { createKubernetesClient, type KubernetesClient } from '../../lib/kubernetes';
 import { createTimer, type Logger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
@@ -141,6 +142,7 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
 export async function verifyDeployment(
   config: VerifyDeploymentConfig,
   logger: Logger,
+  context?: ExtendedToolContext,
 ): Promise<Result<VerifyDeploymentResult>> {
   const timer = createTimer(logger, 'verify-deployment');
 
@@ -155,8 +157,10 @@ export async function verifyDeployment(
 
     logger.info({ sessionId }, 'Starting deployment verification');
 
-    // Create lib instances
-    const sessionManager = createSessionManager(logger);
+    // Create lib instances - use shared sessionManager from context if available
+    const sessionManager =
+      (context && 'sessionManager' in context && context.sessionManager) ||
+      createSessionManager(logger);
     const k8sClient = createKubernetesClient(logger);
 
     // Get or create session
@@ -167,8 +171,7 @@ export async function verifyDeployment(
     }
 
     // Get deployment info from session or config
-    const deploymentResult = (session.workflow_state as { deployment_result?: unknown })
-      ?.deployment_result as
+    const deploymentResult = (session as { deployment_result?: unknown })?.deployment_result as
       | {
           namespace?: string;
           deploymentName?: string;

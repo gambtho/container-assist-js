@@ -6,6 +6,7 @@
  */
 
 import { createSessionManager } from '../../lib/session';
+import type { ExtendedToolContext } from '../shared-types';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, type Logger } from '../../lib/logger';
 import {
@@ -34,6 +35,7 @@ export interface TagImageResult {
 export async function tagImage(
   config: TagImageConfig,
   logger: Logger,
+  context?: ExtendedToolContext,
 ): Promise<Result<TagImageResult>> {
   const timer = createTimer(logger, 'tag-image');
 
@@ -42,8 +44,10 @@ export async function tagImage(
 
     logger.info({ sessionId, tag }, 'Starting image tagging');
 
-    // Create lib instances
-    const sessionManager = createSessionManager(logger);
+    // Create lib instances - use shared sessionManager from context if available
+    const sessionManager =
+      (context && 'sessionManager' in context && context.sessionManager) ||
+      createSessionManager(logger);
     const dockerClient = createDockerClient(logger);
 
     // Get session using lib session manager
@@ -114,5 +118,6 @@ export async function tagImage(
  */
 export const tagImageTool = {
   name: 'tag',
-  execute: (config: TagImageConfig, logger: Logger) => tagImage(config, logger),
+  execute: (config: TagImageConfig, logger: Logger, context?: ExtendedToolContext) =>
+    tagImage(config, logger, context),
 };

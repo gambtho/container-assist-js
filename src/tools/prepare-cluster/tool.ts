@@ -6,6 +6,7 @@
  */
 
 import { createSessionManager } from '../../lib/session';
+import type { ExtendedToolContext } from '../shared-types';
 import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, type Logger } from '../../lib/logger';
 import { Success, Failure, type Result, type WorkflowState } from '../../domain/types';
@@ -180,6 +181,7 @@ async function checkIngressController(
 export async function prepareCluster(
   config: PrepareClusterConfig,
   logger: Logger,
+  context?: ExtendedToolContext,
 ): Promise<Result<PrepareClusterResult>> {
   const timer = createTimer(logger, 'prepare-cluster');
 
@@ -197,7 +199,9 @@ export async function prepareCluster(
     logger.info({ sessionId, cluster, namespace }, 'Starting cluster preparation');
 
     // Create lib instances
-    const sessionManager = createSessionManager(logger);
+    const sessionManager =
+      (context && 'sessionManager' in context && context.sessionManager) ||
+      createSessionManager(logger);
     const k8sClientRaw = createKubernetesClient(logger);
     const k8sClient = createK8sClientAdapter(k8sClientRaw);
 

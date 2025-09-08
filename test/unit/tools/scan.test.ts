@@ -66,10 +66,8 @@ describe('scanImage', () => {
     beforeEach(() => {
       // Session with valid build result
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-          },
+        build_result: {
+          imageId: 'sha256:mock-image-id',
         },
         repo_path: '/test/repo',
       });
@@ -193,7 +191,6 @@ describe('scanImage', () => {
 
     it('should return error when no build result exists', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {},
         repo_path: '/test/repo',
       });
 
@@ -207,10 +204,8 @@ describe('scanImage', () => {
 
     it('should handle scanner failures', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-          },
+        build_result: {
+          imageId: 'sha256:mock-image-id',
         },
         repo_path: '/test/repo',
       });
@@ -229,10 +224,8 @@ describe('scanImage', () => {
 
     it('should handle exceptions during scan process', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-          },
+        build_result: {
+          imageId: 'sha256:mock-image-id',
         },
         repo_path: '/test/repo',
       });
@@ -251,10 +244,8 @@ describe('scanImage', () => {
   describe('Vulnerability Counting', () => {
     it('should correctly count vulnerabilities by severity', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-          },
+        build_result: {
+          imageId: 'sha256:mock-image-id',
         },
         repo_path: '/test/repo',
       });
@@ -295,10 +286,8 @@ describe('scanImage', () => {
   describe('Scanner Configuration', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-          },
+        build_result: {
+          imageId: 'sha256:mock-image-id',
         },
         repo_path: '/test/repo',
       });

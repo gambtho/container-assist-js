@@ -104,7 +104,14 @@ export class SessionManager {
     };
 
     this.sessions.set(id, session);
-    this.logger.debug({ sessionId: id }, 'Session created');
+    this.logger.info(
+      {
+        sessionId: id,
+        totalSessions: this.sessions.size,
+        sessionKeys: Object.keys(workflowState),
+      },
+      'Session created',
+    );
 
     return workflowState;
   }
@@ -114,6 +121,17 @@ export class SessionManager {
    */
   async get(sessionId: string): Promise<WorkflowState | null> {
     const session = this.sessions.get(sessionId);
+
+    this.logger.info(
+      {
+        sessionId,
+        found: !!session,
+        totalSessions: this.sessions.size,
+        allSessionIds: Array.from(this.sessions.keys()),
+        sessionData: session ? Object.keys(session.workflowState) : null,
+      },
+      'Session lookup',
+    );
 
     if (!session) {
       return null;
@@ -159,7 +177,16 @@ export class SessionManager {
     };
 
     this.sessions.set(sessionId, updatedSession);
-    this.logger.debug({ sessionId }, 'Session updated');
+    this.logger.info(
+      {
+        sessionId,
+        updatedKeys: Object.keys(updatedWorkflowState),
+        hasAnalysisResult: 'analysis_result' in updatedWorkflowState,
+        completedSteps: updatedWorkflowState.completed_steps,
+        totalSessions: this.sessions.size,
+      },
+      'Session updated',
+    );
   }
 
   /**

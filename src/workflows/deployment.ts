@@ -62,6 +62,13 @@ export async function runDeploymentWorkflow(
   try {
     logger.info('Starting deployment workflow');
 
+    // Create or get session
+    let session = await sessionManager.get(sessionId);
+    if (!session) {
+      logger.info({ sessionId }, 'Creating new session for deployment workflow');
+      session = await sessionManager.create(sessionId);
+    }
+
     // Update session
     await sessionManager.update(sessionId, {
       status: 'active',

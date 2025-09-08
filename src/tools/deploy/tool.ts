@@ -153,10 +153,7 @@ export async function deployApplication(
     }
 
     // Get K8s manifests from session
-    const workflowState = session.workflow_state as
-      | { k8s_manifests?: { manifests?: string } }
-      | null
-      | undefined;
+    const workflowState = session as { k8s_manifests?: { manifests?: string } } | null | undefined;
     const k8sManifests = workflowState?.k8s_manifests;
     if (!k8sManifests?.manifests) {
       return Failure('No Kubernetes manifests found - run generate_k8s_manifests first');
@@ -324,7 +321,7 @@ export async function deployApplication(
     }
 
     // Update session with deployment result
-    const currentState = session.workflow_state as WorkflowState | undefined;
+    const currentState = session as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       deployment_result: {
         namespace,

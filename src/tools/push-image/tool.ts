@@ -6,6 +6,7 @@
  */
 
 import { createSessionManager } from '../../lib/session';
+import type { ExtendedToolContext } from '../shared-types';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, type Logger } from '../../lib/logger';
 import {
@@ -37,6 +38,7 @@ export interface PushImageResult {
 export async function pushImage(
   config: PushImageConfig,
   logger: Logger,
+  context?: ExtendedToolContext,
 ): Promise<Result<PushImageResult>> {
   const timer = createTimer(logger, 'push-image');
 
@@ -46,7 +48,9 @@ export async function pushImage(
     logger.info({ sessionId, registry }, 'Starting image push');
 
     // Create lib instances
-    const sessionManager = createSessionManager(logger);
+    const sessionManager =
+      (context && 'sessionManager' in context && context.sessionManager) ||
+      createSessionManager(logger);
     const dockerClient = createDockerClient(logger);
 
     // Get or create session using lib session manager
@@ -56,10 +60,7 @@ export async function pushImage(
       session = await sessionManager.create(sessionId);
     }
 
-    const workflowState = session.workflow_state as
-      | { build_result?: { tags?: string[] } }
-      | null
-      | undefined;
+    const workflowState = session as { build_result?: { tags?: string[] } } | null | undefined;
     const buildResult = workflowState?.build_result;
 
     if (!buildResult?.tags || buildResult.tags.length === 0) {
@@ -93,7 +94,7 @@ export async function pushImage(
     const { digest } = pushResult.value;
 
     // Update session with push results
-    const currentState = session.workflow_state as WorkflowState | undefined;
+    const currentState = session as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
       completed_steps: [...(currentState?.completed_steps ?? []), 'push'],
       metadata: {
@@ -146,5 +147,6 @@ export async function pushImage(
  */
 export const pushImageTool = {
   name: 'push',
-  execute: (config: PushImageConfig, logger: Logger) => pushImage(config, logger),
+  execute: (config: PushImageConfig, logger: Logger, context?: ExtendedToolContext) =>
+    pushImage(config, logger, context),
 };
