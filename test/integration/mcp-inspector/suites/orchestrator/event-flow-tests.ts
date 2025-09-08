@@ -28,7 +28,7 @@ export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCas
               sessionId,
               workflowType: 'containerization',
               params: {
-                repoPath: './test/fixtures/node-express'
+                repoPath: './test/__support__/fixtures/node-express'
               }
             }
           });
@@ -111,7 +111,7 @@ export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCas
               sessionId,
               workflowType: 'containerization',
               params: {
-                repoPath: './test/fixtures/node-express'
+                repoPath: './test/__support__/fixtures/node-express'
               }
             }
           });
@@ -154,7 +154,7 @@ export const createOrchestratorEventTests = (testRunner: MCPTestRunner): TestCas
               sessionId,
               workflowType: 'containerization',
               params: {
-                repoPath: './test/fixtures/nonexistent-path'
+                repoPath: './test/__support__/fixtures/nonexistent-path'
               }
             }
           });

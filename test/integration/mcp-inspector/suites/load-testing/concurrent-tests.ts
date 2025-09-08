@@ -102,7 +102,7 @@ export const createLoadTestingTests = (testRunner: MCPTestRunner): TestCase[] =>
             name: 'analyze-repo',
             arguments: {
               sessionId: `analysis-concurrent-${i}`,
-              repoPath: './test/fixtures/node-express',
+              repoPath: './test/__support__/fixtures/node-express',
               depth: 2
             }
           })

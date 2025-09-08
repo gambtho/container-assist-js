@@ -29,7 +29,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
               name: 'generate-dockerfile',
               arguments: {
                 sessionId: `${sessionId}-${i}`,
-                repoPath: './test/fixtures/node-express',
+                repoPath: './test/__support__/fixtures/node-express',
                 enableSampling: true,
                 maxCandidates: 3,
                 useCache: false // Force regeneration
@@ -84,7 +84,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
             name: 'generate-dockerfile',
             arguments: {
               sessionId,
-              repoPath: './test/fixtures/optimized-repo', // Well-structured repo
+              repoPath: './test/__support__/fixtures/optimized-repo', // Well-structured repo
               enableSampling: true,
               maxCandidates: 5,
               earlyStopThreshold: config.orchestrator.earlyStopThreshold
@@ -136,7 +136,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
             name: 'generate-dockerfile',
             arguments: {
               sessionId,
-              repoPath: './test/fixtures/node-express',
+              repoPath: './test/__support__/fixtures/node-express',
               enableSampling: true,
               maxCandidates: 5,
               returnAllCandidates: true
@@ -200,7 +200,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
             name: 'generate-dockerfile',
             arguments: {
               sessionId,
-              repoPath: './test/fixtures/node-express',
+              repoPath: './test/__support__/fixtures/node-express',
               enableSampling: true,
               maxCandidates: 3,
               includeScoreBreakdown: true
@@ -256,7 +256,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
             name: 'generate-dockerfile',
             arguments: {
               sessionId: `${sessionId}-cold`,
-              repoPath: './test/fixtures/node-express',
+              repoPath: './test/__support__/fixtures/node-express',
               enableSampling: true,
               maxCandidates: 3
             }
@@ -269,7 +269,7 @@ export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase
             name: 'generate-dockerfile',
             arguments: {
               sessionId: `${sessionId}-warm`,
-              repoPath: './test/fixtures/node-express',
+              repoPath: './test/__support__/fixtures/node-express',
               enableSampling: true,
               maxCandidates: 3
             }

@@ -26,7 +26,7 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'analyze-repo',
             arguments: {
               sessionId,
-              repoPath: './test/fixtures/node-express',
+              repoPath: './test/__support__/fixtures/node-express',
               depth: 3,
               includeTests: false
             }
@@ -136,7 +136,7 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'analyze-repo',
             arguments: {
               sessionId,
-              repoPath: './test/fixtures/node-express'
+              repoPath: './test/__support__/fixtures/node-express'
             }
           });
 
@@ -176,7 +176,7 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'build-image',
             arguments: {
               sessionId,
-              context: './test/fixtures/node-express'
+              context: './test/__support__/fixtures/node-express'
             }
           });
 
@@ -377,7 +377,7 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'analyze-repo',
             arguments: {
               sessionId,
-              repoPath: './test/fixtures/node-express'
+              repoPath: './test/__support__/fixtures/node-express'
             }
           });
 
@@ -466,7 +466,7 @@ export const createIntegrationFlowTests = (testRunner: MCPTestRunner): TestCase[
             name: 'analyze-repo',
             arguments: {
               sessionId,
-              repoPath: './test/fixtures/node-express'
+              repoPath: './test/__support__/fixtures/node-express'
             }
           });
 

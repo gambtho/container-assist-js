@@ -82,7 +82,7 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
           name: 'build-image',
           arguments: {
             sessionId: 'build-test-123',
-            contextPath: './test/fixtures/node-express',
+            contextPath: './test/__support__/fixtures/node-express',
             noCache: true
           }
         });
@@ -198,7 +198,7 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
         const start = performance.now();
         
         const result = await client.callTool({
-          name: 'tag',
+          name: 'tag-image',
           arguments: {
             sessionId: 'tag-test-123',
             imageId: 'test-image',
@@ -257,7 +257,7 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
         const start = performance.now();
         
         const result = await client.callTool({
-          name: 'push',
+          name: 'push-image',
           arguments: {
             sessionId: 'push-test-123',
             imageId: 'test-image:latest',
@@ -568,7 +568,7 @@ export const createComprehensiveToolTests = (testRunner: MCPTestRunner): TestCas
             sessionId: 'workflow-test-123',
             workflowType: 'containerization',
             params: {
-              repoPath: './test/fixtures/node-express'
+              repoPath: './test/__support__/fixtures/node-express'
             }
           }
         });

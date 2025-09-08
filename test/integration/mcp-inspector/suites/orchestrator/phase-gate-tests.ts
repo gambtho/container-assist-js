@@ -26,7 +26,7 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
             name: 'analyze-repo',
             arguments: {
               sessionId,
-              repoPath: './test/fixtures/nonexistent-repo'
+              repoPath: './test/__support__/fixtures/nonexistent-repo'
             }
           });
           
@@ -287,7 +287,7 @@ export const createPhaseGateTests = (testRunner: MCPTestRunner): TestCase[] => {
             name: 'analyze-repo',
             arguments: {
               sessionId,
-              repoPath: './test/fixtures/node-express'
+              repoPath: './test/__support__/fixtures/node-express'
             }
           });
 

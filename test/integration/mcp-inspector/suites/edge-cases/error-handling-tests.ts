@@ -23,7 +23,7 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
         const result = await client.callTool({
           name: 'analyze-repo',
           arguments: {
-            repoPath: './test/fixtures/node-express'
+            repoPath: './test/__support__/fixtures/node-express'
             // Missing sessionId
           }
         });
@@ -158,7 +158,7 @@ export const createErrorHandlingTests = (testRunner: MCPTestRunner): TestCase[] 
           name: 'analyze-repo',
           arguments: {
             sessionId: 'type-test',
-            repoPath: './test/fixtures/node-express',
+            repoPath: './test/__support__/fixtures/node-express',
             depth: 'invalid-number', // Should be number
             includeTests: 'not-a-boolean' // Should be boolean
           }

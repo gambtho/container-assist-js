@@ -133,7 +133,7 @@ export const createBasicToolTests = (testRunner: MCPTestRunner): TestCase[] => {
           name: 'analyze-repo',
           arguments: {
             sessionId: 'test-session-analyze',
-            repoPath: './test/fixtures/node-express'
+            repoPath: './test/__support__/fixtures/node-express'
           }
         });
 

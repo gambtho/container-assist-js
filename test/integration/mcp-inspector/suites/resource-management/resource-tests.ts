@@ -25,7 +25,7 @@ export const createResourceManagementTests = (testRunner: MCPTestRunner): TestCa
           name: 'analyze-repo',
           arguments: {
             sessionId: 'resource-size-test',
-            repoPath: './test/fixtures/node-express',
+            repoPath: './test/__support__/fixtures/node-express',
             depth: 5, // Deep analysis might produce larger results
             includeTests: true
           }
@@ -193,7 +193,7 @@ export const createResourceManagementTests = (testRunner: MCPTestRunner): TestCa
           name: 'analyze-repo',
           arguments: {
             sessionId: 'mime-type-test',
-            repoPath: './test/fixtures/node-express'
+            repoPath: './test/__support__/fixtures/node-express'
           }
         });
 
@@ -345,7 +345,7 @@ export const createResourceManagementTests = (testRunner: MCPTestRunner): TestCa
           name: 'analyze-repo',
           arguments: {
             sessionId: 'uri-scheme-test',
-            repoPath: './test/fixtures/node-express'
+            repoPath: './test/__support__/fixtures/node-express'
           }
         });
 
