@@ -9,15 +9,15 @@
  * 5. Tag image appropriately
  */
 
-import { analyzeRepo } from '@tools/analyze-repo';
-import { generateDockerfile } from '@tools/generate-dockerfile';
-import { buildImage } from '@tools/build-image';
-import { scanImage } from '@tools/scan';
-import { tagImage } from '@tools/tag-image';
-import { isFail } from '@types';
-import { getRecommendedBaseImage } from '@lib/base-images';
-import { createTimer, type Logger } from '@lib/logger';
-import type { Deps } from '@app/container';
+import { analyzeRepo } from '../tools/analyze-repo';
+import { generateDockerfile } from '../tools/generate-dockerfile';
+import { buildImage } from '../tools/build-image';
+import { scanImage } from '../tools/scan';
+import { tagImage } from '../tools/tag-image';
+import { isFail } from '../domain/types';
+import { getRecommendedBaseImage } from '../lib/base-images';
+import { createTimer, type Logger } from '../lib/logger';
+import type { Deps } from '../app/container';
 import type {
   ContainerizationWorkflowParams,
   ContainerizationWorkflowResult,

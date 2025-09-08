@@ -10,10 +10,10 @@ import {
   McpError,
   ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { Tool } from '@types';
-import type { PromptRegistry } from '@prompts/prompt-registry';
-import type { SessionManager } from '@lib/session';
-import { createToolContextWithProgress } from '@mcp/context/bridge';
+import type { Tool } from '../../domain/types';
+import type { PromptRegistry } from '../../prompts/prompt-registry';
+import type { SessionManager } from '../../lib/session';
+import { createToolContextWithProgress } from '../context/bridge';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 // Sampling tools are now internal services - not imported here
