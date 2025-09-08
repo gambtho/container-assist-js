@@ -5,13 +5,13 @@ import { existsSync } from 'fs';
 const isTestBuild = process.env.BUILD_TEST_UTILS === 'true';
 
 const mainEntries = {
-  // Main entry point (package.json main/exports ".")
-  'src/index': 'src/index.ts',
+  // Main entry point (package.json main/exports ".") - points to main MCP server entry
+  'src/mcp/server': 'src/mcp/server.ts',
   // CLI entry point (package.json bin)
-  'apps/cli': 'apps/cli.ts',
+  'src/cli/cli': 'src/cli/cli.ts',
   // Additional exports from package.json exports (match output paths)
-  'domain/types/index': 'src/domain/types/index.ts',
-  'service/config/config': 'src/config/index.ts'
+  'src/domain/types': 'src/domain/types.ts',
+  'src/config/types': 'src/config/types.ts'
 };
 
 const testEntries = {
@@ -39,6 +39,12 @@ export default defineConfig({
   
   // Enable code splitting for better performance
   splitting: true,
+  
+  // Resolve TypeScript path aliases
+  esbuildOptions(options) {
+    options.tsconfig = './tsconfig.json';
+    options.resolveExtensions = ['.ts', '.tsx', '.js', '.jsx'];
+  },
   
   // External dependencies (not bundled)
   external: [

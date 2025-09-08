@@ -6,10 +6,33 @@
 import type { Logger } from 'pino';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Result, Success, Failure } from '../../src/domain/types/result';
-import { DockerScanResult } from '../../src/domain/types/docker';
+import { Result, Success, Failure } from '@lib/result';
 
 const execAsync = promisify(exec);
+
+// Define DockerScanResult interface for test utilities
+interface DockerScanResult {
+  vulnerabilities?: Array<{
+    id?: string;
+    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+    package?: string;
+    version?: string;
+    description?: string;
+    fixedVersion?: string;
+  }>;
+  summary?: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    unknown?: number;
+    total: number;
+  };
+  scanTime?: string;
+  metadata?: {
+    image: string;
+  };
+}
 
 export interface ScannerStrategy {
   name: string;

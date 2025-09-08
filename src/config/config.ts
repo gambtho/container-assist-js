@@ -1,297 +1,208 @@
 /**
- * Simplified Configuration System
- *
- * Replaces the over-engineered 7-file configuration system with a simple,
- * maintainable approach using defaults + environment overrides.
+ * Application configuration with environment overrides
  */
 
 import type { ApplicationConfig } from './types';
+import { DEFAULT_NETWORK, DEFAULT_TIMEOUTS, getDefaultPort } from './defaults';
 
-// Simple environment variable mapping - no complex inheritance
-const ENV_MAPPINGS = {
-  // Server
-  NODE_ENV: { path: 'server.nodeEnv', type: 'string', default: 'development' },
-  LOG_LEVEL: { path: 'server.logLevel', type: 'string', default: 'info' },
-
-  // MCP
-  MCP_STORE_PATH: { path: 'mcp.storePath', type: 'string', default: './data/sessions.db' },
-  SESSION_TTL: { path: 'mcp.sessionTTL', type: 'string', default: '24h' },
-  MAX_SESSIONS: { path: 'mcp.maxSessions', type: 'number', default: 100 },
-
-  // Workspace
-  WORKSPACE_DIR: { path: 'workspace.workspaceDir', type: 'string', default: process.cwd() },
-
-  // Docker
-  DOCKER_SOCKET: {
-    path: 'infrastructure.docker.socketPath',
-    type: 'string',
-    default: '/var/run/docker.sock',
-  },
-  DOCKER_REGISTRY: { path: 'infrastructure.docker.registry', type: 'string', default: 'docker.io' },
-
-  // Kubernetes
-  K8S_NAMESPACE: {
-    path: 'infrastructure.kubernetes.namespace',
-    type: 'string',
-    default: 'default',
-  },
-  KUBECONFIG: { path: 'infrastructure.kubernetes.kubeconfig', type: 'string', default: '' },
-
-  // AI
-  AI_API_KEY: { path: 'aiServices.ai.apiKey', type: 'string', default: '' },
-  AI_MODEL: { path: 'aiServices.ai.model', type: 'string', default: 'claude-3-sonnet-20241022' },
-  AI_BASE_URL: { path: 'aiServices.ai.baseUrl', type: 'string', default: '' },
-  MOCK_MODE: { path: 'features.mockMode', type: 'boolean', default: false },
-} as const;
-
-// Base configuration with sensible defaults
-const BASE_CONFIG: ApplicationConfig = {
-  server: {
-    nodeEnv: 'development' as const,
-    logLevel: 'info' as const,
-    port: 3000,
-    host: 'localhost',
-  },
-  mcp: {
-    storePath: './data/sessions.db',
-    sessionTTL: '24h',
-    maxSessions: 100,
-    enableMetrics: false,
-    enableEvents: true,
-  },
-  session: {
-    store: 'memory' as const,
-    ttl: 86400, // 24h in seconds
-    maxSessions: 100,
-    persistencePath: './data/sessions.db',
-    persistenceInterval: 3600, // 1h in seconds
-    cleanupInterval: 3600, // 1h in seconds
-  },
-  workspace: {
+/**
+ * Create default configuration with sensible defaults
+ * @returns ApplicationConfig with default values for all sections
+ */
+function createDefaultConfig(): ApplicationConfig {
+  return {
+    logLevel: 'info',
     workspaceDir: process.cwd(),
-    tempDir: './tmp',
-    cleanupOnExit: true,
-  },
-  infrastructure: {
+    server: {
+      nodeEnv: 'development',
+      logLevel: 'info',
+      port: getDefaultPort('javascript'),
+      host: DEFAULT_NETWORK.host,
+    },
+    session: {
+      store: 'memory',
+      ttl: 86400, // 24h
+      maxSessions: 1000,
+      persistencePath: './data/sessions.db',
+      persistenceInterval: 60000, // 1min
+      cleanupInterval: DEFAULT_TIMEOUTS.cacheCleanup,
+    },
+    mcp: {
+      name: 'containerization-assist',
+      version: '1.0.0',
+      storePath: './data/sessions.db',
+      sessionTTL: '24h',
+      maxSessions: 100,
+      enableMetrics: true,
+      enableEvents: true,
+    },
     docker: {
       socketPath: '/var/run/docker.sock',
-      registry: 'docker.io',
       host: 'localhost',
-      port: 2376,
-      timeout: 300000,
-      apiVersion: '1.41',
+      port: 2375,
+      registry: 'docker.io',
+      timeout: 60000,
+      buildArgs: {},
     },
     kubernetes: {
-      kubeconfig: '',
       namespace: 'default',
-      context: '',
-      timeout: 300000,
-      dryRun: false,
-    },
-    scanning: {
-      enabled: true,
-      scanner: 'trivy' as const,
-      severityThreshold: 'high' as const,
-      failOnVulnerabilities: false,
-      skipUpdate: false,
-      timeout: 300000,
-    },
-    build: {
-      enableCache: true,
-      parallel: false,
-      maxParallel: 4,
-      buildArgs: {},
-      labels: {},
-      target: '',
-      squash: false,
-    },
-    java: {
-      defaultVersion: '17',
-      defaultJvmHeapPercentage: 75,
-      enableNativeImage: false,
-      enableJmx: false,
-      enableProfiling: false,
-    },
-  },
-  aiServices: {
-    ai: {
-      apiKey: '',
-      model: 'claude-3-sonnet-20241022',
-      baseUrl: '',
+      kubeconfig: '~/.kube/config',
       timeout: 30000,
-      retryAttempts: 3,
-      retryDelayMs: 1000,
-      temperature: 0.1,
-      maxTokens: 4096,
     },
-    sampler: {
-      mode: 'auto' as const,
-      templateDir: './templates',
-      cacheEnabled: true,
-      retryAttempts: 3,
-      retryDelayMs: 1000,
+    workspace: {
+      workspaceDir: process.cwd(),
+      tempDir: '/tmp',
+      cleanupOnExit: true,
     },
-    mock: {
-      enabled: false,
-      responsesDir: './mock-responses',
-      deterministicMode: false,
-      simulateLatency: false,
-      errorRate: 0,
-      latencyRange: {
-        min: 100,
-        max: 500,
-      },
+    logging: {
+      level: 'info',
+      format: 'json',
     },
-  },
-  logging: {
-    level: 'info' as const,
-    format: 'pretty' as const,
-    destination: 'console' as const,
-    filePath: './logs/app.log',
-    maxFileSize: '10MB',
-    maxFiles: 5,
-    enableColors: true,
-  },
-  workflow: {
-    mode: 'interactive' as const,
-    autoRetry: true,
-    maxRetries: 3,
-    retryDelayMs: 5000,
-    parallelSteps: false,
-    skipOptionalSteps: false,
-  },
-  features: {
-    aiEnabled: true,
-    mockMode: false,
-    enableMetrics: false,
-    enableEvents: true,
-    enablePerformanceMonitoring: false,
-    enableDebugLogs: false,
-    enableTracing: false,
-    nonInteractive: false,
-  },
-};
-
-// Simple value parsing without over-engineering
-function parseValue(value: string, type: string): unknown {
-  switch (type) {
-    case 'string':
-      return value;
-    case 'number': {
-      const num = Number(value);
-      if (isNaN(num)) throw new Error(`Invalid number: ${value}`);
-      return num;
-    }
-    case 'boolean':
-      return value.toLowerCase() === 'true';
-    default:
-      return value;
-  }
+    workflow: {
+      mode: 'interactive',
+    },
+  };
 }
 
-// Simple nested object path setting
-function setPath(obj: unknown, path: string, value: unknown): void {
-  const keys = path.split('.');
-  let current = obj as Record<string, unknown>;
-
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i]!;
-    if (!(key in current)) current[key] = {};
-    current = current[key] as Record<string, unknown>;
+/**
+ * Parse integer with fallback and optional validation
+ */
+function parseIntWithFallback(
+  value: string | undefined,
+  fallback: number,
+  varName?: string,
+): number {
+  if (!value) return fallback;
+  const parsed = parseInt(value);
+  if (isNaN(parsed)) {
+    if (varName) {
+      // eslint-disable-next-line no-console
+      console.warn(`Invalid ${varName}: ${value}. Using default: ${fallback}`);
+    }
+    return fallback;
   }
+  return parsed;
+}
 
-  current[keys[keys.length - 1]!] = value;
+/**
+ * Handle empty string environment variables
+ */
+function getEnvValue(key: string, fallback: string): string {
+  const value = process.env[key];
+  if (value === '') return value; // Preserve empty strings
+  return value || fallback;
 }
 
 /**
  * Create configuration with environment overrides
+ * @returns ApplicationConfig with environment variable overrides applied
  */
-export function createConfiguration(): ApplicationConfig {
-  // Start with base config
-  const config = JSON.parse(JSON.stringify(BASE_CONFIG)) as ApplicationConfig;
+function createConfiguration(): ApplicationConfig {
+  const defaultConfig = createDefaultConfig();
 
-  // Apply environment overrides
-  for (const [envVar, mapping] of Object.entries(ENV_MAPPINGS)) {
-    const value = process.env[envVar];
-    if (value !== undefined) {
-      try {
-        const parsedValue = parseValue(value, mapping.type);
-        setPath(config, mapping.path, parsedValue);
-      } catch (error) {
-        console.warn(
-          `Invalid ${envVar}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    }
-  }
-
-  return config;
+  // Apply environment variable overrides
+  return {
+    ...defaultConfig,
+    server: {
+      ...defaultConfig.server,
+      nodeEnv: (process.env.NODE_ENV as any) || defaultConfig.server.nodeEnv,
+      logLevel: (process.env.LOG_LEVEL as any) || defaultConfig.server.logLevel,
+      port: parseIntWithFallback(process.env.PORT, defaultConfig.server.port),
+      host: process.env.HOST || defaultConfig.server.host,
+    },
+    mcp: {
+      ...defaultConfig.mcp,
+      storePath: process.env.MCP_STORE_PATH || defaultConfig.mcp.storePath,
+      maxSessions: parseIntWithFallback(
+        process.env.MAX_SESSIONS,
+        defaultConfig.mcp.maxSessions,
+        'MAX_SESSIONS',
+      ),
+    },
+    docker: {
+      ...defaultConfig.docker,
+      socketPath:
+        process.env.DOCKER_HOST || process.env.DOCKER_SOCKET || defaultConfig.docker.socketPath,
+      registry: process.env.DOCKER_REGISTRY || defaultConfig.docker.registry,
+      timeout: parseIntWithFallback(process.env.DOCKER_TIMEOUT, defaultConfig.docker.timeout),
+      port: parseIntWithFallback(process.env.DOCKER_PORT, defaultConfig.docker.port),
+    },
+    kubernetes: {
+      ...defaultConfig.kubernetes,
+      namespace:
+        process.env.KUBE_NAMESPACE ||
+        process.env.K8S_NAMESPACE ||
+        defaultConfig.kubernetes.namespace,
+      kubeconfig: getEnvValue('KUBECONFIG', defaultConfig.kubernetes.kubeconfig),
+      timeout: parseIntWithFallback(process.env.K8S_TIMEOUT, defaultConfig.kubernetes.timeout),
+    },
+    logging: {
+      ...defaultConfig.logging,
+      level: (process.env.LOG_LEVEL as any) || defaultConfig.logging.level,
+      format: process.env.LOG_FORMAT || defaultConfig.logging.format,
+    },
+  };
 }
 
 /**
  * Create configuration for specific environment
+ * @param env - Environment name (development, production, test)
+ * @returns ApplicationConfig configured for the specified environment
  */
-export function createConfigurationForEnv(
-  env: 'development' | 'production' | 'test',
-): ApplicationConfig {
-  const config = createConfiguration();
-  config.server.nodeEnv = env;
+function createConfigurationForEnv(env: string): ApplicationConfig {
+  // Set NODE_ENV for consistent environment-specific configuration
+  const originalNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = env;
 
-  // Environment-specific adjustments
+  const config = createConfiguration();
+  config.server.nodeEnv = env as any;
+
+  // Apply environment-specific overrides
   if (env === 'production') {
+    config.logLevel = 'info';
     config.server.logLevel = 'info';
-    config.features.enableDebugLogs = false;
-    config.features.enableMetrics = true;
-  } else if (env === 'development') {
-    config.server.logLevel = 'debug';
-    config.features.enableDebugLogs = true;
-    config.features.mockMode = true;
   } else if (env === 'test') {
+    config.logLevel = 'error';
     config.server.logLevel = 'error';
-    config.features.mockMode = true;
-    config.features.enableEvents = false;
-    config.session.store = 'memory';
+  } else {
+    config.logLevel = 'debug';
+    config.server.logLevel = 'debug';
+  }
+
+  // Restore original NODE_ENV
+  if (originalNodeEnv !== undefined) {
+    process.env.NODE_ENV = originalNodeEnv;
+  } else {
+    delete process.env.NODE_ENV;
   }
 
   return config;
 }
 
 /**
- * Validate configuration (simple checks)
+ * Get configuration summary with key values
+ * @param config - The application configuration
+ * @returns Summary object with key configuration values
  */
-export function validateConfiguration(config: ApplicationConfig): {
-  valid: boolean;
-  errors: string[];
+function getConfigurationSummary(config: ApplicationConfig): {
+  nodeEnv: string;
+  logLevel: string;
+  workflowMode: string;
+  maxSessions: number;
+  dockerRegistry: string;
 } {
-  const errors: string[] = [];
-
-  // Basic validation
-  if (!['development', 'production', 'test'].includes(config.server.nodeEnv)) {
-    errors.push('Invalid NODE_ENV');
-  }
-
-  if (!['error', 'warn', 'info', 'debug', 'trace'].includes(config.server.logLevel)) {
-    errors.push('Invalid LOG_LEVEL');
-  }
-
-  if (config.server.port !== undefined && (config.server.port < 1 || config.server.port > 65535)) {
-    errors.push('Invalid server port');
-  }
-
-  return { valid: errors.length === 0, errors };
-}
-
-/**
- * Get configuration summary for logging
- */
-export function getConfigurationSummary(config: ApplicationConfig): Record<string, unknown> {
   return {
     nodeEnv: config.server.nodeEnv,
     logLevel: config.server.logLevel,
     workflowMode: config.workflow.mode,
-    mockMode: config.features.mockMode,
-    aiEnabled: config.features.aiEnabled,
     maxSessions: config.session.maxSessions,
-    dockerRegistry: config.infrastructure.docker.registry,
+    dockerRegistry: config.docker.registry,
   };
 }
+
+export {
+  createDefaultConfig,
+  createConfiguration,
+  createConfigurationForEnv,
+  getConfigurationSummary,
+};

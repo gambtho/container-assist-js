@@ -91,7 +91,6 @@ export class IntegrationTestCleanup {
       }
     }
 
-    // Clean up temporary directories
     for (const dir of this.tempDirs) {
       try {
         await fs.rm(dir, { recursive: true, force: true });

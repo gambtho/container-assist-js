@@ -1,5 +1,4 @@
 import {
-  Session,
   WorkflowState,
   AnalysisResult,
   DockerBuildResult,
@@ -8,17 +7,32 @@ import {
   K8sManifestResult,
   DeploymentResult,
   WorkflowStep,
-} from '../../src/domain/types/session';
-import { nanoid } from 'nanoid';
-import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../src/domain/types/result';
-import type { ApplicationConfig } from '../../src/config/types';
+} from '../../src/domain/types';
+
+// Test-only Session type (removed from production code)
+type Session = {
+  id: string;
+  repo_path: string;
+  metadata: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+  status?: string;
+  stage?: string;
+  labels?: Record<string, unknown>;
+  workflow_state?: WorkflowState;
+  version?: number;
+};
+// Mock ID generator for tests (replace nanoid to avoid ESM issues)
+const mockId = () => Math.random().toString(36).substring(7);
+import type { Logger } from '../../src/lib/logger';
+import { Success, Failure, type Result } from '../../src/domain/types';
+import type { ApplicationConfig } from '../../src/config/app-config';
 import { jest } from '@jest/globals';
 
 export function createMockSession(overrides?: Partial<Session>): Session {
   const now = new Date().toISOString();
   return {
-    id: nanoid(),
+    id: mockId(),
     created_at: now,
     updated_at: now,
     status: 'active',
@@ -166,7 +180,7 @@ spec:
         image: test-app:latest
         ports:
         - containerPort: 3000`,
-        file_path: './k8s/deployment.yaml',
+        file_path: './test/fixtures/k8s/deployment.yaml',
       },
       {
         kind: 'Service',
@@ -184,7 +198,7 @@ spec:
   - port: 80
     targetPort: 3000
   type: ClusterIP`,
-        file_path: './k8s/service.yaml',
+        file_path: './test/fixtures/k8s/service.yaml',
       },
     ],
     deployment_strategy: 'rolling',
@@ -403,19 +417,20 @@ export function createCompletedWorkflowSession(overrides?: Partial<Session>): Se
  * Mock Logger Implementation
  */
 export function createMockLogger(): jest.Mocked<Logger> {
-  return {
+  const mockLogger = {
     debug: jest.fn(),
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
     trace: jest.fn(),
     fatal: jest.fn(),
-    silent: jest.fn(),
-    level: 'info',
-    child: jest.fn().mockReturnThis(),
-    bindings: jest.fn().mockReturnValue({}),
-    version: '1.0.0',
+    child: jest.fn(),
   } as jest.Mocked<Logger>;
+  
+  // Make child return a new mock logger with the same interface
+  mockLogger.child.mockImplementation(() => mockLogger);
+  
+  return mockLogger;
 }
 
 /**
@@ -488,7 +503,6 @@ export function createMockConfig(overrides?: Partial<ApplicationConfig>): Applic
     },
     aiServices: {
       ai: {
-        apiKey: 'test-key',
         model: 'test-model',
         baseUrl: 'http://localhost:8080',
         timeout: 5000,
@@ -527,7 +541,6 @@ export function createMockConfig(overrides?: Partial<ApplicationConfig>): Applic
       skipOptionalSteps: true,
     },
     features: {
-      aiEnabled: false,
       mockMode: true,
       enableMetrics: false,
       enableEvents: false,
@@ -839,10 +852,6 @@ export function createMockDockerode() {
   };
 }
 
-/**
- * Backward compatibility alias
- */
-export const createMockDockeroade = createMockDockerode;
 
 export function createMockKubernetesClient() {
   return {

@@ -173,7 +173,7 @@ export function createMockBenchmark(overrides?: Partial<BenchmarkResult>): Bench
 /**
  * ESM Mock Creation and Result Testing Utilities
  */
-import type { Result } from '../../src/domain/types/result.js';
+import type { Result } from '../../src/core/types.js';
 
 export function expectSuccess<T>(result: Result<T>): T {
   if (result.kind !== 'ok') {
@@ -183,7 +183,7 @@ export function expectSuccess<T>(result: Result<T>): T {
 }
 
 export function expectFailure<T>(result: Result<T>): string {
-  if (result.kind !== 'fail') {
+  if (result.ok) {
     throw new Error(`Expected failure but got success: ${JSON.stringify(result.value)}`);
   }
   return result.error;
