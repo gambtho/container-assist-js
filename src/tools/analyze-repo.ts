@@ -177,7 +177,8 @@ async function validateRepositoryPath(
     await fs.access(repoPath, fs.constants.R_OK);
     return { valid: true };
   } catch (error) {
-    return { valid: false, error: `Cannot access repository: ${String(error)}` };
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    return { valid: false, error: `Cannot access repository: ${errorMsg}` };
   }
 }
 

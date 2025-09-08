@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -euo pipefail
+
 # Wrapper script for MCP Inspector to run the TypeScript CLI
 cd "$(dirname "$0")/.."
 

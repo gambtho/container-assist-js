@@ -1,34 +1,186 @@
-# Getting Started with Containerization Assistant
+# Getting Started
 
-## Quick Start (5 minutes)
+This guide will help you install, configure, and use the Containerization Assistant MCP Server.
 
-### Prerequisites
+## Prerequisites
 
-Before you begin, ensure you have the following installed:
-
-- **Node.js** (version 18 or higher)
-- **Docker** (version 20.10 or higher)
+- **Node.js** 18 or higher
+- **Docker** 20.10 or higher  
 - **kubectl** (optional, for Kubernetes deployments)
-- **Git** (for repository access)
+- **Git** (for development setup)
 
-### Installation
+## Installation
+
+### As an MCP Server (Recommended)
 
 ```bash
-# Clone and build the project
-git clone <repository-url>
-cd containerization-assist-js
-npm install
-npm run build
-
-# Start the MCP server
-npm run start
+npm install -g @thgamble/containerization-assist-mcp
 ```
 
-### Basic Configuration
+### For Development
 
-The MCP server automatically enhances all tools with AI capabilities. No additional configuration is required for basic usage.
+```bash
+git clone https://github.com/gambtho/container-assist-js.git
+cd container-assist-js
+npm install
+npm run build
+```
 
-Optional configuration file (`.containerization-config.json`):
+## Configuration
+
+### With Claude Desktop
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "containerization-assist": {
+      "command": "containerization-assist-mcp",
+      "args": ["start"],
+      "env": {
+        "DOCKER_SOCKET": "/var/run/docker.sock",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+For Windows users, use:
+```json
+"DOCKER_SOCKET": "//./pipe/docker_engine"
+```
+
+### With VS Code / GitHub Copilot
+
+For local development with hot reload, the project includes `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "containerization-assist-dev": {
+      "command": "npx",
+      "args": ["tsx", "watch", "./src/cli/cli.ts"],
+      "env": {
+        "MCP_MODE": "true",
+        "MCP_QUIET": "true",
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
+```
+
+Simply restart VS Code to enable the MCP server in GitHub Copilot.
+
+### With MCP Inspector
+
+```bash
+# Using installed package
+npx @modelcontextprotocol/inspector containerization-assist-mcp start
+
+# Using local development
+npx @modelcontextprotocol/inspector npx tsx src/cli/cli.ts
+```
+
+## First Containerization
+
+### Using MCP Tools
+
+The server provides 14 enhanced tools that work together seamlessly:
+
+```javascript
+// 1. Analyze your repository
+const analysis = await client.callTool({
+  name: 'analyze_repository',
+  arguments: {
+    repoPath: './my-app',
+    sessionId: 'session-123'
+  }
+});
+
+// 2. Generate optimized Dockerfile
+const dockerfile = await client.callTool({
+  name: 'generate_dockerfile',
+  arguments: {
+    sessionId: 'session-123'
+    // Parameters inferred from analysis
+  }
+});
+
+// 3. Build and scan image
+const build = await client.callTool({
+  name: 'build_image',
+  arguments: {
+    sessionId: 'session-123',
+    imageName: 'my-app:latest'
+  }
+});
+
+// 4. Deploy to Kubernetes (optional)
+const deployment = await client.callTool({
+  name: 'deploy_application',
+  arguments: {
+    sessionId: 'session-123',
+    namespace: 'default'
+  }
+});
+```
+
+### Using Workflows
+
+For complete containerization pipelines:
+
+```javascript
+const workflow = await client.callTool({
+  name: 'start_workflow',
+  arguments: {
+    workflowType: 'containerization',
+    repoPath: './my-app',
+    sessionId: 'session-123'
+  }
+});
+```
+
+Available workflows:
+- **containerization**: Complete flow from analysis to deployment
+- **deployment**: Kubernetes deployment with verification
+- **security**: Vulnerability scanning and remediation
+- **optimization**: Image size and performance optimization
+
+## Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `analyze_repository` | Analyze repository structure and detect language/framework |
+| `resolve_base_images` | Find optimal base images for applications |
+| `generate_dockerfile` | Create optimized Dockerfiles |
+| `generate_dockerfile_ext` | Extended Dockerfile generation with AI |
+| `fix_dockerfile` | Fix and optimize existing Dockerfiles |
+| `build_image` | Build Docker images with progress tracking |
+| `scan_image` | Security vulnerability scanning with Trivy |
+| `tag_image` | Tag Docker images |
+| `push_image` | Push images to registry |
+| `generate_k8s_manifests` | Create Kubernetes deployment configurations |
+| `prepare_cluster` | Prepare Kubernetes cluster for deployment |
+| `deploy_application` | Deploy applications to Kubernetes |
+| `verify_deployment` | Verify deployment health and status |
+| `start_workflow` | Start complete containerization workflow |
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DOCKER_SOCKET` | Docker socket path | `/var/run/docker.sock` |
+| `LOG_LEVEL` | Logging level (debug, info, warn, error) | `info` |
+| `MCP_MODE` | Enable MCP mode | `true` |
+| `MCP_QUIET` | Suppress non-MCP output | `true` |
+| `NODE_ENV` | Environment (development, production) | `production` |
+
+## Configuration File
+
+Create `.containerization-config.json` in your project root:
 
 ```json
 {
@@ -38,321 +190,60 @@ Optional configuration file (`.containerization-config.json`):
   },
   "docker": {
     "registry": "docker.io",
-    "timeout": 300
+    "timeout": 300,
+    "buildkit": true
   },
   "kubernetes": {
     "context": "default",
     "namespace": "default"
+  },
+  "security": {
+    "scanOnBuild": true,
+    "blockOnCritical": false
   }
 }
 ```
 
-### Your First Containerization
-
-Using the MCP tools through your MCP client:
-
-```javascript
-// Analyze a repository
-const analysis = await client.callTool({
-  name: 'analyze-repo',
-  arguments: {
-    repoPath: './my-app',
-    sessionId: 'session-123'
-  }
-});
-
-// Generate Dockerfile
-const dockerfile = await client.callTool({
-  name: 'generate-dockerfile', 
-  arguments: {
-    sessionId: 'session-123'
-    // Language and framework inferred from previous analysis
-  }
-});
-```
-
-The MCP server provides 14 enhanced tools that can:
-1. **Analyze** your repository structure with AI insights
-2. **Generate** optimized Dockerfiles
-3. **Build** Docker images with progress tracking
-4. **Scan** for security vulnerabilities
-5. **Create** Kubernetes manifests
-6. **Deploy** applications with verification
-7. **Orchestrate** complete workflows
-
-### Understanding the Output
-
-During execution, you'll see progress updates:
-
-```
-✓ Analyzing repository structure... (2.1s)
-✓ Generating Dockerfile candidates... (15.3s)
-  → Generated 3 candidates
-  → Selected winner (score: 87.5/100)
-✓ Building Docker image... (45.2s)
-  → Image size: 187MB
-  → Build successful
-✓ Scanning for vulnerabilities... (8.7s)
-  → Found 2 medium, 1 low vulnerabilities
-  → No critical issues
-✓ Generating Kubernetes manifests... (3.4s)
-  → Created deployment, service, configmap
-✓ Deploying to development environment... (25.6s)
-  → 3/3 replicas ready
-✓ Verifying deployment... (12.1s)
-  → Health checks passing
-  → API endpoints responding
-
-🎉 Containerization completed successfully!
-
-📋 Summary:
-   Session ID: session_abc123_def456
-   Total time: 2m 32s
-   Image: your-app:latest
-   Service: http://your-app-service:3000
-   
-📁 Artifacts saved to: ./containerization-output/
-```
-
-### Next Steps
-
-- **Customize the workflow**: Edit `.containerize.yml` for your needs
-- **Review artifacts**: Check generated files in `./containerization-output/`
-- **Deploy to staging**: Use `--target-env staging`
-- **Set up CI/CD**: Integrate with your pipeline
-
-## MCP Tools Overview
-
-### Repository Analysis Tools
-
-```javascript
-// Analyze repository structure and dependencies
-await client.callTool({
-  name: 'analyze-repo',
-  arguments: { repoPath: './my-app', sessionId: 'session-123' }
-});
-
-// Resolve optimal base images
-await client.callTool({
-  name: 'resolve-base-images',
-  arguments: { language: 'node', sessionId: 'session-123' }
-});
-```
-
-### Docker Management Tools
-
-```javascript
-// Generate optimized Dockerfile
-await client.callTool({
-  name: 'generate-dockerfile',
-  arguments: { sessionId: 'session-123' }
-});
-
-// Build Docker image with progress
-await client.callTool({
-  name: 'build-image',
-  arguments: {
-    dockerfilePath: './Dockerfile',
-    tag: 'my-app:latest',
-    sessionId: 'session-123'
-  }
-});
-
-// Security scan
-await client.callTool({
-  name: 'scan',
-  arguments: { imageName: 'my-app:latest', sessionId: 'session-123' }
-});
-```
-
-### Kubernetes Tools
-
-```javascript
-// Generate K8s manifests
-await client.callTool({
-  name: 'generate-k8s-manifests',
-  arguments: {
-    appName: 'my-app',
-    imageName: 'my-app:latest',
-    sessionId: 'session-123'
-  }
-});
-
-// Deploy to cluster
-await client.callTool({
-  name: 'deploy',
-  arguments: {
-    manifestPath: './test/fixtures/k8s/',
-    namespace: 'default',
-    sessionId: 'session-123'
-  }
-});
-```
-
-### Workflow Orchestration
-
-```javascript
-// Complete containerization workflow
-await client.callTool({
-  name: 'workflow',
-  arguments: {
-    workflowType: 'containerization',
-    repoPath: './my-app',
-    buildImage: true,
-    scanImage: true,
-    sessionId: 'session-123'
-  }
-});
-```
-
-## Configuration Options
-
-### Workflow Preferences
-
-```yaml
-workflow:
-  # Sampling configuration
-  sampling:
-    enabled: true          # Enable candidate generation
-    maxCandidates: 3       # Number of candidates to generate
-    timeout: 60            # Timeout in seconds
-  
-  # Build configuration
-  build:
-    timeout: 300           # Build timeout in seconds
-    enableCache: true      # Enable Docker layer caching
-    buildArgs:             # Custom build arguments
-      NODE_ENV: production
-  
-  # Security configuration
-  security:
-    maxVulnerabilityLevel: medium  # high, medium, low, critical
-    autoRemediation: true          # Auto-fix vulnerabilities
-    maxRemediationAttempts: 2      # Max remediation tries
-  
-  # Deployment configuration
-  deployment:
-    targetEnvironment: dev         # dev, staging, prod
-    strategy: rolling             # rolling, blue-green, canary
-    autoVerification: true        # Auto-verify deployment
-  
-  # Resource management
-  resources:
-    keepArtifacts: false          # Keep intermediate artifacts
-    ttl: 3600                     # Resource TTL in seconds
-```
-
-### Environment-Specific Settings
-
-```yaml
-environments:
-  development:
-    deployment:
-      replicas: 1
-      resources:
-        cpu: 100m
-        memory: 256Mi
-      debug: true
-  
-  staging:
-    deployment:
-      replicas: 2
-      resources:
-        cpu: 500m
-        memory: 512Mi
-      monitoring: true
-  
-  production:
-    deployment:
-      replicas: 3
-      resources:
-        cpu: 1000m
-        memory: 1Gi
-      monitoring: true
-      security:
-        enforceSecurityPolicies: true
-```
-
 ## Troubleshooting
 
-### Common Issues
+### Docker Connection Issues
 
-#### "Repository analysis failed"
-- **Cause**: Unsupported project structure or missing files
-- **Solution**: Ensure your project has standard configuration files (package.json, requirements.txt, etc.)
-- **Example**: 
-  ```bash
-  # Add missing package.json for Node.js projects
-  npm init -y
-  ```
-
-#### "Build failed: dependency installation"
-- **Cause**: Network issues or missing dependencies
-- **Solution**: Check internet connection and dependency specifications
-- **Example**:
-  ```bash
-  # Test dependency installation locally
-  npm install
-  # or
-  pip install -r requirements.txt
-  ```
-
-#### "Deployment failed: insufficient resources"
-- **Cause**: Kubernetes cluster doesn't have enough resources
-- **Solution**: Reduce resource requests or scale your cluster
-- **Example**:
-  ```yaml
-  # Reduce resource requests in .containerize.yml
-  environments:
-    dev:
-      deployment:
-        resources:
-          cpu: 50m      # Reduced from 100m
-          memory: 128Mi # Reduced from 256Mi
-  ```
-
-### Getting Help
-
-#### Command Line Help
 ```bash
-# General help
-containerize --help
+# Check Docker is running
+docker ps
 
-# Command-specific help
-containerize build --help
+# Check socket permissions (Linux/Mac)
+ls -la /var/run/docker.sock
 
-# Check configuration
-containerize config --validate
+# For Windows, ensure Docker Desktop is running
 ```
 
-#### Debug Mode
-```bash
-# Enable verbose logging
-containerize --repo . --debug
+### MCP Connection Issues
 
-# Save logs to file
-containerize --repo . --log-file containerize.log
+```bash
+# Test with MCP Inspector
+npx @modelcontextprotocol/inspector containerization-assist-mcp start
+
+# Check logs
+containerization-assist-mcp start --log-level debug
 ```
 
-#### Status and Monitoring
+### Build Issues
+
 ```bash
-# Check workflow status
-containerize status --session session_abc123_def456
+# Clean build
+npm run clean
+npm run build
 
-# List active workflows
-containerize list --active
+# Check TypeScript compilation
+npm run typecheck
 
-# View session artifacts
-containerize artifacts --session session_abc123_def456
+# Run tests
+npm test
 ```
 
-## What's Next?
+## Next Steps
 
-Now that you've started with the containerization assistant:
-
-1. **[Learn about MCP Server Features](./mcp-server.md)** - Explore all 14 enhanced tools
-2. **[Read the Architecture Guide](./ARCHITECTURE.md)** - Understand the system design
-3. **[Check the Testing Guide](./guides/testing.md)** - Learn how to test your setup
-4. **[Review Quality Management](./guides/quality-management.md)** - Code quality best practices
-
-For more help, visit our [documentation index](./README.md) or check the main project [README](../README.md).
+- Review the [Architecture Guide](./architecture.md) to understand the system design
+- Check the [Development Guide](./development.md) for contributing
+- Explore the [Main README](../README.md) for all available commands

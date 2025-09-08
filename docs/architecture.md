@@ -1,4 +1,4 @@
-# Enhanced MCP Server Architecture
+# Architecture
 
 ## Overview
 
@@ -16,8 +16,8 @@ ca-mcp
 
 ## Core Architecture
 
-```
-apps/cli.ts (Entry Point)
+```text
+src/cli/cli.ts (Entry Point)
     ↓
 ContainerizationMCPServer (src/mcp/server.ts)
     ├── enhanceServer() - Automatically called in constructor
@@ -104,7 +104,7 @@ All tools automatically support:
 
 ## Data Flow
 
-```
+```text
 1. Client Request → MCP Server
                       ↓
 2. Enhanced Handler (with ToolContext)
@@ -198,7 +198,7 @@ if (signal?.aborted) {
 
 ## File Structure
 
-```
+```text
 src/
 ├── mcp/
 │   ├── server.ts                    # Main server (auto-enhanced)

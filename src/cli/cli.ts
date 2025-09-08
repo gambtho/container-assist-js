@@ -136,7 +136,8 @@ function validateDockerSocket(options: any): { dockerSocket: string; warnings: s
       dockerSocket = thisSocket;
       break;
     } catch (error) {
-      warnings.push(`Cannot access Docker socket: ${thisSocket}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      warnings.push(`Cannot access Docker socket: ${thisSocket} - ${errorMsg}`);
     }
   }
 
@@ -273,7 +274,8 @@ function validateOptions(opts: any): { valid: boolean; errors: string[] } {
     try {
       statSync(opts.config);
     } catch (error) {
-      errors.push(`Configuration file not found: ${opts.config}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      errors.push(`Configuration file not found: ${opts.config} - ${errorMsg}`);
     }
   }
 
@@ -329,7 +331,8 @@ async function main(): Promise<void> {
           execSync('docker version', { stdio: 'pipe' });
           console.error('  ✅ Docker connection successful');
         } catch (error) {
-          console.error('  ⚠️  Docker connection failed - ensure Docker is running');
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          console.error(`  ⚠️  Docker connection failed - ensure Docker is running: ${errorMsg}`);
         }
       }
 
@@ -339,7 +342,8 @@ async function main(): Promise<void> {
         execSync('kubectl version --client=true', { stdio: 'pipe' });
         console.error('  ✅ Kubernetes client available');
       } catch (error) {
-        console.error('  ⚠️  Kubernetes client not found - kubectl not in PATH');
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error(`  ⚠️  Kubernetes client not found - kubectl not in PATH: ${errorMsg}`);
       }
 
       getLogger().info('Configuration validation completed');
@@ -365,13 +369,28 @@ async function main(): Promise<void> {
       getLogger().info('Listing available tools');
       await server.start();
 
-      const status = server.getStatus();
-      console.error('Available tools and workflows:');
+      const tools = server.getTools();
+      const workflows = server.getWorkflows();
+
+      console.error('\n🛠️  Available MCP Tools:');
       console.error('═'.repeat(60));
-      console.error(`\n📊 Registry Status:`);
-      console.error(`  • Tools: ${status.tools}`);
-      console.error(`  • Workflows: ${status.workflows}`);
-      console.error(`  • Server running: ${status.running}`);
+
+      console.error('\n📦 Containerization Tools:');
+      tools.forEach((tool) => {
+        console.error(`  • ${tool.name.padEnd(30)} - ${tool.description}`);
+      });
+
+      console.error('\n🔄 Workflow Tools:');
+      workflows.forEach((workflow) => {
+        console.error(`  • ${workflow.name.padEnd(30)} - ${workflow.description}`);
+      });
+
+      const status = server.getStatus();
+      console.error('\n📊 Summary:');
+      console.error(`  • Total tools: ${status.tools}`);
+      console.error(`  • Total workflows: ${status.workflows}`);
+      console.error(`  • Resources available: ${status.resources}`);
+      console.error(`  • Prompts available: ${status.prompts}`);
 
       await server.stop();
       process.exit(0);

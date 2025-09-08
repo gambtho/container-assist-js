@@ -439,4 +439,30 @@ export class MCPServer {
       workflows: 2,
     };
   }
+
+  /**
+   * Get list of available tools with their descriptions
+   */
+  getTools(): Array<{ name: string; description: string }> {
+    return Array.from(this.toolRegistry.values()).map((tool) => ({
+      name: tool.name,
+      description: tool.description || `${tool.name} tool`,
+    }));
+  }
+
+  /**
+   * Get list of workflow tools
+   */
+  getWorkflows(): Array<{ name: string; description: string }> {
+    return [
+      {
+        name: 'start_workflow',
+        description: 'Start a complete containerization workflow',
+      },
+      {
+        name: 'workflow_status',
+        description: 'Get the status of a running workflow',
+      },
+    ];
+  }
 }

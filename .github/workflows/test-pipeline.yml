@@ -338,9 +338,9 @@ jobs:
       - name: Validate build artifacts
         run: |
           # Validate CLI executable
-          test -f dist/apps/cli.js || exit 1
-          chmod +x dist/apps/cli.js
-          timeout 10s node dist/apps/cli.js --help || [ $? -eq 124 ]
+          test -f dist/src/cli/cli.js || exit 1
+          chmod +x dist/src/cli/cli.js
+          timeout 10s node dist/src/cli/cli.js --help || [ $? -eq 124 ]
           
           # Validate MCP server
           test -f dist/src/mcp/server.js || exit 1

@@ -287,13 +287,12 @@ sudo usermod -aG docker $USER
 
 ## Documentation
 
-📚 **[Documentation Index](docs/README.md)** - Complete documentation directory
+Comprehensive documentation is available in the [docs](./docs) directory:
 
-### Quick Links
-- **[Testing Guide](docs/guides/testing.md)** - Unit tests, integration tests, CI/CD
-- **[Quality Management](docs/guides/quality-management.md)** - Linting, quality gates, baseline management
-- **[AI Architecture](docs/reference/ai-architecture.md)** - AI system design and tool architecture
-- **[Claude Guide](docs/development/claude-guide.md)** - Guidelines for Claude Code AI assistant
+- **[Getting Started](./docs/getting-started.md)** - Installation, setup, and first use
+- **[Development Guide](./docs/development.md)** - Development setup, testing, and contribution
+- **[Architecture](./docs/architecture.md)** - System design, MCP features, and API reference
+- **[Claude Code Guidelines](./CLAUDE.md)** - Specific guidelines for Claude Code development
 
 ## Development
 
