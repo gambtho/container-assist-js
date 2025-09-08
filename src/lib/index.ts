@@ -1,16 +1,41 @@
 /**
- * Lib Utilities Entry Point
+ * Library Module Exports
  *
- * Import utilities directly from their specific modules:
- * - ./session - Session management
- * - ./logger - Logging utilities
- * - ./ai - AI services
- * - ./docker - Docker operations
- * - ./k8s - Kubernetes operations
- * - ./scanner - Security scanning
- *
- * This file intentionally does not re-export to avoid unused export warnings.
+ * Central export point for all library modules
  */
 
-// Empty export to satisfy TypeScript module requirements
-export {};
+// Core utilities
+export * from './logger';
+export * from './session';
+export * from './errors';
+export * from './composition';
+export * from './sampling';
+
+// Container utilities
+export * from './base-images';
+
+// Kubernetes utilities (re-exports from infrastructure)
+export type * from './kubernetes';
+
+// Security and scanning
+export * from './scanner';
+// Export everything except ScanResult from security-scanner to avoid conflict
+export {
+  type ScanOptions,
+  type VulnerabilityFinding,
+  type SecretFinding,
+  type SecretScanResult,
+  type SecurityReport,
+  scanImage,
+  SecurityScanner,
+} from './security-scanner';
+
+// Caching
+export * from './caching';
+
+// AI services
+export * from './ai/ai-service';
+export * from './mcp-host-ai';
+
+// Re-export AI index if it exists
+export * from './ai/index';

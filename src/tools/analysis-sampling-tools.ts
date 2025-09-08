@@ -9,13 +9,13 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../core/types';
+import { Success, Failure, type Result } from '@types';
 import type {
   AnalysisContext,
   AnalysisVariant,
   AnalysisScoringCriteria,
-} from '../workflows/analysis-sampling/types';
-import { AnalysisSamplingService } from '../workflows/analysis-sampling/analysis-sampling-service';
+} from '@workflows/sampling/analysis-types';
+import { AnalysisSamplingService } from '@workflows/sampling/analysis-sampling-service';
 
 // Tool configuration interfaces
 export interface AnalysisSamplingToolConfig {
@@ -506,11 +506,3 @@ export async function analysisStrategiesListTool(
     return Failure(error instanceof Error ? error.message : String(error));
   }
 }
-
-// Export tool instances
-export const analysisSamplingTools = {
-  'analysis-sampling': { execute: analysisSamplingTool },
-  'analysis-compare': { execute: analysisCompareTool },
-  'analysis-validate': { execute: analysisValidateTool },
-  'analysis-strategies': { execute: analysisStrategiesListTool },
-};

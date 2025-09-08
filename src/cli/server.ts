@@ -3,41 +3,52 @@
  * Uses direct SDK patterns with Zod schemas
  */
 
-import { MCPServer } from '../mcp/server/mcp-server';
-import { createLogger } from '../lib/logger';
-import { config as applicationConfig } from '../config/index';
+import { MCPServer } from '@mcp/server';
+import { createContainer, shutdownContainer, type Deps } from '@app/container';
 import process from 'node:process';
 
 async function main(): Promise<void> {
   // Set MCP mode to ensure logs go to stderr, not stdout (prevents JSON-RPC corruption)
   process.env.MCP_MODE = 'true';
 
-  const logger = createLogger({
-    name: 'containerization-assist-server',
-    level: applicationConfig.logging?.level ?? 'info',
-  });
+  let deps: Deps | undefined;
+  let server: MCPServer | undefined;
 
   try {
-    logger.info('Starting SDK-Native MCP Server with Zod schemas');
+    // Create dependency injection container
+    deps = createContainer({});
 
-    // Create and start the SDK-native server
-    const server = new MCPServer(logger, {
+    deps.logger.info('Starting SDK-Native MCP Server with DI container');
+
+    // Create and start the SDK-native server with injected dependencies
+    server = new MCPServer(deps, {
       name: 'containerization-assist',
       version: '2.0.0',
     });
     await server.start();
 
-    logger.info('MCP Server started successfully');
+    deps.logger.info('MCP Server started successfully');
 
     // Handle graceful shutdown
     const shutdown = async (): Promise<void> => {
-      logger.info('Shutting down server...');
+      if (deps) {
+        deps.logger.info('Shutting down server...');
+      }
       try {
-        await server.stop();
-        logger.info('Server shutdown complete');
+        if (server) {
+          await server.stop();
+        }
+        if (deps) {
+          await shutdownContainer(deps);
+          deps.logger.info('Server shutdown complete');
+        }
         process.exit(0);
       } catch (error) {
-        logger.error({ error }, 'Error during shutdown');
+        if (deps) {
+          deps.logger.error({ error }, 'Error during shutdown');
+        } else {
+          console.error('Error during shutdown:', error);
+        }
         process.exit(1);
       }
     };
@@ -55,7 +66,12 @@ async function main(): Promise<void> {
     // Keep the process alive
     process.stdin.resume();
   } catch (error) {
-    logger.error({ error }, 'Failed to start server');
+    const errorLogger = deps?.logger ?? console;
+    if (typeof errorLogger.error === 'function') {
+      errorLogger.error({ error }, 'Failed to start server');
+    } else {
+      console.error('Failed to start server:', error);
+    }
     process.exit(1);
   }
 }

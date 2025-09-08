@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../core/types';
+import { Success, Failure, type Result } from '@types';
 import type {
   SamplingConfig,
   SamplingOptions,
@@ -14,16 +14,19 @@ import type {
 } from './types';
 import { VariantGenerationPipeline } from './generation-pipeline';
 import { DEFAULT_SCORING_CRITERIA } from './scorer';
-import { MCPPromptRegistry } from '../../mcp/prompts/mcp-prompt-registry';
-import { createMCPAIOrchestrator, type MCPAIOrchestrator } from '../../mcp/ai/orchestrator';
-import { NativeMCPSampling } from '../../mcp/sampling/native-sampling';
-import type { ValidationContext } from '../../mcp/tools/validator';
+import { PromptRegistry } from '@prompts/prompt-registry';
+import {
+  createMCPAIOrchestrator,
+  type MCPAIOrchestrator,
+} from '@workflows/intelligent-orchestration';
+import { Sampler } from '@mcp/sampling/sampler';
+import type { ValidationContext } from '@mcp/tools/validator';
 import {
   createSDKResourceManager,
   createResourceContext,
   type SDKResourceManager,
-} from '../../mcp/resources/manager';
-import { UriParser } from '../../mcp/resources/uri-schemes';
+} from '@resources/manager';
+import { UriParser } from '@resources/uri-schemes';
 
 /**
  * High-level sampling service that provides the main API for Dockerfile sampling
@@ -32,15 +35,15 @@ export class SamplingService {
   private pipeline: VariantGenerationPipeline;
   private aiOrchestrator: MCPAIOrchestrator;
   private resourceManager: SDKResourceManager;
-  private nativeSampling: NativeMCPSampling;
+  private sampler: Sampler;
 
   constructor(
     private logger: Logger,
-    promptRegistry?: MCPPromptRegistry,
+    promptRegistry?: PromptRegistry,
   ) {
     this.pipeline = new VariantGenerationPipeline(logger, promptRegistry);
     this.aiOrchestrator = createMCPAIOrchestrator(logger, promptRegistry ? { promptRegistry } : {});
-    this.nativeSampling = new NativeMCPSampling(logger);
+    this.sampler = new Sampler(logger);
 
     // Initialize resource management for sampling results
     const resourceContext = createResourceContext(
@@ -78,26 +81,26 @@ export class SamplingService {
         validationContext,
       );
 
-      if (validationResult.ok && !validationResult.value.data.isValid) {
+      if (validationResult.ok && !validationResult.value.isValid) {
         logger.warn(
           {
-            errors: validationResult.value.data.errors,
-            warnings: validationResult.value.data.warnings,
+            errors: validationResult.value.errors,
+            warnings: validationResult.value.warnings,
           },
           'Parameter validation failed, proceeding with warnings',
         );
       }
 
-      // Use native MCP sampling when available for optimal quality and performance
-      // This path leverages enhanced AI models with context-aware prompting
-      if (this.nativeSampling.isAvailable()) {
+      // Use sampler when available for optimal quality and performance
+      // This path leverages enhanced AI models with context-aware prompting and transport fallback
+      if (this.sampler.isAvailable()) {
         logger.info(
           {
             sessionId: config.sessionId,
             optimization: options.optimization,
             environment: options.environment,
           },
-          'Using native MCP sampling for enhanced Dockerfile generation',
+          'Using sampler for enhanced Dockerfile generation',
         );
 
         // Analyze repository structure to inform generation strategy
@@ -105,34 +108,44 @@ export class SamplingService {
         const enhancedPrompt = this.buildEnhancedPrompt(config.repoPath, options, repoAnalysis);
 
         // Apply repository-specific strategies for specialized frameworks and patterns
-        const samplingResult = await this.nativeSampling.sampleDockerfileStrategies(
-          enhancedPrompt,
-          {
-            sessionId: config.sessionId,
-            environment: options.environment,
-            optimization: options.optimization,
-            ...repoAnalysis,
+        const samplingResult = await this.sampler.sampleDockerfileStrategies(enhancedPrompt, {
+          sessionId: config.sessionId,
+          context: {
+            language: (repoAnalysis.language as string) || 'javascript',
+            framework: repoAnalysis.framework as string,
+            dependencies: (repoAnalysis.dependencies as string[]) || [],
+            ports: [3000], // Default port, could be enhanced
+            buildTools: [],
+            environment: options.environment || 'production',
+            repoPath: config.repoPath,
           },
-        );
+          variantCount: 1,
+          strategies: options.optimization ? [options.optimization as any] : ['balanced'],
+        });
 
         if (samplingResult.ok) {
-          const strategies = samplingResult.value;
-          const strategiesList = Object.keys(strategies);
+          const result = samplingResult.value;
+          const variants = result.variants;
+          const strategiesList = [...new Set(variants.map((v) => v.strategy))];
 
           logger.info(
             {
               sessionId: config.sessionId,
               strategiesGenerated: strategiesList,
-              source: 'native-mcp-strategies',
+              variantsGenerated: variants.length,
+              source: 'sampler-strategies',
             },
-            'Native MCP strategy sampling successful',
+            'Sampler strategy sampling successful',
           );
 
-          // Choose optimal strategy based on user preferences and repository characteristics
-          // Fallback hierarchy: user preference -> balanced -> first available
+          // Choose optimal variant based on user preferences
           const preferredStrategy = options.optimization || 'balanced';
-          const selectedContent =
-            strategies[preferredStrategy] || strategies['balanced'] || Object.values(strategies)[0];
+          const selectedVariant =
+            result.bestVariant ||
+            variants.find((v) => v.strategy.includes(preferredStrategy)) ||
+            variants[0];
+
+          const selectedContent = selectedVariant?.content;
 
           if (selectedContent) {
             // Calculate confidence score based on strategy alignment and content quality metrics
@@ -146,17 +159,22 @@ export class SamplingService {
               content: selectedContent,
               score: confidence,
               metadata: {
-                approach: 'native-mcp-strategy-sampling',
+                approach: 'sampler-strategy',
                 environment: options.environment,
-                variants: strategiesList.length,
-                strategy: preferredStrategy,
-                optimization: options.optimization || 'balanced',
-                features: this.extractDockerfileFeatures(selectedContent),
+                variants: variants.length,
+                strategy: selectedVariant?.strategy || preferredStrategy,
+                optimization:
+                  selectedVariant?.metadata.optimization || options.optimization || 'balanced',
+                features:
+                  selectedVariant?.metadata.features ||
+                  this.extractDockerfileFeatures(selectedContent),
                 strategiesGenerated: strategiesList,
                 repoAnalysis,
                 generatedAt: new Date().toISOString(),
-                nativeMCP: true,
+                sampler: true,
                 confidence,
+                quality: result.quality,
+                samplingMetadata: result.metadata,
               },
             });
           }
@@ -169,10 +187,15 @@ export class SamplingService {
         );
 
         const enhancedPromptForDiversity = this.buildEnhancedPrompt(config.repoPath, options);
-        const diversityResult = await this.nativeSampling.sampleWithDiversityBoost(
+        const diversityResult = await this.sampler.sampleWithDiversityBoost(
           enhancedPromptForDiversity,
-          0.8, // Target diversity
-          3, // Max attempts
+          {
+            sessionId: config.sessionId,
+            targetDiversity: 0.8,
+            maxAttempts: 3,
+            samples: 3,
+            temperature: 0.7,
+          },
         );
 
         if (diversityResult.ok && diversityResult.value.length > 0) {
@@ -188,7 +211,7 @@ export class SamplingService {
               content: bestContent,
               score: confidence,
               metadata: {
-                approach: 'native-mcp-diversity-sampling',
+                approach: 'sampler-diversity',
                 environment: options.environment,
                 variants: diversityResult.value.length,
                 strategy: 'adaptive',
@@ -196,17 +219,14 @@ export class SamplingService {
                 features: this.extractDockerfileFeatures(bestContent),
                 diversity: 0.8,
                 generatedAt: new Date().toISOString(),
-                nativeMCP: true,
+                sampler: true,
                 confidence,
               },
             });
           }
         }
 
-        logger.warn(
-          { sessionId: config.sessionId },
-          'Native MCP sampling failed, falling back to pipeline',
-        );
+        logger.warn({ sessionId: config.sessionId }, 'Sampler failed, falling back to pipeline');
       }
 
       const samplingConfig: SamplingConfig = {
@@ -292,19 +312,19 @@ export class SamplingService {
       validationContext,
     );
 
-    if (validationResult.ok && !validationResult.value.data.isValid) {
+    if (validationResult.ok && !validationResult.value.isValid) {
       this.logger.warn(
         {
           sessionId: config.sessionId,
-          errors: validationResult.value.data.errors,
-          warnings: validationResult.value.data.warnings,
+          errors: validationResult.value.errors,
+          warnings: validationResult.value.warnings,
         },
         'Sampling configuration validation issues detected',
       );
 
       // Return validation errors if critical
-      const criticalErrors = validationResult.value.data.errors.filter(
-        (error) => error.includes('required') || error.includes('invalid'),
+      const criticalErrors = validationResult.value.errors.filter(
+        (error: string) => error.includes('required') || error.includes('invalid'),
       );
 
       if (criticalErrors.length > 0) {

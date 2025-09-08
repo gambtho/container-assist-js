@@ -9,7 +9,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
-import type { WorkflowState } from '../core/types';
+import { Result, Success, Failure, WorkflowState } from '../domain/types';
 import { SessionError, ErrorCodes } from './errors';
 
 interface SessionConfig {
@@ -144,9 +144,11 @@ export class SessionManager {
     const updatedWorkflowState: WorkflowState = {
       ...session.workflowState,
       ...state,
-      metadata: { ...session.workflowState.metadata, ...state.metadata },
+      metadata: {
+        ...(session.workflowState.metadata || {}),
+        ...(state.metadata || {}),
+      },
       completed_steps: state.completed_steps ?? session.workflowState.completed_steps ?? [],
-      errors: { ...session.workflowState.errors, ...state.errors },
       updatedAt: new Date(),
     };
 
@@ -189,6 +191,53 @@ export class SessionManager {
       }
     }
     this.logger.debug({ cleanedCount }, 'Session cleanup completed');
+  }
+
+  /**
+   * Interface compliance methods
+   */
+
+  async createSession(id: string): Promise<Result<WorkflowState>> {
+    try {
+      const sessionState = await this.create(id);
+      return Success(sessionState);
+    } catch (error) {
+      return Failure(error instanceof Error ? error.message : 'Failed to create session');
+    }
+  }
+
+  async getSession(id: string): Promise<Result<WorkflowState>> {
+    try {
+      const sessionState = await this.get(id);
+      if (!sessionState) {
+        return Failure(`Session ${id} not found`);
+      }
+      return Success(sessionState);
+    } catch (error) {
+      return Failure(error instanceof Error ? error.message : 'Failed to get session');
+    }
+  }
+
+  async updateSession(id: string, updates: Partial<WorkflowState>): Promise<Result<WorkflowState>> {
+    try {
+      await this.update(id, updates);
+      const updatedState = await this.get(id);
+      if (!updatedState) {
+        return Failure(`Session ${id} not found after update`);
+      }
+      return Success(updatedState);
+    } catch (error) {
+      return Failure(error instanceof Error ? error.message : 'Failed to update session');
+    }
+  }
+
+  async deleteSession(id: string): Promise<Result<boolean>> {
+    try {
+      await this.delete(id);
+      return Success(true);
+    } catch (error) {
+      return Failure(error instanceof Error ? error.message : 'Failed to delete session');
+    }
   }
 
   /**

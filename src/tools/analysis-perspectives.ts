@@ -6,16 +6,8 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../core/types';
-import type { AnalyzeRepoResult } from './analyze-repo';
-
-export type AnalysisPerspective = 'comprehensive' | 'security-focused' | 'performance-focused';
-
-export interface PerspectiveConfig {
-  perspective: AnalysisPerspective;
-  emphasis: string[];
-  additionalChecks: string[];
-}
+import { Success, Failure, type Result } from '@types';
+import type { AnalyzeRepoResult, AnalysisPerspective, PerspectiveConfig } from './types';
 
 /**
  * Analysis perspective configurations

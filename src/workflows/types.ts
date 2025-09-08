@@ -10,7 +10,7 @@ export interface BaseWorkflowParams {
 
 export interface WorkflowResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
 }
 
@@ -20,16 +20,16 @@ export interface WorkflowStep {
   startTime?: Date;
   endTime?: Date;
   error?: string;
-  output?: any;
+  output?: unknown;
 }
 
 export interface WorkflowContext {
   sessionId: string;
   steps: WorkflowStep[];
-  artifacts: Map<string, any>;
+  artifacts: Map<string, unknown>;
   metadata: {
     startTime: Date;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   currentStep?: string;
 }
@@ -62,8 +62,8 @@ export interface ContainerizationWorkflowResult {
     imageTags?: string[];
     dockerfilePath?: string;
     scanResults?: {
-      vulnerabilities: any[];
-      summary: any;
+      vulnerabilities: unknown[];
+      summary: unknown;
     };
     analysisData: {
       language: string;

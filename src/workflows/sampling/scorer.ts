@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../core/types';
+import { Success, Failure, type Result } from '@types';
 import type {
   DockerfileVariant,
   ScoredVariant,

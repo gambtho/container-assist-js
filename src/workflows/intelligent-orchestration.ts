@@ -1,6 +1,6 @@
-import { Success, Failure, type Result } from '../core/types';
+import { Success, Failure, type Result } from '@types';
 import type { Logger } from 'pino';
-import type { ProgressReporter } from '../mcp/server/middleware';
+import type { ProgressReporter } from '@mcp/server/middleware';
 
 type WorkflowStep = {
   toolName: string;
@@ -463,6 +463,26 @@ export const executeWorkflow = async (
     return Failure(`Workflow execution failed: ${message}`);
   }
 };
+
+// Create a basic orchestrator for compatibility
+export function createMCPAIOrchestrator(logger: Logger, _options?: any) {
+  return {
+    execute: executeWorkflow,
+    validateParameters: async (_toolName: string, _params: any, _context?: any) =>
+      Success({ isValid: true, errors: [], warnings: [] }),
+    logger,
+  };
+}
+
+export interface MCPAIOrchestrator {
+  execute: typeof executeWorkflow;
+  validateParameters: (
+    toolName: string,
+    params: any,
+    context?: any,
+  ) => Promise<Result<{ isValid: boolean; errors: string[]; warnings: string[] }>>;
+  logger: Logger;
+}
 
 // Export types
 export type { WorkflowStep, WorkflowContext, WorkflowResult };

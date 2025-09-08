@@ -8,8 +8,8 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../core/types';
-import { MCPClient } from '../mcp/client/mcp-client';
+import { Success, Failure, type Result } from '../domain/types';
+import { MCPClient } from '@mcp/client/mcp-client';
 
 /**
  * Interface for communicating with MCP Host AI
@@ -73,7 +73,7 @@ export interface MCPAIResponse {
  * structured responses for environments without SDK support.
  */
 export const createMCPHostAI = (logger: Logger): MCPHostAI => {
-  const sdkClient = new MCPClient(logger, {
+  const sdkClient = MCPClient.createWithStdio(logger, {
     capabilities: {
       completion: true,
       prompts: true,

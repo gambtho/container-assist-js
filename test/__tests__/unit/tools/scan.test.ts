@@ -5,7 +5,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { scanImage, type ScanImageConfig } from '../../../../src/tools/scan';
+import { scanImage, type ScanImageConfig } from '../../../../src/tools/scan/tool';
 import { createMockLogger, createSuccessResult, createFailureResult } from '../../../helpers/mock-infrastructure';
 
 // Mock lib modules following analyze-repo pattern

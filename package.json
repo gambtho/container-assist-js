@@ -15,12 +15,12 @@
       "default": "./dist/src/mcp/server.js"
     },
     "./types": {
-      "types": "./dist/src/core/types.d.ts",
-      "import": "./dist/src/core/types.js"
+      "types": "./dist/src/domain/types.d.ts",
+      "import": "./dist/src/domain/types.js"
     },
     "./config": {
-      "types": "./dist/src/core/types.d.ts",
-      "import": "./dist/src/core/types.js"
+      "types": "./dist/src/domain/types.d.ts",
+      "import": "./dist/src/domain/types.js"
     }
   },
   "bin": {
@@ -56,7 +56,7 @@
     "test:tools": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='test/__tests__/(unit|integration).*/tools'",
     "test:workflows": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='test/__tests__/(unit|integration).*/workflows'",
     "test:mcp": "tsx test/mcp-inspector/runner.ts",
-    "test:lib": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='test/unit/lib'",
+    "test:lib": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='test/__tests__/unit/lib'",
     "test:ci": "NODE_OPTIONS='--experimental-vm-modules' jest --ci --coverage --maxWorkers=2",
     "test:ci:unit": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit --ci --coverage --maxWorkers=2",
     "test:ci:integration": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects integration --ci --maxWorkers=1",
@@ -111,7 +111,7 @@
     "p-timeout": "^6.1.4",
     "pino": "^9.9.0",
     "zod": "^3.23.8",
-    "zod-to-json-schema": "^3.22.5"
+    "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
     "@jest/globals": "^30.1.2",

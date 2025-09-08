@@ -107,10 +107,6 @@ export function logConfigSummaryIfDev(logger?: {
 
     if (logger) {
       logger.info('Configuration loaded', configData);
-    } else {
-      // Fallback for cases where logger is not available
-      // eslint-disable-next-line no-console
-      console.log('Configuration loaded:', configData);
     }
   }
 }

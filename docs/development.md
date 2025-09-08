@@ -48,18 +48,29 @@ npm run validate:pr:fast
 
 ```text
 src/
-├── cli/              # CLI entry points
+├── app/             # Application entry point and DI container
+│   ├── index.ts     # Main application interface
+│   └── container.ts # Dependency injection setup
+├── cli/             # CLI entry points
 │   ├── cli.ts       # Main MCP server CLI
 │   └── server.ts    # Server utilities
 ├── config/          # Configuration management
-├── core/            # Core utilities and types
-├── lib/             # Libraries (AI service, utilities)
+├── domain/          # Core types and business logic
+├── infrastructure/  # External system adapters
+│   ├── docker/      # Docker client
+│   └── kubernetes/  # Kubernetes client
+├── lib/             # Libraries and utilities
+│   └── ai/          # AI services
 ├── mcp/             # MCP server implementation
-│   ├── server.ts    # Main MCP server
-│   ├── session/     # Session management
-│   ├── resources/   # Resource providers
-│   └── prompts/     # Prompt templates
-├── tools/           # Tool implementations
+│   ├── server/      # Core MCP server components
+│   ├── client/      # MCP client implementation
+│   ├── sampling/    # AI sampling services
+│   ├── tools/       # Tool registration
+│   └── utils/       # MCP utilities
+├── prompts/         # AI prompt management
+├── resources/       # Resource management
+├── tools/           # Tool implementations (co-located)
+│   └── [tool]/      # Each tool has tool.ts, schema.ts, index.ts
 └── workflows/       # Workflow orchestration
 ```
 
@@ -88,13 +99,15 @@ export async function buildImage(config: BuildConfig): Promise<Result<BuildOutpu
 ### Import Rules
 
 ```typescript
-// ✅ CORRECT - Relative imports
-import { Config } from '../config/types';
-import { DockerAdapter } from '../lib/docker-adapter';
-
-// ❌ WRONG - Path aliases (banned by ESLint)
+// ✅ OPTION 1 - Path aliases (cleaner, recommended)
 import { Config } from '@config/types';
-import { DockerAdapter } from '@lib/docker-adapter';
+import { DockerAdapter } from '@infrastructure/docker';
+
+// ✅ OPTION 2 - Relative imports (also acceptable)
+import { Config } from '../config/types';
+import { DockerAdapter } from '../infrastructure/docker';
+
+// Both approaches work - choose based on preference and team standards
 ```
 
 ### Error Handling

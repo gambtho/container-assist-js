@@ -5,7 +5,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { tagImage, type TagImageConfig } from '../../../../src/tools/tag';
+import { tagImage, type TagImageConfig } from '../../../../src/tools/tag-image/tool';
 import { createMockLogger, createSuccessResult, createFailureResult } from '../../../helpers/mock-infrastructure';
 
 // Mock lib modules following analyze-repo pattern
@@ -23,15 +23,15 @@ const mockTimer = {
   error: jest.fn(),
 };
 
-jest.mock('../../../../src/lib/session', () => ({
+jest.mock('@lib/session', () => ({
   createSessionManager: jest.fn(() => mockSessionManager),
 }));
 
-jest.mock('../../../../src/lib/docker', () => ({
+jest.mock('@lib/docker', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
 }));
 
-jest.mock('../../../../src/lib/logger', () => ({
+jest.mock('@lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
 }));
 
@@ -580,7 +580,7 @@ describe('tagImage', () => {
 
   describe('Tool Instance', () => {
     it('should provide correctly configured tool instance', async () => {
-      const { tagImageTool } = await import('../../../../src/tools/tag');
+      const { tagImageTool } = await import('../../../../src/tools/tag-image');
 
       expect(tagImageTool.name).toBe('tag');
       expect(typeof tagImageTool.execute).toBe('function');

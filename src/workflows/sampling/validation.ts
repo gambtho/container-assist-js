@@ -2,8 +2,8 @@
  * Validation functions for Dockerfile sampling
  */
 
-import { Success, Failure, type Result } from '../../core/types';
-import { DEFAULT_TIMEOUTS } from '../../config/defaults';
+import { Success, Failure, type Result } from '@types';
+import { DEFAULT_TIMEOUTS } from '@config/defaults';
 import type { SamplingConfig, DockerfileVariant, ScoringCriteria } from './types';
 import { DEFAULT_SCORING_CRITERIA } from './scorer';
 

@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { Result } from '../../core/types';
+import type { Result } from '@types';
 
 /**
  * Repository analysis context for sampling

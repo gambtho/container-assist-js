@@ -6,11 +6,11 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../core/types';
-import { analyzeRepo } from '../tools/analyze-repo';
-import { generateDockerfile } from '../tools/generate-dockerfile';
-import { buildImage } from '../tools/build-image';
-import { scanImage } from '../tools/scan';
+import { Result, Success, Failure } from '@types';
+import { analyzeRepo } from '@tools/analyze-repo';
+import { generateDockerfile } from '@tools/generate-dockerfile';
+import { buildImage } from '@tools/build-image';
+import { scanImage } from '@tools/scan';
 import { generateBestDockerfile } from './dockerfile-sampling';
 
 // Specific configuration for containerization workflow

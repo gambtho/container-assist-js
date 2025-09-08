@@ -1,6 +1,6 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 import { SecurityScanner, ScanResult, ScanOptions, VulnerabilityFinding } from '../../../../src/lib/security-scanner';
-import { Result, Success, Failure } from '../../../../src/core/types';
+import { Result, Success, Failure } from '../../../../src/domain/types';
 import type { Logger } from 'pino';
 
 // Mock the logger

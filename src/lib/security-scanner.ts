@@ -6,7 +6,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure, isFail } from '../core/types';
+import { Result, Success, Failure, isFail } from '../domain/types';
 
 // Type definitions expected by tests and other components
 export interface ScanOptions {

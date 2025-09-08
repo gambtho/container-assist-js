@@ -5,7 +5,7 @@
 
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
-import { buildImage, type BuildImageConfig } from '../../../../src/tools/build-image';
+import { buildImage, type BuildImageConfig } from '../../../../src/tools/build-image/tool';
 import { createMockLogger, createSuccessResult, createFailureResult } from '../../../helpers/mock-infrastructure';
 
 // Mock filesystem functions with proper structure

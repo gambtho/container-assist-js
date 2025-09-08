@@ -6,7 +6,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Result, Success, Failure } from '../core/types';
+import { Result, Success, Failure } from '../domain/types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -38,7 +38,7 @@ export class CacheManager {
   private cache = new Map<string, CacheEntry>();
   private cacheDir: string;
   private options: Required<CacheOptions>;
-  private logger?: Logger;
+  private logger: Logger | undefined;
   private stats = {
     hitCount: 0,
     missCount: 0,
@@ -51,7 +51,7 @@ export class CacheManager {
       maxSize: options.maxSize ?? 1000,
       persistToDisk: options.persistToDisk ?? true,
     };
-    this.logger = logger!;
+    this.logger = logger;
   }
 
   /**
@@ -527,8 +527,8 @@ export class CacheManager {
           if (!this.isExpired(entry)) {
             // Try to restore original key format
             const keyMatch = file.match(/^(.+)\.json$/);
-            if (keyMatch) {
-              const originalKey = keyMatch[1]!.replace(/_/g, ':');
+            if (keyMatch?.[1]) {
+              const originalKey = keyMatch[1].replace(/_/g, ':');
               this.cache.set(originalKey, entry);
             }
           }

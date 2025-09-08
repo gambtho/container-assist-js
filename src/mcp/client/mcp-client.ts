@@ -6,7 +6,9 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../core/types';
+import { Success, Failure, type Result } from '@types';
+import type { MCPTransport } from './transport';
+import { SdkTransport } from './sdk-transport';
 
 /**
  * MCP SDK Client Configuration
@@ -58,15 +60,28 @@ export interface CompletionResponse {
  */
 export class MCPClient {
   private logger: Logger;
-  private config: MCPClientConfig;
+  private transport: MCPTransport;
   private connected: boolean = false;
-  private connectionAttempts: number = 0;
 
-  constructor(logger: Logger, config: MCPClientConfig = {}) {
+  /**
+   * Create a new MCP client with a transport
+   * @param logger Logger instance
+   * @param transport Transport implementation
+   */
+  constructor(logger: Logger, transport: MCPTransport) {
     this.logger = logger;
-    this.config = {
-      serverCommand: config.serverCommand || 'mcp-server',
-      serverArgs: config.serverArgs || ['--mode', 'completion'],
+    this.transport = transport;
+  }
+
+  /**
+   * Factory method for creating a client with stdio transport (backward compatibility)
+   * @param logger Logger instance
+   * @param config Client configuration
+   */
+  static createWithStdio(logger: Logger, config: MCPClientConfig = {}): MCPClient {
+    const transport = new SdkTransport({
+      command: config.serverCommand || 'mcp-server',
+      args: config.serverArgs || [],
       capabilities: {
         completion: true,
         prompts: true,
@@ -74,65 +89,37 @@ export class MCPClient {
         sampling: true,
         ...config.capabilities,
       },
-      connectionTimeout: config.connectionTimeout || 30000,
+      timeout: config.connectionTimeout || 30000,
       retryAttempts: config.retryAttempts || 3,
-    };
+      logger,
+    });
+
+    return new MCPClient(logger, transport);
   }
 
   /**
    * Initialize the SDK client connection
    */
   async initialize(): Promise<Result<void>> {
-    try {
-      this.logger.info('Initializing MCP SDK Client...');
-
-      // In a real implementation, this would use the actual SDK
-      // For now, we simulate the connection setup
-      await this.establishConnection();
-
-      if (this.config.capabilities?.completion) {
-        await this.setupCompletionHandler();
-      }
-
-      this.connected = true;
-      this.logger.info('MCP SDK Client initialized successfully');
+    if (this.connected) {
       return Success(undefined);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error({ error: message }, 'Failed to initialize MCP SDK Client');
-      return Failure(`SDK client initialization failed: ${message}`);
     }
+
+    this.logger.info('Initializing MCP Client...');
+
+    const connectResult = await this.transport.connect();
+    if (!connectResult.ok) {
+      this.logger.error({ error: connectResult.error }, 'Failed to initialize MCP Client');
+      return connectResult;
+    }
+
+    this.connected = true;
+    this.logger.info('MCP Client initialized successfully');
+    return Success(undefined);
   }
 
   /**
-   * Establish connection to MCP server
-   */
-  private async establishConnection(): Promise<void> {
-    this.connectionAttempts++;
-
-    // Simulate connection establishment
-    // In real implementation, this would use StdioClientTransport or similar
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (this.connectionAttempts <= this.config.retryAttempts!) {
-          resolve();
-        } else {
-          reject(new Error('Connection timeout'));
-        }
-      }, 1000);
-    });
-  }
-
-  /**
-   * Set up completion request handler
-   */
-  private async setupCompletionHandler(): Promise<void> {
-    // In real implementation, this would set up the actual handler
-    this.logger.debug('Setting up completion request handler');
-  }
-
-  /**
-   * Make a completion request
+   * Make a completion request using SDK's completion/complete method
    */
   async complete(prompt: string, context?: Record<string, unknown>): Promise<Result<string>> {
     if (!this.connected) {
@@ -142,53 +129,113 @@ export class MCPClient {
       }
     }
 
-    try {
-      const request: CompletionRequest = {
-        ref: {
-          type: 'ref/prompt',
-          name: (context?.promptName as string) || 'default',
-        },
-        argument: {
-          prompt,
-          ...context,
-        },
-        sampling: {
-          temperature: 0.7,
-          topP: 0.9,
-          maxTokens: 2000,
-          n: 1,
-        },
-      };
+    const promptName = (context?.promptName as string) || 'default';
 
-      this.logger.debug(
-        {
-          promptName: request.ref.name,
-          promptLength: prompt.length,
-          contextKeys: Object.keys(context || {}),
-        },
-        'Making completion request',
-      );
+    this.logger.debug(
+      {
+        promptName,
+        promptLength: prompt.length,
+        contextKeys: Object.keys(context || {}),
+      },
+      'Making completion request',
+    );
 
-      // In real implementation, this would make actual SDK request
-      const response = await this.makeSDKRequest(request);
+    const response = await this.transport.request<any>('completion/complete', {
+      ref: {
+        type: 'ref/prompt',
+        name: promptName,
+      },
+      argument: {
+        prompt,
+        ...context,
+      },
+    });
 
-      if (response.completion.values.length === 0) {
-        return Failure('No completion values returned');
-      }
-
-      const firstValue = response.completion.values[0];
-      if (!firstValue) {
-        return Failure('No completion value returned');
-      }
-      return Success(firstValue);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+    if (!response.ok) {
       this.logger.error(
-        { error: message, prompt: prompt.substring(0, 100) },
+        { error: response.error, prompt: prompt.substring(0, 100) },
         'Completion request failed',
       );
-      return Failure(`SDK completion failed: ${message}`);
+      return response;
     }
+
+    if (!response.value?.completion?.values?.length) {
+      return Failure('No completion values returned');
+    }
+
+    const firstValue = response.value.completion.values[0];
+    if (!firstValue) {
+      return Failure('No completion value returned');
+    }
+    return Success(firstValue);
+  }
+
+  /**
+   * Get a prompt from the server
+   */
+  async getPrompt(name: string, args?: Record<string, unknown>): Promise<Result<any>> {
+    if (!this.connected) {
+      const initResult = await this.initialize();
+      if (!initResult.ok) {
+        return initResult;
+      }
+    }
+
+    return this.transport.request('prompts/get', {
+      name,
+      arguments: args || {},
+    });
+  }
+
+  /**
+   * List available resources
+   */
+  async listResources(): Promise<Result<any>> {
+    if (!this.connected) {
+      const initResult = await this.initialize();
+      if (!initResult.ok) {
+        return initResult;
+      }
+    }
+
+    return this.transport.request('resources/list', {});
+  }
+
+  /**
+   * Read a resource
+   */
+  async readResource(uri: string): Promise<Result<any>> {
+    if (!this.connected) {
+      const initResult = await this.initialize();
+      if (!initResult.ok) {
+        return initResult;
+      }
+    }
+
+    return this.transport.request('resources/read', { uri });
+  }
+
+  /**
+   * Check if client is connected
+   */
+  isConnected(): boolean {
+    return this.connected && this.transport.isConnected();
+  }
+
+  /**
+   * Get client capabilities
+   */
+  getCapabilities(): Record<string, any> {
+    return this.transport.getCapabilities?.() || {};
+  }
+
+  /**
+   * Disconnect and cleanup
+   */
+  async disconnect(): Promise<void> {
+    await this.transport.close();
+    this.connected = false;
+    this.logger.info('MCP Client disconnected');
   }
 
   /**
@@ -206,26 +253,36 @@ export class MCPClient {
       }
     }
 
-    try {
-      const request: CompletionRequest = {
+    const promptName = (context?.promptName as string) || 'default';
+
+    // Make multiple completion requests
+    const completionPromises = Array.from({ length: count }, async (_, i) => {
+      const response = await this.transport.request<any>('completion/complete', {
         ref: {
           type: 'ref/prompt',
-          name: (context?.promptName as string) || 'default',
+          name: promptName,
         },
         argument: {
           prompt,
+          variant: i,
           ...context,
         },
-        sampling: {
-          temperature: 0.7,
-          topP: 0.9,
-          maxTokens: 2000,
-          n: count,
-        },
-      };
+      });
 
-      const response = await this.makeSDKRequest(request);
-      return Success(response.completion.values);
+      if (!response.ok) {
+        throw new Error(`Completion ${i} failed: ${response.error}`);
+      }
+
+      if (!response.value?.completion?.values?.length) {
+        throw new Error(`No completion values returned for variant ${i}`);
+      }
+
+      return response.value.completion.values[0];
+    });
+
+    try {
+      const results = await Promise.all(completionPromises);
+      return Success(results.filter((r): r is string => r !== undefined));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return Failure(`Batch completion failed: ${message}`);
@@ -233,280 +290,16 @@ export class MCPClient {
   }
 
   /**
-   * Check if client is connected
+   * Test fallback for completion (only for tests)
    */
-  isConnected(): boolean {
-    return this.connected;
-  }
-
-  /**
-   * Get client capabilities
-   */
-  getCapabilities(): MCPClientConfig['capabilities'] {
-    return this.config.capabilities;
-  }
-
-  /**
-   * Disconnect and cleanup
-   */
-  async disconnect(): Promise<void> {
-    this.connected = false;
-    this.connectionAttempts = 0;
-    this.logger.info('MCP SDK Client disconnected');
-  }
-
-  /**
-   * Make SDK request (internal implementation)
-   */
-  private async makeSDKRequest(request: CompletionRequest): Promise<CompletionResponse> {
-    // In a real implementation, this would use the actual MCP SDK
-    // For now, we provide a working implementation that generates appropriate responses
-
-    const prompt = request.argument.prompt as string;
-    const context = request.argument;
-    const responseCount = request.sampling?.n || 1;
-
-    // Generate contextually appropriate responses based on prompt type
-    const responses = this.generateContextualResponses(prompt, context, responseCount);
-
-    return {
-      completion: {
-        values: responses,
-      },
-    };
-  }
-
-  /**
-   * Generate contextually appropriate responses
-   */
-  private generateContextualResponses(
-    prompt: string,
-    context: Record<string, unknown>,
-    count: number,
-  ): string[] {
-    const type = (context.type as string) || this.detectPromptType(prompt);
-
-    const responses: string[] = [];
-
-    for (let i = 0; i < count; i++) {
-      responses.push(this.generateResponse(type, context, i));
+  async testFallbackComplete(prompt: string): Promise<Result<string>> {
+    // This is only used in test environments when a real server is not available
+    if (process.env.NODE_ENV !== 'test') {
+      return Failure('Test fallback is only available in test environment');
     }
 
-    return responses;
-  }
-
-  /**
-   * Detect prompt type from content
-   */
-  private detectPromptType(prompt: string): string {
-    const lower = prompt.toLowerCase();
-
-    if (lower.includes('dockerfile')) return 'dockerfile';
-    if (lower.includes('kubernetes') || lower.includes('k8s')) return 'kubernetes';
-    if (lower.includes('analyze') || lower.includes('analysis')) return 'analysis';
-    if (lower.includes('enhance') || lower.includes('improvement')) return 'enhancement';
-
-    return 'general';
-  }
-
-  /**
-   * Generate response based on type and context
-   */
-  private generateResponse(
-    type: string,
-    context: Record<string, unknown>,
-    variant: number,
-  ): string {
-    switch (type) {
-      case 'dockerfile':
-        return this.generateDockerfileResponse(context, variant);
-      case 'kubernetes':
-        return this.generateKubernetesResponse(context, variant);
-      case 'analysis':
-        return this.generateAnalysisResponse(context, variant);
-      case 'enhancement':
-        return this.generateEnhancementResponse(context, variant);
-      default:
-        return this.generateGeneralResponse(context, variant);
-    }
-  }
-
-  private generateDockerfileResponse(context: Record<string, unknown>, variant: number): string {
-    const language = context.language || 'node';
-    const optimization = variant === 0 ? 'security' : variant === 1 ? 'performance' : 'size';
-
-    // Generate appropriate Dockerfile based on language and optimization strategy
-    const baseImages = {
-      node: variant === 0 ? 'node:18-alpine' : 'node:18-slim',
-      python: variant === 0 ? 'python:3.11-alpine' : 'python:3.11-slim',
-      java: variant === 0 ? 'openjdk:17-alpine' : 'openjdk:17-jre-slim',
-    };
-
-    const baseImage = baseImages[language as keyof typeof baseImages] || 'alpine:latest';
-
-    return `# Generated Dockerfile - ${optimization} optimized
-FROM ${baseImage}
-
-WORKDIR /app
-
-# Copy package files first for better caching
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy application code
-COPY . .
-
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \\
-    adduser -S nextjs -u 1001
-
-# Set proper ownership
-RUN chown -R nextjs:nodejs /app
-USER nextjs
-
-# Expose port
-EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
-  CMD curl -f http://localhost:3000/health || exit 1
-
-# Start application
-CMD ["npm", "start"]`;
-  }
-
-  private generateKubernetesResponse(context: Record<string, unknown>, _variant: number): string {
-    const appName = String(context.appName || 'app');
-    const environment = String(context.environment || 'production');
-    const replicas = String(context.replicas || 3);
-
-    return `# Generated Kubernetes Manifests - ${environment}
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ${appName}
-  labels:
-    app: ${appName}
-spec:
-  replicas: ${replicas}
-  selector:
-    matchLabels:
-      app: ${appName}
-  template:
-    metadata:
-      labels:
-        app: ${appName}
-    spec:
-      containers:
-      - name: ${appName}
-        image: ${appName}:latest
-        ports:
-        - containerPort: 3000
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 3000
-          initialDelaySeconds: 5
-          periodSeconds: 5
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ${appName}-service
-spec:
-  selector:
-    app: ${appName}
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 3000
-  type: ClusterIP`;
-  }
-
-  private generateAnalysisResponse(context: Record<string, unknown>, variant: number): string {
-    return JSON.stringify(
-      {
-        status: 'completed',
-        analysis: {
-          language: context.language || 'javascript',
-          framework: context.framework || 'express',
-          dependencies: context.dependencies || [],
-          security: {
-            score: 85 + variant * 5,
-            recommendations: [
-              'Update dependencies to latest versions',
-              'Add security headers',
-              'Implement proper input validation',
-            ],
-          },
-          performance: {
-            score: 80 + variant * 3,
-            recommendations: ['Optimize database queries', 'Implement caching', 'Minify assets'],
-          },
-        },
-      },
-      null,
-      2,
-    );
-  }
-
-  private generateEnhancementResponse(context: Record<string, unknown>, variant: number): string {
-    const originalData = context.data || {};
-
-    return JSON.stringify(
-      {
-        status: 'enhanced',
-        original: originalData,
-        enhancements: {
-          recommendations: [
-            'Consider implementing monitoring and logging',
-            'Add automated testing pipeline',
-            'Implement proper error handling',
-          ],
-          bestPractices: [
-            'Use environment variables for configuration',
-            'Implement proper secrets management',
-            'Add rate limiting for API endpoints',
-          ],
-          optimizations: [
-            'Enable compression middleware',
-            'Implement connection pooling',
-            'Use CDN for static assets',
-          ],
-        },
-        confidence: 0.85 + variant * 0.05,
-      },
-      null,
-      2,
-    );
-  }
-
-  private generateGeneralResponse(context: Record<string, unknown>, variant: number): string {
-    return `Generated response for general request (variant ${variant + 1}):
-
-Based on the provided context, here are recommendations:
-
-1. Follow industry best practices for your technology stack
-2. Implement proper security measures
-3. Optimize for performance and scalability
-4. Ensure proper monitoring and logging
-5. Maintain comprehensive documentation
-
-Context analyzed: ${JSON.stringify(context, null, 2)}`;
+    // Simple test response generation
+    const response = `Test response for: ${prompt.substring(0, 50)}...`;
+    return Success(response);
   }
 }

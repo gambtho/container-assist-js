@@ -185,15 +185,32 @@ await server.start();
 
 ```
 src/
-├── config/          # Single source of truth for configuration
-├── domain/          # Pure types only (no business logic!)
-├── infrastructure/  # External adapters (docker, k8s, ai, core) - 100% clean!
-├── application/     # Business logic (tools, workflow, factories)
-└── platform/        # Entry points (bin, server)
-apps/                # CLI entry points
+├── app/             # Application entry point and dependency injection
+├── cli/             # CLI entry points
+├── config/          # Configuration management
+├── domain/          # Core types and business logic
+├── infrastructure/  # External system adapters (Docker, Kubernetes)
+├── lib/             # Libraries and shared utilities
+├── mcp/             # MCP server implementation
+│   ├── client/      # MCP client implementation
+│   ├── sampling/    # AI sampling services
+│   ├── server/      # MCP server core
+│   ├── tools/       # Tool registration and validation
+│   └── utils/       # MCP utilities
+├── prompts/         # AI prompt management
+├── resources/       # Resource management and caching
+├── tools/           # Tool implementations (co-located pattern)
+│   ├── analyze-repo/
+│   │   ├── tool.ts    # Tool implementation
+│   │   ├── schema.ts  # Zod schema definition
+│   │   └── index.ts   # Public exports
+│   └── [tool-name]/   # Same structure for each tool
+└── workflows/       # Workflow orchestration
+    ├── orchestration/ # Complex workflow coordination
+    └── sampling/      # Sampling-based workflows
 dist/                # Built output (ESM modules)
-reports/             # Quality metrics and baselines
-scripts/             # Build and validation scripts
+scripts/             # Build and automation scripts
+test/                # Test files
 ```
 
 ## Example Usage
@@ -345,8 +362,8 @@ npm run test:watch         # Watch mode for development
 
 - **Build System**: Ultra-fast tsdown (esbuild-based) - 10-100x faster than tsc
 - **TypeScript**: Strict mode with ES2022 modules and native ESM support
-- **Imports**: Relative paths only (no path aliases like @domain/@service)
-- **Architecture**: Clean 3-layer separation with strict boundaries
+- **Imports**: Path aliases supported (@app, @mcp, @tools, etc.) for clean imports
+- **Architecture**: Clean layered separation with strict boundaries
 - **Error Handling**: Result<T> monad pattern throughout
 - **Quality Gates**: Automated lint ratcheting prevents regression
 - **Testing**: Comprehensive unit and integration tests

@@ -3,14 +3,17 @@
  * Eliminates unnecessary wrapper class and delegation
  */
 
-import { Result } from '../../core/types';
+import { Result } from '@types';
 import type { Logger } from 'pino';
 import {
   runContainerizationWorkflow,
   runBuildOnlyWorkflow,
   type ContainerizationConfig as ContainerizationWorkflowConfig,
-} from '../containerization-workflow';
-import { executeWorkflow, type WorkflowContext } from '../intelligent-orchestration';
+} from '@workflows/containerization-workflow';
+import {
+  executeWorkflow as executeIntelligentWorkflow,
+  type WorkflowContext,
+} from '@workflows/intelligent-orchestration';
 
 /**
  * Execute containerization workflow for a repository
@@ -50,7 +53,7 @@ export const executeBuildWorkflow = async (
  * @param config - Optional workflow configuration with AI service and session management
  * @returns Promise resolving to enhanced workflow execution result
  */
-export const executeEnhancedWorkflow = async (
+export const executeWorkflow = async (
   repositoryPath: string,
   workflowType: string,
   logger: Logger,
@@ -68,7 +71,7 @@ export const executeEnhancedWorkflow = async (
     ...config,
   };
 
-  return executeWorkflow(workflowType, params, context, config?.toolFactory);
+  return executeIntelligentWorkflow(workflowType, params, context, config?.toolFactory);
 };
 
 /**
@@ -79,7 +82,7 @@ export const executeDeploymentWorkflow = async (
   logger: Logger,
   config?: Partial<ContainerizationWorkflowConfig>,
 ): Promise<Result<any>> => {
-  return executeEnhancedWorkflow(repositoryPath, 'deployment', logger, config);
+  return executeWorkflow(repositoryPath, 'deployment', logger, config);
 };
 
 /**
@@ -90,7 +93,7 @@ export const executeSecurityWorkflow = async (
   logger: Logger,
   config?: Partial<ContainerizationWorkflowConfig>,
 ): Promise<Result<any>> => {
-  return executeEnhancedWorkflow(repositoryPath, 'security', logger, config);
+  return executeWorkflow(repositoryPath, 'security', logger, config);
 };
 
 /**
@@ -101,40 +104,5 @@ export const executeOptimizationWorkflow = async (
   logger: Logger,
   config?: Partial<ContainerizationWorkflowConfig>,
 ): Promise<Result<any>> => {
-  return executeEnhancedWorkflow(repositoryPath, 'optimization', logger, config);
+  return executeWorkflow(repositoryPath, 'optimization', logger, config);
 };
-
-/**
- * List available workflows
- */
-export const getAvailableWorkflows = (): Array<{
-  name: string;
-  description: string;
-  execute: (repositoryPath: string, logger: Logger, config?: any) => Promise<Result<any>>;
-}> => [
-  {
-    name: 'containerization',
-    description: 'Complete containerization workflow from analysis to deployment',
-    execute: executeBasicContainerizationWorkflow,
-  },
-  {
-    name: 'build-only',
-    description: 'Build Docker image only',
-    execute: executeBuildWorkflow,
-  },
-  {
-    name: 'deployment',
-    description: 'Deploy application to Kubernetes cluster',
-    execute: executeDeploymentWorkflow,
-  },
-  {
-    name: 'security',
-    description: 'Security analysis and remediation workflow',
-    execute: executeSecurityWorkflow,
-  },
-  {
-    name: 'optimization',
-    description: 'Optimize Docker images for size and performance',
-    execute: executeOptimizationWorkflow,
-  },
-];

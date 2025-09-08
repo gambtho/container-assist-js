@@ -4,7 +4,7 @@ This guide will help you install, configure, and use the Containerization Assist
 
 ## Prerequisites
 
-- **Node.js** 18 or higher
+- **Node.js** 20 or higher
 - **Docker** 20.10 or higher  
 - **kubectl** (optional, for Kubernetes deployments)
 - **Git** (for development setup)
@@ -88,7 +88,7 @@ npx @modelcontextprotocol/inspector npx tsx src/cli/cli.ts
 
 ### Using MCP Tools
 
-The server provides 14 enhanced tools that work together seamlessly:
+The server provides 14 tools organized with the co-location pattern that work together seamlessly:
 
 ```javascript
 // 1. Analyze your repository
@@ -149,24 +149,26 @@ Available workflows:
 - **security**: Vulnerability scanning and remediation
 - **optimization**: Image size and performance optimization
 
+Workflows are orchestrated using the intelligent orchestration system in `src/workflows/`.
+
 ## Available Tools
 
-| Tool | Description |
-|------|-------------|
-| `analyze_repository` | Analyze repository structure and detect language/framework |
-| `resolve_base_images` | Find optimal base images for applications |
-| `generate_dockerfile` | Create optimized Dockerfiles |
-| `generate_dockerfile_ext` | Extended Dockerfile generation with AI |
-| `fix_dockerfile` | Fix and optimize existing Dockerfiles |
-| `build_image` | Build Docker images with progress tracking |
-| `scan_image` | Security vulnerability scanning with Trivy |
-| `tag_image` | Tag Docker images |
-| `push_image` | Push images to registry |
-| `generate_k8s_manifests` | Create Kubernetes deployment configurations |
-| `prepare_cluster` | Prepare Kubernetes cluster for deployment |
-| `deploy_application` | Deploy applications to Kubernetes |
-| `verify_deployment` | Verify deployment health and status |
-| `start_workflow` | Start complete containerization workflow |
+| Tool | Description | Location |
+|------|-------------|----------|
+| `analyze_repository` | Analyze repository structure and detect language/framework | `src/tools/analyze-repo/` |
+| `resolve_base_images` | Find optimal base images for applications | `src/tools/resolve-base-images/` |
+| `generate_dockerfile` | Create optimized Dockerfiles | `src/tools/generate-dockerfile/` |
+| `fix_dockerfile` | Fix and optimize existing Dockerfiles | `src/tools/fix-dockerfile/` |
+| `build_image` | Build Docker images with progress tracking | `src/tools/build-image/` |
+| `scan_image` | Security vulnerability scanning with Trivy | `src/tools/scan/` |
+| `tag_image` | Tag Docker images | `src/tools/tag-image/` |
+| `push_image` | Push images to registry | `src/tools/push-image/` |
+| `generate_k8s_manifests` | Create Kubernetes deployment configurations | `src/tools/generate-k8s-manifests/` |
+| `prepare_cluster` | Prepare Kubernetes cluster for deployment | `src/tools/prepare-cluster/` |
+| `deploy_application` | Deploy applications to Kubernetes | `src/tools/deploy/` |
+| `verify_deployment` | Verify deployment health and status | `src/tools/verify-deployment/` |
+| `start_workflow` | Start complete containerization workflow | `src/tools/workflow/` |
+| `ops` | Operational tools (ping, health, registry) | `src/tools/ops/` |
 
 ## Environment Variables
 

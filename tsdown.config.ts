@@ -10,7 +10,7 @@ const mainEntries = {
   // CLI entry point (package.json bin)
   'src/cli/cli': 'src/cli/cli.ts',
   // Additional exports from package.json exports (match output paths)
-  'src/core/types': 'src/core/types.ts',
+  'src/domain/types': 'src/domain/types.ts',
   'src/config/types': 'src/config/types.ts'
 };
 
@@ -39,6 +39,12 @@ export default defineConfig({
   
   // Enable code splitting for better performance
   splitting: true,
+  
+  // Resolve TypeScript path aliases
+  esbuildOptions(options) {
+    options.tsconfig = './tsconfig.json';
+    options.resolveExtensions = ['.ts', '.tsx', '.js', '.jsx'];
+  },
   
   // External dependencies (not bundled)
   external: [

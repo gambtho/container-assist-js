@@ -5,7 +5,7 @@
 
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
-import { analyzeRepo, type AnalyzeRepoConfig } from '../../../../src/tools/analyze-repo';
+import { analyzeRepo, type AnalyzeRepoConfig } from '../../../../src/tools/analyze-repo/tool';
 import { createMockLogger, createMockFilesystem, createSuccessResult, createFailureResult } from '../../../helpers/mock-infrastructure';
 import { 
   nodeExpressBasicRepository, 

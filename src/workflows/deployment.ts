@@ -9,14 +9,14 @@
  * 5. Verify deployment health
  */
 
-import { prepareCluster } from '../tools/prepare-cluster';
-import { generateK8sManifests } from '../tools/generate-k8s-manifests';
-import { pushImage } from '../tools/push';
-import { deployApplication } from '../tools/deploy';
-import { verifyDeployment } from '../tools/verify-deployment';
-import { isFail } from '../core/types';
-import { createSessionManager } from '../lib/session';
-import { createTimer, createLogger, type Logger } from '../lib/logger';
+import { prepareCluster } from '@tools/prepare-cluster';
+import { generateK8sManifests } from '@tools/generate-k8s-manifests';
+import { pushImage } from '@tools/push-image';
+import { deployApplication } from '@tools/deploy';
+import { verifyDeployment } from '@tools/verify-deployment';
+import { isFail } from '@types';
+import { createTimer, type Logger } from '@lib/logger';
+import type { Deps } from '@app/container';
 import type {
   DeploymentWorkflowParams,
   DeploymentWorkflowResult,
@@ -29,11 +29,12 @@ import type {
  */
 export async function runDeploymentWorkflow(
   params: DeploymentWorkflowParams,
-  providedLogger?: Logger,
+  deps: Deps,
+  _options?: { abortSignal?: AbortSignal },
 ): Promise<DeploymentWorkflowResult> {
-  const logger = providedLogger || createLogger({ name: 'deployment-workflow' });
+  const logger = deps.logger;
   const timer = createTimer(logger, 'deployment-workflow');
-  const sessionManager = createSessionManager(logger);
+  const sessionManager = deps.sessionManager;
   const { sessionId, imageId, clusterConfig, deploymentOptions } = params;
 
   // Initialize workflow context
@@ -497,7 +498,8 @@ export async function runDeploymentWorkflow(
 export const deploymentWorkflow = {
   name: 'deployment-workflow',
   description: 'Complete deployment pipeline from cluster preparation to verified deployment',
-  execute: runDeploymentWorkflow,
+  execute: (params: DeploymentWorkflowParams, logger: Logger, context?: any) =>
+    runDeploymentWorkflow(params, context?.deps || { logger }, context),
   schema: {
     type: 'object',
     properties: {

@@ -19,41 +19,41 @@ ca-mcp
 ```text
 src/cli/cli.ts (Entry Point)
     ↓
-ContainerizationMCPServer (src/mcp/server.ts)
-    ├── enhanceServer() - Automatically called in constructor
-    │   ├── Progress Reporting (ProgressReporter)
-    │   ├── Cancellation Support (AbortSignal)
-    │   └── Tool Context (sessionId, logger)
+MCP Server (src/mcp/server/)
+    ├── Main Server (index.ts)
+    ├── Progress Reporting (progress.ts)
+    ├── Health Monitoring (health.ts)
+    ├── Middleware (middleware.ts)
+    └── Schema Definitions (schemas.ts, types.ts)
     │
-    ├── Session Manager (src/mcp/session/manager.ts)
+    ├── Session Management (src/lib/session.ts)
     │   ├── State Tracking
     │   ├── Tool History
     │   └── Workflow Progress
     │
-    ├── Intelligent AI Service (src/lib/enhanced-ai.ts)
-    │   ├── Context Building
-    │   ├── Parameter Validation
-    │   ├── Result Analysis
-    │   └── Recommendations
+    ├── AI Services (src/lib/ai/)
+    │   ├── AI Service Implementation (ai-service.ts)
+    │   └── MCP Host AI Integration (mcp-host-ai.ts)
     │
-    ├── Enhanced Tool Registry (src/mcp/registry.ts)
-    │   └── 14 Enhanced Tools (all with AI, progress, cancellation)
+    ├── Tool Registry (src/mcp/tools/)
+    │   ├── Tool Registration (registry.ts)
+    │   ├── Capabilities (capabilities.ts)
+    │   └── Validation (validator.ts)
     │
-    ├── Workflow Orchestrator (src/workflows/intelligent-orchestration.ts)
-    │   ├── Containerization Workflow
-    │   ├── Deployment Workflow
-    │   ├── Security Workflow
-    │   └── Optimization Workflow
+    ├── Workflow Orchestrator (src/workflows/)
+    │   ├── Intelligent Orchestration
+    │   ├── Containerization Workflows
+    │   └── Sampling-based Workflows
     │
-    ├── Enhanced Resources (src/mcp/resources/enhanced-manager.ts)
-    │   ├── AI Augmentation
-    │   ├── Session Resources
-    │   └── Custom URI Schemes
+    ├── Resource Management (src/resources/)
+    │   ├── Resource Manager (manager.ts)
+    │   ├── Caching (cache.ts, resource-cache.ts)
+    │   └── URI Schemes (uri-schemes.ts)
     │
-    └── Prompt Templates (src/mcp/prompts/intelligent-templates.ts)
-        ├── 6 Pre-defined Templates
+    └── Prompt Templates (src/prompts/prompt-registry.ts)
+        ├── Template Management
         ├── Context Integration
-        └── Argument Validation
+        └── Dynamic Generation
 ```
 
 ## Key Components
@@ -200,31 +200,44 @@ if (signal?.aborted) {
 
 ```text
 src/
-├── mcp/
-│   ├── server.ts                    # Main server (auto-enhanced)
-│   ├── enhanced-server.ts           # Enhancement logic
-│   ├── session/
-│   │   └── manager.ts              # Session management
-│   ├── resources/
-│   │   ├── manager.ts              # Base resources
-│   │   └── enhanced-manager.ts     # AI-enhanced resources
-│   ├── prompts/
-│   │   └── intelligent-templates.ts # Prompt templates
-│   └── registry.ts                  # Tool registry
+├── app/                         # Application entry point
+│   ├── index.ts                 # Main app interface
+│   └── container.ts             # Dependency injection
 │
-├── lib/
-│   └── enhanced-ai.ts              # AI service
+├── cli/                         # CLI entry points
+│   ├── cli.ts                   # Main CLI entry
+│   └── server.ts                # Server utilities
 │
-├── application/tools/intelligent/
-│   ├── intelligent-tool-wrapper.ts  # Tool enhancement
-│   ├── intelligent-factory.ts       # Tool factory
-│   └── factory.ts                   # Enhanced tools factory
+├── mcp/                         # MCP server implementation
+│   ├── server/                  # Core server components
+│   │   ├── index.ts             # Main server
+│   │   ├── progress.ts          # Progress reporting
+│   │   ├── health.ts            # Health monitoring
+│   │   └── middleware.ts        # Request middleware
+│   ├── client/                  # MCP client implementation
+│   ├── sampling/                # AI sampling services
+│   ├── tools/                   # Tool registration
+│   └── utils/                   # MCP utilities
 │
-├── workflows/
-│   └── intelligent-orchestration.ts # Workflow orchestrator
+├── infrastructure/              # External adapters
+│   ├── docker/                  # Docker integration
+│   └── kubernetes/              # Kubernetes integration
 │
-└── tools/
-    └── [14 tool implementations]
+├── lib/                         # Libraries and utilities
+│   ├── ai/                      # AI services
+│   ├── session.ts               # Session management
+│   └── [other utilities]
+│
+├── tools/                       # Tool implementations (co-located)
+│   ├── analyze-repo/
+│   │   ├── tool.ts              # Implementation
+│   │   ├── schema.ts            # Validation
+│   │   └── index.ts             # Exports
+│   └── [other tools]/           # Same structure
+│
+└── workflows/                   # Workflow orchestration
+    ├── orchestration/           # Complex workflows
+    └── sampling/                # Sampling workflows
 ```
 
 ## Configuration

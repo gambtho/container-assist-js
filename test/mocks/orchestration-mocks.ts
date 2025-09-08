@@ -10,7 +10,7 @@ import type {
   ScoredCandidate,
   GenerationContext,
 } from './types.js';
-import type { Resource } from '../../mcp/resources/types.js';
+import type { Resource } from '../../resources/types.js';
 import type { ProgressNotifier } from '../../mcp/events/types.js';
 import type {
   CandidateGenerator,

@@ -7,7 +7,7 @@ import {
   K8sManifestResult,
   DeploymentResult,
   WorkflowStep,
-} from '../../src/core/types';
+} from '../../src/domain/types';
 
 // Test-only Session type (removed from production code)
 type Session = {
@@ -25,8 +25,8 @@ type Session = {
 // Mock ID generator for tests (replace nanoid to avoid ESM issues)
 const mockId = () => Math.random().toString(36).substring(7);
 import type { Logger } from '../../src/lib/logger';
-import { Success, Failure, type Result } from '../../src/core/types';
-import type { ApplicationConfig } from '../../src/config/types';
+import { Success, Failure, type Result } from '../../src/domain/types';
+import type { ApplicationConfig } from '../../src/config/app-config';
 import { jest } from '@jest/globals';
 
 export function createMockSession(overrides?: Partial<Session>): Session {
@@ -852,10 +852,6 @@ export function createMockDockerode() {
   };
 }
 
-/**
- * Backward compatibility alias
- */
-export const createMockDockeroade = createMockDockerode;
 
 export function createMockKubernetesClient() {
   return {

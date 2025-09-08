@@ -10,7 +10,7 @@ Welcome to the Containerization Assistant MCP Server documentation.
 
 ## Overview
 
-The Containerization Assistant is a Model Context Protocol (MCP) server that provides AI-powered containerization workflows with Docker and Kubernetes support. It offers 14 enhanced tools for analyzing, building, scanning, and deploying containerized applications.
+The Containerization Assistant is a Model Context Protocol (MCP) server that provides AI-powered containerization workflows with Docker and Kubernetes support. It offers 14 tools organized using a co-location pattern for analyzing, building, scanning, and deploying containerized applications.
 
 ### Key Features
 

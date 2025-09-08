@@ -16,11 +16,17 @@ import {
   type MetricsCollector,
   type ToolParameters,
   type ToolResult,
-} from '../../core/types';
-import { CancelledError } from '../core/errors';
-import type { ToolContext } from '../server/middleware';
-import { pipe } from '../../lib/composition';
-import type { AIAugmentationService } from '../../lib/ai/ai-service';
+} from '@types';
+// CancelledError is now defined inline
+class CancelledError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CancelledError';
+  }
+}
+import type { ToolContext } from '@mcp/server/middleware';
+import { pipe } from '@lib/composition';
+import type { AIAugmentationService } from '@lib/ai/ai-service';
 
 export interface IntelligentTool extends Tool {
   executeEnhanced?: (params: ToolParameters, context: ToolContext) => Promise<Result<ToolResult>>;
@@ -98,13 +104,14 @@ export function withCentralizedAI(aiAugmentationService: AIAugmentationService) 
         if (enhancementResult.ok && enhancementResult.value.augmented) {
           const aiResult = enhancementResult.value;
 
+          const toolResult = result.value as any;
           return Success({
-            ...result.value,
+            ...toolResult,
             aiInsights: aiResult.insights,
             aiRecommendations: aiResult.recommendations,
             aiWarnings: aiResult.warnings,
             metadata: {
-              ...result.value.metadata,
+              ...toolResult.metadata,
               aiEnhanced: true,
               aiProvider: aiResult.metadata.aiProvider,
               augmentationType: aiResult.metadata.augmentationType,
@@ -147,10 +154,11 @@ export function withMetrics(metricsCollector?: MetricsCollector) {
         );
 
         if (result.ok) {
+          const toolResult = result.value as any;
           return Success({
-            ...result.value,
+            ...toolResult,
             metadata: {
-              ...result.value.metadata,
+              ...toolResult.metadata,
               executionTime: duration,
             },
           });
@@ -264,10 +272,11 @@ export function withSessionTracking(sessionManager: SessionManager) {
         await sessionManager?.trackToolEnd?.(sessionId, tool.name, result);
 
         if (result.ok) {
+          const toolResult = result.value as any;
           return Success({
-            ...result.value,
+            ...toolResult,
             metadata: {
-              ...result.value.metadata,
+              ...toolResult.metadata,
               sessionTracked: true,
             },
           });
@@ -276,7 +285,11 @@ export function withSessionTracking(sessionManager: SessionManager) {
         return result;
       } catch (error) {
         // Track execution error
-        await sessionManager?.trackToolError?.(sessionId, tool.name, error);
+        await sessionManager?.trackToolError?.(
+          sessionId,
+          tool.name,
+          error instanceof Error ? error : new Error(String(error)),
+        );
         throw error;
       }
     },
@@ -317,13 +330,13 @@ export function withCancellation() {
 
       // Check if already cancelled
       if (signal?.aborted) {
-        throw new CancelledError();
+        throw new CancelledError('Tool cancelled');
       }
 
       // Set up cancellation listener
       const checkCancellation = (): void => {
         if (signal?.aborted) {
-          throw new CancelledError();
+          throw new CancelledError('Tool cancelled');
         }
       };
 
@@ -367,23 +380,6 @@ export const enhanceWithDefaults = <T extends Tool>(
   }
 
   return pipe(...enhancers)(tool);
-};
-
-/**
- * Create AI-powered tool with validation and analysis
- * @deprecated Use createProductionTool with aiAugmentationService instead
- */
-export const enhanceForAI = <T extends Tool>(
-  tool: T,
-  aiService: AIService,
-  sessionManager: SessionManager,
-  logger: Logger,
-): T => {
-  return pipe(
-    withLogging(logger),
-    withSessionTracking(sessionManager),
-    withAIValidation(aiService, sessionManager),
-  )(tool);
 };
 
 /**

@@ -15,6 +15,20 @@ export default {
       setupFilesAfterEnv: ['<rootDir>/test/setup/unit-setup.ts'],
       testEnvironment: 'node',
       coveragePathIgnorePatterns: ['/node_modules/', '/test/'],
+      moduleNameMapper: {
+        '^@app/(.*)$': '<rootDir>/src/app/$1',
+        '^@config/(.*)$': '<rootDir>/src/config/$1',
+        '^@domain/(.*)$': '<rootDir>/src/domain/$1',
+        '^@infrastructure/(.*)$': '<rootDir>/src/infrastructure/$1',
+        '^@lib/(.*)$': '<rootDir>/src/lib/$1',
+        '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
+        '^@tools/(.*)$': '<rootDir>/src/tools/$1',
+        '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
+        '^@resources/(.*)$': '<rootDir>/src/resources/$1',
+        '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+        '^@types$': '<rootDir>/src/domain/types',
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+      },
       transform: {
         '^.+\\.tsx?$': [
           'ts-jest',
@@ -37,6 +51,20 @@ export default {
       testMatch: ['<rootDir>/test/__tests__/integration/**/*.integration.test.ts'],
       setupFilesAfterEnv: ['<rootDir>/test/setup/integration-setup.ts'],
       testEnvironment: 'node',
+      moduleNameMapper: {
+        '^@app/(.*)$': '<rootDir>/src/app/$1',
+        '^@config/(.*)$': '<rootDir>/src/config/$1',
+        '^@domain/(.*)$': '<rootDir>/src/domain/$1',
+        '^@infrastructure/(.*)$': '<rootDir>/src/infrastructure/$1',
+        '^@lib/(.*)$': '<rootDir>/src/lib/$1',
+        '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
+        '^@tools/(.*)$': '<rootDir>/src/tools/$1',
+        '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
+        '^@resources/(.*)$': '<rootDir>/src/resources/$1',
+        '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+        '^@types$': '<rootDir>/src/domain/types',
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+      },
       transform: {
         '^.+\\.tsx?$': [
           'ts-jest',
@@ -60,6 +88,20 @@ export default {
       setupFilesAfterEnv: ['<rootDir>/test/setup/e2e-setup.ts'],
       testEnvironment: 'node',
       maxWorkers: 1,
+      moduleNameMapper: {
+        '^@app/(.*)$': '<rootDir>/src/app/$1',
+        '^@config/(.*)$': '<rootDir>/src/config/$1',
+        '^@domain/(.*)$': '<rootDir>/src/domain/$1',
+        '^@infrastructure/(.*)$': '<rootDir>/src/infrastructure/$1',
+        '^@lib/(.*)$': '<rootDir>/src/lib/$1',
+        '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
+        '^@tools/(.*)$': '<rootDir>/src/tools/$1',
+        '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
+        '^@resources/(.*)$': '<rootDir>/src/resources/$1',
+        '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+        '^@types$': '<rootDir>/src/domain/types',
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+      },
       transform: {
         '^.+\\.tsx?$': [
           'ts-jest',
@@ -81,6 +123,20 @@ export default {
       displayName: 'performance',
       testMatch: ['<rootDir>/test/performance/**/*.perf.test.ts'],
       testEnvironment: 'node',
+      moduleNameMapper: {
+        '^@app/(.*)$': '<rootDir>/src/app/$1',
+        '^@config/(.*)$': '<rootDir>/src/config/$1',
+        '^@domain/(.*)$': '<rootDir>/src/domain/$1',
+        '^@infrastructure/(.*)$': '<rootDir>/src/infrastructure/$1',
+        '^@lib/(.*)$': '<rootDir>/src/lib/$1',
+        '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
+        '^@tools/(.*)$': '<rootDir>/src/tools/$1',
+        '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
+        '^@resources/(.*)$': '<rootDir>/src/resources/$1',
+        '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+        '^@types$': '<rootDir>/src/domain/types',
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+      },
       transform: {
         '^.+\\.tsx?$': [
           'ts-jest',
@@ -117,6 +173,11 @@ export default {
       },
     ],
   },
+  
+  // Transform ESM packages
+  transformIgnorePatterns: [
+    'node_modules/(?!(@kubernetes/client-node)/)'
+  ],
   // Performance optimizations
   maxWorkers: '50%',  // Use half of available CPU cores
   cache: true,
@@ -164,13 +225,28 @@ export default {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {
+    // Path aliases from tsconfig
+    '^@app/(.*)$': '<rootDir>/src/app/$1',
+    '^@config/(.*)$': '<rootDir>/src/config/$1',
+    '^@domain/(.*)$': '<rootDir>/src/domain/$1',
+    '^@lib/(.*)$': '<rootDir>/src/lib/$1',
+    '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
+    '^@tools/(.*)$': '<rootDir>/src/tools/$1',
+    '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
+    '^@resources/(.*)$': '<rootDir>/src/resources/$1',
+    '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
+    '^@types$': '<rootDir>/src/domain/types',
+    
     // Handle .js imports and map them to .ts
     '^(\\.{1,2}/.*)\\.js$': '$1',
     
+    // ESM modules that need special handling
+    '@kubernetes/client-node': '@kubernetes/client-node',
+    
     // Core types mapping from different locations
-    '^\\.\\./core/types\\.js$': '<rootDir>/src/core/types.ts',
-    '^\\./core/types\\.js$': '<rootDir>/src/core/types.ts',
-    '^\\.\\./\\.\\./core/types\\.js$': '<rootDir>/src/core/types.ts',
+    '^\\.\\./core/types\\.js$': '<rootDir>/src/domain/types.ts',
+    '^\\./core/types\\.js$': '<rootDir>/src/domain/types.ts',
+    '^\\.\\./\\.\\./core/types\\.js$': '<rootDir>/src/domain/types.ts',
     
     // Test fixtures and helpers
     '^@fixtures/(.*)$': '<rootDir>/test/fixtures/$1',

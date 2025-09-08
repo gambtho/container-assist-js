@@ -6,10 +6,10 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../core/types';
+import { Success, Failure, type Result } from '@types';
 import { SamplingService } from './sampling/sampling-service';
-import { createMCPAIOrchestrator } from '../mcp/ai/orchestrator';
-import type { ValidationContext } from '../mcp/tools/validator';
+import { createMCPAIOrchestrator } from '@workflows/intelligent-orchestration';
+import type { ValidationContext } from '@mcp/tools/validator';
 
 // Re-export types for backward compatibility
 export interface SamplingConfig {
@@ -59,19 +59,19 @@ export async function generateBestDockerfile(
       validationContext,
     );
 
-    if (validationResult.ok && !validationResult.value.data.isValid) {
+    if (validationResult.ok && !validationResult.value.isValid) {
       logger.warn(
         {
-          errors: validationResult.value.data.errors,
-          warnings: validationResult.value.data.warnings,
+          errors: validationResult.value.errors,
+          warnings: validationResult.value.warnings,
           sessionId: config.sessionId,
         },
         'Parameter validation issues detected in Dockerfile sampling',
       );
 
       // Check for critical validation errors
-      const criticalErrors = validationResult.value.data.errors.filter(
-        (error) => error.includes('required') || error.includes('invalid'),
+      const criticalErrors = validationResult.value.errors.filter(
+        (error: string) => error.includes('required') || error.includes('invalid'),
       );
 
       if (criticalErrors.length > 0) {

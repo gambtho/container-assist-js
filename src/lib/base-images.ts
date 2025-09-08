@@ -81,6 +81,19 @@ const BASE_IMAGE_MAP: Record<
     security: ['php:8.2-fpm-alpine', 'php:8.3-fpm-alpine'],
     performance: ['php:8.2-fpm', 'php:8.3-fpm'],
   },
+  dotnet: {
+    primary: 'mcr.microsoft.com/dotnet/aspnet:8.0-alpine',
+    alternatives: [
+      'mcr.microsoft.com/dotnet/aspnet:8.0',
+      'mcr.microsoft.com/dotnet/runtime:8.0-alpine',
+      'mcr.microsoft.com/dotnet/aspnet:7.0-alpine',
+    ],
+    security: [
+      'mcr.microsoft.com/dotnet/aspnet:8.0-alpine',
+      'mcr.microsoft.com/dotnet/runtime:8.0-alpine',
+    ],
+    performance: ['mcr.microsoft.com/dotnet/aspnet:8.0', 'mcr.microsoft.com/dotnet/runtime:8.0'],
+  },
 };
 
 /**

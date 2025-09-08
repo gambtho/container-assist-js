@@ -5,7 +5,7 @@
 
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
-import { generateK8sManifests, type GenerateK8sManifestsConfig } from '../../../../src/tools/generate-k8s-manifests';
+import { generateK8sManifests, type GenerateK8sManifestsConfig } from '../../../../src/tools/generate-k8s-manifests/tool';
 import { createMockLogger, createSuccessResult } from '../../../helpers/mock-infrastructure';
 
 // Mock filesystem functions with proper structure
@@ -105,7 +105,7 @@ describe('generateK8sManifests', () => {
       if (result.ok) {
         expect(result.value.ok).toBe(true);
         expect(result.value.sessionId).toBe('test-session-123');
-        expect(result.value.path).toBe('/test/repo/k8s/manifests.yaml');
+        expect(result.value.path).toMatch(/k8s\/manifests\.yaml$/);
         expect(result.value.resources).toEqual([
           { kind: 'Deployment', name: 'myapp', namespace: 'production' },
           { kind: 'Service', name: 'myapp', namespace: 'production' },

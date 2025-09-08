@@ -5,7 +5,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { deployApplication, type DeployApplicationConfig } from '../../../../src/tools/deploy';
+import { deployApplication, type DeployApplicationConfig } from '../../../../src/tools/deploy/tool';
 import { createMockLogger, createSuccessResult, createFailureResult } from '../../../helpers/mock-infrastructure';
 
 // Mock lib modules following analyze-repo pattern

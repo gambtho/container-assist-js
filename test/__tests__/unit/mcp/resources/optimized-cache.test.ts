@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import { ResourceCache } from '../../../../../src/mcp/resources/resource-cache';
+import { ResourceCache } from '../../../../../src/resources/resource-cache';
 import { createMockLogger } from '../../../../utils/mock-factories';
 
 describe('ResourceCache', () => {

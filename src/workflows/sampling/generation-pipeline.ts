@@ -3,15 +3,18 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, isFail, type Result } from '../../core/types';
-import { getDefaultPort } from '../../config/defaults';
+import { Success, Failure, isFail, type Result } from '@types';
+import { getDefaultPort } from '@config/defaults';
 import type { SamplingConfig, SamplingResult, DockerfileContext, ScoringCriteria } from './types';
 import { StrategyEngine } from './strategy-engine';
-import { MCPPromptRegistry } from '../../mcp/prompts/mcp-prompt-registry';
+import { PromptRegistry } from '@prompts/prompt-registry';
 import { VariantScorer } from './scorer';
-import { analyzeRepo } from '../../tools/analyze-repo';
+import { analyzeRepo } from '@tools/analyze-repo';
 import { validateSamplingConfig, validateScoringCriteria } from './validation';
-import { createMCPAIOrchestrator, type MCPAIOrchestrator } from '../../mcp/ai/orchestrator';
+import {
+  createMCPAIOrchestrator,
+  type MCPAIOrchestrator,
+} from '@workflows/intelligent-orchestration';
 
 /**
  * Main generation pipeline for Dockerfile sampling with AI validation
@@ -23,7 +26,7 @@ export class VariantGenerationPipeline {
 
   constructor(
     private logger: Logger,
-    promptRegistry?: MCPPromptRegistry,
+    promptRegistry?: PromptRegistry,
     aiOrchestrator?: MCPAIOrchestrator,
   ) {
     this.strategyEngine = new StrategyEngine(logger, promptRegistry);
@@ -51,8 +54,8 @@ export class VariantGenerationPipeline {
         },
       );
 
-      if (aiValidationResult.ok && !aiValidationResult.value.data.isValid) {
-        const errors = aiValidationResult.value.data.errors;
+      if (aiValidationResult.ok && !aiValidationResult.value.isValid) {
+        const errors = aiValidationResult.value.errors;
         this.logger.warn(
           { errors, sessionId: config.sessionId },
           'AI validation failed for sampling configuration',

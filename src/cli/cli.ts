@@ -5,9 +5,10 @@
  */
 
 import { program } from 'commander';
-import { MCPServer } from '../mcp/server/mcp-server';
-import { createConfig, logConfigSummaryIfDev } from '../config/index';
-import { createLogger } from '../lib/logger';
+import { MCPServer } from '@mcp/server';
+import { createContainer, getContainerStatus } from '@app/container';
+import { createConfig, logConfigSummaryIfDev } from '@config/index';
+import { createLogger } from '@lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
@@ -22,8 +23,8 @@ const packageJsonPath = __dirname.includes('dist')
   : join(__dirname, '../../package.json'); // src/cli/ -> root
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
-let logger: any = null;
-function getLogger(): any {
+let logger: ReturnType<typeof createLogger> | null = null;
+function getLogger(): ReturnType<typeof createLogger> {
   if (!logger) {
     logger = createLogger({ name: 'cli' });
   }
@@ -91,7 +92,7 @@ Environment Variables:
 program.parse(argv);
 
 const options = program.opts();
-const command = program.args[0] || 'start';
+const command = program.args[0] ?? 'start';
 const defaultDockerSockets = ['/var/run/docker.sock', '~/.colima/default/docker.socket'];
 
 // Enhanced transport detection and logging
@@ -318,11 +319,11 @@ async function main(): Promise<void> {
       console.error('🔍 Validating Containerization Assist MCP configuration...\n');
       console.error('📋 Configuration Summary:');
       console.error(`  • Log Level: ${config.server.logLevel}`);
-      console.error(`  • Workspace: ${config.workspace?.workspaceDir || process.cwd()}`);
-      console.error(`  • Docker Socket: ${process.env.DOCKER_SOCKET || '/var/run/docker.sock'}`);
-      console.error(`  • K8s Namespace: ${process.env.K8S_NAMESPACE || 'default'}`);
+      console.error(`  • Workspace: ${config.workspace?.workspaceDir ?? process.cwd()}`);
+      console.error(`  • Docker Socket: ${process.env.DOCKER_SOCKET ?? '/var/run/docker.sock'}`);
+      console.error(`  • K8s Namespace: ${process.env.K8S_NAMESPACE ?? 'default'}`);
       console.error(`  • SDK Native: enabled`);
-      console.error(`  • Environment: ${process.env.NODE_ENV || 'production'}`);
+      console.error(`  • Environment: ${process.env.NODE_ENV ?? 'production'}`);
 
       // Test Docker connection
       {
@@ -358,9 +359,10 @@ async function main(): Promise<void> {
     // Set MCP mode to redirect logs to stderr
     process.env.MCP_MODE = 'true';
 
-    // Create server
-    const logger = getLogger();
-    const server = new MCPServer(logger, {
+    // Create server with DI container
+    const deps = createContainer({});
+
+    const server = new MCPServer(deps, {
       name: 'containerization-assist',
       version: '2.0.0',
     });
@@ -385,12 +387,12 @@ async function main(): Promise<void> {
         console.error(`  • ${workflow.name.padEnd(30)} - ${workflow.description}`);
       });
 
-      const status = server.getStatus();
+      const status = getContainerStatus(deps, true); // Server is running
       console.error('\n📊 Summary:');
-      console.error(`  • Total tools: ${status.tools}`);
-      console.error(`  • Total workflows: ${status.workflows}`);
-      console.error(`  • Resources available: ${status.resources}`);
-      console.error(`  • Prompts available: ${status.prompts}`);
+      console.error(`  • Total tools: ${status.stats.tools}`);
+      console.error(`  • Total workflows: ${status.stats.workflows}`);
+      console.error(`  • Resources available: ${status.stats.resources}`);
+      console.error(`  • Prompts available: ${status.stats.prompts}`);
 
       await server.stop();
       process.exit(0);
@@ -400,18 +402,29 @@ async function main(): Promise<void> {
       getLogger().info('Performing health check');
       await server.start();
 
-      const status = server.getStatus();
+      const status = getContainerStatus(deps, true); // Server is running after start
 
       console.error('🏥 Health Check Results');
       console.error('═'.repeat(40));
-      console.error(`Status: ${status.running ? '✅ Healthy' : '❌ Unhealthy'}`);
+      console.error(`Status: ${status.healthy && status.running ? '✅ Healthy' : '❌ Unhealthy'}`);
       console.error('\nServices:');
       console.error(`  ✅ MCP Server: ${status.running ? 'running' : 'stopped'}`);
-      console.error(`  📊 Tools registered: ${status.tools}`);
-      console.error(`  🔄 Workflows registered: ${status.workflows}`);
+      console.error(`  📊 Tools registered: ${status.stats.tools}`);
+      console.error(`  🔄 Workflows registered: ${status.stats.workflows}`);
+      console.error(`  📁 Resources available: ${status.stats.resources}`);
+      console.error(`  📝 Prompts available: ${status.stats.prompts}`);
+
+      // Show individual service status
+      if (status.services) {
+        console.error('\nService Health:');
+        Object.entries(status.services).forEach(([service, healthy]) => {
+          const icon = healthy ? '✅' : '❌';
+          console.error(`  ${icon} ${service}: ${healthy ? 'healthy' : 'unhealthy'}`);
+        });
+      }
 
       await server.stop();
-      process.exit(status.running ? 0 : 1);
+      process.exit(status.healthy && status.running ? 0 : 1);
     }
 
     getLogger().info(

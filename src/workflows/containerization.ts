@@ -9,15 +9,15 @@
  * 5. Tag image appropriately
  */
 
-import { analyzeRepo } from '../tools/analyze-repo';
-import { generateDockerfile } from '../tools/generate-dockerfile';
-import { buildImage } from '../tools/build-image';
-import { scanImage } from '../tools/scan';
-import { tagImage } from '../tools/tag';
-import { isFail } from '../core/types';
-import { getRecommendedBaseImage } from '../lib/base-images';
-import { createSessionManager } from '../lib/session';
-import { createTimer, createLogger, type Logger } from '../lib/logger';
+import { analyzeRepo } from '@tools/analyze-repo';
+import { generateDockerfile } from '@tools/generate-dockerfile';
+import { buildImage } from '@tools/build-image';
+import { scanImage } from '@tools/scan';
+import { tagImage } from '@tools/tag-image';
+import { isFail } from '@types';
+import { getRecommendedBaseImage } from '@lib/base-images';
+import { createTimer, type Logger } from '@lib/logger';
+import type { Deps } from '@app/container';
 import type {
   ContainerizationWorkflowParams,
   ContainerizationWorkflowResult,
@@ -59,18 +59,21 @@ import type {
  * });
  *
  * if (result.success) {
- *   console.log(`Image built: ${result.data.imageId}`);
- *   console.log(`Tags: ${result.data.imageTags}`);
+ *   logger.info('Image built successfully', {
+ *     imageId: result.data.imageId,
+ *     tags: result.data.imageTags
+ *   });
  * }
  * ```
  */
 export async function runContainerizationWorkflow(
   params: ContainerizationWorkflowParams,
-  providedLogger?: Logger,
+  deps: Deps,
+  options?: { abortSignal?: AbortSignal },
 ): Promise<ContainerizationWorkflowResult> {
-  const logger = providedLogger || createLogger({ name: 'containerization-workflow' });
+  const logger = deps.logger;
   const timer = createTimer(logger, 'containerization-workflow');
-  const sessionManager = createSessionManager(logger);
+  const sessionManager = deps.sessionManager;
   const { sessionId, projectPath, buildOptions = {}, scanOptions = {} } = params;
 
   // Initialize workflow context
@@ -96,6 +99,11 @@ export async function runContainerizationWorkflow(
 
   try {
     logger.info('Starting containerization workflow');
+
+    // Check for abort signal
+    if (options?.abortSignal?.aborted) {
+      throw new Error('Workflow aborted before start');
+    }
 
     // Update session
     await sessionManager.update(sessionId, {
@@ -482,7 +490,8 @@ export async function runContainerizationWorkflow(
 export const containerizationWorkflow = {
   name: 'containerization-workflow',
   description: 'Complete containerization pipeline from analysis to tagged image',
-  execute: runContainerizationWorkflow,
+  execute: (params: ContainerizationWorkflowParams, logger: Logger, context?: any) =>
+    runContainerizationWorkflow(params, context?.deps || { logger }, context),
   schema: {
     type: 'object',
     properties: {

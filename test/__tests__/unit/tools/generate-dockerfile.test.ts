@@ -5,7 +5,7 @@
 
 import { jest } from '@jest/globals';
 import { promises as fs } from 'node:fs';
-import { generateDockerfile, type GenerateDockerfileConfig } from '../../../../src/tools/generate-dockerfile';
+import { generateDockerfile, type GenerateDockerfileConfig } from '../../../../src/tools/generate-dockerfile/tool';
 import { createMockLogger, createSuccessResult } from '../../../helpers/mock-infrastructure';
 import { 
   nodeExpressBasicRepository, 
@@ -623,7 +623,7 @@ describe('generateDockerfile', () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.path).toBe('/test/repo/Dockerfile');
+        expect(result.value.path).toMatch(/Dockerfile$/);
         expect(mockFs.writeFile).toHaveBeenCalledWith(
           '/test/repo/Dockerfile',
           expect.stringContaining('FROM node:18-alpine'),

@@ -1,1 +1,0 @@
-// MCP event types

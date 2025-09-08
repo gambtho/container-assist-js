@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from 'pino';
-import { Success, Failure, type Result } from '../../core/types';
+import { Success, Failure, type Result } from '@types';
 import type {
   SamplingStrategy,
   DockerfileContext,
@@ -11,8 +11,8 @@ import type {
   ScoringCriteria,
   ScoreDetails,
 } from './types';
-import { getBaseImageRecommendations } from '../../lib/base-images';
-import { DEFAULT_NETWORK, DEFAULT_CONTAINER, getDefaultPort } from '../../config/defaults';
+import { getBaseImageRecommendations } from '@lib/base-images';
+import { DEFAULT_NETWORK, DEFAULT_CONTAINER, getDefaultPort } from '@config/defaults';
 
 /**
  * Analyze variant and return individual scores

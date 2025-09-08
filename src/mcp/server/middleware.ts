@@ -6,8 +6,14 @@ import {
   type Progress,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from 'pino';
-import { CancelledError } from '../core/errors';
-import { Failure, type Result } from '../../core/types';
+// CancelledError is now defined inline
+class CancelledError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CancelledError';
+  }
+}
+import { Failure, type Result } from '@types';
 
 /**\n * Functional approach with composable utilities\n * Design decision: Uses functional composition over inheritance/classes for easier testing and modularity\n */
 export type ProgressReporter = (progress: Progress) => Promise<void>;
@@ -75,7 +81,7 @@ const executeWithContext = async (
     return result;
   } catch (error: unknown) {
     if (signal?.aborted) {
-      throw new CancelledError();
+      throw new CancelledError('Operation cancelled');
     }
     const message = error instanceof Error ? error.message : String(error);
     return Failure(`Tool execution failed: ${message}`);
