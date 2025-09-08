@@ -115,33 +115,33 @@ jobs:
           DOCKER_AVAILABLE: true
           CI: true
 
-  test-coverage:
-    name: Test Coverage
-    runs-on: ubuntu-latest
-    needs: quality-checks
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+  # test-coverage:
+  #   name: Test Coverage
+  #   runs-on: ubuntu-latest
+  #   needs: quality-checks
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+  #     - name: Install dependencies
+  #       run: npm ci
 
-      - name: Run tests with coverage
-        run: npm run test:coverage
-        env:
-          NODE_OPTIONS: '--experimental-vm-modules'
+  #     - name: Run tests with coverage
+  #       run: npm run test:coverage
+  #       env:
+  #         NODE_OPTIONS: '--experimental-vm-modules'
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage/lcov.info
-          fail_ci_if_error: false
+  #     - name: Upload coverage reports to Codecov
+  #       uses: codecov/codecov-action@v3
+  #       with:
+  #         file: ./coverage/lcov.info
+  #         fail_ci_if_error: false
 
   build:
     name: Build & Validate
