@@ -33,6 +33,14 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'warn',
       '@typescript-eslint/prefer-as-const': 'error',
       
+      // Fix for no-unused-expressions rule
+      'no-unused-expressions': 'off',
+      '@typescript-eslint/no-unused-expressions': ['error', {
+        allowShortCircuit: true,
+        allowTernary: true,
+        allowTaggedTemplates: true
+      }],
+      
       // Disable noisy unsafe any operations for config/CLI files  
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
