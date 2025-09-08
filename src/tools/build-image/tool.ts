@@ -19,13 +19,13 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { createSessionManager } from '@lib/session';
-import { createDockerClient } from '@lib/docker';
-import { createTimer, type Logger } from '@lib/logger';
-import { updateWorkflowState, type WorkflowState, type Result } from '@types';
-import { createToolProgressReporter } from '@mcp/server/progress';
-import type { ToolContext } from '@tools/types';
-import { DockerError, FileSystemError, ErrorCodes, executeAsResult } from '@lib/errors';
+import { createSessionManager } from '../../lib/session';
+import { createDockerClient } from '../../lib/docker';
+import { createTimer, type Logger } from '../../lib/logger';
+import { updateWorkflowState, type WorkflowState, type Result } from '../../domain/types';
+import { createToolProgressReporter } from '../../mcp/server/progress';
+import type { ToolContext } from '../types';
+import { DockerError, FileSystemError, ErrorCodes, executeAsResult } from '../../lib/errors';
 /**
  * Internal Docker build options interface
  * Maps to docker build command parameters

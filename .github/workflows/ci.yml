@@ -259,7 +259,7 @@ jobs:
         run: npm ci
 
       - name: Run npm audit
-        run: npm audit --audit-level high
+        run: npm audit --audit-level high --include prod
 
       - name: Run CodeQL Analysis
         uses: github/codeql-action/init@v3

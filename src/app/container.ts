@@ -6,17 +6,17 @@
  */
 
 import type { Logger } from 'pino';
-import { createLogger } from '@lib/logger';
-import { createSessionManager, SessionManager } from '@lib/session';
-import { PromptRegistry } from '@prompts/prompt-registry';
+import { createLogger } from '../lib/logger';
+import { createSessionManager, SessionManager } from '../lib/session';
+import { PromptRegistry } from '../prompts/prompt-registry';
 import {
   createResourceContext,
   createSDKResourceManager,
   type SDKResourceManager,
-} from '@resources/manager';
-import { createSDKToolRegistry, type SDKToolRegistry } from '@mcp/tools/registry';
-import type { AIService } from '@types';
-import { createAppConfig, type AppConfig } from '@config/app-config';
+} from '../resources/manager';
+import { createSDKToolRegistry, type SDKToolRegistry } from '../mcp/tools/registry';
+import type { AIService } from '../domain/types';
+import { createAppConfig, type AppConfig } from '../config/app-config';
 
 /**
  * All application dependencies with their types

@@ -7,11 +7,17 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { createSessionManager } from '@lib/session';
-import { createTimer, type Logger } from '@lib/logger';
-import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
-import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
-import type { ToolContext } from '@mcp/context/types';
+import { createSessionManager } from '../../lib/session';
+import { createTimer, type Logger } from '../../lib/logger';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../../domain/types';
+import { stripFencesAndNoise, isValidKubernetesContent } from '../../lib/text-processing';
+import type { ToolContext } from '../../mcp/context/types';
 
 /**
  * Configuration for Kubernetes manifest generation
@@ -441,14 +447,14 @@ function parseK8sManifestsFromAI(aiResponse: string): K8sResource[] {
         if (manifest && typeof manifest === 'object' && manifest.kind) {
           manifests.push(manifest as K8sResource);
         }
-      } catch (parseError) {
+      } catch {
         // If YAML parsing fails, skip this document
         continue;
       }
     }
 
     return manifests.length > 0 ? manifests : [];
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -494,7 +500,7 @@ function parseYAMLtoJSON(yamlString: string): Partial<K8sResource> | null {
     }
 
     return result.kind ? (result as Partial<K8sResource>) : null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

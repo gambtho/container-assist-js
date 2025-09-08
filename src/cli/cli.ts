@@ -5,10 +5,10 @@
  */
 
 import { program } from 'commander';
-import { MCPServer } from '@mcp/server';
-import { createContainer, getContainerStatus } from '@app/container';
-import { createConfig, logConfigSummaryIfDev } from '@config/index';
-import { createLogger } from '@lib/logger';
+import { MCPServer } from '../mcp/server';
+import { createContainer, getContainerStatus } from '../app/container';
+import { createConfig, logConfigSummaryIfDev } from '../config/index';
+import { createLogger } from '../lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';

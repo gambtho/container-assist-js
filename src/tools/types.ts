@@ -14,11 +14,11 @@ export interface ToolContext {
   /** Progress token for progress reporting */
   progressToken?: ProgressToken;
   /** Session manager instance */
-  sessionManager?: import('@lib/session').SessionManager;
+  sessionManager?: import('../lib/session').SessionManager;
   /** Prompt registry for accessing prompts */
-  promptRegistry?: import('@prompts/prompt-registry').PromptRegistry;
+  promptRegistry?: import('../prompts/prompt-registry').PromptRegistry;
   /** Resource manager for accessing resources */
-  resourceManager?: import('@resources/manager').ResourceContext;
+  resourceManager?: import('../resources/manager').ResourceContext;
   /** Server instance for sending progress */
   server?: import('@modelcontextprotocol/sdk/server/mcp.js').McpServer;
   /** Logger instance */

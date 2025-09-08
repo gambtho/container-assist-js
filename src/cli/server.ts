@@ -3,8 +3,8 @@
  * Uses direct SDK patterns with Zod schemas
  */
 
-import { MCPServer } from '@mcp/server';
-import { createContainer, shutdownContainer, type Deps } from '@app/container';
+import { MCPServer } from '../mcp/server';
+import { createContainer, shutdownContainer, type Deps } from '../app/container';
 import process from 'node:process';
 
 async function main(): Promise<void> {

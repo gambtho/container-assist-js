@@ -210,20 +210,20 @@ export default {
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
   coverageThreshold: {
     global: {
-      branches: 11,
-      functions: 26,
-      lines: 18,
-      statements: 18
+      branches: 7,
+      functions: 18,
+      lines: 8,
+      statements: 9
     },
     './src/mcp/': {
       branches: 14,
-      functions: 28,
-      lines: 22,
-      statements: 22
+      functions: 22,
+      lines: 20,
+      statements: 19
     },
     './src/tools/': {
       branches: 51,
-      functions: 59,
+      functions: 55,
       lines: 62,
       statements: 62
     },

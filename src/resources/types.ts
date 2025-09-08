@@ -43,7 +43,7 @@ export interface ResourceCache {
   keys(pattern?: string): string[];
 }
 
-const URI_SCHEMES = {
+export const URI_SCHEMES = {
   MCP: 'mcp',
   CACHE: 'cache',
   SESSION: 'session',

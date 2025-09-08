@@ -6,9 +6,9 @@
  */
 
 import type { Logger } from 'pino';
-import type { PromptRegistry } from '@prompts/prompt-registry';
-import type { SDKResourceManager } from '@resources/manager';
-import type { ToolContext } from '@mcp/context/types';
+import type { PromptRegistry } from '../prompts/prompt-registry';
+import type { SDKResourceManager } from '../resources/manager';
+import type { ToolContext } from '../mcp/context/types';
 
 // ===== RESULT TYPE SYSTEM =====
 
@@ -42,7 +42,7 @@ export type {
   SamplingResponse,
   PromptWithMessages,
   ProgressReporter,
-} from '@mcp/context/types';
+} from '../mcp/context/types';
 
 /**
  * MCP execution context for tools (legacy)
@@ -72,7 +72,7 @@ export interface MCPContext {
  */
 export interface EnhancedMCPContext extends MCPContext {
   /** New ToolContext for AI-enabled tools */
-  toolContext?: import('@mcp/context/types').ToolContext;
+  toolContext?: import('../mcp/context/types').ToolContext;
 }
 
 /**

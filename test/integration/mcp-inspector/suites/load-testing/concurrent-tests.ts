@@ -5,7 +5,7 @@
  */
 
 import { TestCase, MCPTestRunner } from '../../infrastructure/test-runner';
-import { runConcurrentBenchmark, PerformanceMonitor } from '../../benchmarks/performance-monitor';
+import { runConcurrentBenchmark, PerformanceMonitor } from '../../benchmarks/performance-monitor.js';
 
 export const createLoadTestingTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();

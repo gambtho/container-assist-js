@@ -5,13 +5,19 @@
  * Follows new architecture with proper MCP protocol compliance
  */
 
-import { createSessionManager } from '@lib/session';
-import { createTimer, type Logger } from '@lib/logger';
-import { getRecommendedBaseImage } from '@lib/base-images';
-import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
-import { DEFAULT_PORTS } from '@config/defaults';
-import { stripFencesAndNoise, isValidDockerfileContent } from '@lib/text-processing';
-import type { ToolContext } from '@mcp/context/types';
+import { createSessionManager } from '../../lib/session';
+import { createTimer, type Logger } from '../../lib/logger';
+import { getRecommendedBaseImage } from '../../lib/base-images';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../../domain/types';
+import { DEFAULT_PORTS } from '../../config/defaults';
+import { stripFencesAndNoise, isValidDockerfileContent } from '../../lib/text-processing';
+import type { ToolContext } from '../../mcp/context/types';
 
 export interface FixDockerfileConfig {
   sessionId: string;
@@ -177,7 +183,7 @@ async function applyRuleBasedFixes(
     const port = DEFAULT_PORTS[language as keyof typeof DEFAULT_PORTS]?.[0] || 3000;
 
     // If no fixes were applied, generate a basic template
-    if (appliedFixes.length === 0 && (!fixed || !fixed.includes('FROM'))) {
+    if (appliedFixes.length === 0 && !fixed?.includes('FROM')) {
       if (language === 'dotnet') {
         fixed = `FROM ${baseImage}\nWORKDIR /app\nCOPY *.csproj* *.sln ./\nCOPY */*.csproj ./*/\nRUN dotnet restore\nCOPY . .\nRUN dotnet publish -c Release -o out\nEXPOSE ${port}\nCMD ["dotnet", "*.dll"]`;
       } else {

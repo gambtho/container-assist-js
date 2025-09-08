@@ -76,7 +76,6 @@ function parseIntWithFallback(
   const parsed = parseInt(value);
   if (isNaN(parsed)) {
     if (varName) {
-      // eslint-disable-next-line no-console
       console.warn(`Invalid ${varName}: ${value}. Using default: ${fallback}`);
     }
     return fallback;

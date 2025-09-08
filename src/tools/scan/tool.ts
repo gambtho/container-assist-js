@@ -5,12 +5,18 @@
  * Follows architectural requirement: only imports from src/lib/
  */
 
-import { createSessionManager } from '@lib/session';
-import { createSecurityScanner } from '@lib/scanner';
-import { createTimer, type Logger } from '@lib/logger';
-import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
-import { createToolProgressReporter } from '@mcp/server/progress';
-import type { ToolContext } from '@tools/types';
+import { createSessionManager } from '../../lib/session';
+import { createSecurityScanner } from '../../lib/scanner';
+import { createTimer, type Logger } from '../../lib/logger';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../../domain/types';
+import { createToolProgressReporter } from '../../mcp/server/progress';
+import type { ToolContext } from '../types';
 
 export interface ScanImageConfig {
   sessionId: string;
@@ -209,7 +215,7 @@ export async function scanImage(
         success: passed,
         vulnerabilities: dockerScanResult.vulnerabilities?.map((v) => ({
           id: v.id ?? 'unknown',
-          severity: v.severity as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
+          severity: v.severity,
           package: v.package ?? 'unknown',
           version: v.version ?? 'unknown',
           description: v.description ?? '',

@@ -21,20 +21,23 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { createSessionManager } from '@lib/session';
-import { getRecommendedBaseImage } from '@lib/base-images';
-import type { ToolContext } from '@mcp/context/types';
-import { createTimer, type Logger } from '@lib/logger';
-import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
-import { DEFAULT_PORTS } from '@config/defaults';
+import { createSessionManager } from '../../lib/session';
+import { getRecommendedBaseImage } from '../../lib/base-images';
+import type { ToolContext } from '../../mcp/context/types';
+import { createTimer, type Logger } from '../../lib/logger';
 import {
-  enhanceAnalysisWithPerspective,
-  selectBestPerspective,
-} from '@tools/analysis-perspectives';
-import type { AnalyzeRepoResult, AnalysisPerspective } from '@tools/types';
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../../domain/types';
+import { DEFAULT_PORTS } from '../../config/defaults';
+import { enhanceAnalysisWithPerspective, selectBestPerspective } from '../analysis-perspectives';
+import type { AnalyzeRepoResult, AnalysisPerspective } from '../types';
 
 // Re-export for backward compatibility
-export type { AnalyzeRepoResult } from '@tools/types';
+export type { AnalyzeRepoResult } from '../types';
 
 /**
  * Configuration for repository analysis

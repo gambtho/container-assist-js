@@ -1027,7 +1027,7 @@ Keep the response concise but actionable, focusing on practical containerization
 
     // Convert MCP messages to ToolContext format with content arrays
     const messages = mcpResult.messages.map((msg) => ({
-      role: msg.role as 'user' | 'assistant',
+      role: msg.role,
       content: [{ type: 'text' as const, text: String(msg.content.text) }],
     }));
 

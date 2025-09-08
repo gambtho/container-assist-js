@@ -409,7 +409,7 @@ export function createSecurityStrategy(logger: Logger): AnalysisStrategy {
         confidence: 90,
         completeness: 85,
         analysisTime: 0,
-        filesAnalyzed: (analysis.files as FileItem[] | undefined)?.length || 0,
+        filesAnalyzed: analysis.files?.length || 0,
         generated: new Date(),
         recommendations: baseRecommendations
           ? [
@@ -494,7 +494,7 @@ export function createPerformanceStrategy(logger: Logger): AnalysisStrategy {
         confidence: 80,
         completeness: 75,
         analysisTime: 0,
-        filesAnalyzed: (analysis.files as FileItem[] | undefined)?.length || 0,
+        filesAnalyzed: analysis.files?.length || 0,
         generated: new Date(),
         recommendations: baseRecommendations
           ? [
@@ -576,7 +576,7 @@ export function createArchitectureStrategy(logger: Logger): AnalysisStrategy {
         confidence: 85,
         completeness: 80,
         analysisTime: 0,
-        filesAnalyzed: (analysis.files as FileItem[] | undefined)?.length || 0,
+        filesAnalyzed: analysis.files?.length || 0,
         generated: new Date(),
         recommendations: baseRecommendations
           ? [
@@ -658,7 +658,7 @@ export function createDeploymentStrategy(logger: Logger): AnalysisStrategy {
         confidence: 85,
         completeness: 85,
         analysisTime: 0,
-        filesAnalyzed: (analysis.files as FileItem[] | undefined)?.length || 0,
+        filesAnalyzed: analysis.files?.length || 0,
         generated: new Date(),
         recommendations: baseRecommendations
           ? [

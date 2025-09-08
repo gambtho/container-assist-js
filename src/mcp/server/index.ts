@@ -8,48 +8,48 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Logger } from 'pino';
-import type { ToolContext, SamplingResponse } from '@mcp/context/types';
+import type { ToolContext, SamplingResponse } from '../context/types';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { type Tool } from '@types';
-import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
-import { generateDockerfileSchema } from '@tools/generate-dockerfile/schema';
-import { buildImageSchema } from '@tools/build-image/schema';
-import { scanImageSchema } from '@tools/scan/schema';
-import { deployApplicationSchema } from '@tools/deploy/schema';
-import { pushImageSchema } from '@tools/push-image/schema';
-import { tagImageSchema } from '@tools/tag-image/schema';
-import { workflowSchema } from '@tools/workflow/schema';
-import { fixDockerfileSchema } from '@tools/fix-dockerfile/schema';
-import { resolveBaseImagesSchema } from '@tools/resolve-base-images/schema';
-import { prepareClusterSchema } from '@tools/prepare-cluster/schema';
-import { opsToolSchema } from '@tools/ops/schema';
-import { generateK8sManifestsSchema } from '@tools/generate-k8s-manifests/schema';
-import { verifyDeploymentSchema } from '@tools/verify-deployment/schema';
+import { type Tool } from '../../domain/types';
+import { analyzeRepoSchema } from '../../tools/analyze-repo/schema';
+import { generateDockerfileSchema } from '../../tools/generate-dockerfile/schema';
+import { buildImageSchema } from '../../tools/build-image/schema';
+import { scanImageSchema } from '../../tools/scan/schema';
+import { deployApplicationSchema } from '../../tools/deploy/schema';
+import { pushImageSchema } from '../../tools/push-image/schema';
+import { tagImageSchema } from '../../tools/tag-image/schema';
+import { workflowSchema } from '../../tools/workflow/schema';
+import { fixDockerfileSchema } from '../../tools/fix-dockerfile/schema';
+import { resolveBaseImagesSchema } from '../../tools/resolve-base-images/schema';
+import { prepareClusterSchema } from '../../tools/prepare-cluster/schema';
+import { opsToolSchema } from '../../tools/ops/schema';
+import { generateK8sManifestsSchema } from '../../tools/generate-k8s-manifests/schema';
+import { verifyDeploymentSchema } from '../../tools/verify-deployment/schema';
 import {
   containerizationWorkflowSchema,
   deploymentWorkflowSchema,
   toolSchemas as zodToolSchemas,
-} from '@mcp/server/schemas';
-import { containerizationWorkflow } from '@workflows/containerization';
-import { deploymentWorkflow } from '@workflows/deployment';
-import { getContainerStatus, type Deps } from '@app/container';
+} from './schemas';
+import { containerizationWorkflow } from '../../workflows/containerization';
+import { deploymentWorkflow } from '../../workflows/deployment';
+import { getContainerStatus, type Deps } from '../../app/container';
 
 // Import tool functions
-import { analyzeRepo } from '@tools/analyze-repo';
-import { generateDockerfile } from '@tools/generate-dockerfile';
-import { buildImage } from '@tools/build-image';
-import { scanImage } from '@tools/scan';
-import { deployApplication } from '@tools/deploy';
-import { pushImage } from '@tools/push-image';
-import { tagImage } from '@tools/tag-image';
-import { workflowTool } from '@tools/workflow';
-import { fixDockerfile } from '@tools/fix-dockerfile';
-import { resolveBaseImagesTool } from '@tools/resolve-base-images';
-import { prepareCluster } from '@tools/prepare-cluster';
-import { opsTool } from '@tools/ops';
-import { generateK8sManifests } from '@tools/generate-k8s-manifests';
-import { verifyDeployment } from '@tools/verify-deployment';
+import { analyzeRepo } from '../../tools/analyze-repo';
+import { generateDockerfile } from '../../tools/generate-dockerfile';
+import { buildImage } from '../../tools/build-image';
+import { scanImage } from '../../tools/scan';
+import { deployApplication } from '../../tools/deploy';
+import { pushImage } from '../../tools/push-image';
+import { tagImage } from '../../tools/tag-image';
+import { workflowTool } from '../../tools/workflow';
+import { fixDockerfile } from '../../tools/fix-dockerfile';
+import { resolveBaseImagesTool } from '../../tools/resolve-base-images';
+import { prepareCluster } from '../../tools/prepare-cluster';
+import { opsTool } from '../../tools/ops';
+import { generateK8sManifests } from '../../tools/generate-k8s-manifests';
+import { verifyDeployment } from '../../tools/verify-deployment';
 
 // Tool schemas map
 const toolSchemas = {

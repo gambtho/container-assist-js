@@ -4,18 +4,24 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { createSessionManager } from '@lib/session';
-import { createTimer, type Logger } from '@lib/logger';
-import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
-import { getDefaultPort, DEFAULT_NETWORK, DEFAULT_CONTAINER } from '@config/defaults';
-import { getRecommendedBaseImage } from '@lib/base-images';
+import { createSessionManager } from '../../lib/session';
+import { createTimer, type Logger } from '../../lib/logger';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../../domain/types';
+import { getDefaultPort, DEFAULT_NETWORK, DEFAULT_CONTAINER } from '../../config/defaults';
+import { getRecommendedBaseImage } from '../../lib/base-images';
 import {
   stripFencesAndNoise,
   isValidDockerfileContent,
   extractBaseImage,
   parseInstructions,
-} from '@lib/text-processing';
-import type { ToolContext } from '@mcp/context/types';
+} from '../../lib/text-processing';
+import type { ToolContext } from '../../mcp/context/types';
 
 /**
  * Configuration for Dockerfile generation

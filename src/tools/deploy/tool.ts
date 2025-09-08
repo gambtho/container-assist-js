@@ -6,11 +6,17 @@
  */
 
 import * as yaml from 'js-yaml';
-import { createSessionManager, type SessionManager } from '@lib/session';
-import { createKubernetesClient } from '@lib/kubernetes';
-import { createTimer, type Logger } from '@lib/logger';
-import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
-import { DEFAULT_TIMEOUTS } from '@config/defaults';
+import { createSessionManager, type SessionManager } from '../../lib/session';
+import { createKubernetesClient } from '../../lib/kubernetes';
+import { createTimer, type Logger } from '../../lib/logger';
+import {
+  Success,
+  Failure,
+  type Result,
+  updateWorkflowState,
+  type WorkflowState,
+} from '../../domain/types';
+import { DEFAULT_TIMEOUTS } from '../../config/defaults';
 
 interface DeployContext {
   abortSignal?: AbortSignal;
