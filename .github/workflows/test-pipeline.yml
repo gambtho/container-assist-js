@@ -435,6 +435,10 @@ jobs:
     if: always()
     needs: [quality-gates, unit-tests, integration-tests, e2e-tests, performance-tests, build-validation, security-scan]
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     
     steps:
       - name: Checkout

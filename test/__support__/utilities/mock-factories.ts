@@ -358,7 +358,7 @@ export function createSessionWithCompletedStep(step: keyof typeof WorkflowStep, 
   const workflowState = { ...session.workflow_state };
 
   // Add the step to completed steps
-  workflowState.completed_steps = [...(workflowState.completed_steps || []), WorkflowStep[step]];
+  workflowState.completed_steps = [...(workflowState?.completed_steps || []), WorkflowStep[step]];
 
   // Add appropriate result data based on step
   switch (step) {

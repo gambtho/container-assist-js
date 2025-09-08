@@ -4,8 +4,8 @@
  * Tests system behavior under concurrent load
  */
 
-import { TestCase, MCPTestRunner } from '../../infrastructure/test-runner.js';
-import { runConcurrentBenchmark, PerformanceMonitor } from '../../benchmarks/performance-monitor.js';
+import { TestCase, MCPTestRunner } from '../../infrastructure/test-runner';
+import { runConcurrentBenchmark, PerformanceMonitor } from '../../benchmarks/performance-monitor';
 
 export const createLoadTestingTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();
