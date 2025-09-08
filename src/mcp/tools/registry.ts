@@ -13,6 +13,8 @@ import {
 import type { Tool } from '@types';
 import type { PromptRegistry } from '@prompts/prompt-registry';
 import type { SessionManager } from '@lib/session';
+import { createToolContextWithProgress } from '@mcp/context/bridge';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 // Sampling tools are now internal services - not imported here
 
@@ -41,6 +43,7 @@ export const createSDKToolRegistry = (
   _sessionManager: SessionManager,
   _options?: {
     promptRegistry?: PromptRegistry;
+    mcpServer?: Server; // Add reference to MCP server for ToolContext creation
   },
 ): SDKToolRegistry => {
   // Create simple Map-based registry
@@ -95,7 +98,19 @@ export const createSDKToolRegistry = (
         }
 
         try {
-          const result = await tool.execute(args ?? {}, logger.child({ tool: name }));
+          // Create unified ToolContext - no more dual context system
+          const toolContext = _options?.mcpServer
+            ? createToolContextWithProgress(
+                _options.mcpServer,
+                request,
+                logger.child({ component: 'ToolContext', tool: name }),
+                undefined, // signal
+                undefined, // config
+                _options.promptRegistry,
+              )
+            : undefined;
+
+          const result = await tool.execute(args ?? {}, logger.child({ tool: name }), toolContext);
 
           // Handle Result<T> pattern
           if (result && typeof result === 'object' && 'ok' in result) {

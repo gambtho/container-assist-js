@@ -6,9 +6,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Logger } from 'pino';
+import type { ToolContext, SamplingResponse } from '@mcp/context/types';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
+import { type Tool } from '@types';
 import { analyzeRepoSchema } from '@tools/analyze-repo/schema';
 import { generateDockerfileSchema } from '@tools/generate-dockerfile/schema';
 import { buildImageSchema } from '@tools/build-image/schema';
@@ -30,7 +33,6 @@ import {
 } from '@mcp/server/schemas';
 import { containerizationWorkflow } from '@workflows/containerization';
 import { deploymentWorkflow } from '@workflows/deployment';
-import type { Tool } from '@types';
 import { getContainerStatus, type Deps } from '@app/container';
 
 // Import tool functions
@@ -161,7 +163,10 @@ export class MCPServer {
       },
     );
 
-    // Register a prompt
+    // Register prompts dynamically from the prompt registry
+    this.registerPromptsFromRegistry();
+
+    // Register a prompt (kept for backward compatibility)
     this.server.prompt(
       'dockerfile-generation',
       'Generate Dockerfile for application',
@@ -206,8 +211,15 @@ export class MCPServer {
         const toolObject: Tool = {
           name,
           description: `${name} tool`,
-          execute: async (params: any, logger: Logger) => {
-            return await toolFunction(params, logger);
+          execute: async (params: any, logger: Logger, context?: any) => {
+            // Ensure context includes the shared sessionManager
+            const fullContext = {
+              sessionManager: this.deps.sessionManager,
+              promptRegistry: this.deps.promptRegistry,
+              deps: this.deps,
+              ...context,
+            };
+            return await toolFunction(params, logger, fullContext);
           },
         };
         this.deps.toolRegistry.registerTool(toolObject);
@@ -230,10 +242,77 @@ export class MCPServer {
           // Execute tool function directly
           const toolFunction = toolFunctions[name as keyof typeof toolFunctions];
           if (!toolFunction) {
-            throw new Error(`Tool function not found: ${name}`);
+            throw new McpError(ErrorCode.MethodNotFound, `Tool function not found: ${name}`);
           }
 
-          const result = await toolFunction(params, this.deps.logger);
+          // Create proper ToolContext using bridge pattern
+          // Note: The bridge getPrompt is not yet implemented, so we need a custom context
+          const deps = this.deps;
+          const context: ToolContext = {
+            sampling: {
+              createMessage: async (samplingRequest): Promise<SamplingResponse> => {
+                // Use the MCP server's createMessage capability
+                try {
+                  const sdkMessages = samplingRequest.messages.map((msg) => ({
+                    role: msg.role,
+                    content: {
+                      type: 'text' as const,
+                      text: msg.content.map((c) => c.text).join('\n'),
+                    },
+                  }));
+
+                  const response = await this.getServer().createMessage({
+                    messages: sdkMessages,
+                    maxTokens: samplingRequest.maxTokens || 2048,
+                    stopSequences: samplingRequest.stopSequences,
+                    includeContext: samplingRequest.includeContext || 'thisServer',
+                    modelPreferences: samplingRequest.modelPreferences,
+                  });
+
+                  if (!response?.content || response.content.type !== 'text') {
+                    throw new Error('Invalid response from MCP sampling');
+                  }
+
+                  return {
+                    role: 'assistant',
+                    content: [{ type: 'text', text: response.content.text }],
+                    metadata: {
+                      model: (response as any).model,
+                      usage: (response as any).usage,
+                      finishReason: (response as any).finishReason || 'stop',
+                    },
+                  };
+                } catch (error) {
+                  // Fallback response if sampling fails
+                  return {
+                    role: 'assistant',
+                    content: [
+                      {
+                        type: 'text',
+                        text: `Sampling failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                      },
+                    ],
+                  };
+                }
+              },
+            },
+            async getPrompt(name: string, args?: Record<string, unknown>) {
+              const prompt = await deps.promptRegistry.getPrompt(name, args || {});
+              return {
+                description: prompt.description ?? 'Generated prompt',
+                messages: [
+                  {
+                    role: 'user',
+                    content: [
+                      { type: 'text', text: prompt.messages[0]?.content?.toString() || '' },
+                    ],
+                  },
+                ],
+              };
+            },
+          };
+
+          const result = await toolFunction(params, this.deps.logger, context);
 
           if ('ok' in result) {
             if (result.ok) {
@@ -371,6 +450,49 @@ export class MCPServer {
   }
 
   /**
+   * Register prompts from the prompt registry dynamically
+   */
+  private registerPromptsFromRegistry(): void {
+    const promptNames = this.deps.promptRegistry.getPromptNames();
+
+    for (const name of promptNames) {
+      const promptInfo = this.deps.promptRegistry.getPromptInfo(name);
+      if (!promptInfo) continue;
+
+      // Convert PromptArguments to Zod schema shape
+      const schemaShape: Record<string, z.ZodType> = {};
+      for (const arg of promptInfo.arguments) {
+        const description = arg.description || `${arg.name} parameter`;
+        if (arg.required) {
+          schemaShape[arg.name] = z.string().describe(description);
+        } else {
+          schemaShape[arg.name] = z.string().optional().describe(description);
+        }
+      }
+
+      // Register with the MCP server
+      this.server.prompt(
+        name,
+        promptInfo.description || `Prompt: ${name}`,
+        schemaShape,
+        async (params) => {
+          try {
+            const result = await this.deps.promptRegistry.getPrompt(name, params);
+            return result;
+          } catch (error) {
+            throw new McpError(
+              ErrorCode.MethodNotFound,
+              error instanceof Error ? error.message : `Prompt not found: ${name}`,
+            );
+          }
+        },
+      );
+    }
+
+    this.deps.logger.info({ count: promptNames.length }, 'Prompts registered from registry');
+  }
+
+  /**
    * Register a dynamic resource template
    */
   public registerResourceTemplate(name: string, pattern: string): void {
@@ -452,6 +574,14 @@ export class MCPServer {
       this.deps.logger.error({ error }, 'Failed to stop server');
       throw error;
     }
+  }
+
+  /**
+   * Get the underlying MCP SDK server instance for sampling/AI requests
+   * Used by tools for making sampling and prompt requests
+   */
+  getServer(): Server {
+    return this.server.server;
   }
 
   /**

@@ -353,9 +353,11 @@ Repository Files
 
 ### Error Handling Pattern
 
-All tools use the Result<T> pattern:
+All tools use the Result<T> pattern from `@domain/types`:
 
 ```typescript
+import { Result, Success, Failure } from '@types';
+
 // Success case
 return Success({
   ok: true,
@@ -363,8 +365,16 @@ return Success({
   // ... tool-specific data
 });
 
-// Failure case
+// Failure case  
 return Failure('Error message explaining what went wrong');
+```
+
+### Current Type System
+
+```typescript
+export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
+export const Success = <T>(value: T): Result<T> => ({ ok: true, value });
+export const Failure = <T>(error: string): Result<T> => ({ ok: false, error });
 ```
 
 ### Logging and Timing
@@ -385,25 +395,40 @@ try {
 }
 ```
 
-### AI Integration Pattern
+### AI Integration Pattern (New ToolContext)
 
-All tools can leverage MCP Host AI:
+All AI-capable tools use the new ToolContext pattern:
 
 ```typescript
-const mcpHostAI = createMCPHostAI(logger);
-
-if (mcpHostAI.isAvailable()) {
-  const prompt = createPromptTemplate(templateType, context);
-  const aiResult = await mcpHostAI.submitPrompt(prompt, context);
-  
-  if (aiResult.ok) {
-    // Process AI response
-    return processAIResponse(aiResult.value);
-  }
+export interface ToolContext {
+  sampling: {
+    createMessage(request: SamplingRequest): Promise<SamplingResponse>;
+  };
+  getPrompt(name: string, args?: Record<string, unknown>): Promise<PromptWithMessages>;
+  signal?: AbortSignal;
+  progress?: ProgressReporter;
 }
 
-// Fallback to template-based approach
-return generateTemplateResult();
+// Tool execution pattern
+export async function toolFunction(
+  config: ToolConfig,
+  logger: Logger,
+  context?: ToolContext, // Optional for backward compatibility
+): Promise<Result<ToolResult>> {
+  if (context) {
+    // Try AI-enhanced approach
+    const { description, messages } = await context.getPrompt('prompt-name', args);
+    const response = await context.sampling.createMessage({
+      messages,
+      includeContext: 'thisServer',
+      modelPreferences: { hints: [{ name: 'code' }] },
+    });
+    // Process AI response with text-processing utils
+  }
+  
+  // Fallback to template-based approach
+  return generateFallbackResult();
+}
 ```
 
 ## Configuration and Defaults

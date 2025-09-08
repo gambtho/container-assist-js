@@ -1,8 +1,23 @@
 /**
- * Simple Workflow Implementation - De-Enterprise Refactoring
+ * Containerization Workflow Implementation
  *
- * Replaces the 587-line WorkflowCoordinator class with simple functions.
- * Direct execution without complex orchestration patterns.
+ * Orchestrates repository analysis, Dockerfile generation, and image building.
+ * Provides a simplified interface for complex containerization operations.
+ *
+ * @example
+ * ```typescript
+ * const result = await executeContainerizationWorkflow(
+ *   '/path/to/project',
+ *   'session-123',
+ *   { enableSampling: true, securityFocus: true },
+ *   logger
+ * );
+ *
+ * if (result.ok) {
+ *   console.log('Dockerfile generated:', result.dockerfile);
+ *   console.log('Image built:', result.imageId);
+ * }
+ * ```
  */
 
 import type { Logger } from 'pino';
@@ -13,30 +28,49 @@ import { buildImage } from '@tools/build-image';
 import { scanImage } from '@tools/scan';
 import { generateBestDockerfile } from './dockerfile-sampling';
 
-// Specific configuration for containerization workflow
+/**
+ * Configuration for containerization workflow execution
+ * Controls analysis depth, security settings, and build behavior
+ */
 export interface ContainerizationConfig {
+  /** Enable AI-powered sampling for better Dockerfile generation */
   enableSampling?: boolean;
+  /** Enable multiple analysis perspectives for comprehensive insights */
   enablePerspectives?: boolean;
+  /** Primary analysis perspective to apply */
   analysisPerspective?: 'comprehensive' | 'security-focused' | 'performance-focused';
+  /** Prioritize security recommendations in analysis */
   securityFocus?: boolean;
+  /** Prioritize performance optimizations in analysis */
   performanceFocus?: boolean;
+  /** Maximum acceptable vulnerability severity level */
   maxVulnerabilityLevel?: 'low' | 'medium' | 'high' | 'critical';
+  /** Automatically apply security fixes during workflow */
   enableAutoRemediation?: boolean;
+  /** Docker build arguments to pass through */
   buildArgs?: Record<string, string>;
+  /** Specific workflow steps to execute (runs all if not specified) */
   stepsToRun?: string[];
+  /** Custom Dockerfile content to use instead of generation */
   customDockerfile?: string;
 }
 
-// Analysis result interface - using unknown to allow any structure
+/** Repository analysis result with flexible structure */
 type AnalysisResult = Record<string, unknown>;
 
-// Scan result interface - using unknown to allow any structure
+/** Security scan result with flexible structure */
 type ScanResult = Record<string, unknown>;
 
-// Specific result for containerization workflow
+/**
+ * Result of containerization workflow execution
+ * Contains all artifacts produced during the workflow
+ */
 export interface ContainerizationResult {
+  /** Whether the workflow completed successfully */
   ok: boolean;
+  /** Repository analysis results */
   analysis?: AnalysisResult;
+  /** Generated or processed Dockerfile content */
   dockerfile?: string;
   imageId?: string;
   scanResult?: ScanResult;
@@ -130,8 +164,10 @@ export const runContainerizationWorkflow = async (
     }
 
     result.dockerfile = config.enableSampling
-      ? dockerfileResult.value.content
-      : dockerfileResult.value.content;
+      ? (dockerfileResult.value as import('./sampling/types').SamplingResult).bestVariant.content
+      : (
+          dockerfileResult.value as import('../tools/generate-dockerfile/tool').GenerateDockerfileResult
+        ).content;
 
     // Step 3: Build image
     logger.info('Step 3: Building Docker image');

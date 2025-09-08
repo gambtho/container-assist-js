@@ -23,7 +23,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { createSessionManager } from '@lib/session';
 import { getRecommendedBaseImage } from '@lib/base-images';
-import { createMCPHostAI } from '@lib/mcp-host-ai';
+import type { ToolContext } from '@mcp/context/types';
 import { createTimer, type Logger } from '@lib/logger';
 import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
 import { DEFAULT_PORTS } from '@config/defaults';
@@ -303,7 +303,7 @@ async function analyzeDependencies(
 /**
  * Detect exposed ports
  */
-async function detectPorts(_repoPath: string, language: string): Promise<number[]> {
+async function detectPorts(language: string): Promise<number[]> {
   const ports: Set<number> = new Set();
 
   // Use centralized default ports by language/framework
@@ -373,6 +373,7 @@ function getSecurityRecommendations(
 export async function analyzeRepo(
   config: AnalyzeRepoConfig,
   logger: Logger,
+  context?: ToolContext,
 ): Promise<Result<AnalyzeRepoResult>> {
   const timer = createTimer(logger, 'analyze-repo');
 
@@ -391,8 +392,7 @@ export async function analyzeRepo(
     // Create lib instances
     const sessionManager = createSessionManager(logger);
 
-    // Create AI service
-    const aiService = createMCPHostAI(logger);
+    // AI enhancement available through context parameter
 
     // Get or create session
     const session = await sessionManager.get(sessionId);
@@ -406,31 +406,64 @@ export async function analyzeRepo(
     const frameworkInfo = await detectFramework(repoPath, languageInfo.language);
     const buildSystemRaw = await detectBuildSystem(repoPath);
     const dependencies = await analyzeDependencies(repoPath, languageInfo.language);
-    const ports = await detectPorts(repoPath, languageInfo.language);
+    const ports = await detectPorts(languageInfo.language);
     const dockerInfo = await checkDockerFiles(repoPath);
 
-    // Get AI insights
+    // Get AI insights using ToolContext if available
     let aiInsights: string | undefined;
-    try {
-      const aiResponse = await aiService.submitPrompt(
-        `Analyze repository structure for ${languageInfo.language} project`,
-        {
+    if (context) {
+      try {
+        logger.debug('Using AI to enhance repository analysis');
+
+        const { description, messages } = await context.getPrompt('enhance-repo-analysis', {
           language: languageInfo.language,
           framework: frameworkInfo?.framework,
-          hasDependencies: dependencies.length > 0,
+          buildSystem: buildSystemRaw?.type,
+          dependencies: dependencies
+            .slice(0, 10)
+            .map((dep) => dep.name)
+            .join(', '), // Limit for prompt length
+          hasTests: dependencies.some(
+            (dep) =>
+              dep.name.includes('test') || dep.name.includes('jest') || dep.name.includes('mocha'),
+          ),
           hasDocker: dockerInfo.hasDockerfile,
-        },
-      );
+          ports: ports.join(', '),
+          fileCount: dependencies.length, // Rough estimate
+          repoStructure: `${languageInfo.language} project with ${frameworkInfo?.framework || 'standard'} structure`,
+        });
 
-      if (aiResponse.ok) {
-        aiInsights = aiResponse.value || 'Analysis completed using MCP host AI';
+        logger.debug({ description, messageCount: messages.length }, 'Got prompt from registry');
+
+        const aiResponse = await context.sampling.createMessage({
+          messages,
+          includeContext: 'thisServer',
+          modelPreferences: { hints: [{ name: 'analysis' }] },
+          maxTokens: 1500,
+        });
+
+        const responseText = aiResponse.content
+          .filter((c) => c.type === 'text' && typeof c.text === 'string')
+          .map((c) => c.text)
+          .join('\n')
+          .trim();
+
+        if (responseText) {
+          aiInsights = responseText;
+          logger.info('AI analysis enhancement completed successfully');
+        }
+      } catch (error) {
+        logger.debug(
+          { error: error instanceof Error ? error.message : String(error) },
+          'AI analysis enhancement failed, continuing with basic analysis',
+        );
       }
-    } catch (error) {
-      logger.debug({ error }, 'AI analysis skipped');
+    } else {
+      logger.debug('No AI context available, using basic analysis');
     }
 
     // Build recommendations
-    const baseImage = getRecommendedBaseImage(languageInfo.language, frameworkInfo?.framework);
+    const baseImage = getRecommendedBaseImage(languageInfo.language);
     const securityNotes = getSecurityRecommendations(dependencies);
 
     // Transform build system
@@ -557,5 +590,6 @@ export async function analyzeRepo(
  */
 export const analyzeRepoTool = {
   name: 'analyze-repo',
-  execute: (config: AnalyzeRepoConfig, logger: Logger) => analyzeRepo(config, logger),
+  execute: (config: AnalyzeRepoConfig, logger: Logger, context?: ToolContext) =>
+    analyzeRepo(config, logger, context),
 };

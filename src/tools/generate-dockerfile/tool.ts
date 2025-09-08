@@ -5,11 +5,17 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { createSessionManager } from '@lib/session';
-import { createMCPHostAI, createPromptTemplate, type MCPHostAI } from '@lib/mcp-host-ai';
 import { createTimer, type Logger } from '@lib/logger';
 import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
 import { getDefaultPort, DEFAULT_NETWORK, DEFAULT_CONTAINER } from '@config/defaults';
 import { getRecommendedBaseImage } from '@lib/base-images';
+import {
+  stripFencesAndNoise,
+  isValidDockerfileContent,
+  extractBaseImage,
+  parseInstructions,
+} from '@lib/text-processing';
+import type { ToolContext } from '@mcp/context/types';
 
 /**
  * Configuration for Dockerfile generation
@@ -57,6 +63,131 @@ export interface GenerateDockerfileResult {
   multistage: boolean;
   /** Optional warnings about the generated Dockerfile */
   warnings?: string[];
+}
+
+/**
+ * Normalized arguments for Dockerfile prompt
+ */
+interface DockerfilePromptArgs extends Record<string, unknown> {
+  language: string; // required - normalized language name
+  framework?: string | undefined; // optional - framework if detected
+  ports?: string | undefined; // optional - comma-separated port numbers
+  baseImage?: string | undefined; // optional - suggested base image
+  requirements?: string | undefined; // optional - dependency information
+  repoSummary: string; // required - bounded 2-4 sentences
+}
+
+/**
+ * Repository analysis structure from session
+ */
+interface RepoAnalysis {
+  language?: string;
+  framework?: string;
+  dependencies?: Array<{ name: string }>;
+  ports?: number[];
+  build_system?: { type?: string };
+  summary?: string;
+}
+
+/**
+ * Normalize language name to standard format
+ */
+function normalizeLanguage(language?: string): string {
+  if (!language) return 'Node.js';
+
+  const normalized = language.toLowerCase();
+  const languageMap: Record<string, string> = {
+    javascript: 'Node.js',
+    js: 'Node.js',
+    typescript: 'TypeScript',
+    ts: 'TypeScript',
+    python: 'Python',
+    py: 'Python',
+    java: 'Java',
+    go: 'Go',
+    golang: 'Go',
+    rust: 'Rust',
+    dotnet: '.NET',
+    csharp: 'C#',
+    'c#': 'C#',
+    ruby: 'Ruby',
+    php: 'PHP',
+    swift: 'Swift',
+    kotlin: 'Kotlin',
+  };
+
+  return languageMap[normalized] || language.charAt(0).toUpperCase() + language.slice(1);
+}
+
+/**
+ * Normalize ports to comma-separated string
+ */
+function normalizePorts(ports?: number[]): string | undefined {
+  if (!ports || ports.length === 0) return undefined;
+  return ports.join(', ');
+}
+
+/**
+ * Suggest base image based on analysis
+ */
+function suggestBaseImage(analysis: RepoAnalysis): string | undefined {
+  if (!analysis.language) return undefined;
+  return getRecommendedBaseImage(analysis.language);
+}
+
+/**
+ * Format requirements/dependencies for prompt
+ */
+function formatRequirements(dependencies?: Array<{ name: string }>): string | undefined {
+  if (!dependencies || dependencies.length === 0) return undefined;
+
+  const depNames = dependencies.slice(0, 10).map((d) => d.name); // Limit to first 10 deps
+  if (dependencies.length > 10) {
+    return `${depNames.join(', ')} and ${dependencies.length - 10} others`;
+  }
+  return depNames.join(', ');
+}
+
+/**
+ * Create a bounded summary (2-4 sentences)
+ */
+function boundSummary(
+  summary?: string,
+  minSentences: number = 2,
+  maxSentences: number = 4,
+): string {
+  if (!summary) {
+    return 'This is a repository that needs containerization. The Dockerfile will be generated based on detected language and framework.';
+  }
+
+  // Split into sentences and bound to 2-4
+  const sentences = summary.split(/(?<=[.!?])\s+/).filter((s) => s.trim());
+
+  if (sentences.length < minSentences) {
+    return `${summary} The Dockerfile will be optimized for this application's specific requirements.`;
+  }
+
+  if (sentences.length <= maxSentences) {
+    return sentences.join(' ').trim();
+  }
+
+  return sentences.slice(0, maxSentences).join(' ').trim();
+}
+
+/**
+ * Build normalized arguments from analysis for prompting
+ */
+function buildArgsFromAnalysis(analysis: RepoAnalysis): DockerfilePromptArgs {
+  return {
+    language: normalizeLanguage(analysis.language),
+    ...(analysis.framework && { framework: analysis.framework }),
+    ...(normalizePorts(analysis.ports) && { ports: normalizePorts(analysis.ports) }),
+    ...(suggestBaseImage(analysis) && { baseImage: suggestBaseImage(analysis) }),
+    ...(formatRequirements(analysis.dependencies) && {
+      requirements: formatRequirements(analysis.dependencies),
+    }),
+    repoSummary: boundSummary(analysis.summary),
+  };
 }
 
 /**
@@ -168,125 +299,64 @@ function getStartCommand(analysis: { language?: string; framework?: string }): s
 }
 
 /**
- * Generate AI-enhanced Dockerfile based on analysis and options
- * @param analysis - Repository analysis containing language, framework, dependencies
- * @param options - Generation options including multi-stage and security settings
- * @param mcpHostAI - MCP Host AI instance for intelligent generation
- * @param logger - Logger for debug information
- * @returns Complete Dockerfile content as string
+ * Process AI response and extract Dockerfile content
+ * @param response - AI sampling response
+ * @param analysis - Repository analysis for fallback
+ * @returns Result with processed Dockerfile or error
  */
-async function generateAIDockerfile(
-  analysis: {
-    language?: string;
-    framework?: string;
-    dependencies?: Array<{ name: string }>;
-    ports?: number[];
-    build_system?: { type?: string };
-  },
-  options: GenerateDockerfileConfig,
-  mcpHostAI: MCPHostAI,
-  logger: Logger,
-): Promise<string> {
+async function processDockerfileResponse(response: string): Promise<
+  Result<{
+    dockerfile: string;
+    aiUsed: boolean;
+    baseImage: string | null;
+    instructions: Array<{ instruction: string; content: string }>;
+  }>
+> {
   try {
-    const context = {
-      language: analysis.language,
-      framework: analysis.framework,
-      dependencies: analysis.dependencies,
-      ports: analysis.ports,
-      buildTools: analysis.build_system?.type,
-      securityLevel: options.securityHardening ? 'strict' : 'standard',
-      optimization: options.optimization ? 'balanced' : 'minimal',
-      multistage: options.multistage !== false,
-      expectsAIResponse: true,
-      type: 'dockerfile',
-    };
+    // Strip code fences and clean the response
+    const cleaned = stripFencesAndNoise(response);
 
-    const prompt = createPromptTemplate('dockerfile', {
-      ...context,
-      requirements: [
-        'Use best practices for the detected language/framework',
-        'Optimize for minimal image size',
-        'Include security hardening',
-        'Use multi-stage builds where appropriate',
-        'Add proper health checks',
-        'Configure non-root user',
-      ],
-    });
-
-    const result = await mcpHostAI.submitPrompt(prompt, context);
-
-    if (result.ok) {
-      logger.debug(
-        { language: analysis.language, framework: analysis.framework },
-        'AI-enhanced Dockerfile generated',
-      );
-      return parseDockerfileFromAIResponse(result.value);
-    } else {
-      logger.warn(
-        { error: result.error },
-        'AI Dockerfile generation failed, falling back to template',
-      );
+    // Validate Dockerfile format
+    if (!isValidDockerfileContent(cleaned)) {
+      throw new Error('Invalid Dockerfile format - missing FROM instruction');
     }
-  } catch (error) {
-    logger.warn({ error }, 'AI Dockerfile generation error, falling back to template');
-  }
 
-  // Fall back to template-based generation
-  return generateTemplateDockerfile(analysis, options);
+    return Success({
+      dockerfile: cleaned,
+      aiUsed: true,
+      baseImage: extractBaseImage(cleaned),
+      instructions: parseInstructions(cleaned),
+    });
+  } catch (error) {
+    return Failure(
+      `Failed to process AI response: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 /**
- * Parse Dockerfile content from AI response
- * @param aiResponse - Raw AI response that may contain Dockerfile content
- * @returns Cleaned Dockerfile content
+ * Generate fallback Dockerfile when AI is unavailable
+ * @param analysis - Repository analysis
+ * @param config - Generation configuration
+ * @returns Result with fallback Dockerfile
  */
-function parseDockerfileFromAIResponse(aiResponse: string): string {
-  // Extract Dockerfile content from AI response
-  // Look for code blocks first
-  const dockerfileMatch = aiResponse.match(/```(?:dockerfile|docker)?\n([\s\S]*?)\n```/i);
-  if (dockerfileMatch?.[1]) {
-    return dockerfileMatch[1].trim();
-  }
+function generateFallbackDockerfile(
+  analysis: RepoAnalysis,
+  config: GenerateDockerfileConfig,
+): Result<{
+  dockerfile: string;
+  aiUsed: boolean;
+  baseImage: string | null;
+  instructions: Array<{ instruction: string; content: string }>;
+}> {
+  const dockerfile = generateTemplateDockerfile(analysis, config);
 
-  // If no code blocks, check if the response is already a Dockerfile
-  if (aiResponse.trim().startsWith('FROM ')) {
-    return aiResponse.trim();
-  }
-
-  // If response contains Dockerfile commands, extract them
-  const lines = aiResponse.split('\n');
-  const dockerfileLines: string[] = [];
-  let inDockerfile = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('FROM ')) {
-      inDockerfile = true;
-    }
-    if (inDockerfile) {
-      // Check if this looks like a Dockerfile instruction
-      if (
-        trimmed.startsWith('FROM ') ||
-        trimmed.startsWith('RUN ') ||
-        trimmed.startsWith('COPY ') ||
-        trimmed.startsWith('WORKDIR ') ||
-        trimmed.startsWith('EXPOSE ') ||
-        trimmed.startsWith('ENV ') ||
-        trimmed.startsWith('USER ') ||
-        trimmed.startsWith('CMD ') ||
-        trimmed.startsWith('ENTRYPOINT ') ||
-        trimmed.startsWith('HEALTHCHECK ') ||
-        trimmed.startsWith('ARG ') ||
-        trimmed.startsWith('LABEL ') ||
-        trimmed.startsWith('#') ||
-        trimmed === ''
-      ) {
-        dockerfileLines.push(line);
-      }
-    }
-  }
-
-  return dockerfileLines.length > 0 ? dockerfileLines.join('\n') : aiResponse.trim();
+  return Success({
+    dockerfile,
+    aiUsed: false,
+    baseImage: extractBaseImage(dockerfile),
+    instructions: parseInstructions(dockerfile),
+  });
 }
 
 /**
@@ -395,11 +465,13 @@ ${options.customInstructions}
  * Generate optimized Dockerfile based on repository analysis
  * @param config - Generation configuration with optimization options
  * @param logger - Logger instance for debug and info output
+ * @param context - Tool context for MCP operations (optional for backward compatibility)
  * @returns Promise resolving to Result with generated Dockerfile content and metadata
  */
 export async function generateDockerfile(
   config: GenerateDockerfileConfig,
   logger: Logger,
+  context?: ToolContext,
 ): Promise<Result<GenerateDockerfileResult>> {
   const timer = createTimer(logger, 'generate-dockerfile');
 
@@ -411,9 +483,6 @@ export async function generateDockerfile(
     // Create lib instances
     const sessionManager = createSessionManager(logger);
 
-    // Create MCP Host AI service
-    const mcpHostAI = createMCPHostAI(logger);
-
     // Get or create session
     let session = await sessionManager.get(sessionId);
     if (!session) {
@@ -424,12 +493,7 @@ export async function generateDockerfile(
     // Get analysis result from session
     const workflowState = session.workflow_state as
       | {
-          analysis_result?: {
-            language?: string;
-            framework?: string;
-            dependencies?: Array<{ name: string }>;
-            ports?: number[];
-          };
+          analysis_result?: RepoAnalysis;
         }
       | null
       | undefined;
@@ -438,26 +502,83 @@ export async function generateDockerfile(
       return Failure('Repository must be analyzed first - run analyze_repo');
     }
 
-    // Generate Dockerfile content with AI enhancement when available
-    let processedContent: string;
-    let aiGenerated = false;
+    // Generate Dockerfile content - try AI first if context available, then fallback
+    let dockerfileResult: Result<{
+      dockerfile: string;
+      aiUsed: boolean;
+      baseImage: string | null;
+      instructions: Array<{ instruction: string; content: string }>;
+    }>;
 
-    try {
-      if (mcpHostAI.isAvailable()) {
-        logger.debug('Using AI-enhanced Dockerfile generation');
-        processedContent = await generateAIDockerfile(analysisResult, config, mcpHostAI, logger);
-        aiGenerated = true;
-      } else {
-        logger.debug('Using template-based Dockerfile generation');
-        processedContent = generateTemplateDockerfile(analysisResult, config);
+    if (context) {
+      // Try AI generation using new ToolContext pattern
+      try {
+        logger.debug('Using AI-enhanced Dockerfile generation with ToolContext');
+
+        // 1. Build normalized arguments
+        const argsFromAnalysis = buildArgsFromAnalysis(analysisResult);
+
+        // 2. Get prompt with arguments
+        const { description, messages } = await context.getPrompt(
+          'generate-dockerfile',
+          argsFromAnalysis,
+        );
+
+        logger.debug(
+          {
+            prompt: description,
+            language: argsFromAnalysis.language,
+            framework: argsFromAnalysis.framework,
+          },
+          'Generated prompt for AI',
+        );
+
+        // 3. Single sampling call with proper configuration
+        const response = await context.sampling.createMessage({
+          messages,
+          includeContext: 'thisServer',
+          modelPreferences: {
+            hints: [{ name: 'code' }],
+          },
+          stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
+          maxTokens: 2048,
+        });
+
+        // Extract text from response content array
+        const responseText = response.content
+          .filter((c) => c.type === 'text')
+          .map((c) => c.text)
+          .join('\n')
+          .trim();
+
+        logger.debug({ responseLength: responseText.length }, 'Received AI response');
+
+        // 4. Process response
+        dockerfileResult = await processDockerfileResponse(responseText);
+      } catch (error) {
+        logger.warn(
+          { error: error instanceof Error ? error.message : String(error) },
+          'AI generation failed, using fallback',
+        );
+        dockerfileResult = generateFallbackDockerfile(analysisResult, config);
       }
-    } catch (error) {
-      logger.warn({ error }, 'AI generation failed, falling back to template');
-      processedContent = generateTemplateDockerfile(analysisResult, config);
+    } else {
+      logger.debug('No ToolContext provided, using template-based generation');
+      dockerfileResult = generateFallbackDockerfile(analysisResult, config);
     }
 
+    if (!dockerfileResult.ok) {
+      return dockerfileResult;
+    }
+
+    const {
+      dockerfile: processedContent,
+      aiUsed,
+      baseImage: detectedBaseImage,
+    } = dockerfileResult.value;
+
     // Store AI generation info in workflow state
-    if (aiGenerated) {
+    if (aiUsed) {
       const currentWorkflowState = session.workflow_state as WorkflowState | undefined;
       const updatedContext = updateWorkflowState(currentWorkflowState ?? {}, {
         metadata: {
@@ -503,7 +624,9 @@ export async function generateDockerfile(
       metadata: {
         ...(currentState?.metadata ?? {}),
         dockerfile_baseImage:
-          config.baseImage ?? getRecommendedBaseImage(analysisResult.language ?? 'unknown'),
+          detectedBaseImage ??
+          config.baseImage ??
+          getRecommendedBaseImage(analysisResult.language ?? 'unknown'),
         dockerfile_optimization: optimization,
         dockerfile_warnings: warnings,
       },
@@ -521,11 +644,14 @@ export async function generateDockerfile(
       sessionId,
       content: processedContent,
       path: dockerfilePath,
-      baseImage: config.baseImage ?? getRecommendedBaseImage(analysisResult.language ?? 'unknown'),
+      baseImage:
+        detectedBaseImage ??
+        config.baseImage ??
+        getRecommendedBaseImage(analysisResult.language ?? 'unknown'),
       optimization,
       multistage,
       ...(warnings.length > 0 && { warnings }),
-    });
+    } as GenerateDockerfileResult);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Dockerfile generation failed');
@@ -539,5 +665,6 @@ export async function generateDockerfile(
  */
 export const generateDockerfileTool = {
   name: 'generate-dockerfile',
-  execute: (config: GenerateDockerfileConfig, logger: Logger) => generateDockerfile(config, logger),
+  execute: (config: GenerateDockerfileConfig, logger: Logger, context?: ToolContext) =>
+    generateDockerfile(config, logger, context),
 };

@@ -36,26 +36,24 @@ jest.mock('@lib/logger', () => ({
 }));
 
 jest.mock('@lib/base-images', () => ({
-  getSuggestedBaseImages: jest.fn((language: string, framework?: string) => {
+  getSuggestedBaseImages: jest.fn((language: string) => {
     if (language === 'javascript' || language === 'typescript') {
-      return framework === 'react' 
-        ? ['node:18-alpine', 'node:18', 'node:16-alpine']
-        : ['node:18', 'node:18-alpine', 'node:16'];
+      return ['node:18-alpine', 'node:18-slim', 'node:18', 'node:20-alpine'];
     }
     if (language === 'python') {
       return ['python:3.11-slim', 'python:3.11', 'python:3.11-alpine'];
     }
-    return ['ubuntu:20.04', 'alpine:3.16'];
+    return ['alpine:latest', 'ubuntu:22.04', 'debian:12-slim'];
   }),
   getRecommendedBaseImage: jest.fn((language: string) => {
     const defaults: Record<string, string> = {
-      javascript: 'node:18',
-      typescript: 'node:18',
-      python: 'python:3.11',
-      java: 'openjdk:17',
-      go: 'golang:1.19',
+      javascript: 'node:18-alpine',
+      typescript: 'node:18-alpine',
+      python: 'python:3.11-slim',
+      java: 'openjdk:17-alpine',
+      go: 'golang:1.21-alpine',
     };
-    return defaults[language] || 'ubuntu:20.04';
+    return defaults[language] || 'alpine:latest';
   }),
 }));
 
@@ -118,13 +116,13 @@ describe('resolveBaseImagesTool', () => {
           alternativeImages: [
             {
               name: 'node',
-              tag: '18',
+              tag: '18-slim',
               reason: 'More compatibility',
             },
             {
               name: 'node',
-              tag: '16-alpine',
-              reason: 'Smaller size, better security',
+              tag: '18',
+              reason: 'More compatibility',
             },
           ],
           rationale: 'Selected node:18-alpine for javascript/react application based on production environment with medium security requirements',
@@ -307,8 +305,8 @@ describe('resolveBaseImagesTool', () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.alternativeImages?.[1]?.reason).toBe('Smaller size, better security');
         expect(result.value.alternativeImages?.[0]?.reason).toBe('More compatibility');
+        expect(result.value.alternativeImages?.[1]?.reason).toBe('More compatibility');
       }
     });
   });

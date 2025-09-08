@@ -469,6 +469,398 @@ Requirements:
 
 Please provide a production-ready Dockerfile.`,
       },
+
+      // Add generate-dockerfile as alias to dockerfile-generation
+      {
+        name: 'generate-dockerfile',
+        description: 'Generate a Dockerfile for a project based on analysis',
+        category: 'containerization',
+        arguments: [
+          {
+            name: 'language',
+            description: 'Programming language of the application',
+            required: true,
+          },
+          {
+            name: 'framework',
+            description: 'Framework used by the application',
+            required: false,
+          },
+          {
+            name: 'ports',
+            description: 'Comma-separated port numbers',
+            required: false,
+          },
+          {
+            name: 'baseImage',
+            description: 'Suggested base image',
+            required: false,
+          },
+          {
+            name: 'requirements',
+            description: 'Dependency information',
+            required: false,
+          },
+          {
+            name: 'repoSummary',
+            description: 'Repository summary (2-4 sentences)',
+            required: true,
+          },
+        ],
+        template: `Generate a production-ready Dockerfile for a {{language}} project.
+
+Project Details:
+- Language: {{language}}
+{{#framework}}
+- Framework: {{framework}}
+{{/framework}}
+{{#ports}}
+- Ports: {{ports}}
+{{/ports}}
+{{#baseImage}}
+- Suggested Base Image: {{baseImage}}
+{{/baseImage}}
+{{#requirements}}
+- Dependencies: {{requirements}}
+{{/requirements}}
+
+Repository Summary:
+{{repoSummary}}
+
+Requirements:
+1. Use multi-stage builds when appropriate
+2. Include security best practices
+3. Minimize image size
+4. Include proper health checks
+5. Set appropriate working directory and user
+6. Copy files efficiently
+7. Expose necessary ports
+
+Return only the Dockerfile content without explanation or code fences.`,
+      },
+
+      // Fix Dockerfile prompt
+      {
+        name: 'fix-dockerfile',
+        description: 'Fix issues in an existing Dockerfile based on analysis and error context',
+        category: 'containerization',
+        arguments: [
+          {
+            name: 'dockerfileContent',
+            description: 'Current Dockerfile content to fix',
+            required: true,
+          },
+          {
+            name: 'errors',
+            description: 'Array of specific errors to address',
+            required: false,
+          },
+          {
+            name: 'buildError',
+            description: 'Build error message that occurred',
+            required: false,
+          },
+          {
+            name: 'language',
+            description: 'Programming language of the application',
+            required: false,
+          },
+          {
+            name: 'framework',
+            description: 'Framework used by the application',
+            required: false,
+          },
+          {
+            name: 'analysis',
+            description: 'Repository analysis context',
+            required: false,
+          },
+        ],
+        template: `Fix the provided Dockerfile to resolve build issues and improve best practices.
+
+Current Dockerfile:
+{{dockerfileContent}}
+
+{{#buildError}}
+Build Error:
+{{buildError}}
+{{/buildError}}
+
+{{#errors}}
+Specific Issues to Fix:
+{{#each errors}}
+- {{this}}
+{{/each}}
+{{/errors}}
+
+{{#language}}
+Language: {{language}}
+{{/language}}
+
+{{#framework}}
+Framework: {{framework}}
+{{/framework}}
+
+{{#analysis}}
+Repository Context:
+{{analysis}}
+{{/analysis}}
+
+Requirements:
+1. Fix any syntax errors and build failures
+2. Apply containerization best practices
+3. Ensure proper build caching and layer optimization
+4. Use security best practices (non-root user, minimal packages)
+5. Optimize for image size where possible
+6. Maintain the original functionality and intent
+
+Return only the corrected Dockerfile content without explanation or code fences.`,
+      },
+
+      // Generate Kubernetes Manifests prompt
+      {
+        name: 'generate-k8s-manifests',
+        description: 'Generate Kubernetes manifests for containerized applications',
+        category: 'orchestration',
+        arguments: [
+          {
+            name: 'appName',
+            description: 'Application name for the deployment',
+            required: true,
+          },
+          {
+            name: 'imageId',
+            description: 'Docker image to deploy',
+            required: true,
+          },
+          {
+            name: 'namespace',
+            description: 'Kubernetes namespace (defaults to default)',
+            required: false,
+          },
+          {
+            name: 'replicas',
+            description: 'Number of replicas to deploy',
+            required: false,
+          },
+          {
+            name: 'ports',
+            description: 'Comma-separated port numbers to expose',
+            required: false,
+          },
+          {
+            name: 'environment',
+            description: 'Target environment (development, staging, production)',
+            required: false,
+          },
+          {
+            name: 'manifestTypes',
+            description: 'Array of manifest types to generate (Deployment, Service, etc.)',
+            required: false,
+          },
+          {
+            name: 'resources',
+            description: 'Resource limits and requests specification',
+            required: false,
+          },
+          {
+            name: 'repoAnalysis',
+            description: 'Repository analysis context for better manifest generation',
+            required: false,
+          },
+          {
+            name: 'securityLevel',
+            description: 'Security level (standard, strict)',
+            required: false,
+          },
+          {
+            name: 'highAvailability',
+            description: 'Enable high availability features',
+            required: false,
+          },
+        ],
+        template: `Generate production-ready Kubernetes manifests for containerized application.
+
+Application Details:
+- Name: {{appName}}
+- Image: {{imageId}}
+{{#namespace}}
+- Namespace: {{namespace}}
+{{/namespace}}
+{{#replicas}}
+- Replicas: {{replicas}}
+{{/replicas}}
+{{#ports}}
+- Ports: {{ports}}
+{{/ports}}
+{{#environment}}
+- Environment: {{environment}}
+{{/environment}}
+
+Required Manifests:
+{{#manifestTypes}}
+{{#each manifestTypes}}
+- {{this}}
+{{/each}}
+{{/manifestTypes}}
+{{^manifestTypes}}
+- Deployment
+- Service
+{{/manifestTypes}}
+
+{{#resources}}
+Resource Requirements:
+{{resources}}
+{{/resources}}
+
+{{#repoAnalysis}}
+Repository Context:
+{{repoAnalysis}}
+{{/repoAnalysis}}
+
+Configuration:
+{{#securityLevel}}
+- Security Level: {{securityLevel}}
+{{/securityLevel}}
+{{#highAvailability}}
+- High Availability: enabled
+{{/highAvailability}}
+
+Generate complete YAML manifests with the following requirements:
+
+1. **Deployment Manifest:**
+   - Use appropriate resource limits and requests
+   - Include health checks (readiness/liveness probes)
+   - Set security contexts (non-root user when possible)
+   - Use proper labeling and selectors
+   - Include restart policies
+
+2. **Service Manifest:**
+   - Appropriate service type for the environment
+   - Proper port configuration
+   - Correct selectors matching deployment labels
+
+3. **Additional Manifests (if requested):**
+   - ConfigMap for configuration (if needed)
+   - Ingress for external access (if production environment)
+   - HorizontalPodAutoscaler for scaling (if production)
+   - PodDisruptionBudget for high availability
+   - NetworkPolicy for security (if strict security level)
+
+Best Practices:
+- Use specific image tags (avoid :latest in production)
+- Set resource limits to prevent resource starvation
+- Include proper labels for monitoring and management
+- Use namespaces for environment isolation
+- Enable security contexts for better security posture
+- Include annotations for better observability
+
+Return only the YAML manifests separated by "---" without explanation or code fences.`,
+      },
+
+      // Enhance Repository Analysis prompt
+      {
+        name: 'enhance-repo-analysis',
+        description: 'Enhance repository analysis with AI insights and recommendations',
+        category: 'analysis',
+        arguments: [
+          {
+            name: 'language',
+            description: 'Primary programming language detected',
+            required: true,
+          },
+          {
+            name: 'framework',
+            description: 'Framework detected (if any)',
+            required: false,
+          },
+          {
+            name: 'buildSystem',
+            description: 'Build system detected',
+            required: false,
+          },
+          {
+            name: 'dependencies',
+            description: 'Comma-separated list of key dependencies',
+            required: false,
+          },
+          {
+            name: 'hasTests',
+            description: 'Whether tests are present in the repository',
+            required: false,
+          },
+          {
+            name: 'hasDocker',
+            description: 'Whether Docker files are already present',
+            required: false,
+          },
+          {
+            name: 'ports',
+            description: 'Detected or inferred ports',
+            required: false,
+          },
+          {
+            name: 'fileCount',
+            description: 'Approximate number of source files',
+            required: false,
+          },
+          {
+            name: 'repoStructure',
+            description: 'Brief description of repository structure',
+            required: false,
+          },
+        ],
+        template: `Provide enhanced analysis insights for a {{language}} repository.
+
+Repository Details:
+- Language: {{language}}
+{{#framework}}
+- Framework: {{framework}}
+{{/framework}}
+{{#buildSystem}}
+- Build System: {{buildSystem}}
+{{/buildSystem}}
+{{#dependencies}}
+- Key Dependencies: {{dependencies}}
+{{/dependencies}}
+{{#hasTests}}
+- Has Tests: {{hasTests}}
+{{/hasTests}}
+{{#hasDocker}}
+- Has Docker Files: {{hasDocker}}
+{{/hasDocker}}
+{{#ports}}
+- Detected Ports: {{ports}}
+{{/ports}}
+{{#fileCount}}
+- File Count: {{fileCount}}
+{{/fileCount}}
+{{#repoStructure}}
+- Structure: {{repoStructure}}
+{{/repoStructure}}
+
+Provide analysis in the following format:
+
+**Insights:**
+- [2-3 key insights about the project architecture and technology choices]
+
+**Containerization Recommendations:**
+- [Specific recommendations for containerizing this project]
+- [Build strategy suggestions]
+- [Performance and security considerations]
+
+**Risk Assessment:**
+- [Potential challenges or risks for containerization]
+- [Dependency complexity assessment]
+- [Security considerations]
+
+**Deployment Recommendations:**
+- [Suggested deployment patterns]
+- [Orchestration recommendations]
+- [Monitoring and observability suggestions]
+
+Keep the response concise but actionable, focusing on practical containerization and deployment guidance.`,
+      },
     ];
 
     defaultPrompts.forEach((prompt) => {
@@ -611,6 +1003,38 @@ Please provide a production-ready Dockerfile.`,
           arguments: prompt.arguments,
         }
       : null;
+  }
+
+  /**
+   * Get prompt with messages in ToolContext-compatible format
+   * This method is used by the ToolContext bridge to provide prompts
+   * with proper message formatting.
+   */
+  async getPromptWithMessages(
+    name: string,
+    args?: Record<string, unknown>,
+  ): Promise<{
+    description: string;
+    messages: Array<{ role: 'user' | 'assistant'; content: Array<{ type: 'text'; text: string }> }>;
+  }> {
+    const prompt = this.prompts.get(name);
+    if (!prompt) {
+      throw new McpError(ErrorCode.MethodNotFound, `Prompt not found: ${name}`);
+    }
+
+    // Get the MCP-format result
+    const mcpResult = await this.getPrompt(name, args);
+
+    // Convert MCP messages to ToolContext format with content arrays
+    const messages = mcpResult.messages.map((msg) => ({
+      role: msg.role as 'user' | 'assistant',
+      content: [{ type: 'text' as const, text: String(msg.content.text) }],
+    }));
+
+    return {
+      description: prompt.description,
+      messages,
+    };
   }
 
   /**

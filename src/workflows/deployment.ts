@@ -71,7 +71,31 @@ export async function runDeploymentWorkflow(
     // Step 1: Prepare cluster
     const prepareStep = steps[0];
     if (!prepareStep) {
-      throw new Error('Prepare cluster step not found');
+      const endTime = new Date();
+      const errorMessage = 'Prepare cluster step not found';
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Deployment workflow failed - prepare step not found');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     prepareStep.status = 'running';
     prepareStep.startTime = new Date();
@@ -135,7 +159,31 @@ export async function runDeploymentWorkflow(
     // Step 2: Generate K8s manifests
     const generateStep = steps[1];
     if (!generateStep) {
-      throw new Error('Generate manifests step not found');
+      const endTime = new Date();
+      const errorMessage = 'Generate manifests step not found';
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Deployment workflow failed - generate step not found');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     generateStep.status = 'running';
     generateStep.startTime = new Date();
@@ -217,7 +265,31 @@ export async function runDeploymentWorkflow(
     // Step 3: Push image to registry
     const pushStep = steps[2];
     if (!pushStep) {
-      throw new Error('Push image step not found');
+      const endTime = new Date();
+      const errorMessage = 'Push image step not found';
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Deployment workflow failed - push step not found');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     pushStep.status = 'running';
     pushStep.startTime = new Date();
@@ -293,7 +365,31 @@ export async function runDeploymentWorkflow(
     // Step 4: Deploy application
     const deployStep = steps[3];
     if (!deployStep) {
-      throw new Error('Deploy application step not found');
+      const endTime = new Date();
+      const errorMessage = 'Deploy application step not found';
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Deployment workflow failed - deploy step not found');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     deployStep.status = 'running';
     deployStep.startTime = new Date();
@@ -373,7 +469,31 @@ export async function runDeploymentWorkflow(
     // Step 5: Verify deployment
     const verifyStep = steps[4];
     if (!verifyStep) {
-      throw new Error('Verify deployment step not found');
+      const endTime = new Date();
+      const errorMessage = 'Verify deployment step not found';
+
+      await sessionManager.update(sessionId, {
+        status: 'failed',
+        metadata: {
+          error: errorMessage,
+          failedAt: endTime.toISOString(),
+        },
+      });
+
+      timer.end();
+      logger.error('Deployment workflow failed - verify step not found');
+
+      return {
+        success: false,
+        sessionId,
+        error: errorMessage,
+        metadata: {
+          startTime: context.metadata.startTime,
+          endTime,
+          duration: endTime.getTime() - context.metadata.startTime.getTime(),
+          steps: context.steps,
+        },
+      };
     }
     verifyStep.status = 'running';
     verifyStep.startTime = new Date();

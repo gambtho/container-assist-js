@@ -15,8 +15,6 @@ import {
   type SDKResourceManager,
 } from '@resources/manager';
 import { createSDKToolRegistry, type SDKToolRegistry } from '@mcp/tools/registry';
-import { AIAugmentationService } from '@lib/ai/ai-service';
-import { createMCPHostAI, type MCPHostAI } from '@lib/mcp-host-ai';
 import type { AIService } from '@types';
 import { createAppConfig, type AppConfig } from '@config/app-config';
 
@@ -38,8 +36,6 @@ export interface Deps {
 
   // Optional AI services
   aiService?: AIService;
-  aiAugmentationService?: AIAugmentationService;
-  mcpHostAI?: MCPHostAI;
 }
 
 /**
@@ -52,7 +48,6 @@ export interface ContainerConfigOverrides {
   // AI configuration
   ai?: {
     enabled?: boolean;
-    mcpHostAI?: MCPHostAI;
   };
 }
 
@@ -99,24 +94,11 @@ export function createContainer(
         {
           defaultTtl: appConfig.cache.ttl,
           maxResourceSize: appConfig.workspace.maxFileSize,
-          cacheConfig: {
-            defaultTtl: appConfig.cache.ttl,
-            maxSize: appConfig.cache.maxSize,
-            maxMemoryUsage: appConfig.cache.maxSize * 1024, // Convert to bytes estimate
-            enableAccessTracking: true,
-          },
         },
         logger,
       );
       return createSDKResourceManager(resourceContext);
     })();
-
-  const mcpHostAI =
-    depsOverrides.mcpHostAI ?? configOverrides.ai?.mcpHostAI ?? createMCPHostAI(logger);
-
-  const aiAugmentationService =
-    depsOverrides.aiAugmentationService ??
-    new AIAugmentationService(mcpHostAI, promptRegistry, logger);
 
   // Create tool registry
   const toolRegistry =
@@ -129,8 +111,6 @@ export function createContainer(
     promptRegistry,
     resourceManager,
     toolRegistry,
-    mcpHostAI,
-    aiAugmentationService,
   };
 
   logger.info(
@@ -151,8 +131,6 @@ export function createContainer(
         toolRegistry: deps.toolRegistry !== undefined,
         toolRegistryType: typeof deps.toolRegistry,
         toolRegistryKeys: deps.toolRegistry?.tools.size,
-        aiAugmentationService: deps.aiAugmentationService !== undefined,
-        mcpHostAI: deps.mcpHostAI !== undefined,
       },
     },
     'Dependency container created',
@@ -171,7 +149,6 @@ export function createTestContainer(overrides: DepsOverrides = {}): Deps {
   testConfig.server.logLevel = 'error'; // Quiet logs during tests
   testConfig.session.ttl = 60; // Short TTL for tests
   testConfig.session.maxSessions = 10;
-  testConfig.cache.ttl = 60;
   testConfig.workspace.maxFileSize = 1024 * 1024; // 1MB max for tests
 
   return createContainer(
@@ -264,10 +241,7 @@ export function checkContainerHealth(deps: Deps): {
     toolRegistry: deps.toolRegistry !== undefined,
   };
 
-  const optionalServices = {
-    aiAugmentationService: deps.aiAugmentationService !== undefined,
-    mcpHostAI: deps.mcpHostAI !== undefined,
-  };
+  const optionalServices = {};
 
   const services = { ...requiredServices, ...optionalServices };
   const healthy = Object.values(requiredServices).every(Boolean);

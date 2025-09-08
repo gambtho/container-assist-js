@@ -77,12 +77,12 @@ export async function scanImage(
   );
 
   try {
-    await reportProgress(0, 'Initializing security scan');
+    await reportProgress('Initializing security scan', 0);
     const { sessionId, scanner = 'trivy', severityThreshold = 'high' } = config;
 
     logger.info({ sessionId, scanner, severityThreshold }, 'Starting image security scan');
 
-    await reportProgress(10, 'Loading scanner configuration');
+    await reportProgress('Loading scanner configuration', 10);
 
     // Check for abort signal early
     if (abortSignal?.aborted) {
@@ -94,7 +94,7 @@ export async function scanImage(
     const securityScanner = createSecurityScanner(logger, scanner);
 
     // Get or create session
-    await reportProgress(20, 'Loading session');
+    await reportProgress('Loading session', 20);
     let session = await sessionManager.get(sessionId);
     if (!session) {
       // Create new session with the specified sessionId
@@ -114,7 +114,7 @@ export async function scanImage(
     const imageId = buildResult.imageId;
     logger.info({ imageId, scanner }, 'Scanning image for vulnerabilities');
 
-    await reportProgress(30, 'Retrieving image information');
+    await reportProgress('Retrieving image information', 30);
 
     // Check for abort before starting the scan
     if (abortSignal?.aborted) {
@@ -122,7 +122,7 @@ export async function scanImage(
     }
 
     // Scan image using security scanner
-    await reportProgress(50, 'Scanning for vulnerabilities');
+    await reportProgress('Scanning for vulnerabilities', 50);
     const scanResultWrapper = await securityScanner.scanImage(imageId);
 
     if (!scanResultWrapper.ok) {
@@ -201,7 +201,7 @@ export async function scanImage(
 
     const passed = vulnerabilityCount === 0;
 
-    await reportProgress(80, 'Updating scan results');
+    await reportProgress('Updating scan results', 80);
     // Update session with scan results
     const currentState = session.workflow_state as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
@@ -246,7 +246,7 @@ export async function scanImage(
       'Image scan completed',
     );
 
-    await reportProgress(100, 'Scan completed');
+    await reportProgress('Scan completed', 100);
 
     return Success({
       success: true,

@@ -57,18 +57,7 @@ jest.mock('@lib/session', () => ({
   createSessionManager: jest.fn(() => mockSessionManager),
 }));
 
-jest.mock('@lib/mcp-host-ai', () => ({
-  createMCPHostAI: jest.fn(() => mockMCPHostAI),
-  createPromptTemplate: jest.fn((template: string) => ({
-    render: (vars: Record<string, unknown>) => {
-      let result = template;
-      for (const [key, value] of Object.entries(vars)) {
-        result = result.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-      }
-      return result;
-    },
-  })),
-}));
+// Legacy mcp-host-ai module removed - using ToolContext pattern now
 
 jest.mock('@lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),

@@ -32,8 +32,6 @@ export function createLogger(options: pino.LoggerOptions = {}): pino.Logger {
   );
 }
 
-// Singleton pattern removed - use createLogger directly
-
 /**
  * Performance timer interface
  */

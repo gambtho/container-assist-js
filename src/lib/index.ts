@@ -8,7 +8,6 @@
 export * from './logger';
 export * from './session';
 export * from './errors';
-export * from './composition';
 export * from './sampling';
 
 // Container utilities
@@ -30,12 +29,5 @@ export {
   SecurityScanner,
 } from './security-scanner';
 
-// Caching
-export * from './caching';
-
-// AI services
-export * from './ai/ai-service';
-export * from './mcp-host-ai';
-
-// Re-export AI index if it exists
-export * from './ai/index';
+// Text processing utilities
+export * from './text-processing';

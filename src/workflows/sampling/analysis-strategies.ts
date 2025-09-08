@@ -11,6 +11,58 @@ import type {
   AnalysisScoringCriteria,
   AnalysisScoreDetails,
 } from './analysis-types';
+
+// Enhanced analysis data interfaces
+interface SecurityAnalysis {
+  vulnerabilities: Array<{ type: string; severity: string; description: string }>;
+  recommendations: string[];
+}
+
+interface PerformanceAnalysis {
+  buildOptimizations: string[];
+  runtimeOptimizations: string[];
+}
+
+interface ArchitectureAnalysis {
+  style: string;
+  components: Array<{ name: string; type: string }>;
+  recommendations: string[];
+}
+
+interface DeploymentAnalysis {
+  environments: string[];
+  configurations: Array<{ name: string; value: string }>;
+  recommendations: string[];
+}
+
+interface DependencyItem {
+  name: string;
+  version?: string;
+  latestVersion?: string;
+  type: string;
+}
+
+interface FrameworkItem {
+  name: string;
+  version?: string;
+}
+
+interface FileItem {
+  path: string;
+  type?: string;
+  content?: string;
+}
+
+interface EnhancedAnalysis {
+  dependencies?: DependencyItem[];
+  frameworks?: FrameworkItem[];
+  files?: FileItem[];
+  patterns?: Record<string, unknown>;
+  security?: SecurityAnalysis;
+  performance?: PerformanceAnalysis;
+  architecture?: ArchitectureAnalysis;
+  deployment?: DeploymentAnalysis;
+}
 import { analyzeRepo, type AnalyzeRepoResult, type AnalyzeRepoConfig } from '@tools/analyze-repo';
 
 /**
@@ -134,7 +186,7 @@ export async function scoreAnalysis(
       total: Math.round(total),
       breakdown: scores,
       strengths: identifyStrengths(variant, scores),
-      weaknesses: identifyWeaknesses(variant, scores),
+      weaknesses: identifyWeaknesses(scores),
       recommendations: generateRecommendations(variant, scores),
       confidence: variant.confidence,
     };
@@ -190,7 +242,7 @@ function identifyStrengths(variant: AnalysisVariant, scores: Record<string, numb
 /**
  * Identify weaknesses in the analysis
  */
-function identifyWeaknesses(_variant: AnalysisVariant, scores: Record<string, number>): string[] {
+function identifyWeaknesses(scores: Record<string, number>): string[] {
   const weaknesses: string[] = [];
 
   if ((scores.accuracy ?? 100) < 60) {
@@ -258,8 +310,9 @@ export function createComprehensiveStrategy(logger: Logger): AnalysisStrategy {
       if (!result.ok) return result;
 
       const baseAnalysis = result.value;
+      const { recommendations: baseRecommendations, ...analysisData } = baseAnalysis;
       const variant: AnalysisVariant = {
-        ...(baseAnalysis as any),
+        ...analysisData,
         id: `comprehensive-${Date.now()}`,
         strategy: 'comprehensive',
         perspective: 'comprehensive',
@@ -275,6 +328,15 @@ export function createComprehensiveStrategy(logger: Logger): AnalysisStrategy {
         analysisTime: 0,
         filesAnalyzed: 0, // Will be set from actual file analysis
         generated: new Date(),
+        recommendations: baseRecommendations
+          ? [
+              baseRecommendations.baseImage ? `Base image: ${baseRecommendations.baseImage}` : '',
+              baseRecommendations.buildStrategy
+                ? `Build strategy: ${baseRecommendations.buildStrategy}`
+                : '',
+              ...(baseRecommendations.securityNotes || []),
+            ].filter(Boolean)
+          : [],
       };
 
       return Success(variant);
@@ -301,7 +363,7 @@ export function createSecurityStrategy(logger: Logger): AnalysisStrategy {
 
       // Enhance with security-specific checks
       const baseAnalysis = result.value;
-      const analysis: any = { ...baseAnalysis };
+      const analysis: EnhancedAnalysis & typeof baseAnalysis = { ...baseAnalysis };
 
       // Check for common security issues
       if (!analysis.security) {
@@ -314,16 +376,26 @@ export function createSecurityStrategy(logger: Logger): AnalysisStrategy {
       // Add security-specific checks
       if (analysis.dependencies) {
         const outdated = analysis.dependencies.filter(
-          (d: { version?: string; latestVersion?: string }) =>
-            d.version && d.latestVersion && d.version !== d.latestVersion,
+          (d) => d.version && d.latestVersion && d.version !== d.latestVersion,
         );
         if (outdated.length > 0) {
           analysis.security.recommendations.push(`Update ${outdated.length} outdated dependencies`);
         }
       }
 
+      const {
+        recommendations: baseRecommendations,
+        files,
+        security,
+        deployment,
+        ...analysisData
+      } = analysis;
+      const processedFiles = files?.map((file) => ({ ...file, type: file.type || 'unknown' }));
       const variant: AnalysisVariant = {
-        ...analysis,
+        ...analysisData,
+        ...(processedFiles ? { files: processedFiles } : {}),
+        ...(security ? { security: security as unknown as Record<string, unknown> } : {}),
+        ...(deployment ? { deployment: deployment as unknown as Record<string, unknown> } : {}),
         id: `security-${Date.now()}`,
         strategy: 'security',
         perspective: 'security',
@@ -337,8 +409,17 @@ export function createSecurityStrategy(logger: Logger): AnalysisStrategy {
         confidence: 90,
         completeness: 85,
         analysisTime: 0,
-        filesAnalyzed: analysis.files?.length || 0,
+        filesAnalyzed: (analysis.files as FileItem[] | undefined)?.length || 0,
         generated: new Date(),
+        recommendations: baseRecommendations
+          ? [
+              baseRecommendations.baseImage ? `Base image: ${baseRecommendations.baseImage}` : '',
+              baseRecommendations.buildStrategy
+                ? `Build strategy: ${baseRecommendations.buildStrategy}`
+                : '',
+              ...(baseRecommendations.securityNotes || []),
+            ].filter(Boolean)
+          : [],
       };
 
       return Success(variant);
@@ -364,7 +445,7 @@ export function createPerformanceStrategy(logger: Logger): AnalysisStrategy {
       if (!result.ok) return result;
 
       const baseAnalysis = result.value;
-      const analysis: any = { ...baseAnalysis };
+      const analysis: EnhancedAnalysis & typeof baseAnalysis = { ...baseAnalysis };
 
       // Add performance-specific insights
       if (!analysis.performance) {
@@ -379,13 +460,24 @@ export function createPerformanceStrategy(logger: Logger): AnalysisStrategy {
         analysis.performance.buildOptimizations.push('Implement Docker layer caching');
       }
 
-      if (analysis.frameworks?.some((f: { name: string }) => f.name === 'Node.js')) {
+      if (analysis.frameworks?.some((f) => f.name === 'Node.js')) {
         analysis.performance.runtimeOptimizations.push('Use Alpine Linux for smaller image size');
         analysis.performance.runtimeOptimizations.push('Enable Node.js cluster mode');
       }
 
+      const {
+        recommendations: baseRecommendations,
+        files,
+        security,
+        deployment,
+        ...analysisData
+      } = analysis;
+      const processedFiles = files?.map((file) => ({ ...file, type: file.type || 'unknown' }));
       const variant: AnalysisVariant = {
-        ...analysis,
+        ...analysisData,
+        ...(processedFiles ? { files: processedFiles } : {}),
+        ...(security ? { security: security as unknown as Record<string, unknown> } : {}),
+        ...(deployment ? { deployment: deployment as unknown as Record<string, unknown> } : {}),
         id: `performance-${Date.now()}`,
         strategy: 'performance',
         perspective: 'performance',
@@ -402,8 +494,17 @@ export function createPerformanceStrategy(logger: Logger): AnalysisStrategy {
         confidence: 80,
         completeness: 75,
         analysisTime: 0,
-        filesAnalyzed: analysis.files?.length || 0,
+        filesAnalyzed: (analysis.files as FileItem[] | undefined)?.length || 0,
         generated: new Date(),
+        recommendations: baseRecommendations
+          ? [
+              baseRecommendations.baseImage ? `Base image: ${baseRecommendations.baseImage}` : '',
+              baseRecommendations.buildStrategy
+                ? `Build strategy: ${baseRecommendations.buildStrategy}`
+                : '',
+              ...(baseRecommendations.securityNotes || []),
+            ].filter(Boolean)
+          : [],
       };
 
       return Success(variant);
@@ -429,7 +530,7 @@ export function createArchitectureStrategy(logger: Logger): AnalysisStrategy {
       if (!result.ok) return result;
 
       const baseAnalysis = result.value;
-      const analysis: any = { ...baseAnalysis };
+      const analysis: EnhancedAnalysis & typeof baseAnalysis = { ...baseAnalysis };
 
       // Enhance with architecture insights
       if (!analysis.architecture) {
@@ -449,8 +550,19 @@ export function createArchitectureStrategy(logger: Logger): AnalysisStrategy {
         analysis.architecture.recommendations.push('Consider modular structure for containers');
       }
 
+      const {
+        recommendations: baseRecommendations,
+        files,
+        security,
+        deployment,
+        ...analysisData
+      } = analysis;
+      const processedFiles = files?.map((file) => ({ ...file, type: file.type || 'unknown' }));
       const variant: AnalysisVariant = {
-        ...analysis,
+        ...analysisData,
+        ...(processedFiles ? { files: processedFiles } : {}),
+        ...(security ? { security: security as unknown as Record<string, unknown> } : {}),
+        ...(deployment ? { deployment: deployment as unknown as Record<string, unknown> } : {}),
         id: `architecture-${Date.now()}`,
         strategy: 'architecture',
         perspective: 'architecture',
@@ -464,8 +576,17 @@ export function createArchitectureStrategy(logger: Logger): AnalysisStrategy {
         confidence: 85,
         completeness: 80,
         analysisTime: 0,
-        filesAnalyzed: analysis.files?.length || 0,
+        filesAnalyzed: (analysis.files as FileItem[] | undefined)?.length || 0,
         generated: new Date(),
+        recommendations: baseRecommendations
+          ? [
+              baseRecommendations.baseImage ? `Base image: ${baseRecommendations.baseImage}` : '',
+              baseRecommendations.buildStrategy
+                ? `Build strategy: ${baseRecommendations.buildStrategy}`
+                : '',
+              ...(baseRecommendations.securityNotes || []),
+            ].filter(Boolean)
+          : [],
       };
 
       return Success(variant);
@@ -491,7 +612,7 @@ export function createDeploymentStrategy(logger: Logger): AnalysisStrategy {
       if (!result.ok) return result;
 
       const baseAnalysis = result.value;
-      const analysis: any = { ...baseAnalysis };
+      const analysis: EnhancedAnalysis & typeof baseAnalysis = { ...baseAnalysis };
 
       // Enhance with deployment insights
       if (!analysis.deployment) {
@@ -503,20 +624,27 @@ export function createDeploymentStrategy(logger: Logger): AnalysisStrategy {
       }
 
       // Add deployment recommendations
-      if (!analysis.files?.some((f: { path: string }) => f.path.includes('Dockerfile'))) {
+      if (!analysis.files?.some((f) => f.path.includes('Dockerfile'))) {
         analysis.deployment.recommendations.push('Create Dockerfile for containerization');
       }
 
-      if (
-        !analysis.files?.some(
-          (f: { path: string }) => f.path.includes('k8s') || f.path.includes('kubernetes'),
-        )
-      ) {
+      if (!analysis.files?.some((f) => f.path.includes('k8s') || f.path.includes('kubernetes'))) {
         analysis.deployment.recommendations.push('Add Kubernetes manifests for orchestration');
       }
 
+      const {
+        recommendations: baseRecommendations,
+        files,
+        security,
+        deployment,
+        ...analysisData
+      } = analysis;
+      const processedFiles = files?.map((file) => ({ ...file, type: file.type || 'unknown' }));
       const variant: AnalysisVariant = {
-        ...analysis,
+        ...analysisData,
+        ...(processedFiles ? { files: processedFiles } : {}),
+        ...(security ? { security: security as unknown as Record<string, unknown> } : {}),
+        ...(deployment ? { deployment: deployment as unknown as Record<string, unknown> } : {}),
         id: `deployment-${Date.now()}`,
         strategy: 'deployment',
         perspective: 'deployment',
@@ -530,8 +658,17 @@ export function createDeploymentStrategy(logger: Logger): AnalysisStrategy {
         confidence: 85,
         completeness: 85,
         analysisTime: 0,
-        filesAnalyzed: analysis.files?.length || 0,
+        filesAnalyzed: (analysis.files as FileItem[] | undefined)?.length || 0,
         generated: new Date(),
+        recommendations: baseRecommendations
+          ? [
+              baseRecommendations.baseImage ? `Base image: ${baseRecommendations.baseImage}` : '',
+              baseRecommendations.buildStrategy
+                ? `Build strategy: ${baseRecommendations.buildStrategy}`
+                : '',
+              ...(baseRecommendations.securityNotes || []),
+            ].filter(Boolean)
+          : [],
       };
 
       return Success(variant);

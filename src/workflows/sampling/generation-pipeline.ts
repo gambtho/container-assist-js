@@ -5,7 +5,35 @@
 import type { Logger } from 'pino';
 import { Success, Failure, isFail, type Result } from '@types';
 import { getDefaultPort } from '@config/defaults';
-import type { SamplingConfig, SamplingResult, DockerfileContext, ScoringCriteria } from './types';
+import type {
+  SamplingConfig,
+  SamplingResult,
+  DockerfileContext,
+  ScoringCriteria,
+  SamplingStrategy,
+  DockerfileVariant,
+  ScoredVariant,
+} from './types';
+
+// Type definitions for analysis data
+interface PackageJsonData {
+  scripts?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+}
+
+interface AnalysisFiles {
+  'package.json'?: PackageJsonData;
+  'package-lock.json'?: unknown;
+  'yarn.lock'?: unknown;
+  'pnpm-lock.yaml'?: unknown;
+}
+
+interface AnalysisData {
+  language?: string;
+  framework?: string;
+  dependencies?: (string | { name: string })[];
+  files?: AnalysisFiles;
+}
 import { StrategyEngine } from './strategy-engine';
 import { PromptRegistry } from '@prompts/prompt-registry';
 import { VariantScorer } from './scorer';
@@ -211,8 +239,8 @@ export class VariantGenerationPipeline {
           ...(analysis.framework && { framework: analysis.framework }),
           packageManager: this.detectPackageManager(analysis),
           dependencies: Array.isArray(analysis.dependencies)
-            ? analysis.dependencies.map((dep: any) =>
-                typeof dep === 'string' ? dep : dep.name || String(dep),
+            ? analysis.dependencies.map((dep) =>
+                typeof dep === 'string' ? dep : (dep as { name: string }).name || String(dep),
               )
             : [],
           buildTools: this.extractBuildTools(analysis),
@@ -256,14 +284,14 @@ export class VariantGenerationPipeline {
   }
 
   // Helper methods for context building
-  private detectPackageManager(analysis: any): string {
+  private detectPackageManager(analysis: AnalysisData): string {
     if (analysis.files?.['package-lock.json']) return 'npm';
     if (analysis.files?.['yarn.lock']) return 'yarn';
     if (analysis.files?.['pnpm-lock.yaml']) return 'pnpm';
     return 'npm';
   }
 
-  private extractBuildTools(analysis: any): string[] {
+  private extractBuildTools(analysis: AnalysisData): string[] {
     const tools: string[] = [];
     const packageJson = analysis.files?.['package.json'];
 
@@ -282,7 +310,7 @@ export class VariantGenerationPipeline {
     return tools;
   }
 
-  private detectDatabaseUsage(analysis: any): boolean {
+  private detectDatabaseUsage(analysis: AnalysisData): boolean {
     const dependencies = analysis.dependencies || [];
     const dbKeywords = [
       'mongodb',
@@ -294,17 +322,21 @@ export class VariantGenerationPipeline {
       'sequelize',
       'typeorm',
     ];
-    return dependencies.some((dep: string) =>
-      dbKeywords.some((keyword) => dep.toLowerCase().includes(keyword)),
-    );
+    return dependencies.some((dep) => {
+      const depName = typeof dep === 'string' ? dep : (dep as { name: string }).name;
+      return dbKeywords.some((keyword) => depName.toLowerCase().includes(keyword));
+    });
   }
 
-  private extractPorts(analysis: any): number[] {
+  private extractPorts(analysis: AnalysisData): number[] {
     const ports: number[] = [];
 
     // Check common port patterns in code
     const files = analysis.files || {};
-    const content = Object.values(files).join(' ').toLowerCase();
+    const content = Object.values(files)
+      .filter((f): f is string => typeof f === 'string')
+      .join(' ')
+      .toLowerCase();
 
     // Look for common port patterns
     const portMatches = content.match(/port[:\s=]+(\d+)/g);
@@ -327,7 +359,7 @@ export class VariantGenerationPipeline {
     return ports.slice(0, 3); // Limit to first 3 ports
   }
 
-  private extractEnvironmentVars(analysis: any): Record<string, string> {
+  private extractEnvironmentVars(analysis: AnalysisData): Record<string, string> {
     const envVars: Record<string, string> = {};
 
     // Look for common environment variables
@@ -377,7 +409,17 @@ export class VariantGenerationPipeline {
   /**
    * Register a custom sampling strategy
    */
-  registerStrategy(strategy: any): void {
+  registerStrategy(strategy: SamplingStrategy): void {
     this.strategyEngine.registerStrategy(strategy);
+  }
+
+  /**
+   * Score variants using the internal scorer
+   */
+  async scoreVariants(
+    variants: DockerfileVariant[],
+    criteria: ScoringCriteria,
+  ): Promise<Result<ScoredVariant[]>> {
+    return this.scorer.scoreVariants(variants, criteria);
   }
 }

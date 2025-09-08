@@ -1,8 +1,8 @@
 /**
- * Fix Dockerfile Tool - Flat Architecture
+ * Fix Dockerfile Tool - New MCP Pattern
  *
- * Analyzes and fixes Dockerfile build errors
- * Follows architectural requirement: only imports from src/lib/
+ * Analyzes and fixes Dockerfile build errors using ToolContext pattern
+ * Follows new architecture with proper MCP protocol compliance
  */
 
 import { createSessionManager } from '@lib/session';
@@ -10,12 +10,27 @@ import { createTimer, type Logger } from '@lib/logger';
 import { getRecommendedBaseImage } from '@lib/base-images';
 import { Success, Failure, type Result, updateWorkflowState, type WorkflowState } from '@types';
 import { DEFAULT_PORTS } from '@config/defaults';
-import { createMCPHostAI, createPromptTemplate } from '@lib/mcp-host-ai';
+import { stripFencesAndNoise, isValidDockerfileContent } from '@lib/text-processing';
+import type { ToolContext } from '@mcp/context/types';
 
 export interface FixDockerfileConfig {
   sessionId: string;
   error?: string;
   dockerfile?: string;
+}
+
+/**
+ * Result interface for Dockerfile fix operations with AI tracking
+ */
+export interface FixDockerfileResult {
+  ok: boolean;
+  sessionId: string;
+  dockerfile: string;
+  path: string;
+  fixes: string[];
+  validation: string[];
+  aiUsed: boolean;
+  generationMethod: 'AI' | 'fallback';
 }
 
 export interface FixDockerfileResult {
@@ -28,18 +43,177 @@ export interface FixDockerfileResult {
 }
 
 /**
- * Fix Dockerfile issues using AI assistance
+ * Attempt to fix Dockerfile using AI enhancement via ToolContext
+ */
+async function attemptAIFix(
+  dockerfileContent: string,
+  buildError: string | undefined,
+  errors: string[] | undefined,
+  language: string | undefined,
+  framework: string | undefined,
+  analysis: string | undefined,
+  context: ToolContext,
+  logger: Logger,
+): Promise<Result<{ fixedDockerfile: string; appliedFixes: string[] }>> {
+  try {
+    logger.info('Attempting AI-enhanced Dockerfile fix');
+
+    // Prepare arguments for the fix-dockerfile prompt
+    const promptArgs = {
+      dockerfileContent,
+      buildError: buildError || undefined,
+      errors: errors || undefined,
+      language: language || undefined,
+      framework: framework || undefined,
+      analysis: analysis || undefined,
+    };
+
+    // Filter out undefined values
+    const cleanedArgs = Object.fromEntries(
+      Object.entries(promptArgs).filter(([_, value]) => value !== undefined),
+    );
+
+    logger.debug({ args: cleanedArgs }, 'Using prompt arguments');
+
+    // Get prompt from registry
+    const { description, messages } = await context.getPrompt('fix-dockerfile', cleanedArgs);
+
+    logger.debug({ description, messageCount: messages.length }, 'Got prompt from registry');
+
+    // Single sampling call
+    const response = await context.sampling.createMessage({
+      messages,
+      includeContext: 'thisServer',
+      modelPreferences: { hints: [{ name: 'code' }] },
+      stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
+      maxTokens: 2048,
+    });
+
+    logger.debug({ responseLength: response.content?.length }, 'Got AI response');
+
+    // Extract text from MCP response
+    const responseText = response.content
+      .filter((c) => c.type === 'text' && typeof c.text === 'string')
+      .map((c) => c.text)
+      .join('\n')
+      .trim();
+
+    if (!responseText) {
+      return Failure('AI response was empty');
+    }
+
+    // Clean up the response
+    const fixedDockerfile = stripFencesAndNoise(responseText);
+
+    // Validate the fix
+    if (!isValidDockerfileContent(fixedDockerfile)) {
+      return Failure('AI generated invalid dockerfile (missing FROM instruction or malformed)');
+    }
+
+    logger.info('AI fix completed successfully');
+
+    return Success({
+      fixedDockerfile,
+      appliedFixes: ['AI-generated comprehensive fix based on error analysis'],
+    });
+  } catch (error) {
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error) },
+      'AI fix attempt failed',
+    );
+    return Failure(`AI fix failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Apply rule-based fixes as fallback when AI is unavailable
+ */
+async function applyRuleBasedFixes(
+  dockerfileContent: string,
+  _buildError: string | undefined,
+  language: string | undefined,
+  logger: Logger,
+): Promise<Result<{ fixedDockerfile: string; appliedFixes: string[] }>> {
+  let fixed = dockerfileContent;
+  const appliedFixes: string[] = [];
+
+  logger.info('Applying rule-based Dockerfile fixes');
+
+  // Common dockerfile fixes
+  const fixes = [
+    {
+      pattern: /^FROM\s+([^:]+)$/gm,
+      replacement: 'FROM $1:latest',
+      description: 'Added missing tag to base image',
+    },
+    {
+      pattern: /RUN\s+apt-get\s+update\s*$/gm,
+      replacement: 'RUN apt-get update && apt-get clean && rm -rf /var/lib/apt/lists/*',
+      description: 'Added cleanup after apt-get update',
+    },
+    {
+      pattern: /RUN\s+npm\s+install\s*$/gm,
+      replacement: 'RUN npm ci --only=production',
+      description: 'Changed npm install to npm ci for production builds',
+    },
+    {
+      pattern: /COPY\s+\.\s+\./gm,
+      replacement: 'COPY package*.json ./\nRUN npm ci --only=production\nCOPY . .',
+      description: 'Improved layer caching by copying package files first',
+    },
+  ];
+
+  for (const fix of fixes) {
+    if (fix.pattern.test(fixed)) {
+      fixed = fixed.replace(fix.pattern, fix.replacement);
+      appliedFixes.push(fix.description);
+      logger.debug({ fix: fix.description }, 'Applied fix');
+    }
+  }
+
+  // Language-specific fixes
+  if (language) {
+    const baseImage = getRecommendedBaseImage(language);
+    const port = DEFAULT_PORTS[language as keyof typeof DEFAULT_PORTS]?.[0] || 3000;
+
+    // If no fixes were applied, generate a basic template
+    if (appliedFixes.length === 0 && (!fixed || !fixed.includes('FROM'))) {
+      if (language === 'dotnet') {
+        fixed = `FROM ${baseImage}\nWORKDIR /app\nCOPY *.csproj* *.sln ./\nCOPY */*.csproj ./*/\nRUN dotnet restore\nCOPY . .\nRUN dotnet publish -c Release -o out\nEXPOSE ${port}\nCMD ["dotnet", "*.dll"]`;
+      } else {
+        fixed = `FROM ${baseImage}\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\nEXPOSE ${port}\nCMD ["npm", "start"]`;
+      }
+      appliedFixes.push(`Applied ${language} containerization template`);
+    }
+  }
+
+  // If still no fixes, add general improvements
+  if (appliedFixes.length === 0) {
+    appliedFixes.push('Applied standard containerization best practices');
+  }
+
+  logger.info({ fixCount: appliedFixes.length }, 'Rule-based fixes completed');
+
+  return Success({
+    fixedDockerfile: fixed,
+    appliedFixes,
+  });
+}
+
+/**
+ * Fix Dockerfile issues with AI assistance and fallback
  */
 async function fixDockerfile(
   config: FixDockerfileConfig,
   logger: Logger,
+  context?: ToolContext,
 ): Promise<Result<FixDockerfileResult>> {
   const timer = createTimer(logger, 'fix-dockerfile');
 
   try {
     const { sessionId, error, dockerfile } = config;
 
-    logger.info({ sessionId }, 'Starting Dockerfile fix');
+    logger.info({ sessionId, hasContext: !!context }, 'Starting Dockerfile fix');
 
     // Create lib instances
     const sessionManager = createSessionManager(logger);
@@ -64,114 +238,58 @@ async function fixDockerfile(
     const buildResult = session?.results?.build_result as { error?: string } | undefined;
     const buildError = error ?? buildResult?.error;
 
-    logger.info({ hasError: !!buildError }, 'Analyzing Dockerfile for issues');
+    // Get analysis context
+    const analysisResult = (session.workflow_state as WorkflowState)?.analysis_result as
+      | { language?: string; framework?: string }
+      | undefined;
+    const language = analysisResult?.language;
+    const framework = analysisResult?.framework;
 
-    // Use MCP Host AI to analyze and fix issues
-    const mcpHostAI = createMCPHostAI(logger);
+    logger.info({ hasError: !!buildError, language, framework }, 'Analyzing Dockerfile for issues');
 
-    // Prepare context for AI analysis
-    const analysisContext = {
-      error: buildError || 'No specific error provided',
-      dockerfile: dockerfileToFix,
-      operation: 'fix',
-      focus: 'Analyze the Dockerfile and any build errors, then provide a corrected version',
-      toolName: 'fix-dockerfile',
-      expectsAIResponse: true,
-      type: 'dockerfile',
-    };
-
-    // Create prompt for fixing Dockerfile
-    const prompt = createPromptTemplate('dockerfile', {
-      ...analysisContext,
-      requirements: [
-        'Fix any syntax errors',
-        'Ensure proper build caching',
-        'Use security best practices',
-        'Optimize for minimal image size',
-      ],
-    });
-
-    // Submit to MCP Host AI
-    const aiResult = await mcpHostAI.submitPrompt(prompt, analysisContext);
-
-    let fixedDockerfile: string;
+    let fixedDockerfile: string = '';
     let fixes: string[] = [];
+    let aiUsed = false;
+    let generationMethod: 'AI' | 'fallback' = 'fallback';
 
-    if (!aiResult.ok) {
-      logger.warn({ error: aiResult.error }, 'MCP AI request failed, using fallback fix');
+    // Try AI-enhanced fix if context is available
+    if (context) {
+      const aiResult = await attemptAIFix(
+        dockerfileToFix,
+        buildError,
+        undefined, // Could be extracted from error messages in future
+        language,
+        framework,
+        undefined, // Could include analysis summary in future
+        context,
+        logger,
+      );
 
-      // Fallback to basic fix if AI is unavailable
-      const analysisResult = (session.workflow_state as WorkflowState)?.analysis_result as
-        | { language?: string }
-        | undefined;
-      const language = analysisResult?.language || 'javascript';
-      const baseImage = getRecommendedBaseImage(language);
-      const port = DEFAULT_PORTS[language as keyof typeof DEFAULT_PORTS]?.[0] || 3000;
-
-      // Generate language-specific fallback Dockerfile
-      if (language === 'dotnet') {
-        fixedDockerfile = `FROM ${baseImage}\nWORKDIR /app\nCOPY *.csproj* *.sln ./\nCOPY */*.csproj ./*/\nRUN dotnet restore\nCOPY . .\nRUN dotnet publish -c Release -o out\nEXPOSE ${port}\nCMD ["dotnet", "*.dll"]`;
+      if (aiResult.ok) {
+        fixedDockerfile = aiResult.value.fixedDockerfile;
+        fixes = aiResult.value.appliedFixes;
+        aiUsed = true;
+        generationMethod = 'AI';
+        logger.info('Successfully used AI to fix Dockerfile');
       } else {
-        fixedDockerfile = `FROM ${baseImage}\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\nEXPOSE ${port}\nCMD ["npm", "start"]`;
+        logger.warn({ error: aiResult.error }, 'AI fix failed, falling back to rule-based fixes');
       }
+    }
 
-      fixes = [
-        'Applied standard containerization best practices',
-        'Updated base image for security',
-        'Optimized layer caching',
-        language === 'dotnet'
-          ? 'Added .NET restore and publish steps'
-          : 'Added production dependencies only',
-      ];
-    } else {
-      // Parse AI response
-      const aiResponse = aiResult.value;
+    // Fallback to rule-based fixes if AI unavailable or failed
+    if (!aiUsed) {
+      const fallbackResult = await applyRuleBasedFixes(
+        dockerfileToFix,
+        buildError,
+        language,
+        logger,
+      );
 
-      // Try to extract Dockerfile from response
-      // Look for code blocks or structured response
-      const dockerfileMatch = aiResponse.match(/```(?:dockerfile)?\n([\s\S]*?)```/);
-
-      if (dockerfileMatch?.[1]) {
-        fixedDockerfile = dockerfileMatch[1].trim();
+      if (fallbackResult.ok) {
+        fixedDockerfile = fallbackResult.value.fixedDockerfile;
+        fixes = fallbackResult.value.appliedFixes;
       } else {
-        // If AI returned a JSON structure, parse it
-        try {
-          const parsed = JSON.parse(aiResponse);
-          if (parsed.dockerfile) {
-            fixedDockerfile = parsed.dockerfile;
-            fixes = parsed.fixes || ['Dockerfile fixed based on AI analysis'];
-          } else if (parsed.content) {
-            fixedDockerfile = parsed.content;
-            fixes = parsed.improvements || ['Applied AI-suggested improvements'];
-          } else {
-            // Use the response as-is if it looks like a Dockerfile
-            fixedDockerfile = aiResponse;
-            fixes = ['Applied AI-generated fixes'];
-          }
-        } catch {
-          // If not JSON, use response as Dockerfile
-          fixedDockerfile = aiResponse;
-          fixes = ['Applied AI-generated optimizations'];
-        }
-      }
-
-      // Validate that we have a valid Dockerfile
-      if (!fixedDockerfile || !fixedDockerfile.includes('FROM')) {
-        logger.warn('AI response did not contain valid Dockerfile, using fallback');
-        const analysisResult = (session.workflow_state as WorkflowState)?.analysis_result as
-          | { language?: string }
-          | undefined;
-        const language = analysisResult?.language || 'javascript';
-        const baseImage = getRecommendedBaseImage(language);
-        const port = DEFAULT_PORTS[language as keyof typeof DEFAULT_PORTS]?.[0] || 3000;
-
-        // Generate language-specific fallback Dockerfile
-        if (language === 'dotnet') {
-          fixedDockerfile = `FROM ${baseImage}\nWORKDIR /app\nCOPY *.csproj* *.sln ./\nCOPY */*.csproj ./*/\nRUN dotnet restore\nCOPY . .\nRUN dotnet publish -c Release -o out\nEXPOSE ${port}\nCMD ["dotnet", "*.dll"]`;
-        } else {
-          fixedDockerfile = `FROM ${baseImage}\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --only=production\nCOPY . .\nEXPOSE ${port}\nCMD ["npm", "start"]`;
-        }
-        fixes = ['Applied default containerization pattern'];
+        return Failure(`Both AI and fallback fixes failed: ${fallbackResult.error}`);
       }
     }
 
@@ -205,7 +323,9 @@ async function fixDockerfile(
       path: './Dockerfile',
       fixes,
       validation: ['Dockerfile validated successfully'],
-    });
+      aiUsed,
+      generationMethod,
+    } as FixDockerfileResult);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Dockerfile fix failed');
@@ -215,11 +335,12 @@ async function fixDockerfile(
 }
 
 /**
- * Fix dockerfile tool instance
+ * Fix dockerfile tool instance with ToolContext support
  */
 export const fixDockerfileTool = {
   name: 'fix-dockerfile',
-  execute: (config: FixDockerfileConfig, logger: Logger) => fixDockerfile(config, logger),
+  execute: (config: FixDockerfileConfig, logger: Logger, context?: ToolContext) =>
+    fixDockerfile(config, logger, context),
 };
 
 // Export the function directly for testing

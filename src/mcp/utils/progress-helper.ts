@@ -5,6 +5,7 @@
  */
 
 import type { Logger } from 'pino';
+import type { ProgressReporter } from '@mcp/context/types';
 
 export interface ProgressToken {
   id: string;
@@ -17,8 +18,6 @@ export interface ProgressReportOptions {
   server?: import('@modelcontextprotocol/sdk/server/mcp.js').McpServer;
 }
 
-export type ProgressReporter = (progress: number, message?: string) => Promise<void>;
-
 /**
  * Creates a standardized progress reporter for tools
  */
@@ -28,11 +27,11 @@ export function createToolProgressReporter(
 ): ProgressReporter {
   const { progressToken, logger, server } = options;
 
-  return async (progress: number, message?: string): Promise<void> => {
+  return async (message: string, progress?: number, total?: number): Promise<void> => {
     const progressData = {
       tool: toolName,
-      progress: Math.max(0, Math.min(100, progress)),
-      message: message || `${toolName} progress: ${progress}%`,
+      progress: Math.max(0, Math.min(100, progress || 0)),
+      message: message || `${toolName} progress: ${progress || 0}%`,
       timestamp: new Date().toISOString(),
     };
 
@@ -51,7 +50,7 @@ export function createToolProgressReporter(
         ).sendNotification('notifications/progress', {
           progressToken: progressToken.id,
           progress: progressData.progress,
-          total: 100,
+          total: total || 100,
         });
       } catch (error) {
         if (logger) {

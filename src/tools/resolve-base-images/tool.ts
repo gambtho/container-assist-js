@@ -80,7 +80,7 @@ async function resolveBaseImages(
     }
 
     const language = analysisResult?.language ?? 'unknown';
-    const suggestedImages = getSuggestedBaseImages(language, analysisResult?.framework);
+    const suggestedImages = getSuggestedBaseImages(language);
 
     // Select primary image based on environment and security level
     let primaryImage = suggestedImages[0] ?? getRecommendedBaseImage(language); // Default fallback

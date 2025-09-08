@@ -628,10 +628,11 @@ export class VariantScorer {
         );
       }
 
-      if (constraints.mustNotHave && constraints.mustNotHave.length > 0) {
+      if (constraints.mustNotHave?.length) {
+        const mustNotHave = constraints.mustNotHave;
         candidates = candidates.filter(
           (v) =>
-            !constraints.mustNotHave!.some(
+            !mustNotHave.some(
               (feature) =>
                 v.metadata.features.includes(feature) ||
                 v.score.warnings.some((warning) =>

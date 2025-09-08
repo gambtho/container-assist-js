@@ -109,7 +109,7 @@ const FALLBACK_IMAGES = {
 /**
  * Get recommended base image (single image - backward compatible)
  */
-export function getRecommendedBaseImage(language: string, _framework?: string): string {
+export function getRecommendedBaseImage(language: string): string {
   const langKey = language.toLowerCase();
   const imageConfig = BASE_IMAGE_MAP[langKey];
 
@@ -123,7 +123,7 @@ export function getRecommendedBaseImage(language: string, _framework?: string): 
 /**
  * Get multiple suggested base images (array - for choice/alternatives)
  */
-export function getSuggestedBaseImages(language: string, _framework?: string): string[] {
+export function getSuggestedBaseImages(language: string): string[] {
   const langKey = language.toLowerCase();
   const imageConfig = BASE_IMAGE_MAP[langKey];
 

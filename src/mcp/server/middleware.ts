@@ -14,9 +14,8 @@ class CancelledError extends Error {
   }
 }
 import { Failure, type Result } from '@types';
-
-/**\n * Functional approach with composable utilities\n * Design decision: Uses functional composition over inheritance/classes for easier testing and modularity\n */
-export type ProgressReporter = (progress: Progress) => Promise<void>;
+import type { ProgressReporter } from '@mcp/context/types';
+export type { ProgressReporter } from '@mcp/context/types';
 export type ToolContext = {
   signal: AbortSignal;
   progressReporter?: ProgressReporter;
@@ -27,13 +26,18 @@ export type ToolContext = {
 
 const createProgressReporter =
   (server: any, token: string): ProgressReporter =>
-  async (progress: Progress) => {
+  async (message: string, progress?: number, total?: number) => {
     // Use SDK-native progress notification format
+    const progressData: Progress = {
+      progress: progress || 0,
+      message,
+      ...(total && { total }),
+    };
     await server.notification({
       method: 'notifications/progress',
       params: {
         progressToken: token,
-        ...ProgressSchema.parse(progress),
+        ...ProgressSchema.parse(progressData),
       },
     });
   };
@@ -48,7 +52,7 @@ const createToolContext = (request: any, server: any, logger: Logger): ToolConte
   // Progress updater for tool integration
   const progressUpdater = progressReporter
     ? (progress: number, message?: string, total?: number) =>
-        progressReporter({ progress, message, total })
+        progressReporter(message || `Progress: ${progress}%`, progress, total)
     : undefined;
 
   return {
@@ -69,14 +73,14 @@ const executeWithContext = async (
 
   try {
     // SDK-native progress reporting
-    await progressReporter?.({ progress: 0, message: `Starting ${tool.name}...` });
+    await progressReporter?.(`Starting ${tool.name}...`, 0);
 
     // Execute tool with context that includes progress updating capabilities
-    await progressReporter?.({ progress: 10, message: `Executing ${tool.name}...` });
+    await progressReporter?.(`Executing ${tool.name}...`, 10);
 
     const result = await tool.execute(args, logger, context);
 
-    await progressReporter?.({ progress: 100, message: 'Complete' });
+    await progressReporter?.('Complete', 100);
 
     return result;
   } catch (error: unknown) {

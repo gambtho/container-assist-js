@@ -1,5 +1,20 @@
 /**
- * Builds Docker images from Dockerfiles with comprehensive logging and error handling
+ * Builds Docker images from Dockerfiles with comprehensive logging and error handling.
+ *
+ * @example
+ * ```typescript
+ * const result = await buildImage({
+ *   sessionId: 'session-123',
+ *   context: '/path/to/app',
+ *   tags: ['myapp:latest', 'myapp:v1.0.0'],
+ *   buildArgs: { NODE_ENV: 'production' }
+ * }, context, logger);
+ *
+ * if (result.success) {
+ *   console.log('Image built:', result.imageId);
+ *   console.log('Build time:', result.buildTime, 'ms');
+ * }
+ * ```
  */
 
 import path from 'node:path';
@@ -11,34 +26,64 @@ import { updateWorkflowState, type WorkflowState, type Result } from '@types';
 import { createToolProgressReporter } from '@mcp/server/progress';
 import type { ToolContext } from '@tools/types';
 import { DockerError, FileSystemError, ErrorCodes, executeAsResult } from '@lib/errors';
-// Local type for Docker build options
+/**
+ * Internal Docker build options interface
+ * Maps to docker build command parameters
+ */
 interface DockerBuildOptions {
+  /** Path to Dockerfile relative to build context */
   dockerfile?: string;
+  /** Image tag(s) to apply */
   t?: string;
+  /** Build arguments as key-value pairs */
   buildargs?: Record<string, string>;
+  /** Target platform (e.g., 'linux/amd64') */
   platform?: string;
 }
 
+/**
+ * Configuration for Docker image build operation
+ */
 export interface BuildImageConfig {
+  /** Unique session identifier for tracking build state */
   sessionId: string;
+  /** Build context directory path (defaults to current directory) */
   context?: string;
+  /** Path to Dockerfile (defaults to 'Dockerfile' in context) */
   dockerfile?: string;
+  /** Image tags to apply (e.g., ['myapp:latest', 'myapp:1.0']) */
   tags?: string[];
+  /** Build arguments to pass to Docker build */
   buildArgs?: Record<string, string>;
+  /** Multi-stage build target to build */
   target?: string;
+  /** Disable build cache */
   noCache?: boolean;
+  /** Target platform for multi-platform builds */
   platform?: string;
 }
 
+/**
+ * Result of Docker image build operation
+ */
 export interface BuildImageResult {
+  /** Whether the build completed successfully */
   success: boolean;
+  /** Session identifier used for this build */
   sessionId: string;
+  /** Generated Docker image ID (SHA256 hash) */
   imageId: string;
+  /** Tags applied to the built image */
   tags: string[];
+  /** Final image size in bytes */
   size: number;
+  /** Number of layers in the image */
   layers?: number;
+  /** Total build time in milliseconds */
   buildTime: number;
+  /** Complete build output logs */
   logs: string[];
+  /** Security-related warnings discovered during build */
   securityWarnings?: string[];
 }
 
@@ -143,7 +188,7 @@ async function buildImageInternal(
   );
 
   try {
-    await reportProgress(0, 'Initializing build process');
+    await reportProgress('Initializing build process', 0);
     const {
       sessionId,
       context: buildContext = '.',
@@ -160,7 +205,7 @@ async function buildImageInternal(
       'Starting Docker image build',
     );
 
-    await reportProgress(10, 'Validating parameters');
+    await reportProgress('Validating parameters', 10);
 
     const startTime = Date.now();
 
@@ -174,7 +219,7 @@ async function buildImageInternal(
     const dockerClient = createDockerClient(logger);
 
     // Get or create session
-    await reportProgress(20, 'Loading session');
+    await reportProgress('Loading session', 20);
     let session = await sessionManager.get(sessionId);
     if (!session) {
       // Create new session with the specified sessionId
@@ -216,14 +261,14 @@ async function buildImageInternal(
     }
 
     // Read Dockerfile for security analysis
-    await reportProgress(30, 'Reading Dockerfile');
+    await reportProgress('Reading Dockerfile', 30);
     const dockerfileContent = await fs.readFile(dockerfilePath, 'utf-8');
 
     // Prepare build arguments
     const finalBuildArgs = prepareBuildArgs(buildArgs, session as SessionWithAnalysis);
 
     // Analyze security
-    await reportProgress(40, 'Analyzing security');
+    await reportProgress('Analyzing security', 40);
     const securityWarnings = analyzeBuildSecurity(dockerfileContent, finalBuildArgs);
     if (securityWarnings.length > 0) {
       logger.warn({ warnings: securityWarnings }, 'Security warnings found in build');
@@ -244,7 +289,7 @@ async function buildImageInternal(
     }
 
     // Build the image
-    await reportProgress(50, 'Building Docker image');
+    await reportProgress('Building Docker image', 50);
     const buildResult = await dockerClient.buildImage(buildOptions);
 
     if (!buildResult.ok) {
@@ -257,7 +302,7 @@ async function buildImageInternal(
 
     const buildTime = Date.now() - startTime;
 
-    await reportProgress(90, 'Updating session');
+    await reportProgress('Updating session', 90);
     // Update session with build result
     const currentState = session as WorkflowState | undefined;
     const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
@@ -283,7 +328,7 @@ async function buildImageInternal(
     timer.end({ imageId: buildResult.value.imageId, buildTime });
     logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');
 
-    await reportProgress(100, 'Build completed successfully');
+    await reportProgress('Build completed successfully', 100);
 
     return {
       success: true,

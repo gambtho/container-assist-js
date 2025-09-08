@@ -1,6 +1,6 @@
 import { Success, Failure, type Result, type Tool } from '@types';
 import type { Logger } from 'pino';
-import type { ProgressReporter } from '@mcp/server/middleware';
+import type { ProgressReporter } from '@mcp/context/types';
 
 type WorkflowStep = {
   toolName: string;
@@ -377,7 +377,7 @@ export const executeWorkflow = async (
     }
 
     // Plan workflow steps
-    void progressReporter?.({ progress: 5, message: 'Planning workflow steps...' });
+    void progressReporter?.('Planning workflow steps...', 5);
     const steps = await planWorkflowSteps(workflowType, params, sessionId, sessionManager || {});
 
     if (steps.length === 0) {
@@ -405,10 +405,7 @@ export const executeWorkflow = async (
       }
       const progressPercent = 10 + (i / steps.length) * 80;
 
-      void progressReporter?.({
-        progress: progressPercent,
-        message: step.description || `Executing ${step.toolName}...`,
-      });
+      void progressReporter?.(step.description || `Executing ${step.toolName}...`, progressPercent);
 
       // Check for cancellation
       if (signal?.aborted) {
@@ -424,12 +421,12 @@ export const executeWorkflow = async (
           sessionId: sessionId || 'default',
           signal: signal || new AbortController().signal,
           logger: logger.child({ step: step.toolName }),
-          progressReporter: async (progress) => {
-            await progressReporter?.({
-              progress: progressPercent + (progress.progress * 0.8) / steps.length,
-              message: progress.message,
-              total: progress.total,
-            });
+          progressReporter: async (message: string, progress?: number, total?: number) => {
+            await progressReporter?.(
+              message,
+              progressPercent + ((progress || 0) * 0.8) / steps.length,
+              total,
+            );
           },
         } as WorkflowContext,
         results,
@@ -478,7 +475,7 @@ export const executeWorkflow = async (
       }
     }
 
-    void progressReporter?.({ progress: 95, message: 'Finalizing workflow...' });
+    void progressReporter?.('Finalizing workflow...', 95);
 
     // Get final session state for recommendations
     const finalSessionState =
@@ -522,7 +519,7 @@ export const executeWorkflow = async (
       },
     };
 
-    void progressReporter?.({ progress: 100, message: 'Workflow complete' });
+    void progressReporter?.('Workflow complete', 100);
 
     logger.info(
       {

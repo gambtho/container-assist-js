@@ -5,15 +5,7 @@
 
 import type { ProgressToken } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger } from 'pino';
-
-/**
- * Progress reporter function type
- */
-export type ProgressReporter = (
-  progress: number,
-  message?: string,
-  total?: number,
-) => Promise<void>;
+import type { ProgressReporter } from '@mcp/context/types';
 
 /**
  * Progress notification interface for MCP server
@@ -42,7 +34,7 @@ export function createProgressReporter(
   notifier?: ProgressNotifier,
   logger?: Logger,
 ): ProgressReporter {
-  return async (progress: number, message?: string, total?: number): Promise<void> => {
+  return async (message: string, progress?: number, total?: number): Promise<void> => {
     // Log progress for debugging
     if (logger) {
       logger.debug({ progress, message, total }, 'Progress update');
@@ -52,8 +44,8 @@ export function createProgressReporter(
     if (progressToken && notifier) {
       try {
         await notifier.sendProgress(progressToken, {
-          progress,
-          ...(message && { message }),
+          progress: progress || 0,
+          message,
           ...(total && { total }),
         });
       } catch (error) {
@@ -94,7 +86,7 @@ export function createStagedProgressReporter(
 
   const reportStage = async (stage: keyof typeof ProgressStages): Promise<void> => {
     const { progress, message } = ProgressStages[stage];
-    await reporter(progress, message);
+    await reporter(message, progress);
   };
 
   return { reporter, reportStage };
@@ -121,13 +113,11 @@ export function createToolProgressReporter(
       }
     : undefined;
 
-  return async (progress: number, message?: string, total?: number): Promise<void> => {
-    const fullMessage = message
-      ? `[${toolName}] ${message}`
-      : `[${toolName}] Progress: ${progress}%`;
+  return async (message: string, progress?: number, total?: number): Promise<void> => {
+    const fullMessage = `[${toolName}] ${message}`;
 
     const reporter = createProgressReporter(context.progressToken, notifier, context.logger);
 
-    await reporter(progress, fullMessage, total);
+    await reporter(fullMessage, progress, total);
   };
 }

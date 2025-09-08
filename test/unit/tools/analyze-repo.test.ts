@@ -50,21 +50,9 @@ jest.mock('../../../src/lib/session', () => ({
   })),
 }));
 
-jest.mock('../../../src/lib/ai/ai-service', () => ({
-  createAIService: jest.fn(() => ({
-    generate: jest.fn().mockResolvedValue(createSuccessResult({
-      context: { guidance: 'AI-generated analysis' }
-    })),
-  })),
-}));
+// Legacy ai-service module removed - using ToolContext pattern now
 
-jest.mock('../../../src/lib/mcp-host-ai', () => ({
-  createMCPHostAI: jest.fn(() => ({
-    submitPrompt: jest.fn().mockResolvedValue(createSuccessResult('AI-generated analysis')),
-    isAvailable: jest.fn().mockReturnValue(true),
-    getHostType: jest.fn().mockReturnValue('test-host'),
-  })),
-}));
+// Legacy mcp-host-ai module removed - using ToolContext pattern now
 
 jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => ({
@@ -446,7 +434,21 @@ describe('analyzeRepo', () => {
     it('should include AI insights when available', async () => {
       setupMockFilesystem(nodeExpressBasicRepository);
 
-      const result = await analyzeRepo(config, mockLogger);
+      // Create mock ToolContext for AI enhancement
+      const mockContext = {
+        sampling: {
+          createMessage: jest.fn().mockResolvedValue({
+            role: 'assistant',
+            content: [{ type: 'text', text: 'AI-generated analysis' }]
+          })
+        },
+        getPrompt: jest.fn().mockResolvedValue({
+          description: 'Enhance repository analysis',
+          messages: [{ role: 'user', content: [{ type: 'text', text: 'Analyze repository' }] }]
+        })
+      };
+
+      const result = await analyzeRepo(config, mockLogger, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -457,13 +459,6 @@ describe('analyzeRepo', () => {
     it('should handle AI service failures gracefully', async () => {
       setupMockFilesystem(nodeExpressBasicRepository);
 
-      // Mock MCP host AI to fail
-      const { createMCPHostAI } = await import('../../../src/lib/mcp-host-ai');
-      (createMCPHostAI as jest.Mock).mockReturnValue({
-        submitPrompt: jest.fn().mockRejectedValue(new Error('AI service unavailable')),
-        isAvailable: jest.fn().mockReturnValue(true),
-        getHostType: jest.fn().mockReturnValue('test-host'),
-      });
 
       const result = await analyzeRepo(config, mockLogger);
 

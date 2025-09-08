@@ -6,7 +6,6 @@
 
 import type { Logger } from 'pino';
 import { Result, Success, Failure } from '@types';
-import type { AIAugmentationService } from '@lib/ai/ai-service';
 import type { PromptRegistry } from '@prompts/prompt-registry';
 
 /**
@@ -61,7 +60,6 @@ export class AIParameterValidator {
 
   constructor(
     logger: Logger,
-    private aiAugmentationService?: AIAugmentationService,
     private promptRegistry?: PromptRegistry,
   ) {
     this.logger = logger.child({ component: 'AIParameterValidator' });
@@ -175,7 +173,7 @@ export class AIParameterValidator {
    * Check if AI validation is available
    */
   isAIValidationAvailable(): boolean {
-    return !!(this.aiAugmentationService?.isAvailable() && this.promptRegistry);
+    return !!this.promptRegistry;
   }
 
   /**
@@ -311,21 +309,7 @@ export class AIParameterValidator {
         });
       }
 
-      // Submit to AI service for analysis
-      if (!this.aiAugmentationService) {
-        return Failure('AI augmentation service not available');
-      }
-      const aiResult = await this.aiAugmentationService.analyzeResult(
-        parameters,
-        'general', // Use 'general' instead of 'validation'
-        { toolName, context },
-      );
-
-      if (aiResult.ok) {
-        return Success(this.parseAIValidationResult(aiResult.value));
-      } else {
-        return Failure(`AI validation failed: ${aiResult.error}`);
-      }
+      return Failure('AI validation requires ToolContext pattern');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return Failure(`AI validation error: ${message}`);
@@ -352,42 +336,6 @@ export class AIParameterValidator {
     }
 
     return 'Apply general parameter validation rules';
-  }
-
-  /**
-   * Parse AI validation result into ValidationResult format
-   */
-  private parseAIValidationResult(aiResult: {
-    insights?: string[];
-    recommendations?: string[];
-    metadata?: { confidence?: number };
-  }): ValidationResult {
-    const insights = aiResult.insights || [];
-    const recommendations = aiResult.recommendations || [];
-
-    // Convert AI insights to errors/warnings
-    const errors = insights.filter(
-      (insight: string) =>
-        insight.toLowerCase().includes('error') ||
-        insight.toLowerCase().includes('required') ||
-        insight.toLowerCase().includes('invalid'),
-    );
-
-    const warnings = recommendations.concat(
-      insights.filter((insight: string) => !errors.includes(insight)),
-    );
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      warnings,
-      confidence: aiResult.metadata?.confidence || 0.8,
-      metadata: {
-        validationTime: 0, // Will be set by caller
-        aiEnhanced: true,
-        rulesApplied: ['ai-validation', 'contextual-analysis'],
-      },
-    };
   }
 
   /**
@@ -441,8 +389,7 @@ export class AIParameterValidator {
  */
 export const createAIParameterValidator = (
   logger: Logger,
-  aiAugmentationService?: AIAugmentationService,
   promptRegistry?: PromptRegistry,
 ): AIParameterValidator => {
-  return new AIParameterValidator(logger, aiAugmentationService, promptRegistry);
+  return new AIParameterValidator(logger, promptRegistry);
 };

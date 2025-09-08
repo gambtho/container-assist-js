@@ -52,9 +52,7 @@ jest.mock('../../../src/lib/session', () => ({
   createSessionManager: jest.fn(() => mockSessionManager),
 }));
 
-jest.mock('../../../src/lib/ai/ai-service', () => ({
-  createAIService: jest.fn(() => mockAIService),
-}));
+// Legacy ai-service module removed - using ToolContext pattern now
 
 jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => ({

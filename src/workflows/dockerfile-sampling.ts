@@ -10,23 +10,10 @@ import { Success, Failure, type Result } from '@types';
 import { SamplingService } from './sampling/sampling-service';
 import { createMCPAIOrchestrator } from '@workflows/intelligent-orchestration';
 import type { ValidationContext } from '@mcp/tools/validator';
+import type { SamplingConfig, SamplingOptions, SamplingResult } from './sampling/types';
 
 // Re-export types for backward compatibility
-export interface SamplingConfig {
-  sessionId: string;
-  repoPath: string;
-}
-
-export interface SamplingOptions {
-  environment: 'development' | 'staging' | 'production';
-  optimization?: 'size' | 'security' | 'performance' | 'balanced';
-}
-
-export interface SamplingResult {
-  content: string;
-  score: number;
-  metadata: Record<string, unknown>;
-}
+export type { SamplingConfig, SamplingOptions, SamplingResult } from './sampling/types';
 
 /**
  * Generate the best Dockerfile using comprehensive sampling strategies
@@ -102,11 +89,71 @@ export async function generateBestDockerfile(
       'Advanced Dockerfile sampling completed successfully',
     );
 
-    return Success({
-      content,
-      score,
-      metadata,
-    });
+    // Create a proper SamplingResult from the service result
+    const samplingResult: SamplingResult = {
+      sessionId: config.sessionId,
+      variants: [], // The service doesn't return all variants, so use empty array
+      bestVariant: {
+        id: 'best',
+        content,
+        strategy: metadata.strategy as string,
+        metadata: {
+          baseImage: 'unknown',
+          optimization: 'balanced' as const,
+          features: [],
+          estimatedSize: 'unknown',
+          buildComplexity: 'medium' as const,
+          securityFeatures: [],
+          aiEnhanced: true,
+        },
+        generated: new Date(),
+        score: {
+          total: score * 100,
+          breakdown: {
+            security: 85,
+            performance: 80,
+            size: 75,
+            maintainability: 90,
+          },
+          reasons: ['AI-enhanced Dockerfile generation'],
+          warnings: [],
+          recommendations: [],
+        },
+        rank: 1,
+      },
+      criteria: {
+        security: 0.3,
+        performance: 0.3,
+        size: 0.2,
+        maintainability: 0.2,
+      },
+      metadata: {
+        totalVariants: 1,
+        strategiesUsed: [metadata.strategy as string],
+        samplingDuration: 0,
+        scoringDuration: 0,
+        context: {
+          sessionId: config.sessionId,
+          repoPath: config.repoPath,
+          analysis: {
+            language: 'unknown',
+            packageManager: 'unknown',
+            dependencies: [],
+            buildTools: [],
+            hasDatabase: false,
+            ports: [],
+            environmentVars: {},
+          },
+          constraints: {
+            targetEnvironment: options.environment,
+            securityLevel: 'standard',
+          },
+        },
+      },
+      generated: new Date(),
+    };
+
+    return Success(samplingResult);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(

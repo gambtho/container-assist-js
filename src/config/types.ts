@@ -7,7 +7,6 @@ export type NodeEnv = 'development' | 'production' | 'test';
 export type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 export type WorkflowMode = 'interactive' | 'auto' | 'batch';
 export type StoreType = 'memory' | 'file' | 'redis';
-// SamplerMode type removed - unused
 
 // Extended configuration interface to match current usage
 export interface ApplicationConfig {

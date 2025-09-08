@@ -8,6 +8,7 @@
 import type { Logger } from 'pino';
 import type { PromptRegistry } from '@prompts/prompt-registry';
 import type { SDKResourceManager } from '@resources/manager';
+import type { ToolContext } from '@mcp/context/types';
 
 // ===== RESULT TYPE SYSTEM =====
 
@@ -33,8 +34,19 @@ export const isFail = <T>(result: Result<T>): result is { ok: false; error: stri
 
 // ===== TOOL SYSTEM =====
 
+// Re-export ToolContext types for easier imports
+export type {
+  ToolContext,
+  TextMessage,
+  SamplingRequest,
+  SamplingResponse,
+  PromptWithMessages,
+  ProgressReporter,
+} from '@mcp/context/types';
+
 /**
- * MCP execution context for tools
+ * MCP execution context for tools (legacy)
+ * @deprecated Use ToolContext for new AI-enabled tools
  */
 export interface MCPContext {
   /** Progress reporting token */
@@ -54,6 +66,16 @@ export interface MCPContext {
 }
 
 /**
+ * Enhanced MCP context that includes both legacy and new AI capabilities
+ * This allows gradual migration from MCPContext to ToolContext
+ * @deprecated Use ToolContext directly for new implementations
+ */
+export interface EnhancedMCPContext extends MCPContext {
+  /** New ToolContext for AI-enabled tools */
+  toolContext?: import('@mcp/context/types').ToolContext;
+}
+
+/**
  * Tool definition for MCP server operations.
  */
 export interface Tool {
@@ -67,13 +89,13 @@ export interface Tool {
    * Executes the tool with provided parameters.
    * @param params - Tool-specific parameters
    * @param logger - Logger instance for tool execution
-   * @param context - Optional MCP execution context
+   * @param context - Optional ToolContext for AI capabilities and progress reporting
    * @returns Promise resolving to Result with tool output or error
    */
   execute: (
     params: Record<string, unknown>,
     logger: Logger,
-    context?: MCPContext,
+    context?: ToolContext,
   ) => Promise<Result<unknown>>;
 }
 
