@@ -5,7 +5,7 @@
  */
 
 import type { TestCase, MCPTestRunner, TestResult } from '../../infrastructure/test-runner.js';
-import { config } from '../../../../src/config';
+import { config } from '../../../../../src/config/index.js';
 
 export const createSamplingDecisionTests = (testRunner: MCPTestRunner): TestCase[] => {
   const client = testRunner.getClient();

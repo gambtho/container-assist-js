@@ -166,26 +166,7 @@ export class MCPServer {
     // Register prompts dynamically from the prompt registry
     this.registerPromptsFromRegistry();
 
-    // Register a prompt (kept for backward compatibility)
-    this.server.prompt(
-      'dockerfile-generation',
-      'Generate Dockerfile for application',
-      {
-        language: z.string().describe('Programming language'),
-        framework: z.string().optional().describe('Application framework'),
-      },
-      async (params) => {
-        try {
-          const result = await this.deps.promptRegistry.getPrompt('dockerfile-generation', params);
-          return result;
-        } catch (error) {
-          throw new McpError(
-            ErrorCode.MethodNotFound,
-            error instanceof Error ? error.message : 'Prompt not found: dockerfile-generation',
-          );
-        }
-      },
-    );
+    // Note: dockerfile-generation prompt is now registered automatically via registerPromptsFromRegistry()
 
     this.deps.logger.info('SDK-native handlers configured');
   }
