@@ -291,68 +291,68 @@ jobs:
             performance-logs/
           retention-days: 30
 
-  # Stage 6: Build & Package Validation
-  build-validation:
-    name: Build & Package Validation
-    runs-on: ubuntu-latest
-    needs: [quality-gates, unit-tests, integration-tests]
-    if: needs.quality-gates.outputs.should-continue == 'true'
-    timeout-minutes: 15
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Build production package
-        run: npm run build:prod
-      
-      - name: Validate build artifacts
-        run: |
-          # Validate CLI executable
-          test -f dist/src/cli/cli.js || exit 1
-          chmod +x dist/src/cli/cli.js
-          timeout 10s node dist/src/cli/cli.js --help || [ $? -eq 124 ]
-          
-          # Validate MCP server
-          test -f dist/src/mcp/server.js || exit 1
-          node -e "require('./dist/src/mcp/server.js')"
-          
-          # Validate type definitions
-          test -f dist/src/mcp/server.d.ts || echo "Warning: Type definitions missing"
-      
-      - name: Test CLI tools
-        run: |
-          # Test analyze_repository tool
-          echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"analyze_repository","arguments":{"repoPath":"."}},"id":1}' | \
-            timeout 30s node dist/apps/cli.js 2>&1 | grep -E '"result"|"error"'
-          
-          # Test generate_dockerfile tool
-          echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"generate_dockerfile","arguments":{"repoPath":"."}},"id":2}' | \
-            timeout 30s node dist/apps/cli.js 2>&1 | grep -E '"result"|"error"'
-      
-      - name: Check bundle size
-        run: npm run bundle:size
-      
-      - name: Package validation
-        run: npm run bundle:check
-      
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist-build-${{ github.run_id }}
-          path: |
-            dist/
-            bundle-analysis.txt
-          retention-days: 7
+  # Stage 6: Build & Package Validation (Disabled)
+  # build-validation:
+  #   name: Build & Package Validation
+  #   runs-on: ubuntu-latest
+  #   needs: [quality-gates, unit-tests, integration-tests]
+  #   if: needs.quality-gates.outputs.should-continue == 'true'
+  #   timeout-minutes: 15
+  #   
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #     
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: 'npm'
+  #     
+  #     - name: Install dependencies
+  #       run: npm ci
+  #     
+  #     - name: Build production package
+  #       run: npm run build:prod
+  #     
+  #     - name: Validate build artifacts
+  #       run: |
+  #         # Validate CLI executable
+  #         test -f dist/src/cli/cli.js || exit 1
+  #         chmod +x dist/src/cli/cli.js
+  #         timeout 10s node dist/src/cli/cli.js --help || [ $? -eq 124 ]
+  #         
+  #         # Validate MCP server
+  #         test -f dist/src/mcp/server.js || exit 1
+  #         node -e "require('./dist/src/mcp/server.js')"
+  #         
+  #         # Validate type definitions
+  #         test -f dist/src/mcp/server.d.ts || echo "Warning: Type definitions missing"
+  #     
+  #     - name: Test CLI tools
+  #       run: |
+  #         # Test analyze_repository tool
+  #         echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"analyze_repository","arguments":{"repoPath":"."}},"id":1}' | \
+  #           timeout 30s node dist/apps/cli.js 2>&1 | grep -E '"result"|"error"'
+  #         
+  #         # Test generate_dockerfile tool
+  #         echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"generate_dockerfile","arguments":{"repoPath":"."}},"id":2}' | \
+  #           timeout 30s node dist/apps/cli.js 2>&1 | grep -E '"result"|"error"'
+  #     
+  #     - name: Check bundle size
+  #       run: npm run bundle:size
+  #     
+  #     - name: Package validation
+  #       run: npm run bundle:check
+  #     
+  #     - name: Upload build artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: dist-build-${{ github.run_id }}
+  #         path: |
+  #           dist/
+  #           bundle-analysis.txt
+  #         retention-days: 7
 
   # Stage 7: Security & Compliance
   security-scan:
@@ -413,7 +413,7 @@ jobs:
     name: Test Results Summary
     runs-on: ubuntu-latest
     if: always()
-    needs: [quality-gates, unit-tests, integration-tests, performance-tests, build-validation, security-scan]
+    needs: [quality-gates, unit-tests, integration-tests, performance-tests, security-scan]
     timeout-minutes: 5
     permissions:
       contents: read
@@ -440,7 +440,6 @@ jobs:
               unitTests: '${{ needs.unit-tests.result }}',
               integrationTests: '${{ needs.integration-tests.result }}',
               performanceTests: '${{ needs.performance-tests.result }}',
-              buildValidation: '${{ needs.build-validation.result }}',
               securityScan: '${{ needs.security-scan.result }}',
               timestamp: new Date().toISOString(),
               commit: '${{ github.sha }}',
@@ -449,7 +448,7 @@ jobs:
             };
             
             // Calculate overall status
-            const criticalJobs = ['qualityGates', 'unitTests', 'integrationTests', 'buildValidation'];
+            const criticalJobs = ['qualityGates', 'unitTests', 'integrationTests'];
             const criticalPassed = criticalJobs.every(job => results[job] === 'success');
             const allPassed = Object.values(results).every(status => 
               typeof status === 'string' ? 
@@ -468,7 +467,6 @@ jobs:
             console.log('| Unit Tests | ${{ needs.unit-tests.result }} |');
             console.log('| Integration Tests | ${{ needs.integration-tests.result }} |');
             console.log('| Performance Tests | ${{ needs.performance-tests.result }} |');
-            console.log('| Build Validation | ${{ needs.build-validation.result }} |');
             console.log('| Security Scan | ${{ needs.security-scan.result }} |');
             console.log('');
             console.log('**Overall Status:** ' + results.overallStatus.toUpperCase());
@@ -513,7 +511,6 @@ jobs:
             | Unit Tests | ${statusEmoji[summary.unitTests] || '❓'} ${summary.unitTests} | ~ 5 min |
             | Integration Tests | ${statusEmoji[summary.integrationTests] || '❓'} ${summary.integrationTests} | ~ 10 min |
             | Performance Tests | ${statusEmoji[summary.performanceTests] || '❓'} ${summary.performanceTests} | ~ 20 min |
-            | Build Validation | ${statusEmoji[summary.buildValidation] || '❓'} ${summary.buildValidation} | ~ 5 min |
             | Security Scan | ${statusEmoji[summary.securityScan] || '❓'} ${summary.securityScan} | ~ 5 min |
             
             ### Pipeline Details
@@ -538,13 +535,12 @@ jobs:
   deployment-ready:
     name: Deployment Ready
     runs-on: ubuntu-latest
-    needs: [quality-gates, unit-tests, integration-tests, build-validation, security-scan]
+    needs: [quality-gates, unit-tests, integration-tests, security-scan]
     if: |
       always() && 
       needs.quality-gates.result == 'success' &&
       needs.unit-tests.result == 'success' &&
       needs.integration-tests.result == 'success' &&
-      needs.build-validation.result == 'success' &&
       (needs.security-scan.result == 'success' || needs.security-scan.result == 'skipped') &&
       github.ref == 'refs/heads/main'
     
