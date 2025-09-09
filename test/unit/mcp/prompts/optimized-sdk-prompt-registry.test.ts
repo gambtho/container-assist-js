@@ -204,17 +204,6 @@ describe('PromptRegistry', () => {
   });
 
   describe('template rendering edge cases', () => {
-    it.skip('should handle nested template variables', async () => {
-      const result = await registry.getPrompt('dockerfile-generation', {
-        language: 'javascript'
-      });
-
-      const text = result.messages[0].content.text;
-      // Should contain the language but preserve missing framework/optimization
-      expect(text).toContain('javascript');
-      expect(text).toMatch(/\{\{.*\}\}/); // Should have some unreplaced variables
-    });
-
     it('should handle special characters in arguments', async () => {
       const result = await registry.getPrompt('dockerfile-generation', {
         language: 'C++',
