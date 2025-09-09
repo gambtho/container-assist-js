@@ -16,8 +16,8 @@ import type {
   ToolContextConfig,
 } from './types';
 import { extractProgressToken, createProgressReporter } from './progress';
-import { SessionManager } from '@lib/index';
-import { PromptRegistry } from '../../core/prompts/registry';
+import type { SessionManager } from '@lib/session';
+import type { PromptRegistry } from '../../core/prompts/registry';
 
 const DEFAULT_CONFIG: Required<ToolContextConfig> = {
   debug: false,

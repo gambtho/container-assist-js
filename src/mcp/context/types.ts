@@ -6,7 +6,8 @@
  * client/sampling protocol compliance.
  */
 
-import { Logger, SessionManager } from '@lib/index';
+import type { SessionManager } from '@lib/session';
+import type { Logger } from '@lib/logger';
 
 /**
  * MCP-compatible text message structure
