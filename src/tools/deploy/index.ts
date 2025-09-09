@@ -6,4 +6,4 @@
 
 export { deployApplication, deployApplicationTool } from './tool';
 export { deployApplicationSchema, type DeployApplicationParams } from './schema';
-export type { DeployApplicationConfig, DeployApplicationResult } from './tool';
+export type { DeployApplicationResult } from './tool';

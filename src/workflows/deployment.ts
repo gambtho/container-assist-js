@@ -113,9 +113,9 @@ export async function runDeploymentWorkflow(
     const clusterResult = await prepareCluster(
       {
         sessionId,
-        cluster: clusterConfig.context || 'default',
         namespace: clusterConfig.namespace || 'default',
-        createNamespace: true,
+        // TODO: Add createNamespace option to deploy tool schema
+        // createNamespace: true,
       },
       logger,
     );
@@ -423,9 +423,7 @@ export async function runDeploymentWorkflow(
       {
         sessionId,
         namespace: cluster.namespace,
-        cluster: cluster.cluster,
-        wait: true,
-        timeout: 300,
+        imageId,
       },
       logger,
     );
@@ -517,8 +515,6 @@ export async function runDeploymentWorkflow(
         sessionId,
         deploymentName: deploymentOptions.name,
         namespace: cluster.namespace,
-        timeout: 120,
-        healthcheckUrl: '/health',
       },
       logger,
     );

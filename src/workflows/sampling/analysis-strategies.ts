@@ -63,7 +63,11 @@ interface EnhancedAnalysis {
   architecture?: ArchitectureAnalysis;
   deployment?: DeploymentAnalysis;
 }
-import { analyzeRepo, type AnalyzeRepoResult, type AnalyzeRepoConfig } from '@tools/analyze-repo';
+import {
+  analyzeRepo,
+  type AnalyzeRepoResult,
+  type AnalyzeRepoParams as AnalyzeRepoConfig,
+} from '@tools/analyze-repo';
 
 /**
  * Perform base repository analysis

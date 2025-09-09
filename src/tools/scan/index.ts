@@ -6,4 +6,4 @@
 
 export { scanImage, scanImageTool } from './tool';
 export { scanImageSchema, type ScanImageParams } from './schema';
-export type { ScanImageConfig, ScanImageResult } from './tool';
+export type { ScanImageResult } from './tool';

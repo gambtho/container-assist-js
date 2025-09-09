@@ -329,7 +329,7 @@ export async function runContainerizationWorkflow(
       {
         sessionId,
         scanner: 'trivy',
-        severityThreshold: scanOptions.severity || 'high',
+        severity: scanOptions.severity || 'high',
       },
       logger,
     );
@@ -369,9 +369,7 @@ export async function runContainerizationWorkflow(
       {
         sessionId,
         tag: tags[0] || 'latest',
-        imageName: build.imageId || `${analysis.language || 'app'}-app`,
-        sourceTag: 'latest',
-        targetTag: tags[0] || 'latest',
+        imageId: build.imageId || `${analysis.language || 'app'}-app`,
       },
       logger,
     );

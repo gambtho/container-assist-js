@@ -1,49 +1,45 @@
 /**
- * Deploy Application Tool - Flat Architecture
+ * Deploy Application Tool - Standardized Implementation
  *
- * Deploys applications to Kubernetes clusters
- * Follows architectural requirement: only imports from src/lib/
+ * Deploys applications to Kubernetes clusters using standardized helpers
+ * for consistency and improved error handling
+ *
+ * @example
+ * ```typescript
+ * const result = await deployApplication({
+ *   sessionId: 'session-123', // optional
+ *   namespace: 'my-app',
+ *   environment: 'production'
+ * }, context, logger);
+ *
+ * if (result.success) {
+ *   console.log('Deployed:', result.deploymentName);
+ *   console.log('Endpoints:', result.endpoints);
+ * }
+ * ```
  */
 
 import * as yaml from 'js-yaml';
-import { createSessionManager, type SessionManager } from '../../lib/session';
+import { wrapTool } from '@mcp/tools/tool-wrapper';
+import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
+import type { ExtendedToolContext } from '../shared-types';
 import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, type Logger } from '../../lib/logger';
-import {
-  Success,
-  Failure,
-  type Result,
-  updateWorkflowState,
-  type WorkflowState,
-} from '../../domain/types';
+import { Success, Failure, type Result } from '../../domain/types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
+import type { DeployApplicationParams } from './schema';
 
-interface DeployContext {
-  abortSignal?: AbortSignal;
-  progressUpdater?: (progress: number, message: string, total?: number) => Promise<void>;
-  sessionManager?: SessionManager;
-}
-
-interface K8sManifest {
-  apiVersion: string;
-  kind: string;
-  metadata: {
-    name: string;
-    namespace?: string;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
-  };
-  spec?: Record<string, unknown>;
-}
-
-export interface DeployApplicationConfig {
-  sessionId: string;
-  namespace?: string;
-  cluster?: string;
-  dryRun?: boolean;
-  wait?: boolean;
-  timeout?: number;
-}
+// interface K8sManifest {
+//   apiVersion: string;
+//   kind: string;
+//   metadata: {
+//     name: string;
+//     namespace?: string;
+//     labels?: Record<string, string>;
+//     annotations?: Record<string, string>;
+//   };
+//   spec?: Record<string, unknown>;
+// }
 
 export interface DeployApplicationResult {
   success: boolean;
@@ -108,78 +104,71 @@ function orderManifests(manifests: unknown[]): unknown[] {
 }
 
 /**
- * Deploy application to Kubernetes
+ * Core deployment implementation
  */
-export async function deployApplication(
-  config: DeployApplicationConfig,
+async function deployApplicationImpl(
+  params: DeployApplicationParams,
+  context: ExtendedToolContext,
   logger: Logger,
-  context?: DeployContext,
 ): Promise<Result<DeployApplicationResult>> {
   const timer = createTimer(logger, 'deploy-application');
 
   // Extract abort signal from context if available
-  const abortSignal = context?.abortSignal;
+  // const abortSignal = context?.abortSignal; // TODO: implement abort handling
 
   try {
     const {
-      sessionId,
+      // imageId, // TODO: use imageId when implementing actual deployment
       namespace = 'default',
-      cluster = 'default',
-      dryRun = false,
-      wait = true,
-      timeout = 300,
-    } = config;
+      replicas = 1,
+      // port = 8080, // TODO: use port when implementing actual deployment
+      environment = 'development',
+    } = params;
 
-    logger.info({ sessionId, namespace, cluster, dryRun }, 'Starting application deployment');
+    const cluster = 'default';
+    const dryRun = false;
+    const wait = true;
+    const timeout = 300;
 
-    // Check for abort signal early
-    if (abortSignal?.aborted) {
-      return Failure('Deployment operation cancelled');
+    logger.info({ namespace, cluster, dryRun, environment }, 'Starting application deployment');
+
+    // Resolve session (now always optional)
+    const sessionResult = await resolveSession(logger, context, {
+      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
+      defaultIdHint: 'deploy',
+      createIfNotExists: true,
+    });
+
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
     }
 
-    // Enhanced progress tracking
-    await context?.progressUpdater?.(5, 'Initializing deployment...');
+    const { id: sessionId, state: session } = sessionResult.value;
+    logger.info({ sessionId, namespace, environment }, 'Starting Kubernetes deployment');
 
-    // Create lib instances
-    const sessionManager = context?.sessionManager || createSessionManager(logger);
     const k8sClient = createKubernetesClient(logger);
 
-    // Get or create session
-    await context?.progressUpdater?.(10, 'Loading session data...');
-    let session = await sessionManager.get(sessionId);
-    if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
-    }
-
     // Get K8s manifests from session
-    const workflowState = session as { k8s_manifests?: { manifests?: string } } | null | undefined;
-    const k8sManifests = workflowState?.k8s_manifests;
+    const sessionState = session as { k8s_manifests?: { manifests?: string } } | null | undefined;
+    const k8sManifests = sessionState?.k8s_manifests;
     if (!k8sManifests?.manifests) {
-      return Failure('No Kubernetes manifests found - run generate_k8s_manifests first');
+      return Failure(
+        'No Kubernetes manifests found in session. Please run generate-k8s-manifests tool first.',
+      );
     }
 
     // Parse manifests
-    await context?.progressUpdater?.(20, 'Parsing Kubernetes manifests...');
     const manifests = parseManifest(k8sManifests.manifests);
     if (manifests.length === 0) {
-      return Failure('No valid manifests found');
+      return Failure('No valid manifests found in session');
     }
 
     // Order manifests for deployment
-    await context?.progressUpdater?.(25, 'Ordering manifests for deployment...');
     const orderedManifests = orderManifests(manifests);
 
-    // Check for abort before starting deployment
-    if (abortSignal?.aborted) {
-      return Failure('Deployment operation cancelled before applying manifests');
-    }
-
-    logger.info({ manifestCount: orderedManifests.length, dryRun }, 'Deploying manifests');
-    await context?.progressUpdater?.(
-      30,
-      `Deploying ${orderedManifests.length} manifests...`,
-      orderedManifests.length,
+    logger.info(
+      { manifestCount: orderedManifests.length, dryRun, namespace },
+      'Deploying manifests to Kubernetes',
     );
 
     // Deploy manifests
@@ -188,10 +177,6 @@ export async function deployApplication(
     if (!dryRun) {
       for (let i = 0; i < orderedManifests.length; i++) {
         const manifest = orderedManifests[i];
-        await context?.progressUpdater?.(
-          30 + ((i + 1) * 30) / orderedManifests.length,
-          `Deploying ${(manifest as K8sManifest)?.kind || 'resource'} ${i + 1}/${orderedManifests.length}...`,
-        );
         try {
           const manifestObj = manifest as {
             kind?: string;
@@ -252,27 +237,19 @@ export async function deployApplication(
     // Wait for deployment to be ready
     let ready = false;
     let readyReplicas = 0;
-    const totalReplicas = deployment?.spec?.replicas ?? 1;
+    const totalReplicas = deployment?.spec?.replicas ?? replicas;
 
     if (wait && !dryRun) {
       // Wait for deployment with configurable retry delay
-      await context?.progressUpdater?.(70, `Waiting for ${deploymentName} to be ready...`);
+      logger.info({ deploymentName, timeout }, 'Waiting for deployment to be ready');
       const startTime = Date.now();
       const retryDelay = DEFAULT_TIMEOUTS.deploymentPoll || 5000;
       while (Date.now() - startTime < timeout * 1000) {
-        // Check deployment status
-        const elapsedTime = Date.now() - startTime;
-        const progressPercent = Math.min(70 + (elapsedTime / (timeout * 1000)) * 25, 95);
-        await context?.progressUpdater?.(
-          progressPercent,
-          `Checking deployment status... (${Math.round(elapsedTime / 1000)}s elapsed)`,
-        );
-
         const statusResult = await k8sClient.getDeploymentStatus(namespace, deploymentName);
         if (statusResult.ok && statusResult.value?.ready) {
           ready = true;
           readyReplicas = statusResult.value?.readyReplicas || 0;
-          await context?.progressUpdater?.(95, 'Deployment is ready!');
+          logger.info({ deploymentName, readyReplicas }, 'Deployment is ready');
           break;
         }
         // Wait before checking again using configured delay
@@ -320,37 +297,48 @@ export async function deployApplication(
       });
     }
 
-    // Update session with deployment result
-    const currentState = session as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
-      deployment_result: {
-        namespace,
-        deployment_name: deploymentName,
-        service_name: serviceName,
-        endpoints,
-        ready,
-        status: {
-          ready_replicas: readyReplicas,
-          total_replicas: totalReplicas,
-          conditions: [
-            {
-              type: 'Available',
-              status: ready ? 'True' : 'False',
-              message: ready ? 'Deployment is available' : 'Deployment is pending',
-            },
-          ],
+    // Update session with deployment result using standardized helper
+    const updateResult = await updateSessionData(
+      sessionId,
+      {
+        deployment_result: {
+          success: true,
+          namespace,
+          deploymentName,
+          serviceName,
+          endpoints,
+          ready,
+          replicas: totalReplicas,
+          status: {
+            readyReplicas,
+            totalReplicas,
+            conditions: [
+              {
+                type: 'Available',
+                status: ready ? 'True' : 'False',
+                message: ready ? 'Deployment is available' : 'Deployment is pending',
+              },
+            ],
+          },
         },
+        completed_steps: [...(session.completed_steps || []), 'deploy'],
       },
-      completed_steps: [...(currentState?.completed_steps ?? []), 'deploy'],
-    });
+      logger,
+      context,
+    );
 
-    await sessionManager.update(sessionId, {
-      workflow_state: updatedWorkflowState,
-    });
+    if (!updateResult.ok) {
+      logger.warn(
+        { error: updateResult.error },
+        'Failed to update session, but deployment succeeded',
+      );
+    }
 
-    await context?.progressUpdater?.(100, 'Deployment complete');
-    timer.end({ deploymentName, ready });
-    logger.info({ deploymentName, serviceName, ready }, 'Application deployment completed');
+    timer.end({ deploymentName, ready, sessionId });
+    logger.info(
+      { sessionId, deploymentName, serviceName, ready, namespace },
+      'Kubernetes deployment completed',
+    );
 
     return Success({
       success: true,
@@ -382,13 +370,17 @@ export async function deployApplication(
 }
 
 /**
- * Deploy application tool instance
+ * Wrapped deploy tool with standardized behavior
  */
-export const deployApplicationTool = {
-  name: 'deploy',
-  execute: (
-    config: DeployApplicationConfig,
-    logger: Logger,
-    context?: import('../../mcp/server/middleware.js').ToolContext,
-  ) => deployApplication(config, logger, context),
+export const deployApplicationTool = wrapTool('deploy', deployApplicationImpl);
+
+/**
+ * Legacy export for backward compatibility during migration
+ */
+export const deployApplication = async (
+  params: DeployApplicationParams,
+  logger: Logger,
+  context?: ExtendedToolContext,
+): Promise<Result<DeployApplicationResult>> => {
+  return deployApplicationImpl(params, context || {}, logger);
 };

@@ -1,30 +1,34 @@
 /**
- * Fix Dockerfile Tool - New MCP Pattern
+ * Fix Dockerfile Tool - Standardized Implementation
  *
- * Analyzes and fixes Dockerfile build errors using ToolContext pattern
- * Follows new architecture with proper MCP protocol compliance
+ * Analyzes and fixes Dockerfile build errors using standardized helpers
+ * for consistency and improved error handling
+ *
+ * @example
+ * ```typescript
+ * const result = await fixDockerfile({
+ *   sessionId: 'session-123', // optional
+ *   dockerfile: dockerfileContent,
+ *   error: 'Build failed due to missing dependency'
+ * }, context, logger);
+ *
+ * if (result.ok) {
+ *   console.log('Fixed Dockerfile:', result.dockerfile);
+ *   console.log('Applied fixes:', result.fixes);
+ * }
+ * ```
  */
 
-import { createSessionManager } from '../../lib/session';
+import { wrapTool } from '@mcp/tools/tool-wrapper';
+import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
 import type { ExtendedToolContext } from '../shared-types';
 import { createTimer, type Logger } from '../../lib/logger';
 import { getRecommendedBaseImage } from '../../lib/base-images';
-import {
-  Success,
-  Failure,
-  type Result,
-  updateWorkflowState,
-  type WorkflowState,
-} from '../../domain/types';
+import { Success, Failure, type Result } from '../../domain/types';
 import { DEFAULT_PORTS } from '../../config/defaults';
 import { stripFencesAndNoise, isValidDockerfileContent } from '../../lib/text-processing';
 import type { ToolContext } from '../../mcp/context/types';
-
-export interface FixDockerfileConfig {
-  sessionId: string;
-  error?: string;
-  dockerfile?: string;
-}
+import type { FixDockerfileParams } from './schema';
 
 /**
  * Result interface for Dockerfile fix operations with AI tracking
@@ -38,15 +42,6 @@ export interface FixDockerfileResult {
   validation: string[];
   aiUsed: boolean;
   generationMethod: 'AI' | 'fallback';
-}
-
-export interface FixDockerfileResult {
-  ok: boolean;
-  sessionId: string;
-  dockerfile: string;
-  path: string;
-  fixes: string[];
-  validation: string[];
 }
 
 /**
@@ -208,48 +203,53 @@ async function applyRuleBasedFixes(
 }
 
 /**
- * Fix Dockerfile issues with AI assistance and fallback
+ * Core fix dockerfile implementation
  */
-async function fixDockerfile(
-  config: FixDockerfileConfig,
+async function fixDockerfileImpl(
+  params: FixDockerfileParams,
+  context: ExtendedToolContext,
   logger: Logger,
-  context?: ExtendedToolContext,
 ): Promise<Result<FixDockerfileResult>> {
   const timer = createTimer(logger, 'fix-dockerfile');
 
   try {
-    const { sessionId, error, dockerfile } = config;
+    const { error, dockerfile, issues } = params;
 
-    logger.info({ sessionId, hasContext: !!context }, 'Starting Dockerfile fix');
+    logger.info({ hasError: !!error, hasDockerfile: !!dockerfile }, 'Starting Dockerfile fix');
 
-    // Create lib instances - use shared sessionManager from context if available
-    const sessionManager =
-      (context && 'sessionManager' in context && context.sessionManager) ||
-      createSessionManager(logger);
+    // Resolve session (now always optional)
+    const sessionResult = await resolveSession(logger, context, {
+      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
+      defaultIdHint: 'fix-dockerfile',
+      createIfNotExists: true,
+    });
 
-    // Get or create session
-    let session = await sessionManager.get(sessionId);
-    if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
     }
 
+    const { id: sessionId, state: session } = sessionResult.value;
+    logger.info({ sessionId }, 'Starting Dockerfile fix operation');
+
     // Get the Dockerfile to fix (from session or provided)
-    const dockerfileResult = session?.results?.dockerfile_result as
-      | { content?: string }
-      | undefined;
+    const sessionState = session as { dockerfile_result?: { content?: string } } | null | undefined;
+    const dockerfileResult = sessionState?.dockerfile_result;
     const dockerfileToFix = dockerfile ?? dockerfileResult?.content;
     if (!dockerfileToFix) {
-      return Failure('No Dockerfile found to fix - run generate_dockerfile first');
+      return Failure(
+        'No Dockerfile found to fix. Provide dockerfile parameter or run generate-dockerfile tool first.',
+      );
     }
 
     // Get build error from session if not provided
-    const buildResult = session?.results?.build_result as { error?: string } | undefined;
+    const buildResult = (session as { build_result?: { error?: string } } | null | undefined)
+      ?.build_result;
     const buildError = error ?? buildResult?.error;
 
     // Get analysis context
-    const analysisResult = (session as WorkflowState & { analysis_result?: unknown })
-      ?.analysis_result as { language?: string; framework?: string } | undefined;
+    const analysisResult = (
+      session as { analysis_result?: { language?: string; framework?: string } } | null | undefined
+    )?.analysis_result;
     const language = analysisResult?.language;
     const framework = analysisResult?.framework;
 
@@ -267,7 +267,7 @@ async function fixDockerfile(
       const aiResult = await attemptAIFix(
         dockerfileToFix,
         buildError,
-        undefined, // Could be extracted from error messages in future
+        issues, // Use issues parameter if provided
         language,
         framework,
         undefined, // Could include analysis summary in future
@@ -303,28 +303,38 @@ async function fixDockerfile(
       }
     }
 
-    // Update session with fixed Dockerfile
-    const currentState = session as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
-      dockerfile_result: {
-        content: fixedDockerfile,
-        path: './Dockerfile',
-        multistage: false,
+    // Update session with fixed Dockerfile using standardized helper
+    const updateResult = await updateSessionData(
+      sessionId,
+      {
+        dockerfile_result: {
+          content: fixedDockerfile,
+          path: './Dockerfile',
+          multistage: false,
+          fixed: true,
+          fixes,
+        },
+        completed_steps: [...(session.completed_steps || []), 'fix-dockerfile'],
+        metadata: {
+          dockerfile_fixed: true,
+          dockerfile_fixes: fixes,
+          ai_used: aiUsed,
+          generation_method: generationMethod,
+        },
       },
-      completed_steps: [...(currentState?.completed_steps ?? []), 'fix-dockerfile'],
-      metadata: {
-        ...currentState?.metadata,
-        dockerfile_fixed: true,
-        dockerfile_fixes: fixes,
-      },
-    });
+      logger,
+      context,
+    );
 
-    await sessionManager.update(sessionId, {
-      workflow_state: updatedWorkflowState,
-    });
+    if (!updateResult.ok) {
+      logger.warn({ error: updateResult.error }, 'Failed to update session, but fix succeeded');
+    }
 
-    timer.end({ fixCount: fixes.length });
-    logger.info({ fixCount: fixes.length }, 'Dockerfile fix completed');
+    timer.end({ fixCount: fixes.length, sessionId, aiUsed });
+    logger.info(
+      { sessionId, fixCount: fixes.length, aiUsed, generationMethod },
+      'Dockerfile fix completed',
+    );
 
     return Success({
       ok: true,
@@ -345,13 +355,17 @@ async function fixDockerfile(
 }
 
 /**
- * Fix dockerfile tool instance with ToolContext support
+ * Wrapped fix dockerfile tool with standardized behavior
  */
-export const fixDockerfileTool = {
-  name: 'fix-dockerfile',
-  execute: (config: FixDockerfileConfig, logger: Logger, context?: ToolContext) =>
-    fixDockerfile(config, logger, context),
-};
+export const fixDockerfileTool = wrapTool('fix-dockerfile', fixDockerfileImpl);
 
-// Export the function directly for testing
-export { fixDockerfile };
+/**
+ * Legacy export for backward compatibility during migration
+ */
+export const fixDockerfile = async (
+  params: FixDockerfileParams,
+  logger: Logger,
+  context?: ExtendedToolContext,
+): Promise<Result<FixDockerfileResult>> => {
+  return fixDockerfileImpl(params, context || {}, logger);
+};

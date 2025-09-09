@@ -1,26 +1,18 @@
 /**
- * Tag Image Tool - Flat Architecture
+ * Tag Image Tool - Standardized Implementation
  *
  * Tags Docker images with version and registry information
- * Follows architectural requirement: only imports from src/lib/
+ * Uses standardized helpers for consistency
  */
 
-import { createSessionManager } from '../../lib/session';
+import { wrapTool } from '@mcp/tools/tool-wrapper';
+import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
+// import { formatStandardResponse } from '@mcp/tools/response-formatter'; // Not used directly, wrapped by wrapTool
 import type { ExtendedToolContext } from '../shared-types';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, type Logger } from '../../lib/logger';
-import {
-  Success,
-  Failure,
-  type Result,
-  type TagImageParams,
-  type WorkflowState,
-} from '../../domain/types';
-
-export interface TagImageConfig extends TagImageParams {
-  sessionId: string;
-  tag: string;
-}
+import { Success, Failure, type Result } from '../../domain/types';
+import type { TagImageParams } from './schema';
 
 export interface TagImageResult {
   success: boolean;
@@ -30,43 +22,47 @@ export interface TagImageResult {
 }
 
 /**
- * Tag Docker image using lib utilities only
+ * Core tag image implementation
  */
-export async function tagImage(
-  config: TagImageConfig,
+async function tagImageImpl(
+  params: TagImageParams,
+  context: ExtendedToolContext,
   logger: Logger,
-  context?: ExtendedToolContext,
 ): Promise<Result<TagImageResult>> {
   const timer = createTimer(logger, 'tag-image');
 
   try {
-    const { sessionId, tag } = config;
+    const { tag } = params;
 
+    if (!tag) {
+      return Failure('Tag parameter is required');
+    }
+
+    // Resolve session (now always optional)
+    const sessionResult = await resolveSession(logger, context, {
+      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
+      defaultIdHint: 'tag-image',
+      createIfNotExists: true,
+    });
+
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
+    }
+
+    const { id: sessionId, state: session } = sessionResult.value;
     logger.info({ sessionId, tag }, 'Starting image tagging');
 
-    // Create lib instances - use shared sessionManager from context if available
-    const sessionManager =
-      (context && 'sessionManager' in context && context.sessionManager) ||
-      createSessionManager(logger);
     const dockerClient = createDockerClient(logger);
 
-    // Get session using lib session manager
-    // Get or create session
-    let session = await sessionManager.get(sessionId);
-    if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
+    // Check for built image in session or use provided imageId
+    const buildResult = (session as any)?.build_result;
+    const source = params.imageId || buildResult?.imageId;
+
+    if (!source) {
+      return Failure(
+        'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
+      );
     }
-
-    const buildResult = (session?.workflow_state as WorkflowState)?.build_result as
-      | { imageId?: string }
-      | undefined;
-
-    if (!buildResult?.imageId) {
-      return Failure('No built image found in session - run build_image first');
-    }
-
-    const source = buildResult.imageId;
 
     // Tag image using lib docker client
     // Parse repository and tag from the tag parameter
@@ -85,16 +81,24 @@ export async function tagImage(
 
     const tags = [tag];
 
-    // Update session with tag information using lib session manager
-    await sessionManager.update(sessionId, {
-      workflow_state: {
-        ...(session?.workflow_state || {}),
+    // Update session with tag information using standardized helper
+    const updateResult = await updateSessionData(
+      sessionId,
+      {
         build_result: {
-          ...buildResult,
+          ...(buildResult || {}),
+          imageId: source,
           tags,
         },
+        completed_steps: [...(session.completed_steps || []), 'tag'],
       },
-    });
+      logger,
+      context,
+    );
+
+    if (!updateResult.ok) {
+      logger.warn({ error: updateResult.error }, 'Failed to update session, but tagging succeeded');
+    }
 
     timer.end({ source, tag });
     logger.info({ source, tag }, 'Image tagging completed');
@@ -114,10 +118,17 @@ export async function tagImage(
 }
 
 /**
- * Tag image tool instance
+ * Wrapped tag image tool with standardized behavior
  */
-export const tagImageTool = {
-  name: 'tag',
-  execute: (config: TagImageConfig, logger: Logger, context?: ExtendedToolContext) =>
-    tagImage(config, logger, context),
+export const tagImageTool = wrapTool('tag-image', tagImageImpl);
+
+/**
+ * Legacy export for backward compatibility during migration
+ */
+export const tagImage = async (
+  params: TagImageParams,
+  logger: Logger,
+  context?: ExtendedToolContext,
+): Promise<Result<TagImageResult>> => {
+  return tagImageImpl(params, context || {}, logger);
 };

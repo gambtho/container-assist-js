@@ -1,33 +1,30 @@
 /**
- * Workflow Tool - Flat Architecture
+ * Workflow Tool - Standardized Implementation
  *
- * Orchestrates containerization workflows
- * Follows architectural requirement: only imports from src/lib/
+ * Orchestrates containerization workflows using standardized helpers
+ * for consistency and improved error handling
+ *
+ * @example
+ * ```typescript
+ * const result = await workflow({
+ *   sessionId: 'session-123', // optional
+ *   workflow: 'containerization',
+ *   options: { skipSecurity: false, deploy: true }
+ * }, context, logger);
+ *
+ * if (result.ok) {
+ *   console.log('Workflow:', result.workflowName);
+ *   console.log('Status:', result.status);
+ * }
+ * ```
  */
 
-import { createSessionManager } from '../../lib/session';
+import { wrapTool } from '@mcp/tools/tool-wrapper';
+import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
 import type { ExtendedToolContext } from '../shared-types';
 import { createTimer, type Logger } from '../../lib/logger';
 import { Success, Failure, type Result, type Tool } from '../../domain/types';
-
-// Export specific workflow tool configuration
-export interface WorkflowToolConfig {
-  sessionId?: string;
-  repoPath: string;
-  workflowType?: 'full' | 'build-only' | 'deploy-only' | 'quick' | 'containerization';
-  automated?: boolean;
-  options?: {
-    skipTests?: boolean;
-    skipSecurity?: boolean;
-    registryUrl?: string;
-    namespace?: string;
-    autoRollback?: boolean;
-    imageTag?: string;
-    deploy?: boolean;
-    scan?: boolean;
-    parallelSteps?: boolean;
-  };
-}
+import type { WorkflowParams } from './schema';
 
 // Export specific workflow tool result
 export interface WorkflowToolResult {
@@ -43,7 +40,6 @@ export interface WorkflowToolResult {
   failedSteps?: string[];
   nextSteps?: string[];
   metadata?: {
-    repoPath: string;
     workflowType: string;
     automated: boolean;
     options?: Record<string, unknown>;
@@ -65,7 +61,7 @@ export interface WorkflowStatusResult {
 /**
  * Get workflow steps based on type
  */
-function getWorkflowSteps(workflowType: string, options?: WorkflowToolConfig['options']): string[] {
+function getWorkflowSteps(workflowType: string, options?: Record<string, unknown>): string[] {
   const baseSteps = {
     full: [
       'analyze-repo',
@@ -158,92 +154,76 @@ import { verifyDeploymentTool } from '@tools/verify-deployment';
 // Import proper ToolContext from MCP middleware since that's what deploy tool uses
 
 // Define ResolveBaseImagesContext interface locally
-interface ResolveBaseImagesContext {
-  sessionManager?: import('@lib/session').SessionManager;
-}
+// interface ResolveBaseImagesContext {
+//   sessionManager?: import('@lib/session').SessionManager;
+// }
 
 // Type guard to safely cast params
 const castParams = <T>(params: Record<string, unknown>): T => {
   return params as T;
 };
 
-// Create tool mapping with proper type wrapping
+// Create tool mapping with wrapped tools (which are functions directly)
 const toolMap: Record<string, Tool> = {
   'analyze-repo': {
     name: 'analyze-repo',
-    execute: (params: Record<string, unknown>, logger: Logger) =>
-      analyzeRepoTool.execute(castParams(params), logger),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      analyzeRepoTool(castParams(params), context as ExtendedToolContext),
   },
   'generate-dockerfile': {
     name: 'generate-dockerfile',
-    execute: (params: Record<string, unknown>, logger: Logger) =>
-      generateDockerfileTool.execute(castParams(params), logger),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      generateDockerfileTool(castParams(params), context as ExtendedToolContext),
   },
   'build-image': {
     name: 'build-image',
-    execute: (params: Record<string, unknown>, logger: Logger, context?: unknown) =>
-      buildImageTool.execute(
-        castParams(params),
-        logger,
-        context as Parameters<typeof buildImageTool.execute>[2],
-      ),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      buildImageTool(castParams(params), context as ExtendedToolContext),
   },
   'scan-image': {
     name: 'scan-image',
-    execute: (params: Record<string, unknown>, logger: Logger, context?: unknown) =>
-      scanImageTool.execute(
-        castParams(params),
-        logger,
-        context as Parameters<typeof scanImageTool.execute>[2],
-      ),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      scanImageTool(castParams(params), context as ExtendedToolContext),
   },
   'push-image': {
     name: 'push-image',
-    execute: (params: Record<string, unknown>, logger: Logger) =>
-      pushImageTool.execute(castParams(params), logger),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      pushImageTool(castParams(params), context as ExtendedToolContext),
   },
   'tag-image': {
     name: 'tag-image',
-    execute: (params: Record<string, unknown>, logger: Logger) =>
-      tagImageTool.execute(castParams(params), logger),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      tagImageTool(castParams(params), context as ExtendedToolContext),
   },
   'fix-dockerfile': {
     name: 'fix-dockerfile',
-    execute: (params: Record<string, unknown>, logger: Logger) =>
-      fixDockerfileTool.execute(castParams(params), logger),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      fixDockerfileTool(castParams(params), context as ExtendedToolContext),
   },
   'resolve-base-images': {
     name: 'resolve-base-images',
-    execute: (params: Record<string, unknown>, logger: Logger, context?: unknown) =>
-      resolveBaseImagesTool.execute(
-        castParams(params),
-        logger,
-        context as ResolveBaseImagesContext | undefined,
-      ),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      resolveBaseImagesTool(castParams(params), context as ExtendedToolContext),
   },
   'prepare-cluster': {
     name: 'prepare-cluster',
-    execute: (params: Record<string, unknown>, logger: Logger) =>
-      prepareClusterTool.execute(castParams(params), logger),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      prepareClusterTool(castParams(params), context as ExtendedToolContext),
   },
   deploy: {
     name: 'deploy',
-    execute: (params: Record<string, unknown>, logger: Logger, context?: unknown) =>
-      deployApplicationTool.execute(
-        castParams(params),
-        logger,
-        context as Parameters<typeof deployApplicationTool.execute>[2],
-      ),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      deployApplicationTool(castParams(params), context as ExtendedToolContext),
   },
   'generate-k8s-manifests': {
     name: 'generate-k8s-manifests',
-    execute: (params: Record<string, unknown>, logger: Logger) =>
-      generateK8sManifestsTool.execute(castParams(params), logger),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      generateK8sManifestsTool(castParams(params), context as ExtendedToolContext),
   },
   'verify-deployment': {
     name: 'verify-deployment',
-    execute: (params: Record<string, unknown>, logger: Logger) =>
-      verifyDeploymentTool.execute(castParams(params), logger),
+    execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
+      verifyDeploymentTool(castParams(params), context as ExtendedToolContext),
   },
 };
 
@@ -253,8 +233,9 @@ const toolMap: Record<string, Tool> = {
 async function executeStep(
   step: string,
   sessionId: string,
-  config: WorkflowToolConfig,
+  config: { workflowType: string; options?: Record<string, unknown> },
   logger: Logger,
+  context: ExtendedToolContext,
 ): Promise<{ ok: boolean; error?: string }> {
   const timer = createTimer(logger, `workflow-step-${step}`);
 
@@ -271,7 +252,6 @@ async function executeStep(
     // Prepare tool configuration based on the step
     const toolConfig: Record<string, unknown> = {
       sessionId,
-      repoPath: config.repoPath,
     };
 
     // Add step-specific configuration
@@ -302,7 +282,7 @@ async function executeStep(
     }
 
     // Execute the actual tool
-    const result = await tool.execute(toolConfig, logger);
+    const result = await tool.execute(toolConfig, logger, context as any);
 
     // Handle Result<T> pattern
     if (result && typeof result === 'object' && 'ok' in result) {
@@ -329,49 +309,59 @@ async function executeStep(
 }
 
 /**
- * Start or manage a workflow
+ * Core workflow implementation
  */
-async function workflow(
-  config: WorkflowToolConfig,
+async function workflowImpl(
+  params: WorkflowParams,
+  context: ExtendedToolContext,
   logger: Logger,
-  context?: ExtendedToolContext,
 ): Promise<Result<WorkflowToolResult>> {
   const timer = createTimer(logger, 'workflow');
   const startedAt = new Date().toISOString();
 
   try {
-    const { repoPath, workflowType = 'full', automated = false, options = {} } = config;
+    const { workflow: workflowType = 'full', options = {} } = params;
+    const automated = Boolean(options.automated);
 
-    // Create or get session - use shared sessionManager from context if available
-    const sessionManager =
-      (context && 'sessionManager' in context && context.sessionManager) ||
-      createSessionManager(logger);
-    let sessionId = config.sessionId;
+    logger.info({ workflowType, options }, 'Starting workflow execution');
 
-    if (!sessionId) {
-      // Generate new session ID if not provided
-      sessionId = `session-${Date.now()}`;
+    // Resolve session (now always optional)
+    const sessionResult = await resolveSession(logger, context, {
+      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
+      defaultIdHint: 'workflow',
+      createIfNotExists: true,
+    });
+
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
     }
 
-    // Get or create session
-    let session = await sessionManager.get(sessionId);
-    if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
-    }
+    const { id: sessionId, state: session } = sessionResult.value;
+    logger.info({ sessionId, workflowType, automated }, 'Starting containerization workflow');
 
     // Check if workflow is already running
-    const workflowStatus = session.metadata?.status as string;
-    if (workflowStatus === 'running') {
+    const sessionState = session as
+      | {
+          workflow_state?: {
+            status?: string;
+            workflowId?: string;
+            steps?: string[];
+            completedSteps?: string[];
+          };
+        }
+      | null
+      | undefined;
+    const workflowState = sessionState?.workflow_state;
+    if (workflowState?.status === 'running') {
       return Success({
         ok: false,
         sessionId,
-        workflowId: (session.metadata?.workflowId as string) ?? `workflow-${sessionId}`,
+        workflowId: workflowState.workflowId ?? `workflow-${sessionId}`,
         status: 'already_running',
         message: 'A workflow is already running for this session',
         workflowName: `${workflowType} workflow`,
-        steps: (session.metadata?.steps as string[]) ?? [],
-        completedSteps: (session.metadata?.completedSteps as string[]) ?? [],
+        steps: workflowState.steps ?? [],
+        completedSteps: workflowState.completedSteps ?? [],
       });
     }
 
@@ -392,18 +382,30 @@ async function workflow(
       'Starting workflow',
     );
 
-    // Update session with workflow start
-    await sessionManager.update(sessionId, {
-      workflow_state: {
-        status: 'running',
-        workflowId,
-        workflowType,
-        steps,
-        completedSteps: [],
-        currentStep: steps[0],
-        startedAt,
+    // Update session with workflow start using standardized helper
+    const initialUpdateResult = await updateSessionData(
+      sessionId,
+      {
+        workflow_state: {
+          status: 'running',
+          workflowId,
+          workflowType,
+          steps,
+          completedSteps: [],
+          currentStep: steps[0],
+          startedAt,
+        },
       },
-    });
+      logger,
+      context,
+    );
+
+    if (!initialUpdateResult.ok) {
+      logger.warn(
+        { error: initialUpdateResult.error },
+        'Failed to update session with workflow start',
+      );
+    }
 
     // Execute workflow steps
     const completedSteps: string[] = [];
@@ -411,22 +413,31 @@ async function workflow(
     let workflowFailed = false;
 
     for (const step of steps) {
-      // Update current step
-      await sessionManager.update(sessionId, {
-        workflow_state: {
-          status: 'running',
-          workflowId,
-          workflowType,
-          steps,
-          currentStep: step,
-          completedSteps,
-          failedSteps,
-          startedAt,
+      // Update current step using standardized helper
+      const stepUpdateResult = await updateSessionData(
+        sessionId,
+        {
+          workflow_state: {
+            status: 'running',
+            workflowId,
+            workflowType,
+            steps,
+            currentStep: step,
+            completedSteps,
+            failedSteps,
+            startedAt,
+          },
         },
-      });
+        logger,
+        context,
+      );
+
+      if (!stepUpdateResult.ok) {
+        logger.warn({ error: stepUpdateResult.error, step }, 'Failed to update session for step');
+      }
 
       // Execute step
-      const result = await executeStep(step, sessionId, config, logger);
+      const result = await executeStep(step, sessionId, { workflowType, options }, logger, context);
 
       if (result.ok) {
         completedSteps.push(step);
@@ -445,22 +456,35 @@ async function workflow(
     const completedAt = new Date().toISOString();
     const duration = Date.now() - new Date(startedAt).getTime();
 
-    // Update session with final workflow state
+    // Update session with final workflow state using standardized helper
     const finalStatus = workflowFailed ? 'failed' : 'completed';
-    await sessionManager.update(sessionId, {
-      workflow_state: {
-        status: finalStatus,
-        workflowId,
-        workflowType,
-        steps,
-        completedSteps,
-        failedSteps,
-        currentStep: null,
-        startedAt,
-        completedAt,
-        duration,
+    const finalUpdateResult = await updateSessionData(
+      sessionId,
+      {
+        workflow_state: {
+          status: finalStatus,
+          workflowId,
+          workflowType,
+          steps,
+          completedSteps,
+          failedSteps,
+          currentStep: null,
+          startedAt,
+          completedAt,
+          duration,
+        },
+        completed_steps: [...(session.completed_steps || []), 'workflow'],
       },
-    });
+      logger,
+      context,
+    );
+
+    if (!finalUpdateResult.ok) {
+      logger.warn(
+        { error: finalUpdateResult.error },
+        'Failed to update session with final workflow state',
+      );
+    }
 
     timer.end({
       workflowId,
@@ -496,10 +520,9 @@ async function workflow(
       ...(failedSteps.length > 0 && { failedSteps }),
       nextSteps: steps.filter((s) => !completedSteps.includes(s)),
       metadata: {
-        repoPath,
         workflowType,
         automated,
-        options: options as Record<string, unknown>,
+        options,
         startedAt,
         completedAt,
         duration,
@@ -514,43 +537,62 @@ async function workflow(
 }
 
 /**
- * Get workflow status
+ * Wrapped workflow tool with standardized behavior
  */
-async function getWorkflowStatus(
-  sessionId: string,
-  logger: Logger,
-): Promise<Result<WorkflowStatusResult>> {
-  try {
-    const sessionManager = createSessionManager(logger);
-    const session = await sessionManager.get(sessionId);
-
-    if (!session) {
-      return Failure('Session not found');
-    }
-
-    const steps = (session.metadata?.steps as string[]) ?? [];
-    const completedSteps = (session.metadata?.completedSteps as string[]) ?? [];
-    const progress = steps.length > 0 ? (completedSteps.length / steps.length) * 100 : 0;
-
-    return Success({
-      status: (session.metadata?.status as string) ?? 'not_started',
-      workflowId: session.metadata?.workflowId as string,
-      currentStep: session.currentStep || '',
-      completedSteps,
-      failedSteps: (session.metadata?.failedSteps as string[]) ?? [],
-      progress,
-    });
-  } catch (error) {
-    return Failure(error instanceof Error ? error.message : String(error));
-  }
-}
+export const workflowTool = wrapTool('workflow', workflowImpl);
 
 /**
- * Workflow tool instance
+ * Legacy export for backward compatibility during migration
  */
-export const workflowTool = {
-  name: 'workflow',
-  execute: (config: WorkflowToolConfig, logger: Logger, context?: ExtendedToolContext) =>
-    workflow(config, logger, context),
-  getStatus: (sessionId: string, logger: Logger) => getWorkflowStatus(sessionId, logger),
+export const workflow = async (
+  params: WorkflowParams,
+  logger: Logger,
+  context?: ExtendedToolContext,
+): Promise<Result<WorkflowToolResult>> => {
+  return workflowImpl(params, context || {}, logger);
+};
+
+export const getWorkflowStatus = async (
+  sessionId: string,
+  logger: Logger,
+): Promise<Result<WorkflowStatusResult>> => {
+  const sessionResult = await resolveSession(
+    logger,
+    {},
+    {
+      sessionId,
+      createIfNotExists: false,
+    },
+  );
+
+  if (!sessionResult.ok) {
+    return Failure(sessionResult.error);
+  }
+
+  const { state: session } = sessionResult.value;
+  const sessionState = session as
+    | {
+        workflow_state?: {
+          steps?: string[];
+          completedSteps?: string[];
+          status?: string;
+          workflowId?: string;
+        };
+      }
+    | null
+    | undefined;
+  const workflowState = sessionState?.workflow_state;
+
+  const steps = workflowState?.steps ?? [];
+  const completedSteps = workflowState?.completedSteps ?? [];
+  const progress = steps.length > 0 ? (completedSteps.length / steps.length) * 100 : 0;
+
+  return Success({
+    status: workflowState?.status ?? 'not_started',
+    workflowId: workflowState?.workflowId || '',
+    currentStep: session.currentStep || '',
+    completedSteps,
+    failedSteps: [],
+    progress,
+  });
 };

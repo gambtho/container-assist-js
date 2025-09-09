@@ -101,14 +101,12 @@ build_result: {
       expect(mockSessionManager.update).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
-          workflow_state: expect.objectContaining({
-            completed_steps: expect.arrayContaining(['push']),
-            metadata: expect.objectContaining({
-              pushResult: expect.objectContaining({
-                registry: 'docker.io',
-                digest: 'sha256:abc123def456',
-                pushedTags: ['myapp:v1.0'],
-              }),
+          completed_steps: expect.arrayContaining(['push']),
+          metadata: expect.objectContaining({
+            pushResult: expect.objectContaining({
+              registry: 'docker.io',
+              digest: 'sha256:abc123def456',
+              pushedTags: ['myapp:v1.0'],
             }),
           }),
         })
@@ -284,7 +282,7 @@ build_result: {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('No tagged images found in session - run tag_image first');
+        expect(result.error).toBe('No image specified. Provide imageId parameter or ensure session has tagged images from tag-image tool.');
       }
     });
 
@@ -302,7 +300,7 @@ build_result: {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('No tagged images found in session - run tag_image first');
+        expect(result.error).toBe('No image specified. Provide imageId parameter or ensure session has tagged images from tag-image tool.');
       }
     });
 
@@ -320,7 +318,7 @@ build_result: {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('No image tags available to push');
+        expect(result.error).toBe('No image specified. Provide imageId parameter or ensure session has tagged images from tag-image tool.');
       }
     });
 
@@ -339,7 +337,7 @@ build_result: {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // The actual implementation checks for empty tag first, so it returns "No image tags available to push"
-        expect(result.error).toBe('No image tags available to push');
+        expect(result.error).toBe('No image specified. Provide imageId parameter or ensure session has tagged images from tag-image tool.');
       }
     });
 
@@ -409,7 +407,7 @@ build_result: {
       expect(mockTimer.error).toHaveBeenCalled();
     });
 
-    it('should handle session update failures', async () => {
+    it('should handle session update failures gracefully', async () => {
       mockSessionManager.get.mockResolvedValue({
         
 build_result: {
@@ -427,9 +425,11 @@ build_result: {
 
       const result = await pushImage(config, mockLogger);
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toBe('Failed to update session');
+      // Should still succeed even if session update fails
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.success).toBe(true);
+        expect(result.value.digest).toBe('sha256:abc123def456');
       }
     });
   });
@@ -533,16 +533,14 @@ metadata: {
       expect(mockSessionManager.update).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
-          workflow_state: expect.objectContaining({
-            completed_steps: expect.arrayContaining(['analyze', 'build', 'push']),
-            metadata: expect.objectContaining({
-              existingData: 'preserved', // Existing metadata should be preserved
-              pushResult: expect.objectContaining({
-                registry: 'docker.io',
-                digest: 'sha256:abc123def456',
-                pushedTags: ['myapp:v1.0'],
-                timestamp: expect.any(String),
-              }),
+          completed_steps: expect.arrayContaining(['analyze', 'build', 'push']),
+          metadata: expect.objectContaining({
+            existingData: 'preserved', // Existing metadata should be preserved
+            pushResult: expect.objectContaining({
+              registry: 'docker.io',
+              digest: 'sha256:abc123def456',
+              pushedTags: ['myapp:v1.0'],
+              timestamp: expect.any(String),
             }),
           }),
         })
@@ -566,9 +564,7 @@ build_result: {
       expect(mockSessionManager.update).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
-          workflow_state: expect.objectContaining({
-            completed_steps: ['push'], // Should create new array
-          }),
+          completed_steps: ['push'], // Should create new array
         })
       );
     });
@@ -590,12 +586,10 @@ build_result: {
       expect(mockSessionManager.update).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
-          workflow_state: expect.objectContaining({
-            metadata: expect.objectContaining({
-              pushResult: expect.objectContaining({
-                registry: 'docker.io',
-                digest: 'sha256:abc123def456',
-              }),
+          metadata: expect.objectContaining({
+            pushResult: expect.objectContaining({
+              registry: 'docker.io',
+              digest: 'sha256:abc123def456',
             }),
           }),
         })

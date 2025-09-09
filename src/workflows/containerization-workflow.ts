@@ -194,7 +194,7 @@ export const runContainerizationWorkflow = async (
       {
         sessionId,
         scanner: 'trivy',
-        severityThreshold: config.maxVulnerabilityLevel || 'high',
+        severity: config.maxVulnerabilityLevel || 'high',
       },
       logger,
     );

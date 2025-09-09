@@ -1,5 +1,8 @@
 /**
- * Builds Docker images from Dockerfiles with comprehensive logging and error handling.
+ * Build Image Tool - Standardized Implementation
+ *
+ * Builds Docker images from Dockerfiles with comprehensive logging and error handling
+ * Uses standardized helpers for consistency
  *
  * @example
  * ```typescript
@@ -19,13 +22,13 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { createSessionManager } from '../../lib/session';
+import { wrapTool } from '@mcp/tools/tool-wrapper';
+import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
+import type { ExtendedToolContext } from '../shared-types';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, type Logger } from '../../lib/logger';
-import { updateWorkflowState, type WorkflowState, type Result } from '../../domain/types';
-import { createToolProgressReporter } from '../../mcp/server/progress';
-import type { ToolContext } from '../types';
-import { DockerError, FileSystemError, ErrorCodes, executeAsResult } from '../../lib/errors';
+import { type Result, Success, Failure } from '../../domain/types';
+import type { BuildImageParams } from './schema';
 /**
  * Internal Docker build options interface
  * Maps to docker build command parameters
@@ -38,28 +41,6 @@ interface DockerBuildOptions {
   /** Build arguments as key-value pairs */
   buildargs?: Record<string, string>;
   /** Target platform (e.g., 'linux/amd64') */
-  platform?: string;
-}
-
-/**
- * Configuration for Docker image build operation
- */
-export interface BuildImageConfig {
-  /** Unique session identifier for tracking build state */
-  sessionId: string;
-  /** Build context directory path (defaults to current directory) */
-  context?: string;
-  /** Path to Dockerfile (defaults to 'Dockerfile' in context) */
-  dockerfile?: string;
-  /** Image tags to apply (e.g., ['myapp:latest', 'myapp:1.0']) */
-  tags?: string[];
-  /** Build arguments to pass to Docker build */
-  buildArgs?: Record<string, string>;
-  /** Multi-stage build target to build */
-  target?: string;
-  /** Disable build cache */
-  noCache?: boolean;
-  /** Target platform for multi-platform builds */
   platform?: string;
 }
 
@@ -168,68 +149,52 @@ function analyzeBuildSecurity(dockerfile: string, buildArgs: Record<string, stri
 }
 
 /**
- * Internal implementation using exceptions
+ * Core build image implementation
  */
-async function buildImageInternal(
-  config: BuildImageConfig,
+async function buildImageImpl(
+  params: BuildImageParams,
+  context: ExtendedToolContext,
   logger: Logger,
-  context?: ToolContext,
-): Promise<BuildImageResult> {
+): Promise<Result<BuildImageResult>> {
   const timer = createTimer(logger, 'build-image');
 
-  // Extract abort signal and progress token from context if available
-  const abortSignal = context?.abortSignal;
-  const progressToken = context?.progressToken;
-
-  // Create progress reporter
-  const reportProgress = createToolProgressReporter(
-    progressToken ? { progressToken, logger } : { logger },
-    'build-image',
-  );
-
   try {
-    await reportProgress('Initializing build process', 0);
     const {
-      sessionId,
       context: buildContext = '.',
       dockerfile = 'Dockerfile',
+      dockerfilePath,
+      imageName,
       tags = [],
       buildArgs = {},
-      target,
-      noCache = false,
       platform,
-    } = config;
+    } = params;
 
-    logger.info(
-      { sessionId, context: buildContext, dockerfile, tags },
-      'Starting Docker image build',
-    );
-
-    await reportProgress('Validating parameters', 10);
+    logger.info({ context: buildContext, dockerfile, tags }, 'Starting Docker image build');
 
     const startTime = Date.now();
 
-    // Check for abort signal early
-    if (abortSignal?.aborted) {
-      throw new Error('Build operation cancelled');
+    // Resolve session (now always optional)
+    const sessionResult = await resolveSession(logger, context, {
+      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
+      defaultIdHint: 'build-image',
+      createIfNotExists: true,
+    });
+
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
     }
 
-    // Use sessionManager from context or create new one
-    const sessionManager = context?.sessionManager || createSessionManager(logger);
+    const { id: sessionId, state: session } = sessionResult.value;
+    logger.info({ sessionId }, 'Starting Docker image build');
+
     const dockerClient = createDockerClient(logger);
-
-    // Get or create session
-    await reportProgress('Loading session', 20);
-    let session = await sessionManager.get(sessionId);
-    if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
-    }
 
     // Determine paths
     const sessionState = session as SessionWithAnalysis & { repo_path?: string };
     const repoPath = sessionState.repo_path ?? buildContext;
-    let dockerfilePath = path.resolve(repoPath, dockerfile);
+    let finalDockerfilePath = dockerfilePath
+      ? path.resolve(repoPath, dockerfilePath)
+      : path.resolve(repoPath, dockerfile);
 
     // Check if we should use a generated Dockerfile
     const dockerfileResult = (sessionState as Record<string, unknown>).dockerfile_result as
@@ -237,38 +202,37 @@ async function buildImageInternal(
       | undefined;
     const generatedPath = dockerfileResult?.path as string | undefined;
 
-    if (!(await fileExists(dockerfilePath))) {
+    if (!(await fileExists(finalDockerfilePath))) {
       // If the specified Dockerfile doesn't exist, check for generated one
       if (generatedPath && (await fileExists(generatedPath))) {
-        dockerfilePath = generatedPath;
+        finalDockerfilePath = generatedPath;
         logger.info({ generatedPath, originalPath: dockerfile }, 'Using generated Dockerfile');
       } else {
         // Check if we have Dockerfile content in session
         const dockerfileContent = dockerfileResult?.content as string | undefined;
         if (dockerfileContent) {
           // Write the Dockerfile content to generated file
-          dockerfilePath = path.join(repoPath, 'Dockerfile.generated');
-          await fs.writeFile(dockerfilePath, dockerfileContent, 'utf-8');
-          logger.info({ dockerfilePath }, 'Created Dockerfile from session content');
+          finalDockerfilePath = path.join(repoPath, 'Dockerfile.generated');
+          await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
+          logger.info(
+            { dockerfilePath: finalDockerfilePath },
+            'Created Dockerfile from session content',
+          );
         } else {
-          throw new FileSystemError(
-            `Dockerfile not found at ${dockerfilePath}`,
-            ErrorCodes.FILE_NOT_FOUND,
-            { dockerfilePath, repoPath },
+          return Failure(
+            `Dockerfile not found at ${finalDockerfilePath}. Provide dockerfilePath parameter or ensure session has Dockerfile from generate-dockerfile tool.`,
           );
         }
       }
     }
 
     // Read Dockerfile for security analysis
-    await reportProgress('Reading Dockerfile', 30);
-    const dockerfileContent = await fs.readFile(dockerfilePath, 'utf-8');
+    const dockerfileContent = await fs.readFile(finalDockerfilePath, 'utf-8');
 
     // Prepare build arguments
     const finalBuildArgs = prepareBuildArgs(buildArgs, session as SessionWithAnalysis);
 
     // Analyze security
-    await reportProgress('Analyzing security', 40);
     const securityWarnings = analyzeBuildSecurity(dockerfileContent, finalBuildArgs);
     if (securityWarnings.length > 0) {
       logger.warn({ warnings: securityWarnings }, 'Security warnings found in build');
@@ -276,65 +240,63 @@ async function buildImageInternal(
 
     // Prepare Docker build options
     const buildOptions: DockerBuildOptions = {
-      dockerfile: dockerfilePath,
+      dockerfile: finalDockerfilePath,
       buildargs: finalBuildArgs,
-      ...(target !== undefined && { target }),
-      ...(noCache !== undefined && { noCache }),
       ...(platform !== undefined && { platform }),
     };
 
-    // Check for abort before starting the build
-    if (abortSignal?.aborted) {
-      throw new Error('Build operation cancelled before Docker build');
+    // Add tags if provided
+    if (tags.length > 0 || imageName) {
+      const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
+      if (finalTags.length > 0) {
+        (buildOptions as any).t = finalTags[0]; // Docker buildImage expects single tag
+      }
     }
 
     // Build the image
-    await reportProgress('Building Docker image', 50);
     const buildResult = await dockerClient.buildImage(buildOptions);
 
     if (!buildResult.ok) {
-      throw new DockerError(
-        buildResult.error ?? 'Docker build failed',
-        ErrorCodes.DOCKER_BUILD_FAILED,
-        { buildOptions, dockerfilePath },
-      );
+      return Failure(`Failed to build image: ${buildResult.error ?? 'Unknown error'}`);
     }
 
     const buildTime = Date.now() - startTime;
 
-    await reportProgress('Updating session', 90);
-    // Update session with build result
-    const currentState = session as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
-      build_result: {
-        success: true,
-        imageId: buildResult.value.imageId ?? '',
-        tags: buildResult.value.tags || [],
-        size: (buildResult.value as unknown as { size?: number }).size ?? 0,
-        metadata: {
-          layers: (buildResult.value as unknown as { layers?: number }).layers,
-          buildTime,
-          logs: buildResult.value.logs,
-          securityWarnings,
+    // Update session with build result using standardized helper
+    const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
+    const updateResult = await updateSessionData(
+      sessionId,
+      {
+        build_result: {
+          success: true,
+          imageId: buildResult.value.imageId ?? '',
+          tags: finalTags,
+          size: (buildResult.value as unknown as { size?: number }).size ?? 0,
+          metadata: {
+            layers: (buildResult.value as unknown as { layers?: number }).layers,
+            buildTime,
+            logs: buildResult.value.logs,
+            securityWarnings,
+          },
         },
+        completed_steps: [...(session.completed_steps || []), 'build-image'],
       },
-      completed_steps: [...(currentState?.completed_steps ?? []), 'build-image'],
-    });
+      logger,
+      context,
+    );
 
-    await sessionManager.update(sessionId, {
-      workflow_state: updatedWorkflowState,
-    });
+    if (!updateResult.ok) {
+      logger.warn({ error: updateResult.error }, 'Failed to update session, but build succeeded');
+    }
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
     logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');
 
-    await reportProgress('Build completed successfully', 100);
-
-    return {
+    return Success({
       success: true,
       sessionId,
       imageId: buildResult.value.imageId,
-      tags: buildResult.value.tags || [],
+      tags: finalTags,
       size: (buildResult.value as unknown as { size?: number }).size ?? 0,
       ...((buildResult.value as unknown as { layers?: number }).layers !== undefined && {
         layers: (buildResult.value as unknown as { layers: number }).layers,
@@ -342,33 +304,27 @@ async function buildImageInternal(
       buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
-    };
+    });
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Docker image build failed');
-    throw error; // Re-throw for proper error propagation
+
+    return Failure(error instanceof Error ? error.message : String(error));
   }
 }
 
 /**
- * MCP-compatible wrapper that returns Result<T>
- * @param config - Build configuration including session ID, context, tags, etc.
- * @param logger - Logger instance for debug and info output
- * @returns Promise resolving to Result with build details or failure message
+ * Wrapped build image tool with standardized behavior
  */
-export async function buildImage(
-  config: BuildImageConfig,
-  logger: Logger,
-  context?: ToolContext,
-): Promise<Result<BuildImageResult>> {
-  return executeAsResult(() => buildImageInternal(config, logger, context));
-}
+export const buildImageTool = wrapTool('build-image', buildImageImpl);
 
 /**
- * Build image tool instance (uses Result<T> for MCP compatibility)
+ * Legacy export for backward compatibility during migration
  */
-export const buildImageTool = {
-  name: 'build-image',
-  execute: (config: BuildImageConfig, logger: Logger, context?: ToolContext) =>
-    buildImage(config, logger, context),
+export const buildImage = async (
+  params: BuildImageParams,
+  logger: Logger,
+  context?: ExtendedToolContext,
+): Promise<Result<BuildImageResult>> => {
+  return buildImageImpl(params, context || {}, logger);
 };
