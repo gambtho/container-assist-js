@@ -12,8 +12,8 @@ import type { ParsedUri, UriScheme } from './types';
  * // Parse a URI
  * const result = UriParser.parse('mcp://dockerfile/app.dockerfile');
  * if (result.success) {
- *   console.log(result.value.scheme); // 'mcp'
- *   console.log(result.value.path); // '/dockerfile/app.dockerfile'
+ *   const { scheme, path } = result.value;
+ *   // scheme: 'mcp', path: '/dockerfile/app.dockerfile'
  * }
  *
  * // Build a URI

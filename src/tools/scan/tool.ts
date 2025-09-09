@@ -231,6 +231,7 @@ async function scanImageImpl(
     return Success({
       success: true,
       sessionId,
+      imageId,
       vulnerabilities: {
         critical: dockerScanResult.summary?.critical ?? 0,
         high: dockerScanResult.summary?.high ?? 0,
@@ -241,6 +242,9 @@ async function scanImageImpl(
       },
       scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
       passed,
+      _chainHint: passed
+        ? 'Next: tag_image or push_image'
+        : 'Next: fix vulnerabilities with fix_dockerfile or proceed to tag_image',
     });
   } catch (error) {
     timer.error(error);

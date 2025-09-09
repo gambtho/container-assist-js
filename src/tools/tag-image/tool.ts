@@ -107,6 +107,7 @@ async function tagImageImpl(
       sessionId,
       tags,
       imageId: source,
+      _chainHint: 'Next: push_image to registry or generate_k8s_manifests for deployment',
     });
   } catch (error) {
     timer.end({ error });

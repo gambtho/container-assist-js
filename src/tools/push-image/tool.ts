@@ -124,6 +124,8 @@ async function pushImageImpl(
       registry,
       digest,
       pushedTags: [imageTag],
+      _chainHint:
+        'Next: generate_k8s_manifests for deployment or deploy_application if manifests exist',
     });
   } catch (error) {
     timer.error(error);

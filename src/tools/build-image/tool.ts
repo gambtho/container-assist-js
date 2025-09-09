@@ -330,6 +330,7 @@ async function buildImageImpl(
       buildTime,
       logs: buildResult.value.logs,
       ...(securityWarnings.length > 0 && { securityWarnings }),
+      _chainHint: 'Next: scan_image, tag_image, or push_image',
     });
   } catch (error) {
     timer.error(error);

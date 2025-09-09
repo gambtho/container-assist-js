@@ -230,7 +230,7 @@ const toolMap: Record<string, Tool> = {
 /**
  * Execute a single workflow step
  */
-async function executeStep(
+export async function executeStep(
   step: string,
   sessionId: string,
   config: { workflowType: string; options?: Record<string, unknown> },

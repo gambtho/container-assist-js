@@ -7,14 +7,16 @@
  * @example
  * ```typescript
  * const result = await deployApplication({
- *   sessionId: 'session-123', // optional
+ *   sessionId: 'session-123',
  *   namespace: 'my-app',
  *   environment: 'production'
  * }, context, logger);
  *
  * if (result.success) {
- *   console.log('Deployed:', result.deploymentName);
- *   console.log('Endpoints:', result.endpoints);
+ *   logger.info('Application deployed', {
+ *     deployment: result.deploymentName,
+ *     endpoints: result.endpoints
+ *   });
  * }
  * ```
  */
@@ -333,6 +335,9 @@ async function deployApplicationImpl(
           },
         ],
       },
+      _chainHint: ready
+        ? 'Next: verify_deployment to confirm app is working correctly'
+        : 'Deployment in progress. Wait and run verify_deployment to check status',
     });
   } catch (error) {
     timer.error(error);

@@ -542,13 +542,17 @@ async function generateK8sManifestsImpl(
 
     timer.end({ outputPath });
 
-    // Return result
+    // Return result with file indicator and chain hint
     return Success({
       manifests: yaml,
       outputPath,
       resources: resourceList,
       ...(warnings.length > 0 && { warnings }),
       sessionId: session.id,
+      _fileWritten: true,
+      _fileWrittenPath: outputPath,
+      _chainHint:
+        'Next: prepare_cluster to set up Kubernetes or deploy_application if cluster is ready',
     });
   } catch (error) {
     timer.error(error);
