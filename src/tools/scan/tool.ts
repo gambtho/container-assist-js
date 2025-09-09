@@ -11,6 +11,7 @@ import { createSecurityScanner } from '../../lib/scanner';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import type { ScanImageParams } from './schema';
+import type { SessionData } from '../session-types';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -90,7 +91,8 @@ async function scanImageImpl(
     const securityScanner = createSecurityScanner(logger, scanner);
 
     // Check for built image in session or use provided imageId
-    const buildResult = (session as any)?.build_result;
+    const sessionData = session as SessionData;
+    const buildResult = sessionData?.build_result;
     const imageId = params.imageId || buildResult?.imageId;
 
     if (!imageId) {
@@ -229,6 +231,7 @@ async function scanImageImpl(
     return Success({
       success: true,
       sessionId,
+      imageId,
       vulnerabilities: {
         critical: dockerScanResult.summary?.critical ?? 0,
         high: dockerScanResult.summary?.high ?? 0,
@@ -239,6 +242,9 @@ async function scanImageImpl(
       },
       scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
       passed,
+      _chainHint: passed
+        ? 'Next: tag_image or push_image'
+        : 'Next: fix vulnerabilities with fix_dockerfile or proceed to tag_image',
     });
   } catch (error) {
     timer.error(error);

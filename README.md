@@ -30,55 +30,7 @@ npm run build
 
 ### Usage
 
-#### With Claude Desktop
-
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "containerization-assist": {
-      "command": "containerization-assist-mcp",
-      "args": ["start"],
-      "env": {
-        "DOCKER_SOCKET": "/var/run/docker.sock",
-        "LOG_LEVEL": "info"
-      }
-    }
-  }
-}
-```
-
-For Windows users:
-```json
-{
-  "mcpServers": {
-    "containerization-assist": {
-      "command": "containerization-assist-mcp",
-      "args": ["start"],
-      "env": {
-        "DOCKER_SOCKET": "//./pipe/docker_engine",
-        "LOG_LEVEL": "info"
-      }
-    }
-  }
-}
-```
-
-#### With MCP Inspector
-
-```bash
-npx @modelcontextprotocol/inspector containerization-assist-mcp start
-```
-
-#### Programmatic Usage
-
-```typescript
-import { ContainerizationAssistMCPServer } from '@thgamble/containerization-assist-mcp';
-
-const server = new ContainerizationAssistMCPServer();
-await server.start();
-```
+See the [Getting Started Guide](./docs/getting-started.md) for detailed setup instructions including Claude Desktop, MCP Inspector, and programmatic usage.
 
 ## Available Tools
 
@@ -87,7 +39,6 @@ await server.start();
 | `analyze_repository` | Analysis | Analyze repository structure and detect language/framework |
 | `resolve_base_images` | Build | Find optimal base images for applications |
 | `generate_dockerfile` | Build | Create optimized Dockerfiles |
-| `generate_dockerfile_ext` | Build | Extended Dockerfile generation with AI |
 | `fix_dockerfile` | Build | Fix and optimize existing Dockerfiles |
 | `build_image` | Build | Build Docker images with progress tracking |
 | `scan_image` | Build | Security vulnerability scanning with Trivy |
@@ -98,11 +49,7 @@ await server.start();
 | `deploy_application` | Deploy | Deploy applications to Kubernetes |
 | `verify_deployment` | Deploy | Verify deployment health and status |
 | `start_workflow` | Workflow | Start complete containerization workflow |
-| `workflow_status` | Workflow | Check workflow progress and status |
-| `ping` | Ops | Test server connectivity |
-| `server_status` | Ops | Get server health status |
-| `registry` | Ops | Tool registry operations |
-| `error_recovery` | Ops | Handle and retry failed operations |
+| `ops` | Ops | Operational tools (ping, health, registry)
 
 ## System Requirements
 
@@ -112,106 +59,11 @@ await server.start();
 
 ## Configuration
 
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DOCKER_SOCKET` | Docker daemon socket path | `/var/run/docker.sock` |
-| `KUBECONFIG` | Kubernetes config path | `~/.kube/config` |
-| `LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` |
-| `SESSION_DIR` | Session storage directory | `~/.containerization-assist/sessions` |
-| `AI_CACHE_TTL` | AI response cache duration (ms) | `900000` (15 min) |
-| `K8S_NAMESPACE` | Default Kubernetes namespace | `default` |
-| `DOCKER_REGISTRY` | Default Docker registry | `docker.io` |
-
-### Advanced Configuration
-
-```json
-{
-  "mcpServers": {
-    "containerization-assist": {
-      "command": "containerization-assist-mcp",
-      "args": [
-        "start",
-        "--mode", "production",
-        "--tools", "all",
-        "--progress", "true"
-      ],
-      "env": {
-        "DOCKER_SOCKET": "/var/run/docker.sock",
-        "KUBECONFIG": "/home/user/.kube/config",
-        "LOG_LEVEL": "debug",
-        "SESSION_DIR": "/home/user/.containerization-assist",
-        "ENABLE_CACHE": "true",
-        "AI_CACHE_TTL": "1800000"
-      }
-    }
-  }
-}
-```
+See the [Getting Started Guide](./docs/getting-started.md) for detailed configuration options including environment variables and advanced configurations.
 
 ## Architecture
 
-### System Design
-
-```
-┌─────────────────────────────────────────┐
-│            MCP Client (Claude)          │
-└─────────────────┬───────────────────────┘
-                  │ MCP Protocol
-┌─────────────────▼───────────────────────┐
-│          MCP Server Layer               │
-│  ┌─────────────────────────────────┐    │
-│  │     Tool Registry & Router      │    │
-│  └─────────────────────────────────┘    │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│         Application Layer               │
-│  ┌──────────┐ ┌──────────┐ ┌────────┐  │
-│  │  Tools   │ │Workflow  │ │Session │  │
-│  └──────────┘ └──────────┘ └────────┘  │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│         Infrastructure Layer            │
-│  ┌──────┐ ┌──────┐ ┌─────┐ ┌────────┐  │
-│  │Docker│ │ K8s  │ │ AI  │ │Session │  │
-│  └──────┘ └──────┘ └─────┘ └────────┘  │
-└─────────────────────────────────────────┘
-```
-
-### Project Structure
-
-```
-src/
-├── app/             # Application entry point and dependency injection
-├── cli/             # CLI entry points
-├── config/          # Configuration management
-├── domain/          # Core types and business logic
-├── infrastructure/  # External system adapters (Docker, Kubernetes)
-├── lib/             # Libraries and shared utilities
-├── mcp/             # MCP server implementation
-│   ├── client/      # MCP client implementation
-│   ├── sampling/    # AI sampling services
-│   ├── server/      # MCP server core
-│   ├── tools/       # Tool registration and validation
-│   └── utils/       # MCP utilities
-├── prompts/         # AI prompt management
-├── resources/       # Resource management and caching
-├── tools/           # Tool implementations (co-located pattern)
-│   ├── analyze-repo/
-│   │   ├── tool.ts    # Tool implementation
-│   │   ├── schema.ts  # Zod schema definition
-│   │   └── index.ts   # Public exports
-│   └── [tool-name]/   # Same structure for each tool
-└── workflows/       # Workflow orchestration
-    ├── orchestration/ # Complex workflow coordination
-    └── sampling/      # Sampling-based workflows
-dist/                # Built output (ESM modules)
-scripts/             # Build and automation scripts
-test/                # Test files
-```
+See the [Architecture Guide](./docs/architecture.md) for detailed system design, component breakdown, and technical implementation details.
 
 ## Example Usage
 
@@ -276,31 +128,7 @@ Ask Claude to:
 
 ## Troubleshooting
 
-### Docker Not Found
-**Error**: "Docker is not available"
-
-**Solution**:
-1. Ensure Docker Desktop is running
-2. Check Docker socket path in configuration
-3. On Windows, ensure Docker is set to "Linux containers"
-
-### Permission Denied
-**Error**: "Permission denied accessing Docker socket"
-
-**Solution** (Linux/Mac):
-```bash
-sudo usermod -aG docker $USER
-# Log out and back in
-```
-
-### Tools Not Available
-**Error**: Claude doesn't see Containerization Assist tools
-
-**Solution**:
-1. Verify server is installed: `containerization-assist-mcp --version`
-2. Check configuration file syntax (valid JSON)
-3. Restart Claude Desktop
-4. Check logs: `~/.containerization-assist/logs/`
+For common issues and solutions, see the [Getting Started Guide](./docs/getting-started.md#troubleshooting).
 
 ## Documentation
 
@@ -350,12 +178,11 @@ npm run fix:all           # Auto-fix lint + format
 #### Testing
 ```bash
 npm test                   # Run all tests
-npm run test:unit          # Unit tests with bail
-npm run test:unit:quick    # Unit tests with 10s timeout
-npm run test:integration   # Integration tests
+npm run test:unit          # Unit tests only
+npm run test:integration   # Integration tests via MCP Inspector
 npm run test:coverage      # Generate coverage report
-npm run test:ci            # Fast CI tests
-npm run test:watch         # Watch mode for development
+npm run test:mcp           # MCP server integration tests
+npm run validate:pr:fast   # Complete validation pipeline
 ```
 
 ### Code Standards

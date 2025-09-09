@@ -74,6 +74,9 @@ export class PromptRegistry {
 
   /**
    * List all available prompts (SDK-compatible)
+   *
+   * @param category - Optional category filter to limit results
+   * @returns Promise containing list of available prompts with metadata
    */
   async listPrompts(category?: string): Promise<ListPromptsResult> {
     this.ensureInitialized();
@@ -103,6 +106,11 @@ export class PromptRegistry {
 
   /**
    * Get a specific prompt (SDK-compatible)
+   *
+   * @param name - Name of the prompt to retrieve
+   * @param args - Optional arguments for template parameter substitution
+   * @returns Promise containing the prompt with rendered content
+   * @throws McpError if prompt is not found
    */
   async getPrompt(name: string, args?: Record<string, unknown>): Promise<GetPromptResult> {
     this.ensureInitialized();
@@ -180,6 +188,9 @@ export class PromptRegistry {
 
   /**
    * Get prompts by category
+   *
+   * @param category - Category name to filter by
+   * @returns Array of prompt files matching the category
    */
   getPromptsByCategory(category: string): PromptFile[] {
     this.ensureInitialized();
@@ -188,6 +199,9 @@ export class PromptRegistry {
 
   /**
    * Check if a prompt exists
+   *
+   * @param name - Name of the prompt to check
+   * @returns True if the prompt exists and registry is initialized
    */
   hasPrompt(name: string): boolean {
     return this.initialized && this.loader.hasPrompt(name);
@@ -195,6 +209,8 @@ export class PromptRegistry {
 
   /**
    * Get all prompt names
+   *
+   * @returns Array of all registered prompt names
    */
   getPromptNames(): string[] {
     this.ensureInitialized();
@@ -235,21 +251,4 @@ export class PromptRegistry {
       required: param.required || false,
     }));
   }
-}
-
-/**
- * Factory function to create and initialize the registry
- */
-export async function createPromptRegistry(
-  logger: Logger,
-  promptsDirectory?: string,
-): Promise<PromptRegistry> {
-  const registry = new PromptRegistry(logger);
-  const result = await registry.initialize(promptsDirectory);
-
-  if (!result.ok) {
-    throw new Error(`Failed to initialize prompt registry: ${result.error}`);
-  }
-
-  return registry;
 }

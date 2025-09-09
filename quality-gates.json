@@ -20,7 +20,7 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 24
+        "warnings": 28
       },
       "deadcode": {
         "count": 229

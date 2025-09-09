@@ -10,6 +10,7 @@ import type { ToolContext } from '../../mcp/context/types';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
+import type { SessionData } from '../session-types';
 import type { TagImageParams } from './schema';
 
 export interface TagImageResult {
@@ -53,7 +54,8 @@ async function tagImageImpl(
     const dockerClient = createDockerClient(logger);
 
     // Check for built image in session or use provided imageId
-    const buildResult = (session as any)?.build_result;
+    const sessionData = session as SessionData;
+    const buildResult = sessionData?.build_result;
     const source = params.imageId || buildResult?.imageId;
 
     if (!source) {
@@ -105,6 +107,7 @@ async function tagImageImpl(
       sessionId,
       tags,
       imageId: source,
+      _chainHint: 'Next: push_image to registry or generate_k8s_manifests for deployment',
     });
   } catch (error) {
     timer.end({ error });

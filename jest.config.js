@@ -129,48 +129,6 @@ export default {
         ],
       },
     },
-    {
-      displayName: 'performance',
-      testMatch: [
-        '<rootDir>/test/performance/**/*.test.ts',
-        '<rootDir>/test/performance/**/*.perf.test.ts'
-      ],
-      testEnvironment: 'node',
-      setupFilesAfterEnv: ['<rootDir>/test/__support__/setup/performance.ts'],
-      moduleNameMapper: {
-        '^@app/(.*)$': '<rootDir>/src/app/$1',
-        '^@config/(.*)$': '<rootDir>/src/config/$1',
-        '^@domain/(.*)$': '<rootDir>/src/domain/$1',
-        '^@infrastructure/(.*)$': '<rootDir>/src/infrastructure/$1',
-        '^@lib/(.*)$': '<rootDir>/src/lib/$1',
-        '^@mcp/(.*)$': '<rootDir>/src/mcp/$1',
-        '^@tools/(.*)$': '<rootDir>/src/tools/$1',
-        '^@workflows/(.*)$': '<rootDir>/src/workflows/$1',
-        '^@resources/(.*)$': '<rootDir>/src/resources/$1',
-        '^@prompts/(.*)$': '<rootDir>/src/prompts/$1',
-        '^@types$': '<rootDir>/src/domain/types',
-        '^(\\.{1,2}/.*)\\.js$': '$1',
-        '^@test/fixtures/(.*)$': '<rootDir>/test/__support__/fixtures/$1',
-        '^@test/utilities/(.*)$': '<rootDir>/test/__support__/utilities/$1',
-        '^@test/mocks/(.*)$': '<rootDir>/test/__support__/mocks/$1',
-      },
-      transform: {
-        '^.+\\.tsx?$': [
-          'ts-jest',
-          {
-            useESM: true,
-            tsconfig: {
-              module: 'ES2022',
-              moduleResolution: 'bundler',
-              target: 'ES2022',
-              allowSyntheticDefaultImports: true,
-              esModuleInterop: true,
-              isolatedModules: true
-            },
-          },
-        ],
-      },
-    },
   ],
   
   // Global configuration

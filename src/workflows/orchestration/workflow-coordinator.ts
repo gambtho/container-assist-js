@@ -1,6 +1,8 @@
 /**
- * Simple Workflow Functions - Direct function calls replacing coordinator pattern
- * Eliminates unnecessary wrapper class and delegation
+ * Workflow Coordinator
+ *
+ * This module serves as the workflow coordinator for orchestrating various
+ * containerization workflows and intelligent workflow execution.
  */
 
 import { Result, Success, type Tool } from '@types';

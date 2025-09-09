@@ -70,6 +70,27 @@ export * from './session-helpers';
 export * from './ai-helpers';
 
 // =============================================================================
+// TOOL EXECUTION WRAPPER
+// =============================================================================
+
+/**
+ * NOTE: Tool wrapper has been replaced with direct implementation pattern.
+ * Use selective progress reporting with createStandardProgress() instead.
+ *
+ * @example Direct tool implementation (current pattern)
+ * ```typescript
+ * async function myToolImpl(params: MyParams, context: ToolContext): Promise<Result<MyResult>> {
+ *   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
+ *   if (progress) await progress('VALIDATING');
+ *   // Implementation logic
+ *   if (progress) await progress('COMPLETE');
+ *   return Success(result);
+ * }
+ * export const myTool = myToolImpl;
+ * ```
+ */
+
+// =============================================================================
 // RESPONSE FORMATTING
 // =============================================================================
 

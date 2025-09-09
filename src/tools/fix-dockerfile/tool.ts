@@ -348,6 +348,9 @@ async function fixDockerfileImpl(
       validation: ['Dockerfile validated successfully'],
       aiUsed,
       generationMethod,
+      _fileWritten: true,
+      _fileWrittenPath: './Dockerfile',
+      _chainHint: 'Next: build_image to test the fixed Dockerfile',
     } as FixDockerfileResult);
   } catch (error) {
     timer.error(error);

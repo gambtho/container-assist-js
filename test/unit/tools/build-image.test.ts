@@ -229,7 +229,8 @@ CMD ["node", "index.js"]`;
       expect(result.ok).toBe(true);
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
         expect.objectContaining({
-          dockerfile: '/test/repo/Dockerfile.generated',
+          context: '/test/repo',
+          dockerfile: 'Dockerfile.generated',
         })
       );
     });
@@ -258,7 +259,8 @@ CMD ["node", "index.js"]`;
       );
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
         expect.objectContaining({
-          dockerfile: '/test/repo/Dockerfile.generated',
+          context: '/test/repo',
+          dockerfile: 'Dockerfile.generated',
         })
       );
     });

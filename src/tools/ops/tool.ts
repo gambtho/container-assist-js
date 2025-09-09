@@ -35,7 +35,7 @@ interface PingResult {
 /**
  * Ping operation - test server connectivity
  */
-async function ping(config: PingConfig, context: ToolContext): Promise<Result<PingResult>> {
+export async function ping(config: PingConfig, context: ToolContext): Promise<Result<PingResult>> {
   const timer = createTimer(context.logger, 'ops-ping');
 
   try {
@@ -103,7 +103,7 @@ interface ServerStatusResult {
 /**
  * Get server status
  */
-async function serverStatus(
+export async function serverStatus(
   config: ServerStatusConfig,
   context: ToolContext,
 ): Promise<Result<ServerStatusResult>> {

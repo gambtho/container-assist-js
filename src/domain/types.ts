@@ -7,8 +7,56 @@ import type { Logger } from 'pino';
 import type { ToolContext } from '../mcp/context/types';
 
 /**
- * Result type for functional error handling.
- * Use instead of throwing exceptions.
+ * Result type for functional error handling
+ *
+ * DESIGN DECISION: Why Result<T> instead of exceptions?
+ *
+ * This pattern was chosen over traditional try/catch exception handling for several reasons:
+ *
+ * 1. **Explicit Error Handling**: Forces consumers to handle errors explicitly at the type level
+ *    - TypeScript compiler ensures error cases aren't ignored
+ *    - Makes error paths visible in the function signature
+ *    - Prevents accidental exception bubbling that breaks the MCP protocol
+ *
+ * 2. **MCP Protocol Compatibility**: The Model Context Protocol expects structured responses
+ *    - Exceptions would break the JSON-RPC message flow
+ *    - Result<T> ensures all responses are serializable
+ *    - Enables graceful error reporting to AI models
+ *
+ * 3. **Async Chain Safety**: Prevents unhandled promise rejections
+ *    - Traditional exceptions can be lost in async chains
+ *    - Result<T> makes error propagation explicit and safe
+ *    - Enables better error aggregation in workflows
+ *
+ * 4. **Functional Programming Alignment**: Supports railway-oriented programming
+ *    - Enables clean error composition and transformation
+ *    - Allows building robust workflows from potentially-failing operations
+ *    - Makes error recovery patterns more predictable
+ *
+ * Trade-offs accepted:
+ * - Slightly more verbose than exceptions (requires .ok checks)
+ * - Different from typical JavaScript patterns (but aligns with Rust/Go)
+ * - Learning curve for developers used to exception-based error handling
+ *
+ * @example
+ * ```typescript
+ * // Instead of this (exception-based):
+ * try {
+ *   const result = await riskyOperation();
+ *   return processResult(result);
+ * } catch (error) {
+ *   logger.error(error);
+ *   throw new Error('Operation failed');
+ * }
+ *
+ * // Use this (Result-based):
+ * const result = await riskyOperation(); // Returns Result<T>
+ * if (!result.ok) {
+ *   logger.error(result.error);
+ *   return Failure('Operation failed');
+ * }
+ * return Success(processResult(result.value));
+ * ```
  */
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 

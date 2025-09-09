@@ -42,7 +42,7 @@ export interface ParameterSpec {
  * Contains descriptive information and parameter definitions for a prompt template.
  * Used for validation, documentation, and dynamic UI generation.
  */
-export interface PromptMetadata {
+interface PromptMetadata {
   name: string;
   category: string;
   description: string;

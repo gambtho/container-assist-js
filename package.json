@@ -1,18 +1,30 @@
 {
   "name": "@thgamble/containerization-assist-mcp",
-  "version": "1.1.8",
+  "version": "1.1.15",
   "description": "TypeScript MCP server for AI-powered containerization workflows with Docker and Kubernetes support",
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
   },
-  "main": "./dist/src/mcp/server.js",
-  "types": "./dist/src/mcp/server.d.ts",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js",
+      "default": "./dist/src/index.js"
+    },
+    "./server": {
       "types": "./dist/src/mcp/server.d.ts",
-      "import": "./dist/src/mcp/server.js",
-      "default": "./dist/src/mcp/server.js"
+      "import": "./dist/src/mcp/server.js"
+    },
+    "./tools": {
+      "types": "./dist/src/exports/tools.d.ts",
+      "import": "./dist/src/exports/tools.js"
+    },
+    "./helpers": {
+      "types": "./dist/src/exports/helpers.d.ts",
+      "import": "./dist/src/exports/helpers.js"
     },
     "./types": {
       "types": "./dist/src/domain/types.d.ts",
@@ -43,32 +55,18 @@
     "dev": "tsx watch src/cli/cli.ts",
     "start": "node dist/src/cli/cli.js",
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
-    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
-    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
     "test:unit": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit",
-    "test:unit:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit --watch",
-    "test:unit:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit --coverage",
-    "test:unit:quick": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit --testTimeout=10000",
-    "test:integration": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects integration --passWithNoTests",
-    "test:integration:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects integration --watch",
-    "test:e2e": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects e2e",
-    "test:e2e:quick": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects e2e --testTimeout=60000",
-    "test:tools": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='test/(unit|integration).*/tools'",
-    "test:workflows": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='test/(unit|integration).*/workflows'",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
+    "test:integration": "tsx test/integration/mcp-inspector/runner.ts --category=integration-flows",
+    "test:integration:workflows": "tsx test/integration/mcp-inspector/standalone-containerization-test.ts",
     "test:mcp": "tsx test/integration/mcp-inspector/runner.ts",
-    "test:lib": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='test/unit/lib'",
-    "test:performance": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects=performance",
-    "test:ci": "NODE_OPTIONS='--experimental-vm-modules' jest --ci --coverage --maxWorkers=2",
-    "test:ci:unit": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects unit --ci --coverage --maxWorkers=2",
-    "test:ci:integration": "NODE_OPTIONS='--experimental-vm-modules' jest --selectProjects integration --ci --maxWorkers=1 --passWithNoTests",
-    "test:debug": "NODE_OPTIONS='--experimental-vm-modules --inspect-brk' jest --runInBand",
-    "test:clear-cache": "jest --clearCache",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
     "typecheck": "tsc --noEmit",
     "validate": "npm run lint && npm run typecheck && npm run test:unit",
+    "validate:pr:fast": "npm run lint && npm run typecheck && npm run test:unit && npm run test:integration",
     "fix:all": "npm run lint:fix && npm run format",
     "quality:check": "./scripts/lint-metrics.sh",
     "quality:gates": "SKIP_TYPECHECK=true ./scripts/quality-gates.sh",
@@ -80,25 +78,7 @@
     "release": "npm run validate && npm run build:prod && npm publish",
     "prepare": "husky install",
     "mcp:inspect": "npx @modelcontextprotocol/inspector ./scripts/mcp-start.sh start",
-    "mcp:inspect:mock": "npx @modelcontextprotocol/inspector ./scripts/mcp-start-mock.sh start",
-    "test:mcp:setup": "echo 'MCP Inspector test framework ready'",
-    "test:mcp:tools": "tsx test/mcp-inspector/runner.ts --category=tool-validation",
-    "test:mcp:sampling": "tsx test/mcp-inspector/runner.ts --category=sampling-validation",
-    "test:mcp:resources": "tsx test/mcp-inspector/runner.ts --category=resource-management",
-    "test:mcp:load": "tsx test/mcp-inspector/runner.ts --category=load-testing",
-    "test:mcp:performance": "tsx test/mcp-inspector/runner.ts --category=load-testing",
-    "test:mcp:edge-cases": "tsx test/mcp-inspector/runner.ts --category=edge-cases",
-    "test:mcp:integration": "tsx test/mcp-inspector/runner.ts --category=integration-flows",
-    "test:mcp:orchestrator": "tsx test/mcp-inspector/runner.ts --category=orchestrator",
-    "test:mcp:gates": "tsx test/mcp-inspector/runner.ts --category=gates",
-    "test:mcp:remediation": "tsx test/mcp-inspector/runner.ts --category=remediation",
-    "test:mcp:all": "npm run test:mcp",
-    "test:mcp:watch": "tsx watch test/mcp-inspector/runner.ts",
-    "test:maintenance": "tsx scripts/test-maintenance.ts",
-    "test:maintenance:auto": "tsx scripts/test-maintenance.ts --output-mode auto",
-    "test:performance:monitor": "tsx scripts/performance-monitoring.ts",
-    "test:performance:baseline": "tsx scripts/performance-monitoring.ts && npm run test:performance:monitor",
-    "test:validate:phase4": "tsx scripts/validate-phase4-completion.ts"
+    "mcp:inspect:mock": "npx @modelcontextprotocol/inspector ./scripts/mcp-start-mock.sh start"
   },
   "dependencies": {
     "@kubernetes/client-node": "^1.0.0",

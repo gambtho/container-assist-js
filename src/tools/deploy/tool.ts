@@ -7,14 +7,16 @@
  * @example
  * ```typescript
  * const result = await deployApplication({
- *   sessionId: 'session-123', // optional
+ *   sessionId: 'session-123',
  *   namespace: 'my-app',
  *   environment: 'production'
  * }, context, logger);
  *
  * if (result.success) {
- *   console.log('Deployed:', result.deploymentName);
- *   console.log('Endpoints:', result.endpoints);
+ *   logger.info('Application deployed', {
+ *     deployment: result.deploymentName,
+ *     endpoints: result.endpoints
+ *   });
  * }
  * ```
  */
@@ -27,18 +29,6 @@ import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
 import type { DeployApplicationParams } from './schema';
-
-// interface K8sManifest {
-//   apiVersion: string;
-//   kind: string;
-//   metadata: {
-//     name: string;
-//     namespace?: string;
-//     labels?: Record<string, string>;
-//     annotations?: Record<string, string>;
-//   };
-//   spec?: Record<string, unknown>;
-// }
 
 export interface DeployApplicationResult {
   success: boolean;
@@ -112,17 +102,8 @@ async function deployApplicationImpl(
   const logger = context.logger || createLogger({ name: 'deploy-application' });
   const timer = createTimer(logger, 'deploy-application');
 
-  // Extract abort signal from context if available
-  // const abortSignal = context?.abortSignal; // TODO: implement abort handling
-
   try {
-    const {
-      // imageId, // TODO: use imageId when implementing actual deployment
-      namespace = 'default',
-      replicas = 1,
-      // port = 8080, // TODO: use port when implementing actual deployment
-      environment = 'development',
-    } = params;
+    const { namespace = 'default', replicas = 1, environment = 'development' } = params;
 
     const cluster = 'default';
     const dryRun = false;
@@ -354,6 +335,9 @@ async function deployApplicationImpl(
           },
         ],
       },
+      _chainHint: ready
+        ? 'Next: verify_deployment to confirm app is working correctly'
+        : 'Deployment in progress. Wait and run verify_deployment to check status',
     });
   } catch (error) {
     timer.error(error);
