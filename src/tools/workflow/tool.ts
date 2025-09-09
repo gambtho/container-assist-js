@@ -142,8 +142,8 @@ import { analyzeRepo } from '@tools/analyze-repo';
 import { generateDockerfile } from '@tools/generate-dockerfile';
 import { buildImage } from '@tools/build-image';
 import { scanImage } from '@tools/scan';
-import { pushImage } from '../push-image/tool';
-import { tagImage } from '../tag-image/tool';
+import { pushImage } from '@tools/push-image';
+import { tagImage } from '@tools/tag-image';
 import { fixDockerfile } from '@tools/fix-dockerfile';
 import { resolveBaseImages } from '@tools/resolve-base-images';
 import { prepareCluster } from '@tools/prepare-cluster';
@@ -546,11 +546,6 @@ async function workflowImpl(
  * Workflow tool with selective progress reporting
  */
 export const workflow = workflowImpl;
-
-/**
- * Default export
- */
-export default workflow;
 
 export const getWorkflowStatus = async (
   sessionId: string,

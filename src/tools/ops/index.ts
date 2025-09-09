@@ -1,7 +1,9 @@
 /**
  * Ops Tool
- * Operations management tool
+ *
+ * Exports the tool implementation and schema for co-located access
  */
 
 export { opsTool } from './tool';
-export { type OpsToolParams } from './schema';
+export { opsToolSchema, type OpsToolParams } from './schema';
+export type { OpsResult } from './tool';

@@ -11,12 +11,13 @@
 
 import { prepareCluster } from '@tools/prepare-cluster';
 import { generateK8sManifests } from '@tools/generate-k8s-manifests';
-import { pushImage } from '../tools/push-image/tool';
+import { pushImage } from '@tools/push-image';
 import { deployApplication } from '@tools/deploy';
 import { verifyDeployment } from '@tools/verify-deployment';
 import { isFail } from '@types';
 import { createTimer, type Logger } from '@lib/logger';
 import type { ToolContext } from '../mcp/context/types';
+import type { SessionManager } from '../lib/session';
 import type {
   DeploymentWorkflowParams,
   DeploymentWorkflowResult,
@@ -35,9 +36,8 @@ export async function runDeploymentWorkflow(
   const logger = toolContext.logger;
   const timer = createTimer(logger, 'deployment-workflow');
   // Access sessionManager through context if available
-  const sessionManager =
-    (toolContext as any).sessionManager ||
-    (await import('../lib/session')).createSessionManager(logger);
+  const sessionManager: SessionManager =
+    toolContext.sessionManager || (await import('../lib/session')).createSessionManager(logger);
   const { sessionId, imageId, clusterConfig, deploymentOptions } = params;
 
   // Initialize workflow context
@@ -649,10 +649,18 @@ export async function runDeploymentWorkflow(
 export const deploymentWorkflow = {
   name: 'deployment-workflow',
   description: 'Complete deployment pipeline from cluster preparation to verified deployment',
-  execute: (params: DeploymentWorkflowParams, _logger: Logger, context?: Record<string, unknown>) =>
-    runDeploymentWorkflow(params, context as unknown as ToolContext, {
-      abortSignal: (context as any)?.abortSignal,
-    }),
+  execute: (
+    params: DeploymentWorkflowParams,
+    _logger: Logger,
+    context?: Record<string, unknown>,
+  ) => {
+    const toolContext = context as unknown as ToolContext;
+    const options: { abortSignal?: AbortSignal } = {};
+    if (toolContext?.signal) {
+      options.abortSignal = toolContext.signal;
+    }
+    return runDeploymentWorkflow(params, toolContext, options);
+  },
   schema: {
     type: 'object',
     properties: {

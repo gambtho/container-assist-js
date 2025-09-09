@@ -1,9 +1,16 @@
+/**
+ * Schema definition for ops tool
+ */
+
 import { z } from 'zod';
 
+const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
+
 export const opsToolSchema = z.object({
-  sessionId: z.string().optional().describe('Session identifier for tracking operations'),
-  action: z.enum(['status', 'logs', 'restart', 'scale']).describe('Operation to perform'),
-  target: z.string().optional().describe('Target resource'),
+  sessionId: sessionIdSchema.optional(),
+  operation: z.enum(['ping', 'status']).describe('Operation to perform'),
+  message: z.string().optional().describe('Message for ping operation'),
+  details: z.boolean().optional().describe('Include detailed information in status'),
 });
 
 export type OpsToolParams = z.infer<typeof opsToolSchema>;

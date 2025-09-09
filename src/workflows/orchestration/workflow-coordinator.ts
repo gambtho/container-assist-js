@@ -5,7 +5,10 @@
 
 import { Result, Success, type Tool } from '@types';
 import { runContainerizationWorkflow } from '@workflows/containerization';
-import { runBuildOnlyWorkflow } from '@workflows/containerization-workflow';
+import {
+  runBuildOnlyWorkflow,
+  type ContainerizationConfig,
+} from '@workflows/containerization-workflow';
 import type { ToolContext } from '@mcp/context/types';
 import type {
   ContainerizationWorkflowParams as ContainerizationWorkflowConfig,
@@ -62,7 +65,11 @@ export const executeBuildWorkflow = async (
   context: ToolContext,
   config?: Partial<ContainerizationWorkflowConfig>,
 ): Promise<Result<ContainerizationResult>> => {
-  const result = await runBuildOnlyWorkflow(repositoryPath, context, config as any);
+  const result = await runBuildOnlyWorkflow(
+    repositoryPath,
+    context,
+    config as ContainerizationConfig,
+  );
   if (!result.ok) {
     return result as Result<ContainerizationResult>;
   }
@@ -122,34 +129,30 @@ export const executeWorkflow = async (
 };
 
 /**
- * Execute deployment workflow - direct function
+ * Workflow type shortcuts - use executeWorkflow directly for flexibility
+ * @deprecated Use executeWorkflow directly with the workflow type parameter
+ *
+ * Example:
+ *   executeWorkflow(repoPath, 'deployment', context, config)
+ *   executeWorkflow(repoPath, 'security', context, config)
+ *   executeWorkflow(repoPath, 'optimization', context, config)
  */
-export const executeDeploymentWorkflow = async (
+export const executeDeploymentWorkflow = (
   repositoryPath: string,
   context: ToolContext,
   config?: Partial<ContainerizationWorkflowConfig>,
-): Promise<Result<WorkflowResult>> => {
-  return executeWorkflow(repositoryPath, 'deployment', context, config);
-};
+): Promise<Result<WorkflowResult>> =>
+  executeWorkflow(repositoryPath, 'deployment', context, config);
 
-/**
- * Execute security workflow - direct function
- */
-export const executeSecurityWorkflow = async (
+export const executeSecurityWorkflow = (
   repositoryPath: string,
   context: ToolContext,
   config?: Partial<ContainerizationWorkflowConfig>,
-): Promise<Result<WorkflowResult>> => {
-  return executeWorkflow(repositoryPath, 'security', context, config);
-};
+): Promise<Result<WorkflowResult>> => executeWorkflow(repositoryPath, 'security', context, config);
 
-/**
- * Execute optimization workflow - direct function
- */
-export const executeOptimizationWorkflow = async (
+export const executeOptimizationWorkflow = (
   repositoryPath: string,
   context: ToolContext,
   config?: Partial<ContainerizationWorkflowConfig>,
-): Promise<Result<WorkflowResult>> => {
-  return executeWorkflow(repositoryPath, 'optimization', context, config);
-};
+): Promise<Result<WorkflowResult>> =>
+  executeWorkflow(repositoryPath, 'optimization', context, config);

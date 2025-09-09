@@ -1,6 +1,8 @@
 /**
- * Push Image Tool - Public exports
+ * Push image tool exports.
+ * Co-locates tool implementation with its schema definition.
  */
 
-export { pushImage, pushImageSchema } from './tool';
-export type { PushImageParams, PushImageResult } from './tool';
+export { pushImage } from './tool';
+export { pushImageSchema, type PushImageParams } from './schema';
+export type { PushImageResult } from './tool';

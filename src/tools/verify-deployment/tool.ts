@@ -343,8 +343,3 @@ async function verifyDeploymentImpl(
  * Verify deployment tool
  */
 export const verifyDeployment = verifyDeploymentImpl;
-
-/**
- * Default export
- */
-export default verifyDeployment;

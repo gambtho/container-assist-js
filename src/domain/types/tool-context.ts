@@ -1,16 +1,14 @@
 /**
  * Domain Types - Tool Context
  *
- * Re-exports ToolContext and related types from MCP implementation.
- * This provides a stable import path for tools that expect domain-level types.
+ * DEPRECATED: This file previously re-exported ToolContext types.
  *
  * ## Migration Guide
  *
- * This file was created as part of the Part B anti-pattern refactoring to provide
- * a unified ToolContext interface. All tools should import from this location:
+ * All tools should now import ToolContext directly from MCP:
  *
  * ```typescript
- * import type { ToolContext } from '../../domain/types/tool-context';
+ * import type { ToolContext } from '@mcp/context/types';
  * ```
  *
  * ## Key Changes from Previous Context Types
@@ -22,48 +20,5 @@
  *
  * @see {@link ../../mcp/context/types.ts} for implementation details
  * @since 2.0.0 - Part of the anti-pattern refactoring effort
+ * @deprecated Import directly from '@mcp/context/types' instead
  */
-
-// Re-export all ToolContext types from MCP implementation
-export type {
-  /**
-   * Main context interface for all tools - replaces previous context inheritance chain
-   * @see {@link ../../mcp/context/types.ts#ToolContext} for detailed documentation
-   */
-  ToolContext,
-
-  /**
-   * Factory function for creating ToolContext instances
-   */
-  ToolContextFactory,
-
-  /**
-   * Configuration options for ToolContext creation
-   */
-  ToolContextConfig,
-
-  /**
-   * Request structure for AI sampling operations
-   */
-  SamplingRequest,
-
-  /**
-   * Response structure from AI sampling operations
-   */
-  SamplingResponse,
-
-  /**
-   * Prompt with processed messages ready for use
-   */
-  PromptWithMessages,
-
-  /**
-   * Function signature for progress reporting
-   */
-  ProgressReporter,
-
-  /**
-   * MCP-compatible message structure
-   */
-  TextMessage,
-} from '../../mcp/context/types';

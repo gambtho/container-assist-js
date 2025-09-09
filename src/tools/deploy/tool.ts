@@ -21,13 +21,24 @@
 
 import * as yaml from 'js-yaml';
 import { getSession, updateSession } from '@mcp/tools/session-helpers';
-import { createStandardProgress } from '@mcp/utils/progress-helper';
 import type { ToolContext } from '../../mcp/context/types';
 import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
 import type { DeployApplicationParams } from './schema';
+
+// interface K8sManifest {
+//   apiVersion: string;
+//   kind: string;
+//   metadata: {
+//     name: string;
+//     namespace?: string;
+//     labels?: Record<string, string>;
+//     annotations?: Record<string, string>;
+//   };
+//   spec?: Record<string, unknown>;
+// }
 
 export interface DeployApplicationResult {
   success: boolean;
@@ -92,26 +103,26 @@ function orderManifests(manifests: unknown[]): unknown[] {
 }
 
 /**
- * Deploy application implementation with selective progress reporting
+ * Core deployment implementation
  */
 async function deployApplicationImpl(
   params: DeployApplicationParams,
   context: ToolContext,
 ): Promise<Result<DeployApplicationResult>> {
-  // Basic parameter validation
-  if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
-  }
-
-  // Progress reporting for complex deployment operations
-  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
   const logger = context.logger || createLogger({ name: 'deploy-application' });
   const timer = createTimer(logger, 'deploy-application');
 
   // Extract abort signal from context if available
+  // const abortSignal = context?.abortSignal; // TODO: implement abort handling
 
   try {
-    const { namespace = 'default', replicas = 1, environment = 'development' } = params;
+    const {
+      // imageId, // TODO: use imageId when implementing actual deployment
+      namespace = 'default',
+      replicas = 1,
+      // port = 8080, // TODO: use port when implementing actual deployment
+      environment = 'development',
+    } = params;
 
     const cluster = 'default';
     const dryRun = false;
@@ -120,10 +131,7 @@ async function deployApplicationImpl(
 
     logger.info({ namespace, cluster, dryRun, environment }, 'Starting application deployment');
 
-    // Progress: Validation phase
-    if (progress) await progress('VALIDATING');
-
-    // Resolve session (now always optional)
+    // Get session using standardized helper
     const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
@@ -157,9 +165,6 @@ async function deployApplicationImpl(
       { manifestCount: orderedManifests.length, dryRun, namespace },
       'Deploying manifests to Kubernetes',
     );
-
-    // Progress: Main execution phase
-    if (progress) await progress('EXECUTING');
 
     // Deploy manifests
     const deployedResources: Array<{ kind: string; name: string; namespace: string }> = [];
@@ -323,17 +328,11 @@ async function deployApplicationImpl(
       );
     }
 
-    // Progress: Finalizing results
-    if (progress) await progress('FINALIZING');
-
     timer.end({ deploymentName, ready, sessionId });
     logger.info(
       { sessionId, deploymentName, serviceName, ready, namespace },
       'Kubernetes deployment completed',
     );
-
-    // Progress: Complete
-    if (progress) await progress('COMPLETE');
 
     return Success({
       success: true,
@@ -365,11 +364,6 @@ async function deployApplicationImpl(
 }
 
 /**
- * Deploy application tool with selective progress reporting
+ * Export the deploy tool directly
  */
 export const deployApplication = deployApplicationImpl;
-
-/**
- * Default export
- */
-export default deployApplication;

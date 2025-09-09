@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 
-export const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
+const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
 
 export const scanImageSchema = z.object({
   sessionId: sessionIdSchema.optional(),

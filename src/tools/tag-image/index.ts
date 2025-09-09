@@ -1,6 +1,9 @@
 /**
- * Tag Image Tool - Public exports
+ * Tag Image Tool
+ *
+ * Exports the tool implementation and schema for co-located access
  */
 
-export { tagImage, tagImageSchema } from './tool';
-export type { TagImageParams, TagImageResult } from './tool';
+export { tagImage } from './tool';
+export { tagImageSchema, type TagImageParams } from './schema';
+export type { TagImageResult } from './tool';

@@ -253,8 +253,3 @@ async function scanImageImpl(
  * Scan image tool
  */
 export const scanImage = scanImageImpl;
-
-/**
- * Default export
- */
-export default scanImage;

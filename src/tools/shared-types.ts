@@ -6,5 +6,4 @@
 
 // This file previously contained ExtendedToolContext
 // All types have been consolidated into ToolContext
-// Re-export ToolContext for compatibility during migration
-export type { ToolContext } from '../mcp/context/types';
+// ToolContext should now be imported directly from '@mcp/context/types'

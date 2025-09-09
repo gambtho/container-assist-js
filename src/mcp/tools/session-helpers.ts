@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { Result, Success, Failure, WorkflowState } from '../../domain/types.js';
 import type { SessionManager } from '../../lib/session.js';
-import type { ToolContext } from '../../tools/shared-types.js';
+import type { ToolContext } from '@mcp/context/types';
 
 /**
  * Get session manager from context (no longer creates new instances)

@@ -1,8 +1,6 @@
 /**
- * Build Image Tool - Standardized Implementation
- *
- * Builds Docker images from Dockerfiles with comprehensive logging and error handling
- * Uses standardized helpers for consistency
+ * Build Docker images from Dockerfiles.
+ * Handles multi-stage builds, build arguments, and platform-specific builds.
  *
  * @example
  * ```typescript
@@ -11,12 +9,7 @@
  *   context: '/path/to/app',
  *   tags: ['myapp:latest', 'myapp:v1.0.0'],
  *   buildArgs: { NODE_ENV: 'production' }
- * }, context, logger);
- *
- * if (result.success) {
- *   console.log('Image built:', result.imageId);
- *   console.log('Build time:', result.buildTime, 'ms');
- * }
+ * }, context);
  * ```
  */
 
@@ -29,10 +22,6 @@ import { createDockerClient } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
 import { type Result, Success, Failure } from '../../domain/types';
 import type { BuildImageParams } from './schema';
-/**
- * Internal Docker build options interface
- * Maps to docker build command parameters
- */
 interface DockerBuildOptions {
   /** Path to Dockerfile relative to build context */
   dockerfile?: string;
@@ -44,9 +33,6 @@ interface DockerBuildOptions {
   platform?: string;
 }
 
-/**
- * Result of Docker image build operation
- */
 export interface BuildImageResult {
   /** Whether the build completed successfully */
   success: boolean;
@@ -254,7 +240,10 @@ async function buildImageImpl(
     if (tags.length > 0 || imageName) {
       const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
       if (finalTags.length > 0) {
-        (buildOptions as any).t = finalTags[0]; // Docker buildImage expects single tag
+        const primaryTag = finalTags[0];
+        if (primaryTag) {
+          buildOptions.t = primaryTag; // Docker buildImage expects single tag
+        }
       }
     }
 

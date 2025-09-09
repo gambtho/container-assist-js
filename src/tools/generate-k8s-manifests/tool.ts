@@ -561,8 +561,3 @@ async function generateK8sManifestsImpl(
  * Generate K8s manifests tool with selective progress reporting
  */
 export const generateK8sManifests = generateK8sManifestsImpl;
-
-/**
- * Default export
- */
-export default generateK8sManifests;

@@ -22,7 +22,7 @@
 import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import type { ToolContext } from '../../mcp/context/types';
 import { createKubernetesClient } from '../../lib/kubernetes';
-import { createTimer, createLogger, type Logger } from '../../lib/logger';
+import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import type { PrepareClusterParams } from './schema';
 
@@ -75,7 +75,7 @@ function createK8sClientAdapter(
 /**
  * Check cluster connectivity
  */
-async function checkConnectivity(k8sClient: K8sClientAdapter, logger: Logger): Promise<boolean> {
+async function checkConnectivity(k8sClient: K8sClientAdapter, logger: any): Promise<boolean> {
   try {
     const connected = await k8sClient.ping();
     logger.debug({ connected }, 'Cluster connectivity check');
@@ -92,7 +92,7 @@ async function checkConnectivity(k8sClient: K8sClientAdapter, logger: Logger): P
 async function checkNamespace(
   k8sClient: K8sClientAdapter,
   namespace: string,
-  logger: Logger,
+  logger: any,
 ): Promise<boolean> {
   try {
     const exists = await k8sClient.namespaceExists(namespace);
@@ -110,7 +110,7 @@ async function checkNamespace(
 async function createNamespace(
   k8sClient: K8sClientAdapter,
   namespace: string,
-  logger: Logger,
+  logger: any,
 ): Promise<void> {
   try {
     const namespaceManifest = {
@@ -139,7 +139,7 @@ async function createNamespace(
 async function setupRbac(
   k8sClient: K8sClientAdapter,
   namespace: string,
-  logger: Logger,
+  logger: any,
 ): Promise<void> {
   try {
     // Create service account
@@ -166,10 +166,7 @@ async function setupRbac(
 /**
  * Check for ingress controller
  */
-async function checkIngressController(
-  k8sClient: K8sClientAdapter,
-  logger: Logger,
-): Promise<boolean> {
+async function checkIngressController(k8sClient: K8sClientAdapter, logger: any): Promise<boolean> {
   try {
     const hasIngress = await k8sClient.checkIngressController();
     logger.debug({ hasIngress }, 'Checking for ingress controller');
@@ -181,16 +178,12 @@ async function checkIngressController(
 }
 
 /**
- * Cluster preparation implementation - direct execution without wrapper
+ * Core cluster preparation implementation
  */
 async function prepareClusterImpl(
   params: PrepareClusterParams,
   context: ToolContext,
 ): Promise<Result<PrepareClusterResult>> {
-  // Basic parameter validation (essential validation only)
-  if (!params || typeof params !== 'object') {
-    return Failure('Invalid parameters provided');
-  }
   const logger = context.logger || createLogger({ name: 'prepare-cluster' });
   const timer = createTimer(logger, 'prepare-cluster');
 
@@ -205,7 +198,7 @@ async function prepareClusterImpl(
 
     logger.info({ cluster, namespace, environment }, 'Starting cluster preparation');
 
-    // Resolve session (now always optional)
+    // Get session using standardized helper
     const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
@@ -328,11 +321,6 @@ async function prepareClusterImpl(
 }
 
 /**
- * Prepare cluster tool
+ * Export the prepare cluster tool directly
  */
 export const prepareCluster = prepareClusterImpl;
-
-/**
- * Default export
- */
-export default prepareCluster;

@@ -15,8 +15,8 @@ import { generateDockerfileSchema } from '../../tools/generate-dockerfile/schema
 import { buildImageSchema } from '../../tools/build-image/schema';
 import { scanImageSchema } from '../../tools/scan/schema';
 import { deployApplicationSchema } from '../../tools/deploy/schema';
-import { pushImageSchema, pushImage } from '../../tools/push-image';
-import { tagImageSchema, tagImage } from '../../tools/tag-image';
+import { pushImageSchema } from '../../tools/push-image/schema';
+import { tagImageSchema } from '../../tools/tag-image/schema';
 import { workflowSchema } from '../../tools/workflow/schema';
 import { fixDockerfileSchema } from '../../tools/fix-dockerfile/schema';
 import { resolveBaseImagesSchema } from '../../tools/resolve-base-images/schema';
@@ -35,6 +35,8 @@ import { generateDockerfile } from '../../tools/generate-dockerfile';
 import { buildImage } from '../../tools/build-image';
 import { scanImage } from '../../tools/scan';
 import { deployApplication } from '../../tools/deploy';
+import { pushImage } from '../../tools/push-image';
+import { tagImage } from '../../tools/tag-image';
 import { workflow } from '../../tools/workflow';
 import { fixDockerfile } from '../../tools/fix-dockerfile';
 import { resolveBaseImages } from '../../tools/resolve-base-images';
@@ -76,7 +78,7 @@ const toolFunctions = {
   'fix-dockerfile': fixDockerfile,
   'resolve-base-images': resolveBaseImages,
   'prepare-cluster': prepareCluster,
-  ops: (params: any, context: any) => opsTool.execute(params, context.logger),
+  ops: opsTool,
   'generate-k8s-manifests': generateK8sManifests,
   'verify-deployment': verifyDeployment,
 } as const;
@@ -442,14 +444,6 @@ export class MCPServer {
     }
 
     this.deps.logger.info({ count: promptNames.length }, 'Prompts registered from registry');
-  }
-
-  /**
-   * Register a dynamic resource template
-   */
-  public registerResourceTemplate(name: string, pattern: string): void {
-    // This would integrate with SDK ResourceTemplate when available
-    this.deps.logger.info({ name, pattern }, 'Resource template registered');
   }
 
   /**

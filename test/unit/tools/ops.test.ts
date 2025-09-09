@@ -4,7 +4,8 @@
  */
 
 import { jest } from '@jest/globals';
-import { opsTool, type OpsConfig } from '@tools/ops/tool';
+import { opsTool } from '@tools/ops/tool';
+import type { OpsToolParams } from '@tools/ops/schema';
 import { createMockLogger } from '../../__support__/utilities/mock-factories';
 import { Success, Failure } from '@types';
 
@@ -28,12 +29,12 @@ describe('opsTool', () => {
 
   describe('ping operation', () => {
     it('should return pong response with server details', async () => {
-      const config: OpsConfig = {
+      const config: OpsToolParams = {
         operation: 'ping',
         message: 'test-ping',
       };
 
-      const result = await opsTool.execute(config, mockLogger);
+      const result = await opsTool(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -56,11 +57,11 @@ describe('opsTool', () => {
     });
 
     it('should use default message when none provided', async () => {
-      const config: OpsConfig = {
+      const config: OpsToolParams = {
         operation: 'ping',
       };
 
-      const result = await opsTool.execute(config, mockLogger);
+      const result = await opsTool(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -70,12 +71,12 @@ describe('opsTool', () => {
     });
 
     it('should log ping request', async () => {
-      const config: OpsConfig = {
+      const config: OpsToolParams = {
         operation: 'ping',
         message: 'test-message',
       };
 
-      await opsTool.execute(config, mockLogger);
+      await opsTool(config, { logger: mockLogger });
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         { message: 'test-message' },
@@ -86,12 +87,12 @@ describe('opsTool', () => {
 
   describe('status operation', () => {
     it('should return comprehensive server status', async () => {
-      const config: OpsConfig = {
+      const config: OpsToolParams = {
         operation: 'status',
         details: true,
       };
 
-      const result = await opsTool.execute(config, mockLogger);
+      const result = await opsTool(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -123,12 +124,12 @@ describe('opsTool', () => {
     });
 
     it('should handle status request without details', async () => {
-      const config: OpsConfig = {
+      const config: OpsToolParams = {
         operation: 'status',
         details: false,
       };
 
-      const result = await opsTool.execute(config, mockLogger);
+      const result = await opsTool(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockLogger.info).toHaveBeenCalledWith(
@@ -138,11 +139,11 @@ describe('opsTool', () => {
     });
 
     it('should log server status compilation', async () => {
-      const config: OpsConfig = {
+      const config: OpsToolParams = {
         operation: 'status',
       };
 
-      await opsTool.execute(config, mockLogger);
+      await opsTool(config, { logger: mockLogger });
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -162,7 +163,7 @@ describe('opsTool', () => {
         operation: 'invalid',
       } as any;
 
-      const result = await opsTool.execute(config, mockLogger);
+      const result = await opsTool(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -173,33 +174,24 @@ describe('opsTool', () => {
 
   describe('timer usage', () => {
     it('should end timer on successful ping', async () => {
-      const config: OpsConfig = {
+      const config: OpsToolParams = {
         operation: 'ping',
       };
 
-      await opsTool.execute(config, mockLogger);
+      await opsTool(config, { logger: mockLogger });
 
       expect(mockTimer.end).toHaveBeenCalled();
     });
 
     it('should end timer on successful status', async () => {
-      const config: OpsConfig = {
+      const config: OpsToolParams = {
         operation: 'status',
       };
 
-      await opsTool.execute(config, mockLogger);
+      await opsTool(config, { logger: mockLogger });
 
       expect(mockTimer.end).toHaveBeenCalled();
     });
   });
 
-  describe('tool structure', () => {
-    it('should have correct tool name', () => {
-      expect(opsTool.name).toBe('ops');
-    });
-
-    it('should have execute function', () => {
-      expect(typeof opsTool.execute).toBe('function');
-    });
-  });
 });

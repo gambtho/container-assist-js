@@ -16,12 +16,21 @@ import type {
   ScoringCriteria,
 } from './types';
 import type {
+  ScoredAnalysisVariant,
   AnalysisContext,
   AnalysisVariant,
   AnalysisScoringCriteria,
   AnalysisSamplingResult,
   AnalysisSamplingConfig,
 } from './analysis-types';
+
+interface ComparisonVariant {
+  strategy: string;
+  score: number;
+  strengths: string[];
+  weaknesses: string[];
+  recommendation: 'recommended' | 'acceptable' | 'not-recommended';
+}
 import { VariantGenerationPipeline } from './generation-pipeline';
 import { createMCPAIOrchestrator } from '@workflows/intelligent-orchestration';
 import { DEFAULT_SCORING_CRITERIA } from './scorer';
@@ -450,47 +459,51 @@ export function createAnalysisSampling(logger: Logger): AnalysisSampler {
         const scoredVariants = scoringResult.value;
 
         // Analyze each variant
-        const comparisonVariants = scoredVariants.map((variant: any) => {
-          const strengths: string[] = [];
-          const weaknesses: string[] = [];
+        const comparisonVariants: ComparisonVariant[] = scoredVariants.map(
+          (variant: ScoredAnalysisVariant) => {
+            const strengths: string[] = [];
+            const weaknesses: string[] = [];
 
-          // Analyze scores to determine strengths and weaknesses
-          if (variant.score.breakdown.accuracy >= 0.8) strengths.push('High accuracy analysis');
-          if (variant.score.breakdown.completeness >= 0.8) strengths.push('Comprehensive coverage');
-          if (variant.score.breakdown.relevance >= 0.8) strengths.push('Highly relevant insights');
-          if (variant.score.breakdown.actionability >= 0.8)
-            strengths.push('Clear actionable recommendations');
+            // Analyze scores to determine strengths and weaknesses
+            if (variant.score.breakdown.accuracy >= 80) strengths.push('High accuracy analysis');
+            if (variant.score.breakdown.completeness >= 80)
+              strengths.push('Comprehensive coverage');
+            if (variant.score.breakdown.relevance >= 80) strengths.push('Highly relevant insights');
+            if (variant.score.breakdown.actionability >= 80)
+              strengths.push('Clear actionable recommendations');
 
-          if (variant.score.breakdown.accuracy < 0.6) weaknesses.push('Lower accuracy');
-          if (variant.score.breakdown.completeness < 0.6) weaknesses.push('Limited coverage');
-          if (variant.score.breakdown.relevance < 0.6) weaknesses.push('Less relevant');
-          if (variant.score.breakdown.actionability < 0.6) weaknesses.push('Vague recommendations');
+            if (variant.score.breakdown.accuracy < 60) weaknesses.push('Lower accuracy');
+            if (variant.score.breakdown.completeness < 60) weaknesses.push('Limited coverage');
+            if (variant.score.breakdown.relevance < 60) weaknesses.push('Less relevant');
+            if (variant.score.breakdown.actionability < 60)
+              weaknesses.push('Vague recommendations');
 
-          // Determine recommendation level
-          let recommendation: 'recommended' | 'acceptable' | 'not-recommended';
-          if (variant.score.total >= 80) {
-            recommendation = 'recommended';
-          } else if (variant.score.total >= 60) {
-            recommendation = 'acceptable';
-          } else {
-            recommendation = 'not-recommended';
-          }
+            // Determine recommendation level
+            let recommendation: 'recommended' | 'acceptable' | 'not-recommended';
+            if (variant.score.total >= 80) {
+              recommendation = 'recommended';
+            } else if (variant.score.total >= 60) {
+              recommendation = 'acceptable';
+            } else {
+              recommendation = 'not-recommended';
+            }
 
-          return {
-            strategy: variant.strategy,
-            score: variant.score.total,
-            strengths,
-            weaknesses,
-            recommendation,
-          };
-        });
+            return {
+              strategy: variant.strategy,
+              score: variant.score.total,
+              strengths,
+              weaknesses,
+              recommendation,
+            };
+          },
+        );
 
         // Calculate summary statistics
-        const scores = scoredVariants.map((v: any) => v.score.total);
+        const scores = scoredVariants.map((v: ScoredAnalysisVariant) => v.score.total);
         const averageScore =
           scores.reduce((sum: number, score: number) => sum + score, 0) / scores.length;
         const recommendedCount = comparisonVariants.filter(
-          (v: any) => v.recommendation === 'recommended',
+          (v) => v.recommendation === 'recommended',
         ).length;
 
         const sortedVariants = [...comparisonVariants].sort((a, b) => b.score - a.score);

@@ -8,7 +8,6 @@ import { fixDockerfile as fixDockerfileTool } from '../../../src/tools/fix-docke
 import type { FixDockerfileParams } from '../../../src/tools/fix-dockerfile/schema';
 import { createMockLogger, createSuccessResult, createFailureResult } from '../../__support__/utilities/mock-infrastructure';
 import type { ToolContext, SamplingRequest, SamplingResponse, PromptWithMessages } from '../../../src/mcp/context/types';
-import type { ExtendedToolContext } from '../../../src/tools/shared-types';
 import { promises as fs } from 'node:fs';
 
 // Mock fs promises
@@ -40,11 +39,11 @@ const mockMCPHostAI = {
   fixContent: jest.fn(),
 };
 
-// Create mock ExtendedToolContext
+// Create mock ToolContext
 function createMockToolContext(
   responses: Record<string, string> = {},
   shouldFail = false
-): ExtendedToolContext {
+): ToolContext {
   return {
     logger: createMockLogger(),
     progressReporter: jest.fn(),
@@ -121,8 +120,6 @@ describe('fixDockerfileTool', () => {
   let config: FixDockerfileParams;
   let mockGetSession: jest.Mock;
   let mockUpdateSession: jest.Mock;
-  let mockResolveSession: jest.Mock;
-  let mockUpdateSessionData: jest.Mock;
 
   beforeEach(() => {
     mockLogger = createMockLogger();
@@ -136,8 +133,6 @@ describe('fixDockerfileTool', () => {
     const sessionHelpers = require('@mcp/tools/session-helpers');
     mockGetSession = sessionHelpers.getSession = jest.fn();
     mockUpdateSession = sessionHelpers.updateSession = jest.fn();
-    mockResolveSession = sessionHelpers.resolveSession = jest.fn();
-    mockUpdateSessionData = sessionHelpers.updateSessionData = jest.fn();
 
     // Reset all mocks
     jest.clearAllMocks();
@@ -160,22 +155,6 @@ describe('fixDockerfileTool', () => {
       },
     });
     mockUpdateSession.mockResolvedValue({ ok: true });
-    mockResolveSession.mockResolvedValue({
-      ok: true,
-      value: {
-        id: 'test-session-123',
-        state: {
-          sessionId: 'test-session-123',
-          analysis_result: { language: 'javascript', framework: 'express' },
-          dockerfile_result: { content: 'FROM node:latest\nCOPY . .\nRUN npm install' },
-          build_result: { error: 'npm install failed' },
-          metadata: {},
-          completed_steps: [],
-        },
-        isNew: false,
-      },
-    });
-    mockUpdateSessionData.mockResolvedValue({ ok: true });
     // Mock AI responses (legacy - for fallback compatibility)
     mockMCPHostAI.isAvailable = jest.fn().mockReturnValue(true);
     mockMCPHostAI.submitPrompt = jest.fn().mockResolvedValue({
@@ -246,7 +225,7 @@ describe('fixDockerfileTool', () => {
       const mockContext = createMockToolContext();
       await fixDockerfileTool(config, mockContext);
 
-      expect(mockUpdateSessionData).toHaveBeenCalledWith(
+      expect(mockUpdateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
           dockerfile_result: expect.objectContaining({
@@ -259,7 +238,6 @@ describe('fixDockerfileTool', () => {
             dockerfile_fixes: expect.any(Array),
           }),
         }),
-        expect.any(Object), // logger
         expect.any(Object)  // context
       );
     });
@@ -274,8 +252,8 @@ describe('fixDockerfileTool', () => {
         metadata: {},
       });
       
-      // Mock resolveSession to return session without dockerfile_result
-      mockResolveSession.mockResolvedValueOnce({
+      // Mock getSession to return session without dockerfile_result
+      mockGetSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -285,6 +263,7 @@ describe('fixDockerfileTool', () => {
             metadata: {},
             completed_steps: [],
           },
+          isNew: false,
         },
       });
       
@@ -327,8 +306,8 @@ describe('fixDockerfileTool', () => {
 
   describe('Session management', () => {
     it('should create new session if not exists', async () => {
-      // Mock resolveSession to simulate creating a new session
-      mockResolveSession.mockResolvedValueOnce({
+      // Mock getSession to simulate creating a new session
+      mockGetSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -338,6 +317,7 @@ describe('fixDockerfileTool', () => {
             metadata: {},
             completed_steps: [],
           },
+          isNew: true,
         },
       });
 
@@ -345,15 +325,7 @@ describe('fixDockerfileTool', () => {
       const result = await fixDockerfileTool(config, mockContext);
 
       expect(result.ok).toBe(true);
-      expect(mockResolveSession).toHaveBeenCalledWith(
-        expect.any(Object), // logger
-        mockContext,
-        expect.objectContaining({
-          sessionId: 'test-session-123',
-          defaultIdHint: 'fix-dockerfile',
-          createIfNotExists: true,
-        })
-      );
+      expect(mockGetSession).toHaveBeenCalledWith('test-session-123', mockContext);
     });
     
     it('should work with AI context and proper prompt integration', async () => {

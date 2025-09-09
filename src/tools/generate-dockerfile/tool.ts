@@ -405,8 +405,3 @@ async function generateDockerfileImpl(
  * Generate Dockerfile tool with selective progress reporting
  */
 export const generateDockerfile = generateDockerfileImpl;
-
-/**
- * Default export
- */
-export default generateDockerfile;

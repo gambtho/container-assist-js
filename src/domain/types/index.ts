@@ -1,16 +1,6 @@
 /**
  * Domain Types - Core exports
  *
- * Central export point for all domain types including ToolContext
+ * Central export point for all domain types
+ * ToolContext should now be imported directly from '@mcp/context/types'
  */
-
-// Re-export ToolContext from MCP types (main definition)
-export type {
-  ToolContext,
-  ToolContextFactory,
-  ToolContextConfig,
-  SamplingRequest,
-  SamplingResponse,
-  PromptWithMessages,
-  ProgressReporter,
-} from '../../mcp/context/types';

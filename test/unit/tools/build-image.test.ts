@@ -128,7 +128,7 @@ CMD ["node", "index.js"]`;
     });
 
     it('should successfully build Docker image with default settings', async () => {
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -150,7 +150,7 @@ CMD ["node", "index.js"]`;
         API_URL: 'https://api.example.com',
       };
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
@@ -168,7 +168,7 @@ CMD ["node", "index.js"]`;
     });
 
     it('should include default build arguments', async () => {
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
@@ -186,7 +186,7 @@ CMD ["node", "index.js"]`;
 
 
     it('should update session with build result', async () => {
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockSessionManager.update).toHaveBeenCalledWith('test-session-123', expect.objectContaining({
@@ -224,7 +224,7 @@ CMD ["node", "index.js"]`;
         .mockRejectedValueOnce(new Error('Original Dockerfile not found'))
         .mockResolvedValueOnce(undefined); // Generated Dockerfile exists
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
@@ -248,7 +248,7 @@ CMD ["node", "index.js"]`;
       // Mock both original and generated Dockerfiles not found
       mockFs.access.mockRejectedValue(new Error('Dockerfile not found'));
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockFs.writeFile).toHaveBeenCalledWith(
@@ -282,7 +282,7 @@ CMD ["node", "index.js"]`;
         DB_TOKEN: 'token456',
       };
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -313,7 +313,7 @@ USER appuser`;
 
       mockFs.readFile.mockResolvedValue(dockerfileWithSudo);
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -341,7 +341,7 @@ USER appuser`;
 
       mockFs.readFile.mockResolvedValue(dockerfileWithLatest);
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -370,7 +370,7 @@ CMD ["node", "index.js"]`;
 
       mockFs.readFile.mockResolvedValue(dockerfileWithoutUser);
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -400,7 +400,7 @@ CMD ["node", "index.js"]`;
 
       mockFs.readFile.mockResolvedValue(dockerfileWithRootUser);
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -425,7 +425,7 @@ CMD ["node", "index.js"]`;
       "updatedAt": "2025-09-08T11:12:40.362Z"
 });
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(mockSessionManager.get).toHaveBeenCalledWith('test-session-123');
       expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
@@ -442,7 +442,7 @@ CMD ["node", "index.js"]`;
 
       mockFs.access.mockRejectedValue(new Error('Dockerfile not found'));
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -466,7 +466,7 @@ CMD ["node", "index.js"]`;
         createFailureResult('Docker build failed: syntax error')
       );
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -488,7 +488,7 @@ CMD ["node", "index.js"]`;
 
       mockFs.readFile.mockRejectedValue(new Error('Permission denied'));
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -510,7 +510,7 @@ CMD ["node", "index.js"]`;
 
       mockDockerClient.buildImage.mockRejectedValue(new Error('Docker daemon not running'));
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -537,7 +537,7 @@ CMD ["node", "index.js"]`;
     });
 
     it('should include language and framework from analysis', async () => {
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
@@ -556,7 +556,7 @@ CMD ["node", "index.js"]`;
         BUILD_DATE: '2023-01-01',
       };
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
@@ -580,7 +580,7 @@ CMD ["node", "index.js"]`;
         },
       });
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
@@ -620,7 +620,7 @@ CMD ["node", "index.js"]`;
         },
       });
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(
@@ -650,7 +650,7 @@ CMD ["node", "index.js"]`;
         },
       });
 
-      const result = await buildImage(config, { logger: mockLogger });
+      const result = await buildImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockDockerClient.buildImage).toHaveBeenCalledWith(

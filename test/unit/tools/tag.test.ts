@@ -5,7 +5,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { tagImage, type TagImageConfig } from '../../../src/tools/tag-image/tool';
+import { tagImage, type TagImageParams } from '../../../src/tools/tag-image/tool';
 import { createMockLogger, createSuccessResult, createFailureResult } from '../../__support__/utilities/mock-infrastructure';
 
 // Mock lib modules following analyze-repo pattern
@@ -46,9 +46,12 @@ jest.mock('@lib/logger', () => ({
   createLogger: jest.fn(() => createMockLogger()),
 }));
 
+// Mock session helpers
+jest.mock('@mcp/tools/session-helpers');
+
 describe('tagImage', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
-  let config: TagImageConfig;
+  let config: TagImageParams;
 
   beforeEach(() => {
     mockLogger = createMockLogger();
@@ -59,8 +62,35 @@ describe('tagImage', () => {
 
     // Reset all mocks
     jest.clearAllMocks();
+    
+    // Setup session helper mocks
+    const sessionHelpers = require('@mcp/tools/session-helpers');
+    sessionHelpers.getSession = jest.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        id: 'test-session-123',
+        state: {
+          sessionId: 'test-session-123',
+          build_result: {
+            imageId: 'sha256:mock-image-id',
+            context: '/test/repo',
+          },
+          workflow_state: {
+            build_result: {
+              imageId: 'sha256:mock-image-id',
+              context: '/test/repo',
+            },
+          },
+          metadata: {},
+          completed_steps: [],
+        },
+        isNew: false,
+      },
+    });
+    sessionHelpers.updateSession = jest.fn().mockResolvedValue({ ok: true });
     mockSessionManager.update.mockResolvedValue(true);
   });
+
 
   describe('Successful Tagging Operations', () => {
     beforeEach(() => {
@@ -80,7 +110,10 @@ describe('tagImage', () => {
       });
 
       // Default successful tag result
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
+      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
+        success: true,
+        imageId: 'sha256:mock-image-id'
+      }));
     });
 
     it('should successfully tag image with repository and tag', async () => {
@@ -98,7 +131,8 @@ describe('tagImage', () => {
       expect(mockDockerClient.tagImage).toHaveBeenCalledWith('sha256:mock-image-id', 'myapp', 'v1.0');
       
       // Verify session was updated with tag information
-      expect(mockSessionManager.update).toHaveBeenCalledWith(
+      const sessionHelpers = require('@mcp/tools/session-helpers');
+      expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
           build_result: expect.objectContaining({
@@ -106,7 +140,8 @@ describe('tagImage', () => {
             tags: ['myapp:v1.0'],
           }),
           completed_steps: expect.arrayContaining(['tag']),
-        })
+        }),
+        expect.any(Object)
       );
 
       // Verify timer was used correctly
@@ -155,35 +190,44 @@ describe('tagImage', () => {
         );
 
         // Reset mocks for next iteration
-        jest.clearAllMocks();
-        mockSessionManager.update.mockResolvedValue(true);
-        mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
+        mockDockerClient.tagImage.mockClear();
+        mockSessionManager.update.mockClear();
       }
     });
 
     it('should preserve existing build result data when updating session', async () => {
-      mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
-            context: '/test/repo',
-            dockerfile: 'Dockerfile',
-            size: 1024000,
+      const sessionHelpers = require('@mcp/tools/session-helpers');
+      sessionHelpers.getSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            build_result: {
+              imageId: 'sha256:mock-image-id',
+              context: '/test/repo',
+              dockerfile: 'Dockerfile',
+              size: 1024000,
+            },
+            workflow_state: {
+              build_result: {
+                imageId: 'sha256:mock-image-id',
+                context: '/test/repo',
+                dockerfile: 'Dockerfile',
+                size: 1024000,
+              },
+            },
+            metadata: {},
+            completed_steps: [],
           },
+          isNew: false,
         },
-        build_result: {
-          imageId: 'sha256:mock-image-id',
-          context: '/test/repo',
-          dockerfile: 'Dockerfile',
-          size: 1024000,
-        },
-        repo_path: '/test/repo',
       });
 
       const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
-      expect(mockSessionManager.update).toHaveBeenCalledWith(
+      expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
           build_result: expect.objectContaining({
@@ -194,10 +238,12 @@ describe('tagImage', () => {
             tags: ['myapp:v1.0'], // New tags added
           }),
           completed_steps: expect.arrayContaining(['tag']),
-        })
+        }),
+        expect.any(Object)
       );
     });
   });
+
 
   describe('Tag Format Validation', () => {
     beforeEach(() => {
@@ -213,7 +259,10 @@ describe('tagImage', () => {
         repo_path: '/test/repo',
       });
 
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
+      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
+        success: true,
+        imageId: 'sha256:mock-image-id'
+      }));
     });
 
     it('should handle various valid tag formats', async () => {
@@ -238,9 +287,8 @@ describe('tagImage', () => {
         }
 
         // Reset mocks for next iteration
-        jest.clearAllMocks();
-        mockSessionManager.update.mockResolvedValue(true);
-        mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
+        mockDockerClient.tagImage.mockClear();
+        mockSessionManager.update.mockClear();
       }
     });
 
@@ -266,37 +314,53 @@ describe('tagImage', () => {
         );
 
         // Reset mocks for next iteration
-        jest.clearAllMocks();
-        mockSessionManager.update.mockResolvedValue(true);
-        mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
+        mockDockerClient.tagImage.mockClear();
+        mockSessionManager.update.mockClear();
       }
     });
   });
 
+
   describe('Error Handling', () => {
     it('should auto-create session when not found', async () => {
-      mockSessionManager.get.mockResolvedValue(null);
-      mockSessionManager.create.mockResolvedValue({
-      "sessionId": "test-session-123",
-      "workflow_state": {},
-      "metadata": {},
-      "completed_steps": [],
-      "errors": {},
-      "current_step": null,
-      "createdAt": "2025-09-08T11:12:40.362Z",
-      "updatedAt": "2025-09-08T11:12:40.362Z"
-});
+      const sessionHelpers = require('@mcp/tools/session-helpers');
+      sessionHelpers.getSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            build_result: {
+              imageId: 'sha256:mock-image-id',
+              context: '/test/repo',
+            },
+            workflow_state: {},
+            metadata: {},
+            completed_steps: [],
+          },
+          isNew: true, // Indicates new session
+        },
+      });
 
       const result = await tagImage(config, { logger: mockLogger });
 
-      expect(mockSessionManager.get).toHaveBeenCalledWith('test-session-123');
-      expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
+      expect(sessionHelpers.getSession).toHaveBeenCalledWith('test-session-123', expect.any(Object));
     });
 
     it('should return error when no build result exists', async () => {
-      mockSessionManager.get.mockResolvedValue({
-        workflow_state: {},
-        repo_path: '/test/repo',
+      const sessionHelpers = require('@mcp/tools/session-helpers');
+      sessionHelpers.getSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            workflow_state: {},
+            metadata: {},
+            completed_steps: [],
+          },
+          isNew: false,
+        },
       });
 
       const result = await tagImage(config, { logger: mockLogger });
@@ -308,18 +372,23 @@ describe('tagImage', () => {
     });
 
     it('should return error when build result has no imageId', async () => {
-      mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            context: '/test/repo',
-            // No imageId
+      const sessionHelpers = require('@mcp/tools/session-helpers');
+      sessionHelpers.getSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            build_result: {
+              context: '/test/repo',
+              // No imageId
+            },
+            workflow_state: {},
+            metadata: {},
+            completed_steps: [],
           },
+          isNew: false,
         },
-        build_result: {
-          context: '/test/repo',
-          // No imageId
-        },
-        repo_path: '/test/repo',
       });
 
       const result = await tagImage(config, { logger: mockLogger });
@@ -429,20 +498,33 @@ describe('tagImage', () => {
     });
 
     it('should handle session update failures gracefully', async () => {
-      mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          build_result: {
-            imageId: 'sha256:mock-image-id',
+      const sessionHelpers = require('@mcp/tools/session-helpers');
+      sessionHelpers.getSession.mockResolvedValue({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            build_result: {
+              imageId: 'sha256:mock-image-id',
+            },
+            workflow_state: {
+              build_result: {
+                imageId: 'sha256:mock-image-id',
+              },
+            },
+            metadata: {},
+            completed_steps: [],
           },
+          isNew: false,
         },
-        build_result: {
-          imageId: 'sha256:mock-image-id',
-        },
-        repo_path: '/test/repo',
       });
 
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
-      mockSessionManager.update.mockRejectedValue(new Error('Failed to update session state'));
+      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
+        success: true,
+        imageId: 'sha256:mock-image-id'
+      }));
+      sessionHelpers.updateSession.mockResolvedValue({ ok: false, error: 'Failed to update session state' });
 
       const result = await tagImage(config, { logger: mockLogger });
 
@@ -455,9 +537,13 @@ describe('tagImage', () => {
     });
   });
 
+
   describe('Session State Management', () => {
     beforeEach(() => {
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
+      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
+        success: true,
+        imageId: 'sha256:mock-image-id'
+      }));
     });
 
     it('should handle workflow state with existing data', async () => {
@@ -482,7 +568,8 @@ describe('tagImage', () => {
       const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
-      expect(mockSessionManager.update).toHaveBeenCalledWith(
+      const sessionHelpers = require('@mcp/tools/session-helpers');
+      expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
           build_result: expect.objectContaining({
@@ -491,7 +578,8 @@ describe('tagImage', () => {
             tags: ['myapp:v1.0'], // Added
           }),
           completed_steps: expect.arrayContaining(['tag']),
-        })
+        }),
+        expect.any(Object)
       );
     });
 
@@ -511,7 +599,8 @@ describe('tagImage', () => {
       const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
-      expect(mockSessionManager.update).toHaveBeenCalledWith(
+      const sessionHelpers = require('@mcp/tools/session-helpers');
+      expect(sessionHelpers.updateSession).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
           build_result: expect.objectContaining({
@@ -519,10 +608,12 @@ describe('tagImage', () => {
             tags: ['myapp:v1.0'],
           }),
           completed_steps: expect.arrayContaining(['tag']),
-        })
+        }),
+        expect.any(Object)
       );
     });
   });
+
 
   describe('Multiple Tagging Scenarios', () => {
     beforeEach(() => {
@@ -538,7 +629,10 @@ describe('tagImage', () => {
         repo_path: '/test/repo',
       });
 
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
+      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
+        success: true,
+        imageId: 'sha256:mock-image-id'
+      }));
     });
 
     it('should handle tagging with different configurations', async () => {
@@ -549,7 +643,27 @@ describe('tagImage', () => {
       ];
 
       for (const testConfig of configurations) {
-        const result = await tagImage(testConfig, mockLogger);
+        // Setup session for each different sessionId
+        const sessionHelpers = require('@mcp/tools/session-helpers');
+        sessionHelpers.getSession.mockResolvedValue({
+          ok: true,
+          value: {
+            id: testConfig.sessionId,
+            state: {
+              sessionId: testConfig.sessionId,
+              build_result: {
+                imageId: 'sha256:mock-image-id',
+                context: '/test/repo',
+              },
+              workflow_state: {},
+              metadata: {},
+              completed_steps: [],
+            },
+            isNew: false,
+          },
+        });
+        
+        const result = await tagImage(testConfig, { logger: mockLogger });
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -558,9 +672,9 @@ describe('tagImage', () => {
         }
 
         // Reset mocks for next iteration
-        jest.clearAllMocks();
-        mockSessionManager.update.mockResolvedValue(true);
-        mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
+        mockDockerClient.tagImage.mockClear();
+        sessionHelpers.getSession.mockClear();
+        sessionHelpers.updateSession.mockClear();
       }
     });
 
@@ -584,12 +698,12 @@ describe('tagImage', () => {
         );
 
         // Reset mocks for next iteration
-        jest.clearAllMocks();
-        mockSessionManager.update.mockResolvedValue(true);
-        mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
+        mockDockerClient.tagImage.mockClear();
+        mockSessionManager.update.mockClear();
       }
     });
   });
+
 
   describe('Tool Instance', () => {
     it('should provide correctly configured tool instance', async () => {
@@ -611,10 +725,13 @@ describe('tagImage', () => {
         repo_path: '/test/repo',
       });
 
-      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
+      mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({
+        success: true,
+        imageId: 'sha256:mock-image-id'
+      }));
 
       // The wrapped tool can be called directly with params and context
-      const result = await tagImageTool(config, {});
+      const result = await tagImageTool(config, { logger: mockLogger });
       expect(result.ok).toBe(true);
     });
   });

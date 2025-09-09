@@ -17,23 +17,7 @@ import {
   // updateWorkflowState, // Not used directly
   // type WorkflowState, // Not used directly
 } from '../../domain/types';
-import { z } from 'zod';
-
-// Schema definition (consolidated from schema.ts)
-export const pushImageSchema = z.object({
-  sessionId: z.string().optional().describe('Session identifier for tracking operations'),
-  imageId: z.string().optional().describe('Docker image ID to push'),
-  registry: z.string().optional().describe('Target registry URL'),
-  credentials: z
-    .object({
-      username: z.string(),
-      password: z.string(),
-    })
-    .optional()
-    .describe('Registry credentials'),
-});
-
-export type PushImageParams = z.infer<typeof pushImageSchema>;
+import type { PushImageParams } from './schema';
 
 export interface PushImageResult {
   success: boolean;
@@ -158,8 +142,3 @@ async function pushImageImpl(
  * Push image tool
  */
 export const pushImage = pushImageImpl;
-
-/**
- * Default export
- */
-export default pushImage;

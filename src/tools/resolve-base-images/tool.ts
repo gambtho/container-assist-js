@@ -185,8 +185,3 @@ async function resolveBaseImagesImpl(
  * Resolve base images tool
  */
 export const resolveBaseImages = resolveBaseImagesImpl;
-
-/**
- * Default export
- */
-export default resolveBaseImages;

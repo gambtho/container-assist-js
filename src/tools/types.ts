@@ -2,8 +2,7 @@
  * Shared types for tools to prevent circular dependencies
  */
 
-// Re-export ToolContext from main definition
-export type { ToolContext } from '../mcp/context/types';
+// ToolContext should now be imported directly from '@mcp/context/types'
 
 export interface AnalyzeRepoResult {
   ok: boolean;

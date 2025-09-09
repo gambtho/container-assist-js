@@ -533,9 +533,11 @@ export const containerizationWorkflow = {
   ) => {
     // The context from MCP server needs to be properly structured as ToolContext
     const toolContext = context as unknown as ToolContext;
-    return runContainerizationWorkflow(params, toolContext, {
-      abortSignal: (context as any)?.abortSignal,
-    });
+    const options: { abortSignal?: AbortSignal } = {};
+    if (toolContext?.signal) {
+      options.abortSignal = toolContext.signal;
+    }
+    return runContainerizationWorkflow(params, toolContext, options);
   },
   schema: {
     type: 'object',

@@ -362,8 +362,3 @@ async function fixDockerfileImpl(
  * Fix dockerfile tool with selective progress reporting
  */
 export const fixDockerfile = fixDockerfileImpl;
-
-/**
- * Default export
- */
-export default fixDockerfile;

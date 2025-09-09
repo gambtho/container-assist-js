@@ -6,8 +6,10 @@
  */
 
 import * as os from 'os';
-import { createTimer, type Logger } from '../../lib/logger';
+import { createTimer } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
+import type { ToolContext } from '../../mcp/context/types';
+import type { OpsToolParams } from './schema';
 
 interface PingConfig {
   message?: string;
@@ -33,13 +35,13 @@ interface PingResult {
 /**
  * Ping operation - test server connectivity
  */
-async function ping(config: PingConfig, logger: Logger): Promise<Result<PingResult>> {
-  const timer = createTimer(logger, 'ops-ping');
+async function ping(config: PingConfig, context: ToolContext): Promise<Result<PingResult>> {
+  const timer = createTimer(context.logger, 'ops-ping');
 
   try {
     const { message = 'ping' } = config;
 
-    logger.info({ message }, 'Processing ping request');
+    context.logger.info({ message }, 'Processing ping request');
 
     const result: PingResult = {
       success: true,
@@ -62,7 +64,7 @@ async function ping(config: PingConfig, logger: Logger): Promise<Result<PingResu
     return Success(result);
   } catch (error) {
     timer.error(error);
-    logger.error({ error }, 'Ping failed');
+    context.logger.error({ error }, 'Ping failed');
     return Failure(error instanceof Error ? error.message : String(error));
   }
 }
@@ -103,14 +105,14 @@ interface ServerStatusResult {
  */
 async function serverStatus(
   config: ServerStatusConfig,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<ServerStatusResult>> {
-  const timer = createTimer(logger, 'ops-server-status');
+  const timer = createTimer(context.logger, 'ops-server-status');
 
   try {
     const { details = false } = config;
 
-    logger.info({ details }, 'Server status requested');
+    context.logger.info({ details }, 'Server status requested');
 
     const uptime = Math.floor(process.uptime());
     const version = '2.0.0';
@@ -150,7 +152,7 @@ async function serverStatus(
       },
     };
 
-    logger.info(
+    context.logger.info(
       {
         uptime,
         memoryUsed: usedMem,
@@ -164,7 +166,7 @@ async function serverStatus(
     return Success(status);
   } catch (error) {
     timer.error(error);
-    logger.error({ error }, 'Error collecting server status');
+    context.logger.error({ error }, 'Error collecting server status');
     return Failure(error instanceof Error ? error.message : String(error));
   }
 }
@@ -181,26 +183,23 @@ export type OpsResult = PingResult | ServerStatusResult;
 /**
  * Main ops function that delegates to specific operations
  */
-async function ops(config: OpsConfig, logger: Logger): Promise<Result<OpsResult>> {
-  const { operation } = config;
+async function opsImpl(params: OpsToolParams, context: ToolContext): Promise<Result<OpsResult>> {
+  const { operation } = params;
 
   switch (operation) {
     case 'ping':
-      return ping({ ...(config.message !== undefined && { message: config.message }) }, logger);
+      return ping({ ...(params.message !== undefined && { message: params.message }) }, context);
     case 'status':
       return serverStatus(
-        { ...(config.details !== undefined && { details: config.details }) },
-        logger,
+        { ...(params.details !== undefined && { details: params.details }) },
+        context,
       );
     default:
-      return Failure(`Unknown operation: ${config.operation}`);
+      return Failure(`Unknown operation: ${params.operation}`);
   }
 }
 
 /**
- * Ops tool instance
+ * Export the ops tool directly
  */
-export const opsTool = {
-  name: 'ops',
-  execute: (config: OpsConfig, logger: Logger) => ops(config, logger),
-};
+export const opsTool = opsImpl;

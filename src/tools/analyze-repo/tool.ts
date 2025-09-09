@@ -30,7 +30,6 @@ import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import type { AnalyzeRepoParams } from './schema';
 import { DEFAULT_PORTS } from '../../config/defaults';
-import { applyAnalysisPerspective, selectBestPerspective } from '../analysis-perspectives';
 import type { AnalyzeRepoResult } from '../types';
 
 // Re-export for backward compatibility
@@ -541,30 +540,6 @@ async function analyzeRepoImpl(
     // Progress: Finalizing results
     if (progress) await progress('FINALIZING');
 
-    // Apply perspective enhancement if requested
-    if ((params as any).usePerspectives) {
-      const selectedPerspective = (params as any).perspective || selectBestPerspective(result, {});
-
-      const perspectiveResult = applyAnalysisPerspective(result, selectedPerspective, logger);
-      if (perspectiveResult.ok) {
-        timer.end({ language: languageInfo.language, perspective: selectedPerspective });
-        logger.info(
-          {
-            language: languageInfo.language,
-            perspective: selectedPerspective,
-          },
-          'Repository analysis completed with perspective',
-        );
-
-        return Success(perspectiveResult.value);
-      } else {
-        logger.warn(
-          { error: perspectiveResult.error },
-          'Failed to apply perspective, returning base analysis',
-        );
-      }
-    }
-
     timer.end({ language: languageInfo.language });
     logger.info({ language: languageInfo.language }, 'Repository analysis completed');
 
@@ -584,8 +559,3 @@ async function analyzeRepoImpl(
  * Analyze repository tool with selective progress reporting
  */
 export const analyzeRepo = analyzeRepoImpl;
-
-/**
- * Default export
- */
-export default analyzeRepo;

@@ -1,38 +1,26 @@
 /**
- * Core Types - TypeScript Structure
- *
- * All type definitions from src/types/* subdirectories
- * for easier imports and better IDE navigation.
+ * Core type definitions for the containerization assist system.
+ * Provides Result type for error handling and tool system interfaces.
  */
 
 import type { Logger } from 'pino';
 import type { ToolContext } from '../mcp/context/types';
 
-// ===== RESULT TYPE SYSTEM =====
-
 /**
- * Result type - simple discriminated union for error handling
+ * Result type for functional error handling.
+ * Use instead of throwing exceptions.
  */
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
-/**
- * Create a success result
- */
+/** Create a success result */
 export const Success = <T>(value: T): Result<T> => ({ ok: true, value });
 
-/**
- * Create a failure result
- */
+/** Create a failure result */
 export const Failure = <T>(error: string): Result<T> => ({ ok: false, error });
 
-/**
- * Type guard to check if result is a failure
- */
+/** Type guard to check if result is a failure */
 export const isFail = <T>(result: Result<T>): result is { ok: false; error: string } => !result.ok;
 
-// ===== TOOL SYSTEM =====
-
-// Re-export ToolContext types for easier imports
 export type {
   ToolContext,
   TextMessage,
@@ -74,16 +62,6 @@ export interface TagImageParams {
   registry?: string;
 }
 
-export interface ToolExecution {
-  toolName: string;
-  params: Record<string, unknown>;
-  result?: Result<unknown>;
-  error?: Error;
-  startTime: Date;
-  endTime?: Date;
-  duration?: number;
-}
-
 // ===== SESSION & WORKFLOW =====
 
 /**
@@ -118,19 +96,6 @@ export interface SessionManager {
    * @returns Promise resolving to Result with deletion success status
    */
   deleteSession(id: string): Promise<Result<boolean>>;
-
-  /** Retrieves tool execution history for a session */
-  getToolHistory?(sessionId: string): Promise<ToolExecution[]>;
-  /** Gets current session state */
-  getState?(sessionId: string): Promise<WorkflowState>;
-  /** Records a tool execution in session history */
-  addToolExecution?(sessionId: string, execution: ToolExecution): Promise<void>;
-  /** Tracks tool execution start */
-  trackToolStart?(sessionId: string, toolName: string): Promise<void>;
-  /** Tracks tool execution completion */
-  trackToolEnd?(sessionId: string, toolName: string, result: Result<unknown>): Promise<void>;
-  /** Tracks tool execution errors */
-  trackToolError?(sessionId: string, toolName: string, error: Error): Promise<void>;
 }
 
 /**
@@ -157,74 +122,16 @@ export interface WorkflowState {
   [key: string]: unknown;
 }
 
-/**
- * Merges workflow state updates into existing state.
- * @param state - Current workflow state
- * @param updates - State updates to apply
- * @returns Merged workflow state
- */
-export function updateWorkflowState(
-  state: Record<string, unknown>,
-  updates: Record<string, unknown>,
-): Record<string, unknown> {
-  return { ...state, ...updates };
-}
-
 // ===== AI SERVICE TYPES =====
-
-export interface AIAnalysis {
-  summary?: string;
-  insights?: string[];
-  recommendations: string[];
-  issues?: Array<{
-    type: 'security' | 'performance' | 'maintainability' | 'style';
-    severity: 'low' | 'medium' | 'high';
-    message: string;
-    line?: number;
-    suggestion?: string;
-  }>;
-  score?: number;
-  metadata?: {
-    confidence?: number;
-    processingTime?: number;
-    model?: string;
-    [key: string]: unknown;
-  };
-}
-
-export interface ValidationResult {
-  isValid: boolean;
-  errors?: string[];
-  warnings?: string[];
-  suggestions?: string[];
-}
 
 export interface AIService {
   isAvailable(): boolean;
   generateResponse(prompt: string, context?: Record<string, unknown>): Promise<Result<string>>;
-  analyzeCode(code: string, language: string): Promise<Result<AIAnalysis>>;
+  analyzeCode(code: string, language: string): Promise<Result<unknown>>;
   enhanceDockerfile(
     dockerfile: string,
     requirements?: Record<string, unknown>,
   ): Promise<Result<string>>;
-  validateParameters?(params: Record<string, unknown>): Promise<Result<ValidationResult>>;
-  analyzeResults?(results: unknown): Promise<Result<AIAnalysis>>;
-}
-
-export interface ToolParameters {
-  sessionId?: string;
-  [key: string]: unknown;
-}
-
-export interface ToolResult {
-  success: boolean;
-  data?: unknown;
-  error?: string;
-  metadata?: Record<string, unknown>;
-}
-
-export interface MetricsCollector {
-  recordToolExecution(toolName: string, duration: number, success: boolean): void;
-  recordError(toolName: string, error: string): void;
-  getMetrics(): Record<string, unknown>;
+  validateParameters?(params: Record<string, unknown>): Promise<Result<unknown>>;
+  analyzeResults?(results: unknown): Promise<Result<unknown>>;
 }

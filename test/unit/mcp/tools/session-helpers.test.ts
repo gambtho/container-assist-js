@@ -12,7 +12,7 @@ import {
 } from '@mcp/tools/session-helpers';
 import type { SessionManager } from '@lib/session';
 import type { WorkflowState } from '@domain/types';
-import type { ExtendedToolContext } from '@tools/shared-types';
+import type { ToolContext } from '@mcp/context/types';
 
 // Mock the session module
 jest.mock('@lib/session');
@@ -52,13 +52,15 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
-// Mock context
-const context: ExtendedToolContext = {
-  logger: mockLogger,
-  sessionManager,
-  getPrompt: jest.fn(),
-  sampling: jest.fn(),
-} as any;
+// Helper to create context with sessionManager
+function createContext(): ToolContext {
+  return {
+    logger: mockLogger,
+    sessionManager,
+    getPrompt: jest.fn(),
+    sampling: jest.fn(),
+  } as any;
+}
 
 // Default session state
 const defaultState: WorkflowState = {
@@ -81,7 +83,7 @@ describe('Session Helpers', () => {
         sessionId: 'existing-session'
       });
       
-      const result = await getSession('existing-session', context);
+      const result = await getSession('existing-session', createContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -99,7 +101,7 @@ describe('Session Helpers', () => {
         sessionId: 'new-session'
       });
       
-      const result = await getSession('new-session', context);
+      const result = await getSession('new-session', createContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -116,7 +118,7 @@ describe('Session Helpers', () => {
         sessionId: id
       }));
       
-      const result = await getSession(undefined, context);
+      const result = await getSession(undefined, createContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -126,22 +128,12 @@ describe('Session Helpers', () => {
       }
     });
 
-    it('should create session manager if not in context', async () => {
-      const sessionModule = require('@lib/session');
-      sessionModule.createSessionManager.mockReturnValue(sessionManager);
-      
-      sessionManager.get.mockResolvedValue(null);
-      sessionManager.create.mockResolvedValue({
-        ...defaultState,
-        sessionId: 'test-session'
-      });
-      
+    it('should return error when session manager not in context', async () => {
       const result = await getSession('test-session', undefined);
 
-      // Should still work with a new session manager
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.id).toBe('test-session');
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('Session manager not found in context');
       }
     });
   });
@@ -157,7 +149,7 @@ describe('Session Helpers', () => {
       sessionManager.get.mockResolvedValue(existingState);
       sessionManager.update.mockResolvedValue(true);
       
-      const result = await completeStep('test-session', 'step2', context);
+      const result = await completeStep('test-session', 'step2', createContext());
 
       expect(result.ok).toBe(true);
       expect(sessionManager.update).toHaveBeenCalledWith(
@@ -178,7 +170,7 @@ describe('Session Helpers', () => {
       sessionManager.get.mockResolvedValue(existingState);
       sessionManager.update.mockResolvedValue(true);
       
-      const result = await completeStep('test-session', 'step2', context);
+      const result = await completeStep('test-session', 'step2', createContext());
 
       expect(result.ok).toBe(true);
       expect(sessionManager.update).toHaveBeenCalledWith(
@@ -192,7 +184,7 @@ describe('Session Helpers', () => {
     it('should fail for non-existent session', async () => {
       sessionManager.get.mockResolvedValue(null);
       
-      const result = await completeStep('missing-session', 'step1', context);
+      const result = await completeStep('missing-session', 'step1', createContext());
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -209,7 +201,7 @@ describe('Session Helpers', () => {
         workflow_state: { test: 'data' }
       });
       
-      const result = await createSession('new-session', context);
+      const result = await createSession('new-session', createContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -224,7 +216,7 @@ describe('Session Helpers', () => {
         sessionId: id
       }));
       
-      const result = await createSession(undefined, context);
+      const result = await createSession(undefined, createContext());
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -247,7 +239,7 @@ describe('Session Helpers', () => {
       const result = await updateSession(
         'test-session',
         { new: 'data' },
-        context
+        createContext()
       );
 
       expect(result.ok).toBe(true);
@@ -266,7 +258,7 @@ describe('Session Helpers', () => {
       const result = await updateSession(
         'test-session',
         { test: 'data' },
-        context
+        createContext()
       );
 
       expect(result.ok).toBe(false);
@@ -281,7 +273,7 @@ describe('Session Helpers', () => {
       const result = await updateSession(
         'missing-session',
         { test: 'data' },
-        context
+        createContext()
       );
 
       expect(result.ok).toBe(false);

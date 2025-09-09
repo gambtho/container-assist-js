@@ -7,7 +7,7 @@
 import { program } from 'commander';
 import { MCPServer } from '../mcp/server';
 import { createContainer, getContainerStatus } from '../app/container';
-import { createConfig, logConfigSummaryIfDev } from '../config/index';
+import { config, logConfigSummaryIfDev } from '../config/index';
 import { createLogger } from '../lib/logger';
 import { exit, argv, env, cwd } from 'node:process';
 import { execSync } from 'node:child_process';
@@ -309,8 +309,7 @@ async function main(): Promise<void> {
     if (options.k8sNamespace) process.env.K8S_NAMESPACE = options.k8sNamespace;
     if (options.dev) process.env.NODE_ENV = 'development';
 
-    // Create configuration (reads from environment)
-    const config = createConfig();
+    // Configuration is imported from config module
 
     // Log configuration summary in development mode
     logConfigSummaryIfDev();

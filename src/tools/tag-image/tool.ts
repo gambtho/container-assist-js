@@ -11,16 +11,7 @@ import type { ToolContext } from '../../mcp/context/types';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
-import { z } from 'zod';
-
-// Schema definition (consolidated from schema.ts)
-export const tagImageSchema = z.object({
-  sessionId: z.string().optional().describe('Session identifier for tracking operations'),
-  imageId: z.string().optional().describe('Docker image ID to tag'),
-  tag: z.string().optional().describe('New tag to apply'),
-});
-
-export type TagImageParams = z.infer<typeof tagImageSchema>;
+import type { TagImageParams } from './schema';
 
 export interface TagImageResult {
   success: boolean;
@@ -128,8 +119,3 @@ async function tagImageImpl(
  * Tag image tool
  */
 export const tagImage = tagImageImpl;
-
-/**
- * Default export
- */
-export default tagImage;
