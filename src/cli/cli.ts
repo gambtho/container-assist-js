@@ -309,7 +309,6 @@ async function main(): Promise<void> {
     if (options.k8sNamespace) process.env.K8S_NAMESPACE = options.k8sNamespace;
     if (options.dev) process.env.NODE_ENV = 'development';
 
-    // Configuration is imported from config module
 
     // Log configuration summary in development mode
     logConfigSummaryIfDev();
