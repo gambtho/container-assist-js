@@ -49,19 +49,20 @@ const mockDockerClient = {
   buildImage: jest.fn(),
 };
 
-jest.mock('../../../src/lib/session', () => ({
+jest.mock('@lib/session', () => ({
   createSessionManager: jest.fn(() => mockSessionManager),
 }));
 
-jest.mock('../../../src/lib/docker', () => ({
+jest.mock('@lib/docker', () => ({
   createDockerClient: jest.fn(() => mockDockerClient),
 }));
 
-jest.mock('../../../src/lib/logger', () => ({
+jest.mock('@lib/logger', () => ({
   createTimer: jest.fn(() => ({
     end: jest.fn(),
     error: jest.fn(),
   })),
+  createLogger: jest.fn(() => createMockLogger()),
 }));
 
 const mockFs = fs as jest.Mocked<typeof fs>;
@@ -112,11 +113,9 @@ CMD ["node", "index.js"]`;
   describe('Successful Build', () => {
     beforeEach(() => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: {
-            language: 'javascript',
-            framework: 'express',
-          },
+        analysis_result: {
+          language: 'javascript',
+          framework: 'express',
         },
         repo_path: '/test/repo',
         dockerfile_result: {
@@ -190,31 +189,27 @@ CMD ["node", "index.js"]`;
       const result = await buildImage(config, mockLogger);
 
       expect(result.ok).toBe(true);
-      expect(mockSessionManager.update).toHaveBeenCalledWith('test-session-123', {
-        workflow_state: expect.objectContaining({
-          build_result: {
-            success: true,
-            imageId: 'sha256:mock-image-id',
-            tags: ['myapp:latest', 'myapp:v1.0'],
-            size: 123456789,
-            metadata: expect.objectContaining({
-              layers: 8,
-              buildTime: expect.any(Number),
-              logs: expect.arrayContaining(['Successfully built mock-image-id']),
-            }),
-          },
-          completed_steps: expect.arrayContaining(['build-image']),
-        }),
-      });
+      expect(mockSessionManager.update).toHaveBeenCalledWith('test-session-123', expect.objectContaining({
+        build_result: {
+          success: true,
+          imageId: 'sha256:mock-image-id',
+          tags: ['myapp:latest', 'myapp:v1.0'],
+          size: 123456789,
+          metadata: expect.objectContaining({
+            layers: 8,
+            buildTime: expect.any(Number),
+            logs: expect.arrayContaining(['Successfully built mock-image-id']),
+          }),
+        },
+        completed_steps: expect.arrayContaining(['build-image']),
+      }));
     });
   });
 
   describe('Dockerfile Resolution', () => {
     it('should use generated Dockerfile when original not found', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
-        },
+        analysis_result: { language: 'javascript' },
         repo_path: '/test/repo',
         dockerfile_result: {
           path: '/test/repo/Dockerfile.generated',
@@ -436,9 +431,7 @@ CMD ["node", "index.js"]`;
 
     it('should return error when Dockerfile not found and no session content', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
-        },
+        analysis_result: { language: 'javascript' },
         repo_path: '/test/repo',
         dockerfile_result: {},
       });
@@ -455,9 +448,7 @@ CMD ["node", "index.js"]`;
 
     it('should return error when Docker build fails', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
-        },
+        analysis_result: { language: 'javascript' },
         repo_path: '/test/repo',
         dockerfile_result: {
           path: '/test/repo/Dockerfile',
@@ -479,9 +470,7 @@ CMD ["node", "index.js"]`;
 
     it('should handle filesystem errors', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
-        },
+        analysis_result: { language: 'javascript' },
         repo_path: '/test/repo',
         dockerfile_result: {
           path: '/test/repo/Dockerfile',
@@ -501,9 +490,7 @@ CMD ["node", "index.js"]`;
 
     it('should handle Docker client errors', async () => {
       mockSessionManager.get.mockResolvedValue({
-        workflow_state: {
-          analysis_result: { language: 'javascript' },
-        },
+        analysis_result: { language: 'javascript' },
         repo_path: '/test/repo',
         dockerfile_result: {
           path: '/test/repo/Dockerfile',

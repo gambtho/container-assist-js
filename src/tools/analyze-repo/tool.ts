@@ -23,6 +23,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { wrapTool } from '@mcp/tools/tool-wrapper';
 import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
+import { aiGenerate } from '@mcp/tools/ai-helpers';
 import { getRecommendedBaseImage } from '../../lib/base-images';
 import type { ToolContext } from '../../mcp/context/types';
 import type { ExtendedToolContext } from '../shared-types';
@@ -388,51 +389,49 @@ async function analyzeRepoImpl(
     const ports = await detectPorts(languageInfo.language);
     const dockerInfo = await checkDockerFiles(repoPath);
 
-    // Get AI insights using ToolContext if available
+    // Get AI insights using standardized helper if available
     let aiInsights: string | undefined;
     if (isToolContext && context) {
       try {
         logger.debug('Using AI to enhance repository analysis');
         const toolContext = context as ToolContext;
 
-        const { description, messages } = await toolContext.getPrompt('enhance-repo-analysis', {
-          language: languageInfo.language,
-          framework: frameworkInfo?.framework,
-          buildSystem: buildSystemRaw?.type,
-          dependencies: dependencies
-            .slice(0, 10)
-            .map((dep) => dep.name)
-            .join(', '), // Limit for prompt length
-          hasTests: dependencies.some(
-            (dep) =>
-              dep.name.includes('test') || dep.name.includes('jest') || dep.name.includes('mocha'),
-          ),
-          hasDocker: dockerInfo.hasDockerfile,
-          ports: ports.join(', '),
-          fileCount: dependencies.length, // Rough estimate
-          repoStructure: `${languageInfo.language} project with ${frameworkInfo?.framework || 'standard'} structure`,
-        });
-
-        logger.debug({ description, messageCount: messages.length }, 'Got prompt from registry');
-
-        const aiResponse = await toolContext.sampling.createMessage({
-          messages,
-          includeContext: 'thisServer',
-          modelPreferences: { hints: [{ name: 'analysis' }] },
+        const aiResult = await aiGenerate(logger, toolContext, {
+          promptName: 'enhance-repo-analysis',
+          promptArgs: {
+            language: languageInfo.language,
+            framework: frameworkInfo?.framework,
+            buildSystem: buildSystemRaw?.type,
+            dependencies: dependencies
+              .slice(0, 10)
+              .map((dep) => dep.name)
+              .join(', '), // Limit for prompt length
+            hasTests: dependencies.some(
+              (dep) =>
+                dep.name.includes('test') ||
+                dep.name.includes('jest') ||
+                dep.name.includes('mocha'),
+            ),
+            hasDocker: dockerInfo.hasDockerfile,
+            ports: ports.join(', '),
+            fileCount: dependencies.length, // Rough estimate
+            repoStructure: `${languageInfo.language} project with ${frameworkInfo?.framework || 'standard'} structure`,
+          },
+          expectation: 'text',
+          fallbackBehavior: 'error',
+          maxRetries: 2,
           maxTokens: 1500,
+          modelHints: ['analysis'],
         });
 
-        const responseText = aiResponse.content
-          .filter(
-            (c: { type: string; text?: string }) => c.type === 'text' && typeof c.text === 'string',
-          )
-          .map((c: { type: string; text?: string }) => c.text || '')
-          .join('\n')
-          .trim();
-
-        if (responseText) {
-          aiInsights = responseText;
+        if (aiResult.ok && aiResult.value.content) {
+          aiInsights = aiResult.value.content;
           logger.info('AI analysis enhancement completed successfully');
+        } else {
+          logger.debug(
+            { error: aiResult.ok ? 'Empty response' : aiResult.error },
+            'AI analysis enhancement failed, continuing with basic analysis',
+          );
         }
       } catch (error) {
         logger.debug(

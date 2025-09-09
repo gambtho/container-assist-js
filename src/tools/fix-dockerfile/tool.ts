@@ -21,6 +21,7 @@
 
 import { wrapTool } from '@mcp/tools/tool-wrapper';
 import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
+import { aiGenerate } from '@mcp/tools/ai-helpers';
 import type { ExtendedToolContext } from '../shared-types';
 import { createTimer, type Logger } from '../../lib/logger';
 import { getRecommendedBaseImage } from '../../lib/base-images';
@@ -45,7 +46,7 @@ export interface FixDockerfileResult {
 }
 
 /**
- * Attempt to fix Dockerfile using AI enhancement via ToolContext
+ * Attempt to fix Dockerfile using standardized AI helper
  */
 async function attemptAIFix(
   dockerfileContent: string,
@@ -77,37 +78,26 @@ async function attemptAIFix(
 
     logger.debug({ args: cleanedArgs }, 'Using prompt arguments');
 
-    // Get prompt from registry
-    const { description, messages } = await context.getPrompt('fix-dockerfile', cleanedArgs);
-
-    logger.debug({ description, messageCount: messages.length }, 'Got prompt from registry');
-
-    // Single sampling call
-    const response = await context.sampling.createMessage({
-      messages,
-      includeContext: 'thisServer',
-      modelPreferences: { hints: [{ name: 'code' }] },
-      stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
+    // Use standardized AI helper
+    const aiResult = await aiGenerate(logger, context, {
+      promptName: 'fix-dockerfile',
+      promptArgs: cleanedArgs,
+      expectation: 'dockerfile',
+      fallbackBehavior: 'error',
+      maxRetries: 2,
       maxTokens: 2048,
+      stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
+      modelHints: ['code'],
     });
 
-    logger.debug({ responseLength: response.content?.length }, 'Got AI response');
-
-    // Extract text from MCP response
-    const responseText = response.content
-      .filter((c) => c.type === 'text' && typeof c.text === 'string')
-      .map((c) => c.text)
-      .join('\n')
-      .trim();
-
-    if (!responseText) {
-      return Failure('AI response was empty');
+    if (!aiResult.ok) {
+      return Failure(aiResult.error);
     }
 
     // Clean up the response
-    const fixedDockerfile = stripFencesAndNoise(responseText);
+    const fixedDockerfile = stripFencesAndNoise(aiResult.value.content);
 
-    // Validate the fix
+    // Additional validation (aiGenerate already validates basic Dockerfile structure)
     if (!isValidDockerfileContent(fixedDockerfile)) {
       return Failure('AI generated invalid dockerfile (missing FROM instruction or malformed)');
     }
