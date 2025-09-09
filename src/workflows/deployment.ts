@@ -11,12 +11,12 @@
 
 import { prepareCluster } from '@tools/prepare-cluster';
 import { generateK8sManifests } from '@tools/generate-k8s-manifests';
-import { pushImage } from '@tools/push-image';
+import { pushImage } from '../tools/push-image/tool';
 import { deployApplication } from '@tools/deploy';
 import { verifyDeployment } from '@tools/verify-deployment';
 import { isFail } from '@types';
 import { createTimer, type Logger } from '@lib/logger';
-import type { Deps } from '@app/container';
+import type { ToolContext } from '../mcp/context/types';
 import type {
   DeploymentWorkflowParams,
   DeploymentWorkflowResult,
@@ -29,12 +29,15 @@ import type {
  */
 export async function runDeploymentWorkflow(
   params: DeploymentWorkflowParams,
-  deps: Deps,
+  toolContext: ToolContext,
   _options?: { abortSignal?: AbortSignal },
 ): Promise<DeploymentWorkflowResult> {
-  const logger = deps.logger;
+  const logger = toolContext.logger;
   const timer = createTimer(logger, 'deployment-workflow');
-  const sessionManager = deps.sessionManager;
+  // Access sessionManager through context if available
+  const sessionManager =
+    (toolContext as any).sessionManager ||
+    (await import('../lib/session')).createSessionManager(logger);
   const { sessionId, imageId, clusterConfig, deploymentOptions } = params;
 
   // Initialize workflow context
@@ -114,10 +117,8 @@ export async function runDeploymentWorkflow(
       {
         sessionId,
         namespace: clusterConfig.namespace || 'default',
-        // TODO: Add createNamespace option to deploy tool schema
-        // createNamespace: true,
       },
-      logger,
+      toolContext,
     );
 
     if (!clusterResult.ok) {
@@ -223,7 +224,7 @@ export async function runDeploymentWorkflow(
           },
         }),
       },
-      logger,
+      toolContext,
     );
 
     if (isFail(manifestResult)) {
@@ -323,7 +324,7 @@ export async function runDeploymentWorkflow(
         sessionId,
         registry: deploymentOptions.registry || 'docker.io',
       },
-      logger,
+      toolContext,
     );
 
     if (!pushResult.ok) {
@@ -425,7 +426,7 @@ export async function runDeploymentWorkflow(
         namespace: cluster.namespace,
         imageId,
       },
-      logger,
+      toolContext,
     );
 
     if (!deployResult.ok) {
@@ -516,7 +517,7 @@ export async function runDeploymentWorkflow(
         deploymentName: deploymentOptions.name,
         namespace: cluster.namespace,
       },
-      logger,
+      toolContext,
     );
 
     let verify: Record<string, unknown> | null = null;
@@ -648,8 +649,10 @@ export async function runDeploymentWorkflow(
 export const deploymentWorkflow = {
   name: 'deployment-workflow',
   description: 'Complete deployment pipeline from cluster preparation to verified deployment',
-  execute: (params: DeploymentWorkflowParams, logger: Logger, context?: Record<string, unknown>) =>
-    runDeploymentWorkflow(params, (context?.deps as Deps) || ({ logger } as Deps), context),
+  execute: (params: DeploymentWorkflowParams, _logger: Logger, context?: Record<string, unknown>) =>
+    runDeploymentWorkflow(params, context as unknown as ToolContext, {
+      abortSignal: (context as any)?.abortSignal,
+    }),
   schema: {
     type: 'object',
     properties: {

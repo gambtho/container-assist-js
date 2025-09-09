@@ -8,11 +8,14 @@
 import type { Logger } from 'pino';
 import { createLogger } from '../lib/logger';
 import { createSessionManager, SessionManager } from '../lib/session';
-import { PromptRegistryCompatAdapter, createTemplateEngine } from '../core/templates';
+import { PromptRegistry } from '../core/prompts/registry';
 import {
-  createResourceContext,
-  createSDKResourceManager,
-  type SDKResourceManager,
+  storeResource,
+  getResource,
+  listResources,
+  clearExpired,
+  getStats,
+  cleanup,
 } from '../resources/manager';
 import { createSDKToolRegistry, type SDKToolRegistry } from '../mcp/tools/registry';
 import type { AIService } from '../domain/types';
@@ -36,8 +39,15 @@ export interface Deps {
   kubernetesClient: KubernetesClient;
 
   // MCP services
-  promptRegistry: PromptRegistryCompatAdapter;
-  resourceManager: SDKResourceManager;
+  promptRegistry: PromptRegistry;
+  resourceManager: {
+    storeResource: typeof storeResource;
+    getResource: typeof getResource;
+    listResources: typeof listResources;
+    clearExpired: typeof clearExpired;
+    getStats: typeof getStats;
+    cleanup: typeof cleanup;
+  };
   toolRegistry: SDKToolRegistry;
 
   // Optional AI services
@@ -112,34 +122,28 @@ export async function createContainer(
   const dockerClient = depsOverrides.dockerClient ?? createDockerClient(logger);
   const kubernetesClient = depsOverrides.kubernetesClient ?? createKubernetesClient(logger);
 
-  // Create prompt registry using new template system
+  // Create prompt registry
   const promptRegistry =
     depsOverrides.promptRegistry ??
     (await (async () => {
-      const engineResult = await createTemplateEngine(logger);
-      if (!engineResult.ok) {
-        logger.error(
-          { error: engineResult.error },
-          'Failed to create template engine, using fallback',
-        );
-        throw new Error(`Template engine creation failed: ${engineResult.error}`);
+      const registry = new PromptRegistry(logger);
+      const initResult = await registry.initialize();
+      if (!initResult.ok) {
+        logger.error({ error: initResult.error }, 'Failed to initialize prompt registry');
+        throw new Error(`Prompt registry initialization failed: ${initResult.error}`);
       }
-      return new PromptRegistryCompatAdapter(engineResult.value, logger);
+      return registry;
     })());
 
-  // Create resource manager using config
-  const resourceManager =
-    depsOverrides.resourceManager ??
-    (() => {
-      const resourceContext = createResourceContext(
-        {
-          defaultTtl: appConfig.cache.ttl,
-          maxResourceSize: appConfig.workspace.maxFileSize,
-        },
-        logger,
-      );
-      return createSDKResourceManager(resourceContext);
-    })();
+  // Create resource manager using simple functions
+  const resourceManager = depsOverrides.resourceManager ?? {
+    storeResource,
+    getResource,
+    listResources,
+    clearExpired,
+    getStats,
+    cleanup,
+  };
 
   // Create tool registry
   const toolRegistry =
@@ -295,7 +299,9 @@ export function checkContainerHealth(deps: Deps): {
 
   const details = {
     toolCount: deps.toolRegistry.tools.size,
-    promptCount: deps.promptRegistry.hasPrompt('dockerfile-generation') ? 7 : 0,
+    promptCount: deps.promptRegistry.hasPrompt('dockerfile-generation')
+      ? deps.promptRegistry.getPromptNames().length
+      : 0,
     resourceStats: 'getStats' in deps.resourceManager ? deps.resourceManager.getStats() : undefined,
   };
 
@@ -314,7 +320,9 @@ export function getContainerStatus(deps: Deps, serverRunning: boolean = false): 
   const healthCheck = checkContainerHealth(deps);
 
   // Count prompts - check if prompt registry has the base prompts
-  const promptCount = deps.promptRegistry.hasPrompt('dockerfile-generation') ? 7 : 0;
+  const promptCount = deps.promptRegistry.hasPrompt('dockerfile-generation')
+    ? deps.promptRegistry.getPromptNames().length
+    : 0;
 
   // Get resource stats
   const resourceStats = deps.resourceManager.getStats();

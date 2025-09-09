@@ -1,7 +1,6 @@
 /**
  * Unit Tests: Image Scanning Tool
  * Tests the scan image tool functionality with mock security scanner
- * Following analyze-repo test structure and Phase 2 completion requirements
  */
 
 import { jest } from '@jest/globals';
@@ -96,7 +95,7 @@ describe('scanImage', () => {
     });
 
     it('should successfully scan image and return results', async () => {
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -135,7 +134,7 @@ describe('scanImage', () => {
         imageId: 'sha256:mock-image-id',
       }));
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -148,7 +147,7 @@ describe('scanImage', () => {
       config.severityThreshold = 'critical';
       
       // Only high vulnerability, threshold is critical
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -161,7 +160,7 @@ describe('scanImage', () => {
         sessionId: 'test-session-123',
       };
 
-      const result = await scanImage(minimalConfig, mockLogger);
+      const result = await scanImage(minimalConfig, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockSecurityScanner.scanImage).toHaveBeenCalled();
@@ -182,7 +181,7 @@ describe('scanImage', () => {
       "updatedAt": "2025-09-08T11:12:40.362Z"
 });
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger });
 
       expect(mockSessionManager.get).toHaveBeenCalledWith('test-session-123');
       expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
@@ -193,7 +192,7 @@ describe('scanImage', () => {
         repo_path: '/test/repo',
       });
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -213,7 +212,7 @@ describe('scanImage', () => {
         createFailureResult('Scanner failed to analyze image')
       );
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -231,7 +230,7 @@ describe('scanImage', () => {
 
       mockSecurityScanner.scanImage.mockRejectedValue(new Error('Scanner crashed'));
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -266,7 +265,7 @@ describe('scanImage', () => {
         imageId: 'sha256:mock-image-id',
       }));
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -309,7 +308,7 @@ describe('scanImage', () => {
       
       for (const scanner of scannerTypes) {
         config.scanner = scanner;
-        const result = await scanImage(config, mockLogger);
+        const result = await scanImage(config, { logger: mockLogger });
         
         expect(result.ok).toBe(true);
         // Verify the scanner was created with the correct type
@@ -322,7 +321,7 @@ describe('scanImage', () => {
       
       for (const threshold of thresholds) {
         config.severityThreshold = threshold;
-        const result = await scanImage(config, mockLogger);
+        const result = await scanImage(config, { logger: mockLogger });
         
         expect(result.ok).toBe(true);
       }

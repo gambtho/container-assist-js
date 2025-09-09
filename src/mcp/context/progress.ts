@@ -32,7 +32,7 @@ export type EnhancedProgressReporter = (
   progress?: number,
   total?: number,
   metadata?: Record<string, unknown>,
-) => void;
+) => Promise<void>;
 
 /**
  * Extracts progress token from MCP request metadata
@@ -87,7 +87,7 @@ export function extractProgressToken(request: unknown): string | undefined {
 }
 
 /**
- * Creates an enhanced progress reporter that forwards notifications
+ * Creates a progress reporter that forwards notifications
  * through the MCP protocol
  *
  * @param server - MCP server instance for sending notifications
@@ -104,7 +104,7 @@ export function createProgressReporter(
     return undefined;
   }
 
-  return (
+  return async (
     message: string,
     progress?: number,
     total?: number,
@@ -205,7 +205,7 @@ export function createScopedProgressReporter(
   baseProgress: number = 0,
   progressRange: number = 100,
 ): EnhancedProgressReporter {
-  return (
+  return async (
     message: string,
     progress?: number,
     total?: number,
@@ -218,7 +218,7 @@ export function createScopedProgressReporter(
 
     const scopedMessage = `[${operationName}] ${message}`;
 
-    baseReporter(scopedMessage, scopedProgress, baseProgress + progressRange, {
+    await baseReporter(scopedMessage, scopedProgress, baseProgress + progressRange, {
       operation: operationName,
       originalProgress: progress,
       originalTotal: total,

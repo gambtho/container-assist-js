@@ -17,7 +17,7 @@ import type {
   AnalysisSamplingResult,
   AnalysisSamplingConfig,
 } from './analysis-types';
-import { AnalysisStrategyEngine } from './analysis-strategies';
+import { executeMultipleAnalysisStrategies } from './analysis-strategies';
 import { AnalysisVariantScorer } from './analysis-scorer';
 
 /**
@@ -108,12 +108,10 @@ export class AnalysisValidator {
  */
 export class AnalysisGenerationPipeline {
   private validator: AnalysisValidator;
-  private strategyEngine: AnalysisStrategyEngine;
   private scorer: AnalysisVariantScorer;
 
   constructor(private logger: Logger) {
     this.validator = new AnalysisValidator(logger);
-    this.strategyEngine = new AnalysisStrategyEngine(logger);
     this.scorer = new AnalysisVariantScorer(logger);
   }
 
@@ -137,13 +135,19 @@ export class AnalysisGenerationPipeline {
       }
 
       // Generate variants using different strategies
-      const strategies = config.strategies || [
-        'comprehensive',
-        'security-focused',
-        'performance-focused',
-      ];
-      // Generate all variants using the strategy engine
-      const variantsResult = await this.strategyEngine.generateVariants(context, strategies);
+      const strategies = (config.strategies || ['comprehensive', 'security', 'performance']) as (
+        | 'comprehensive'
+        | 'security'
+        | 'performance'
+        | 'architecture'
+        | 'deployment'
+      )[];
+      // Generate all variants using the functional API
+      const variantsResult = await executeMultipleAnalysisStrategies(
+        strategies,
+        context,
+        this.logger,
+      );
 
       if (!variantsResult.ok) {
         return Failure(`Failed to generate analysis variants: ${variantsResult.error}`);

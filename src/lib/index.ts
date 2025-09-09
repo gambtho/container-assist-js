@@ -18,11 +18,12 @@ export type * from './kubernetes';
 
 // Security and scanning
 export * from './scanner';
-// Export everything except ScanResult from security-scanner to avoid conflict
+// Export security scanner types with specific names to avoid conflicts
 export {
   type ScanOptions,
   type VulnerabilityFinding,
   type SecretFinding,
+  type SecurityScanResult,
   type SecretScanResult,
   type SecurityReport,
   scanImage,

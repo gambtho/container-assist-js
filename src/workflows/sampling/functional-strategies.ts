@@ -22,23 +22,80 @@ import type {
   AnalysisSamplingResult,
   AnalysisSamplingConfig,
 } from './analysis-types';
+import { VariantGenerationPipeline } from './generation-pipeline';
+import { createMCPAIOrchestrator } from '@workflows/intelligent-orchestration';
+import { DEFAULT_SCORING_CRITERIA } from './scorer';
+import { AnalysisGenerationPipeline, AnalysisValidator } from './analysis-generation-pipeline';
+import { AnalysisVariantScorer } from './analysis-scorer';
 
 // ============================================================================
 // CORE FUNCTIONAL TYPES
 // ============================================================================
 
 export interface DockerfileSampler {
-  generateBest(config: { sessionId: string; repoPath: string }, options: SamplingOptions): Promise<Result<{ content: string; score: number; metadata: Record<string, unknown> }>>;
+  generateBest(
+    config: { sessionId: string; repoPath: string },
+    options: SamplingOptions,
+  ): Promise<Result<{ content: string; score: number; metadata: Record<string, unknown> }>>;
   generateVariants(config: SamplingConfig): Promise<Result<SamplingResult>>;
-  compareDockerfiles(dockerfiles: { id: string; content: string; strategy?: string }[], criteria?: ScoringCriteria): Promise<Result<{ variants: ScoredVariant[]; bestVariant: ScoredVariant; comparison: { summary: string; advantages: Record<string, string[]>; tradeoffs: Record<string, string[]>; } }>>;
-  validateDockerfile(content: string, criteria?: ScoringCriteria): Promise<Result<{ score: number; breakdown: Record<string, number>; issues: string[]; recommendations: string[]; isValid: boolean; }>>;
+  compareDockerfiles(
+    dockerfiles: { id: string; content: string; strategy?: string }[],
+    criteria?: ScoringCriteria,
+  ): Promise<
+    Result<{
+      variants: ScoredVariant[];
+      bestVariant: ScoredVariant;
+      comparison: {
+        summary: string;
+        advantages: Record<string, string[]>;
+        tradeoffs: Record<string, string[]>;
+      };
+    }>
+  >;
+  validateDockerfile(
+    content: string,
+    criteria?: ScoringCriteria,
+  ): Promise<
+    Result<{
+      score: number;
+      breakdown: Record<string, number>;
+      issues: string[];
+      recommendations: string[];
+      isValid: boolean;
+    }>
+  >;
   getAvailableStrategies(): string[];
 }
 
 export interface AnalysisSampler {
-  generateBest(context: AnalysisContext, criteria?: AnalysisScoringCriteria, samplingConfig?: AnalysisSamplingConfig): Promise<Result<AnalysisSamplingResult>>;
-  compareVariants(variants: AnalysisVariant[], criteria?: AnalysisScoringCriteria): Promise<Result<{ variants: Array<{ strategy: string; score: number; strengths: string[]; weaknesses: string[]; recommendation: 'recommended' | 'acceptable' | 'not-recommended'; }>; summary: { bestStrategy: string; worstStrategy: string; averageScore: number; recommendedCount: number; }; }>>;
-  validateVariant(variant: AnalysisVariant): Promise<Result<{ isValid: boolean; issues: string[] }>>;
+  generateBest(
+    context: AnalysisContext,
+    criteria?: AnalysisScoringCriteria,
+    samplingConfig?: AnalysisSamplingConfig,
+  ): Promise<Result<AnalysisSamplingResult>>;
+  compareVariants(
+    variants: AnalysisVariant[],
+    criteria?: AnalysisScoringCriteria,
+  ): Promise<
+    Result<{
+      variants: Array<{
+        strategy: string;
+        score: number;
+        strengths: string[];
+        weaknesses: string[];
+        recommendation: 'recommended' | 'acceptable' | 'not-recommended';
+      }>;
+      summary: {
+        bestStrategy: string;
+        worstStrategy: string;
+        averageScore: number;
+        recommendedCount: number;
+      };
+    }>
+  >;
+  validateVariant(
+    variant: AnalysisVariant,
+  ): Promise<Result<{ isValid: boolean; issues: string[] }>>;
   getAvailableStrategies(): string[];
 }
 
@@ -88,14 +145,9 @@ export async function sample<T>(
  * Creates a dockerfile sampling function suite
  */
 export function createDockerfileSampling(logger: Logger): DockerfileSampler {
-  // Import the existing pipeline and AI orchestrator functionality
-  const { VariantGenerationPipeline } = require('./generation-pipeline');
-  const { createMCPAIOrchestrator } = require('@workflows/intelligent-orchestration');
-  const { DEFAULT_SCORING_CRITERIA } = require('./scorer');
-  
   const pipeline = new VariantGenerationPipeline(logger);
   const aiOrchestrator = createMCPAIOrchestrator(logger, {});
-  
+
   return {
     async generateBest(config, options) {
       try {
@@ -130,7 +182,7 @@ export function createDockerfileSampling(logger: Logger): DockerfileSampler {
 
         return Success({
           content: bestVariant.content,
-          score: bestVariant.score / 100,
+          score: bestVariant.score.total / 100,
           metadata: {
             approach: 'functional-pipeline',
             environment: options.environment,
@@ -209,7 +261,7 @@ export function createDockerfileSampling(logger: Logger): DockerfileSampler {
         // Score all variants
         const scoringCriteria = criteria || DEFAULT_SCORING_CRITERIA;
         const scoredResult = await pipeline.scoreVariants(variants, scoringCriteria);
-        
+
         if (!scoredResult.ok) {
           return Failure(`Comparison scoring failed: ${scoredResult.error}`);
         }
@@ -283,7 +335,7 @@ export function createDockerfileSampling(logger: Logger): DockerfileSampler {
           [variant],
           criteria || DEFAULT_SCORING_CRITERIA,
         );
-        
+
         if (!scoredResult.ok) {
           return Failure(`Validation scoring failed: ${scoredResult.error}`);
         }
@@ -292,7 +344,7 @@ export function createDockerfileSampling(logger: Logger): DockerfileSampler {
         if (!scoredValue || scoredValue.length === 0) {
           return Failure('No validation scores available');
         }
-        
+
         const scored = scoredValue[0];
         if (!scored) {
           return Failure('No validation score data found');
@@ -328,14 +380,10 @@ export function createDockerfileSampling(logger: Logger): DockerfileSampler {
  * Creates an analysis sampling function suite
  */
 export function createAnalysisSampling(logger: Logger): AnalysisSampler {
-  // Import the existing analysis pipeline components
-  const { AnalysisGenerationPipeline, AnalysisValidator } = require('./analysis-generation-pipeline');
-  const { AnalysisVariantScorer } = require('./analysis-scorer');
-  
   const pipeline = new AnalysisGenerationPipeline(logger);
   const validator = new AnalysisValidator(logger);
   const scorer = new AnalysisVariantScorer(logger);
-  
+
   return {
     async generateBest(context, criteria, samplingConfig) {
       const effectiveCriteria = criteria || getDefaultAnalysisCriteria(context);
@@ -351,11 +399,7 @@ export function createAnalysisSampling(logger: Logger): AnalysisSampler {
       );
 
       try {
-        const result = await pipeline.executePipeline(
-          context,
-          effectiveCriteria,
-          effectiveConfig,
-        );
+        const result = await pipeline.executePipeline(context, effectiveCriteria, effectiveConfig);
 
         if (result.ok) {
           logger.info(
@@ -443,7 +487,8 @@ export function createAnalysisSampling(logger: Logger): AnalysisSampler {
 
         // Calculate summary statistics
         const scores = scoredVariants.map((v: any) => v.score.total);
-        const averageScore = scores.reduce((sum: number, score: number) => sum + score, 0) / scores.length;
+        const averageScore =
+          scores.reduce((sum: number, score: number) => sum + score, 0) / scores.length;
         const recommendedCount = comparisonVariants.filter(
           (v: any) => v.recommendation === 'recommended',
         ).length;
@@ -512,7 +557,10 @@ export function createAnalysisSampling(logger: Logger): AnalysisSampler {
 
         return Success({ isValid, issues });
       } catch (error) {
-        logger.error({ error, strategy: variant.strategy }, 'Functional analysis validation failed');
+        logger.error(
+          { error, strategy: variant.strategy },
+          'Functional analysis validation failed',
+        );
         return Failure(error instanceof Error ? error.message : String(error));
       }
     },
@@ -521,82 +569,6 @@ export function createAnalysisSampling(logger: Logger): AnalysisSampler {
       return ['comprehensive', 'security-focused', 'performance-focused'];
     },
   };
-}
-
-// ============================================================================
-// COMPATIBILITY LAYER (TEMPORARY)
-// ============================================================================
-
-/**
- * Temporary compatibility wrapper for existing SamplingService consumers
- * This will be removed once all consumers are updated
- */
-export class SamplingServiceCompat {
-  private dockerfileSampler: DockerfileSampler;
-
-  constructor(private _logger: Logger) {
-    this.dockerfileSampler = createDockerfileSampling(_logger);
-  }
-
-  async generateBestDockerfile(
-    config: { sessionId: string; repoPath: string },
-    options: SamplingOptions,
-  ) {
-    return this.dockerfileSampler.generateBest(config, options);
-  }
-
-  async generateVariants(config: SamplingConfig) {
-    return this.dockerfileSampler.generateVariants(config);
-  }
-
-  async compareDockerfiles(
-    dockerfiles: { id: string; content: string; strategy?: string }[],
-    criteria?: ScoringCriteria,
-  ) {
-    return this.dockerfileSampler.compareDockerfiles(dockerfiles, criteria);
-  }
-
-  async validateDockerfile(content: string, criteria?: ScoringCriteria) {
-    return this.dockerfileSampler.validateDockerfile(content, criteria);
-  }
-
-  getAvailableStrategies() {
-    return this.dockerfileSampler.getAvailableStrategies();
-  }
-}
-
-/**
- * Temporary compatibility wrapper for existing AnalysisSamplingService consumers
- */
-export class AnalysisSamplingServiceCompat {
-  private analysisSampler: AnalysisSampler;
-
-  constructor(private _logger: Logger) {
-    this.analysisSampler = createAnalysisSampling(_logger);
-  }
-
-  async generateBestAnalysis(
-    context: AnalysisContext,
-    criteria?: AnalysisScoringCriteria,
-    samplingConfig?: AnalysisSamplingConfig,
-  ) {
-    return this.analysisSampler.generateBest(context, criteria, samplingConfig);
-  }
-
-  async compareAnalysisVariants(
-    variants: AnalysisVariant[],
-    criteria?: AnalysisScoringCriteria,
-  ) {
-    return this.analysisSampler.compareVariants(variants, criteria);
-  }
-
-  async validateAnalysisVariant(variant: AnalysisVariant) {
-    return this.analysisSampler.validateVariant(variant);
-  }
-
-  getAvailableStrategies() {
-    return this.analysisSampler.getAvailableStrategies();
-  }
 }
 
 // ============================================================================
@@ -645,7 +617,7 @@ function generateComparisonAnalysis(scoredVariants: ScoredVariant[]): {
       tradeoffs: {},
     };
   }
-  
+
   const summary = `Best variant: ${best.id} (${best.strategy}) with score ${best.score.total}/100`;
 
   const advantages: Record<string, string[]> = {};

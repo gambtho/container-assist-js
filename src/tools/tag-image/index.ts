@@ -1,2 +1,6 @@
-export { tagImageTool, tagImage } from './tool';
-export { tagImageSchema, type TagImageParams } from './schema';
+/**
+ * Tag Image Tool - Public exports
+ */
+
+export { tagImage, tagImageSchema } from './tool';
+export type { TagImageParams, TagImageResult } from './tool';

@@ -4,7 +4,7 @@ import { Result, Success, Failure } from '@types';
  * Standard success response shape for all tools
  * Ensures consistent structure across all tool responses
  */
-export interface StandardToolResponse<T = any> {
+export interface StandardToolResponse<T = unknown> {
   ok: boolean;
   sessionId?: string;
   data?: T;

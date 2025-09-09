@@ -5,8 +5,15 @@
 
 import type { Logger } from 'pino';
 import type { Result } from '@types';
-import type { PromptRegistry } from '@prompts/prompt-registry';
-import type { SDKResourceManager } from '@resources/manager';
+import type { PromptRegistry } from '../../core/prompts/registry';
+import type {
+  storeResource,
+  getResource,
+  listResources,
+  clearExpired,
+  getStats,
+  cleanup,
+} from '@resources/manager';
 import type { SessionManager } from '@lib/session';
 
 /**
@@ -20,7 +27,14 @@ export interface MCPContext {
   /** Prompt registry access */
   promptRegistry?: PromptRegistry;
   /** Resource manager access */
-  resourceManager?: SDKResourceManager;
+  resourceManager?: {
+    storeResource: typeof storeResource;
+    getResource: typeof getResource;
+    listResources: typeof listResources;
+    clearExpired: typeof clearExpired;
+    getStats: typeof getStats;
+    cleanup: typeof cleanup;
+  };
   /** Session manager access */
   sessionManager?: SessionManager;
   /** Application dependencies */

@@ -1,128 +1,159 @@
-import type { Logger } from 'pino';
-import {
-  type ListResourcesResult,
-  type ReadResourceResult,
-} from '@modelcontextprotocol/sdk/types.js';
-import { Result } from '@types';
-import type { Resource, ResourceCategory } from './types';
+import { Result, Success, Failure } from '@types';
+import type { ResourceCategory } from './types';
 
 /**
- * Resource configuration
+ * Simple resource storage entry
  */
-export interface ResourceConfig {
-  defaultTtl: number;
-  maxResourceSize: number;
-  cacheConfig?: {
-    defaultTtl: number;
-    maxSize?: number;
-    maxMemoryUsage?: number;
-    enableAccessTracking?: boolean;
-  };
+interface StoredResource {
+  data: unknown;
+  expiresAt: number;
+  category?: ResourceCategory | undefined;
 }
 
 /**
- * Resource context for functional operations
+ * Simple in-memory resource storage with TTL
  */
-export interface ResourceContext {
-  config: ResourceConfig;
-  logger: Logger;
-  // Category indexing for efficient resource discovery
-  categoryIndex?: Map<ResourceCategory, Set<string>>;
-  // Resource metadata index for advanced features
-  resourceIndex?: Map<string, Resource>;
+const resourceStore = new Map<string, StoredResource>();
+
+/**
+ * Store a resource with optional TTL
+ */
+export function storeResource(
+  uri: string,
+  content: unknown,
+  ttl = 3600000, // 1 hour default
+  category?: ResourceCategory,
+): Result<void> {
+  try {
+    resourceStore.set(uri, {
+      data: content,
+      expiresAt: Date.now() + ttl,
+      category,
+    });
+    return Success(undefined);
+  } catch (error) {
+    return Failure(`Failed to store resource: ${error}`);
+  }
 }
 
 /**
- * Create resource context with dependencies
+ * Get a resource by URI
  */
-export const createResourceContext = (config: ResourceConfig, logger: Logger): ResourceContext => {
-  const context: ResourceContext = {
-    config,
-    logger: logger.child({ component: 'ResourceManager' }),
-    categoryIndex: new Map(),
-    resourceIndex: new Map(),
-  };
-
-  // Initialize category indices
-  const categories: ResourceCategory[] = [
-    'dockerfile',
-    'k8s-manifest',
-    'scan-result',
-    'build-artifact',
-    'deployment-status',
-    'session-data',
-    'sampling-result',
-    'sampling-variant',
-    'sampling-config',
-  ];
-  categories.forEach((category) => {
-    if (context.categoryIndex) {
-      context.categoryIndex.set(category, new Set());
+export function getResource(uri: string): Result<unknown | null> {
+  try {
+    const entry = resourceStore.get(uri);
+    if (!entry) {
+      return Success(null);
     }
-  });
 
-  return context;
-};
+    // Check if expired
+    if (Date.now() > entry.expiresAt) {
+      resourceStore.delete(uri);
+      return Success(null);
+    }
+
+    return Success(entry.data);
+  } catch (error) {
+    return Failure(`Failed to get resource: ${error}`);
+  }
+}
 
 /**
- * Enhanced metadata for publishing resources
+ * List all resource URIs, optionally filtered by category
  */
-export interface PublishMetadata {
-  name?: string;
-  description?: string;
-  category?: ResourceCategory;
-  annotations?: {
-    audience?: string[];
-    priority?: number;
-    tags?: string[];
+export function listResources(category?: ResourceCategory): Result<string[]> {
+  try {
+    const uris: string[] = [];
+    const now = Date.now();
+
+    for (const [uri, entry] of resourceStore.entries()) {
+      // Skip expired resources
+      if (now > entry.expiresAt) {
+        resourceStore.delete(uri);
+        continue;
+      }
+
+      // Filter by category if specified
+      if (category && entry.category !== category) {
+        continue;
+      }
+
+      uris.push(uri);
+    }
+
+    return Success(uris);
+  } catch (error) {
+    return Failure(`Failed to list resources: ${error}`);
+  }
+}
+
+/**
+ * Clear expired resources and return count removed
+ */
+export function clearExpired(): Result<number> {
+  try {
+    const now = Date.now();
+    let removed = 0;
+
+    for (const [uri, entry] of resourceStore.entries()) {
+      if (now > entry.expiresAt) {
+        resourceStore.delete(uri);
+        removed++;
+      }
+    }
+
+    return Success(removed);
+  } catch (error) {
+    return Failure(`Failed to clear expired resources: ${error}`);
+  }
+}
+
+/**
+ * Get basic storage statistics
+ */
+export function getStats(): {
+  total: number;
+  byCategory: Record<ResourceCategory, number>;
+  memoryUsage: number;
+} {
+  const now = Date.now();
+  const byCategory: Record<ResourceCategory, number> = {
+    dockerfile: 0,
+    'k8s-manifest': 0,
+    'scan-result': 0,
+    'build-artifact': 0,
+    'deployment-status': 0,
+    'session-data': 0,
+    'sampling-result': 0,
+    'sampling-variant': 0,
+    'sampling-config': 0,
+  };
+
+  let total = 0;
+  for (const [, entry] of resourceStore.entries()) {
+    if (now <= entry.expiresAt) {
+      total++;
+      if (entry.category) {
+        byCategory[entry.category]++;
+      }
+    }
+  }
+
+  return {
+    total,
+    byCategory,
+    memoryUsage: resourceStore.size * 1024, // rough estimate
   };
 }
 
 /**
- * SDK-native resource manager interface
+ * Clear all resources (cleanup function)
  */
-export interface SDKResourceManager {
-  listResources(cursor?: string, category?: ResourceCategory): Promise<Result<ListResourcesResult>>;
-  readResource(uri: string): Promise<Result<ReadResourceResult>>;
-  publishResource(
-    uri: string,
-    content: unknown,
-    ttl?: number,
-    metadata?: PublishMetadata,
-  ): Promise<Result<string>>;
-  publishEnhanced(
-    uri: string,
-    content: unknown,
-    metadata: PublishMetadata & { category: ResourceCategory },
-    ttl?: number,
-  ): Promise<Result<string>>;
-  invalidateResource(pattern: string): Promise<Result<void>>;
-  cleanup(): Promise<Result<void>>;
-  getResourcesByCategory(category: ResourceCategory, filters?: any): Promise<Result<Resource[]>>;
-  searchResources(query: any): Promise<Result<Resource[]>>;
-  getStats(): { total: number; byCategory: Record<ResourceCategory, number>; memoryUsage: number };
+export async function cleanup(): Promise<Result<void>> {
+  try {
+    resourceStore.clear();
+    return Success(undefined);
+  } catch (error) {
+    return Failure(`Failed to cleanup resources: ${error}`);
+  }
 }
-
-/**
- * Create SDK-native resource manager with bound context
- */
-export const createSDKResourceManager = (_context: ResourceContext): SDKResourceManager => ({
-  listResources: () =>
-    Promise.resolve({ ok: false, error: 'Not implemented' } as Result<ListResourcesResult>),
-  readResource: () =>
-    Promise.resolve({ ok: false, error: 'Not implemented' } as Result<ReadResourceResult>),
-  publishResource: () => Promise.resolve({ ok: false, error: 'Not implemented' } as Result<string>),
-  publishEnhanced: () => Promise.resolve({ ok: false, error: 'Not implemented' } as Result<string>),
-  invalidateResource: () =>
-    Promise.resolve({ ok: false, error: 'Not implemented' } as Result<void>),
-  cleanup: () => Promise.resolve({ ok: false, error: 'Not implemented' } as Result<void>),
-  getResourcesByCategory: () =>
-    Promise.resolve({ ok: false, error: 'Not implemented' } as Result<Resource[]>),
-  searchResources: () =>
-    Promise.resolve({ ok: false, error: 'Not implemented' } as Result<Resource[]>),
-  getStats: () => ({
-    total: 0,
-    byCategory: {} as Record<ResourceCategory, number>,
-    memoryUsage: 0,
-  }),
-});

@@ -19,10 +19,10 @@
  * ```
  */
 
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
-import type { ExtendedToolContext } from '../shared-types';
-import { createTimer, type Logger } from '../../lib/logger';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import { createStandardProgress } from '@mcp/utils/progress-helper';
+import type { ToolContext } from '../../mcp/context/types';
+import { createTimer, createLogger, type Logger } from '../../lib/logger';
 import { Success, Failure, type Result, type Tool } from '../../domain/types';
 import type { WorkflowParams } from './schema';
 
@@ -138,18 +138,18 @@ function estimateWorkflowDuration(steps: string[]): number {
 }
 
 // Import tool registry at the module level
-import { analyzeRepoTool } from '@tools/analyze-repo';
-import { generateDockerfileTool } from '@tools/generate-dockerfile';
-import { buildImageTool } from '@tools/build-image';
-import { scanImageTool } from '@tools/scan';
-import { pushImageTool } from '@tools/push-image';
-import { tagImageTool } from '@tools/tag-image';
-import { fixDockerfileTool } from '@tools/fix-dockerfile';
-import { resolveBaseImagesTool } from '@tools/resolve-base-images';
-import { prepareClusterTool } from '@tools/prepare-cluster';
-import { deployApplicationTool } from '@tools/deploy';
-import { generateK8sManifestsTool } from '@tools/generate-k8s-manifests';
-import { verifyDeploymentTool } from '@tools/verify-deployment';
+import { analyzeRepo } from '@tools/analyze-repo';
+import { generateDockerfile } from '@tools/generate-dockerfile';
+import { buildImage } from '@tools/build-image';
+import { scanImage } from '@tools/scan';
+import { pushImage } from '../push-image/tool';
+import { tagImage } from '../tag-image/tool';
+import { fixDockerfile } from '@tools/fix-dockerfile';
+import { resolveBaseImages } from '@tools/resolve-base-images';
+import { prepareCluster } from '@tools/prepare-cluster';
+import { deployApplication } from '@tools/deploy';
+import { generateK8sManifests } from '@tools/generate-k8s-manifests';
+import { verifyDeployment } from '@tools/verify-deployment';
 
 // Import proper ToolContext from MCP middleware since that's what deploy tool uses
 
@@ -168,62 +168,62 @@ const toolMap: Record<string, Tool> = {
   'analyze-repo': {
     name: 'analyze-repo',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      analyzeRepoTool(castParams(params), context as ExtendedToolContext),
+      analyzeRepo(castParams(params), context as ToolContext),
   },
   'generate-dockerfile': {
     name: 'generate-dockerfile',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      generateDockerfileTool(castParams(params), context as ExtendedToolContext),
+      generateDockerfile(castParams(params), context as ToolContext),
   },
   'build-image': {
     name: 'build-image',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      buildImageTool(castParams(params), context as ExtendedToolContext),
+      buildImage(castParams(params), context as ToolContext),
   },
   'scan-image': {
     name: 'scan-image',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      scanImageTool(castParams(params), context as ExtendedToolContext),
+      scanImage(castParams(params), context as ToolContext),
   },
   'push-image': {
     name: 'push-image',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      pushImageTool(castParams(params), context as ExtendedToolContext),
+      pushImage(castParams(params), context as ToolContext),
   },
   'tag-image': {
     name: 'tag-image',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      tagImageTool(castParams(params), context as ExtendedToolContext),
+      tagImage(castParams(params), context as ToolContext),
   },
   'fix-dockerfile': {
     name: 'fix-dockerfile',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      fixDockerfileTool(castParams(params), context as ExtendedToolContext),
+      fixDockerfile(castParams(params), context as ToolContext),
   },
   'resolve-base-images': {
     name: 'resolve-base-images',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      resolveBaseImagesTool(castParams(params), context as ExtendedToolContext),
+      resolveBaseImages(castParams(params), context as ToolContext),
   },
   'prepare-cluster': {
     name: 'prepare-cluster',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      prepareClusterTool(castParams(params), context as ExtendedToolContext),
+      prepareCluster(castParams(params), context as ToolContext),
   },
   deploy: {
     name: 'deploy',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      deployApplicationTool(castParams(params), context as ExtendedToolContext),
+      deployApplication(castParams(params), context as ToolContext),
   },
   'generate-k8s-manifests': {
     name: 'generate-k8s-manifests',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      generateK8sManifestsTool(castParams(params), context as ExtendedToolContext),
+      generateK8sManifests(castParams(params), context as ToolContext),
   },
   'verify-deployment': {
     name: 'verify-deployment',
     execute: (params: Record<string, unknown>, _logger: Logger, context?: unknown) =>
-      verifyDeploymentTool(castParams(params), context as ExtendedToolContext),
+      verifyDeployment(castParams(params), context as ToolContext),
   },
 };
 
@@ -235,7 +235,7 @@ async function executeStep(
   sessionId: string,
   config: { workflowType: string; options?: Record<string, unknown> },
   logger: Logger,
-  context: ExtendedToolContext,
+  context: ToolContext,
 ): Promise<{ ok: boolean; error?: string }> {
   const timer = createTimer(logger, `workflow-step-${step}`);
 
@@ -309,13 +309,20 @@ async function executeStep(
 }
 
 /**
- * Core workflow implementation
+ * Workflow implementation with selective progress reporting
  */
 async function workflowImpl(
   params: WorkflowParams,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<WorkflowToolResult>> {
+  // Basic parameter validation
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+
+  // Progress reporting for complex workflow orchestration
+  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
+  const logger = context.logger || createLogger({ name: 'workflow' });
   const timer = createTimer(logger, 'workflow');
   const startedAt = new Date().toISOString();
 
@@ -325,12 +332,11 @@ async function workflowImpl(
 
     logger.info({ workflowType, options }, 'Starting workflow execution');
 
+    // Progress: Workflow orchestration started
+    if (progress) await progress('EXECUTING');
+
     // Resolve session (now always optional)
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: 'workflow',
-      createIfNotExists: true,
-    });
+    const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
@@ -383,7 +389,7 @@ async function workflowImpl(
     );
 
     // Update session with workflow start using standardized helper
-    const initialUpdateResult = await updateSessionData(
+    const initialUpdateResult = await updateSession(
       sessionId,
       {
         workflow_state: {
@@ -396,7 +402,6 @@ async function workflowImpl(
           startedAt,
         },
       },
-      logger,
       context,
     );
 
@@ -414,7 +419,7 @@ async function workflowImpl(
 
     for (const step of steps) {
       // Update current step using standardized helper
-      const stepUpdateResult = await updateSessionData(
+      const stepUpdateResult = await updateSession(
         sessionId,
         {
           workflow_state: {
@@ -428,7 +433,6 @@ async function workflowImpl(
             startedAt,
           },
         },
-        logger,
         context,
       );
 
@@ -458,7 +462,7 @@ async function workflowImpl(
 
     // Update session with final workflow state using standardized helper
     const finalStatus = workflowFailed ? 'failed' : 'completed';
-    const finalUpdateResult = await updateSessionData(
+    const finalUpdateResult = await updateSession(
       sessionId,
       {
         workflow_state: {
@@ -475,7 +479,6 @@ async function workflowImpl(
         },
         completed_steps: [...(session.completed_steps || []), 'workflow'],
       },
-      logger,
       context,
     );
 
@@ -539,31 +542,25 @@ async function workflowImpl(
 /**
  * Wrapped workflow tool with standardized behavior
  */
-export const workflowTool = wrapTool('workflow', workflowImpl);
+/**
+ * Workflow tool with selective progress reporting
+ */
+export const workflow = workflowImpl;
 
 /**
- * Legacy export for backward compatibility during migration
+ * Default export
  */
-export const workflow = async (
-  params: WorkflowParams,
-  logger: Logger,
-  context?: ExtendedToolContext,
-): Promise<Result<WorkflowToolResult>> => {
-  return workflowImpl(params, context || {}, logger);
-};
+export default workflow;
 
 export const getWorkflowStatus = async (
   sessionId: string,
   logger: Logger,
 ): Promise<Result<WorkflowStatusResult>> => {
-  const sessionResult = await resolveSession(
+  const sessionResult = await getSession(sessionId, {
     logger,
-    {},
-    {
-      sessionId,
-      createIfNotExists: false,
-    },
-  );
+    sampling: null,
+    getPrompt: null,
+  } as any);
 
   if (!sessionResult.ok) {
     return Failure(sessionResult.error);

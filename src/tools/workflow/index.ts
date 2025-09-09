@@ -3,5 +3,5 @@
  * Orchestrates containerization workflows
  */
 
-export { workflowTool } from './tool';
+export { workflow } from './tool';
 export { workflowSchema, type WorkflowParams } from './schema';

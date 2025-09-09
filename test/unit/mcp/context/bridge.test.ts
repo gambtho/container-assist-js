@@ -6,10 +6,12 @@ import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 import type { Logger } from 'pino';
 import {
   createToolContext,
+  createToolContextWithProgress,
+} from '@mcp/context/tool-context';
+import {
   extractProgressToken,
   createProgressReporter,
-  createToolContextWithProgress,
-} from '@mcp/context/bridge';
+} from '@mcp/context/progress';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 // Mock server and logger
@@ -279,8 +281,9 @@ describe('ToolContext Bridge', () => {
             message: 'Processing...',
             progress: 50,
             total: 100,
+            type: 'progress_notification',
           }),
-          'Progress notification sent'
+          'Progress notification logged - MCP transport implementation pending'
         );
       }
     });

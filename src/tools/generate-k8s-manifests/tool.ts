@@ -7,14 +7,13 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import crypto from 'node:crypto';
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
+// crypto import removed - was unused after tool wrapper elimination
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import { aiGenerate } from '@mcp/tools/ai-helpers';
-import { reportProgress } from '@mcp/utils/progress-helper';
-import { createTimer, type Logger } from '@lib/logger';
-import type { ExtendedToolContext } from '../shared-types';
-import type { ProgressReporter } from '@mcp/context/types';
+import { createStandardProgress } from '@mcp/utils/progress-helper';
+import { createTimer } from '@lib/logger';
+import type { ToolContext } from '../../mcp/context/types';
+// Removed unused ProgressReporter import
 import type { SessionData } from '../session-types';
 import { Success, Failure, type Result } from '../../domain/types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
@@ -379,41 +378,33 @@ function buildK8sManifestPromptArgs(
   };
 }
 
-/**
- * Compute hash for default session ID
- */
-function computeHash(input: string): string {
-  return crypto.createHash('sha256').update(input).digest('hex').substring(0, 8);
-}
+// computeHash function removed - was unused after tool wrapper elimination
 
 /**
- * Core implementation of generate K8s manifests
+ * Generate K8s manifests implementation with selective progress reporting
  */
 async function generateK8sManifestsImpl(
   params: GenerateK8sManifestsConfig,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<GenerateK8sManifestsResult>> {
+  // Basic parameter validation
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+
+  // Progress reporting for complex manifest generation
+  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
+  const logger = context.logger;
   const timer = createTimer(logger, 'generate-k8s-manifests');
 
   try {
     const { appName = 'app', namespace = 'default' } = params;
 
-    // Progress: Analyzing
-    if (context && 'progressReporter' in context && context.progressReporter) {
-      await reportProgress(
-        context.progressReporter as ProgressReporter,
-        'Preparing K8s generation',
-        10,
-      );
-    }
+    // Progress: Starting validation and analysis
+    if (progress) await progress('VALIDATING');
 
     // Resolve session with optional sessionId
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: computeHash(`k8s-${appName}`),
-      createIfNotExists: true,
-    });
+    const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
@@ -426,14 +417,8 @@ async function generateK8sManifestsImpl(
     const buildResult = sessionData?.build_result || sessionData?.workflow_state?.build_result;
     const image = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
 
-    // Progress: Processing
-    if (context && 'progressReporter' in context && context.progressReporter) {
-      await reportProgress(
-        context.progressReporter as ProgressReporter,
-        'Generating manifests',
-        50,
-      );
-    }
+    // Progress: Main execution phase (manifest generation)
+    if (progress) await progress('EXECUTING');
 
     // Generate K8s manifests with AI or fallback
     let result: Result<{ manifests: K8sResource[]; aiUsed: boolean }>;
@@ -475,10 +460,8 @@ async function generateK8sManifestsImpl(
       return Failure('Failed to generate K8s manifests');
     }
 
-    // Progress: Finalizing
-    if (context && 'progressReporter' in context && context.progressReporter) {
-      await reportProgress(context.progressReporter as ProgressReporter, 'Writing manifests', 90);
-    }
+    // Progress: Finalizing results
+    if (progress) await progress('FINALIZING');
 
     // Build resource list
     const resourceList: Array<{ kind: string; name: string; namespace: string }> = [];
@@ -519,7 +502,7 @@ async function generateK8sManifestsImpl(
     }
 
     // Update session with K8s result using standardized helper
-    const updateResult = await updateSessionData(
+    const updateResult = await updateSession(
       session.id,
       {
         k8s_result: {
@@ -544,7 +527,6 @@ async function generateK8sManifestsImpl(
           k8s_warnings: warnings,
         },
       },
-      logger,
       context,
     );
 
@@ -556,13 +538,7 @@ async function generateK8sManifestsImpl(
     }
 
     // Progress: Complete
-    if (context && 'progressReporter' in context && context.progressReporter) {
-      await reportProgress(
-        context.progressReporter as ProgressReporter,
-        'K8s manifests generated',
-        100,
-      );
-    }
+    if (progress) await progress('COMPLETE');
 
     timer.end({ outputPath });
 
@@ -582,20 +558,11 @@ async function generateK8sManifestsImpl(
 }
 
 /**
- * Wrapped generate K8s manifests tool with standardized behavior
+ * Generate K8s manifests tool with selective progress reporting
  */
-export const generateK8sManifestsTool = wrapTool(
-  'generate-k8s-manifests',
-  generateK8sManifestsImpl,
-);
+export const generateK8sManifests = generateK8sManifestsImpl;
 
 /**
- * Legacy function export for backward compatibility during migration
+ * Default export
  */
-export async function generateK8sManifests(
-  config: GenerateK8sManifestsConfig,
-  logger: Logger,
-  context?: ExtendedToolContext,
-): Promise<Result<GenerateK8sManifestsResult>> {
-  return generateK8sManifestsImpl(config, context || {}, logger);
-}
+export default generateK8sManifests;

@@ -19,10 +19,10 @@
  * ```
  */
 
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
-import type { ExtendedToolContext } from '../shared-types';
-import { createTimer, type Logger } from '../../lib/logger';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+// Removed wrapTool - using direct implementation
+import type { ToolContext } from '../../mcp/context/types';
+import { createTimer, createLogger } from '../../lib/logger';
 import { createDockerRegistryClient } from '../../lib/docker';
 import { Success, Failure, type Result } from '../../domain/types';
 import { getSuggestedBaseImages, getRecommendedBaseImage } from '../../lib/base-images';
@@ -49,13 +49,17 @@ export interface BaseImageRecommendation {
 }
 
 /**
- * Core base image resolution implementation
+ * Base image resolution implementation - direct execution without wrapper
  */
 async function resolveBaseImagesImpl(
   params: ResolveBaseImagesParams,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<BaseImageRecommendation>> {
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+  const logger = context.logger || createLogger({ name: 'resolve-base-images' });
   const timer = createTimer(logger, 'resolve-base-images');
 
   try {
@@ -68,11 +72,7 @@ async function resolveBaseImagesImpl(
     logger.info({ technology, targetEnvironment, securityLevel }, 'Resolving base images');
 
     // Resolve session (now always optional)
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: 'resolve-base-images',
-      createIfNotExists: true,
-    });
+    const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
@@ -150,13 +150,12 @@ async function resolveBaseImagesImpl(
     };
 
     // Update session with recommendation using standardized helper
-    const updateResult = await updateSessionData(
+    const updateResult = await updateSession(
       sessionId,
       {
         base_image_recommendation: recommendation,
         completed_steps: [...(session.completed_steps || []), 'resolve-base-images'],
       },
-      logger,
       context,
     );
 
@@ -183,17 +182,11 @@ async function resolveBaseImagesImpl(
 }
 
 /**
- * Wrapped resolve base images tool with standardized behavior
+ * Resolve base images tool
  */
-export const resolveBaseImagesTool = wrapTool('resolve-base-images', resolveBaseImagesImpl);
+export const resolveBaseImages = resolveBaseImagesImpl;
 
 /**
- * Legacy export for backward compatibility during migration
+ * Default export
  */
-export const resolveBaseImages = async (
-  params: ResolveBaseImagesParams,
-  logger: Logger,
-  context?: ExtendedToolContext,
-): Promise<Result<BaseImageRecommendation>> => {
-  return resolveBaseImagesImpl(params, context || {}, logger);
-};
+export default resolveBaseImages;

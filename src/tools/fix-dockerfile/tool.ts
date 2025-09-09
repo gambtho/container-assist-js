@@ -19,16 +19,16 @@
  * ```
  */
 
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import { aiGenerate } from '@mcp/tools/ai-helpers';
-import type { ExtendedToolContext } from '../shared-types';
-import { createTimer, type Logger } from '../../lib/logger';
+import { createStandardProgress } from '@mcp/utils/progress-helper';
+// Removed wrapTool - using direct implementation with selective progress
+import type { ToolContext } from '../../mcp/context/types';
+import { createTimer, createLogger, type Logger } from '../../lib/logger';
 import { getRecommendedBaseImage } from '../../lib/base-images';
 import { Success, Failure, type Result } from '../../domain/types';
 import { DEFAULT_PORTS } from '../../config/defaults';
 import { stripFencesAndNoise, isValidDockerfileContent } from '../../lib/text-processing';
-import type { ToolContext } from '../../mcp/context/types';
 import type { FixDockerfileParams } from './schema';
 
 /**
@@ -193,13 +193,20 @@ async function applyRuleBasedFixes(
 }
 
 /**
- * Core fix dockerfile implementation
+ * Fix dockerfile implementation - direct execution with selective progress
  */
 async function fixDockerfileImpl(
   params: FixDockerfileParams,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<FixDockerfileResult>> {
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+
+  // Optional progress reporting for AI operations
+  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
+  const logger = context.logger || createLogger({ name: 'fix-dockerfile' });
   const timer = createTimer(logger, 'fix-dockerfile');
 
   try {
@@ -207,12 +214,11 @@ async function fixDockerfileImpl(
 
     logger.info({ hasError: !!error, hasDockerfile: !!dockerfile }, 'Starting Dockerfile fix');
 
+    // Progress: Starting validation
+    if (progress) await progress('VALIDATING');
+
     // Resolve session (now always optional)
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: 'fix-dockerfile',
-      createIfNotExists: true,
-    });
+    const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
@@ -251,9 +257,12 @@ async function fixDockerfileImpl(
     let generationMethod: 'AI' | 'fallback' = 'fallback';
     const isToolContext = context && 'sampling' in context && 'getPrompt' in context;
 
+    // Progress: Main execution (AI fix or fallback)
+    if (progress) await progress('EXECUTING');
+
     // Try AI-enhanced fix if context is available
     if (isToolContext && context) {
-      const toolContext = context as ToolContext;
+      const toolContext = context;
       const aiResult = await attemptAIFix(
         dockerfileToFix,
         buildError,
@@ -294,7 +303,7 @@ async function fixDockerfileImpl(
     }
 
     // Update session with fixed Dockerfile using standardized helper
-    const updateResult = await updateSessionData(
+    const updateResult = await updateSession(
       sessionId,
       {
         dockerfile_result: {
@@ -312,7 +321,6 @@ async function fixDockerfileImpl(
           generation_method: generationMethod,
         },
       },
-      logger,
       context,
     );
 
@@ -320,11 +328,17 @@ async function fixDockerfileImpl(
       logger.warn({ error: updateResult.error }, 'Failed to update session, but fix succeeded');
     }
 
+    // Progress: Finalizing results
+    if (progress) await progress('FINALIZING');
+
     timer.end({ fixCount: fixes.length, sessionId, aiUsed });
     logger.info(
       { sessionId, fixCount: fixes.length, aiUsed, generationMethod },
       'Dockerfile fix completed',
     );
+
+    // Progress: Complete
+    if (progress) await progress('COMPLETE');
 
     return Success({
       ok: true,
@@ -345,17 +359,11 @@ async function fixDockerfileImpl(
 }
 
 /**
- * Wrapped fix dockerfile tool with standardized behavior
+ * Fix dockerfile tool with selective progress reporting
  */
-export const fixDockerfileTool = wrapTool('fix-dockerfile', fixDockerfileImpl);
+export const fixDockerfile = fixDockerfileImpl;
 
 /**
- * Legacy export for backward compatibility during migration
+ * Default export
  */
-export const fixDockerfile = async (
-  params: FixDockerfileParams,
-  logger: Logger,
-  context?: ExtendedToolContext,
-): Promise<Result<FixDockerfileResult>> => {
-  return fixDockerfileImpl(params, context || {}, logger);
-};
+export default fixDockerfile;

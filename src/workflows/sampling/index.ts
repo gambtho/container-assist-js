@@ -1,13 +1,12 @@
 /**
- * Unified Sampling Workflows
+ * Sampling Workflows
  *
- * All sampling-related workflow functionality consolidated here.
+ * All sampling-related workflow functionality.
  */
 
 // Core sampling services
-export { SamplingService } from './sampling-service';
+export { SamplingService } from './sampling-service-functional';
 export { VariantGenerationPipeline } from './generation-pipeline';
-export { StrategyEngine } from './strategy-engine';
 export { VariantScorer, DockerfileAnalyzer } from './scorer';
 
 // Functional sampling API (recommended)
@@ -19,11 +18,10 @@ export {
   type SamplingStrategyName,
 } from './strategy-engine';
 
-// Analysis-specific sampling
-export { AnalysisSamplingService } from './analysis-sampling-service';
+// Analysis-specific sampling (now functional)
+export { AnalysisSamplingService } from './analysis-sampling-service-functional';
 export { AnalysisGenerationPipeline, AnalysisValidator } from './analysis-generation-pipeline';
 export { AnalysisVariantScorer } from './analysis-scorer';
-export { AnalysisStrategyEngine } from './analysis-strategies';
 
 // Functional analysis API (recommended)
 export {
@@ -33,7 +31,6 @@ export {
   getAvailableAnalysisStrategies,
   type AnalysisStrategyName,
 } from './analysis-strategies';
-
 
 // Types
 export type * from './types';

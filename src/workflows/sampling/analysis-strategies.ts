@@ -4,6 +4,7 @@
 
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@types';
+import type { ToolContext } from '@mcp/context/types';
 import type {
   AnalysisStrategy,
   AnalysisContext,
@@ -74,7 +75,7 @@ import {
  */
 async function performBaseAnalysis(
   context: AnalysisContext,
-  logger: Logger,
+  loggerOrContext: Logger | ToolContext,
 ): Promise<Result<AnalyzeRepoResult>> {
   const config: AnalyzeRepoConfig = {
     sessionId: `analysis-${Date.now()}`,
@@ -89,7 +90,27 @@ async function performBaseAnalysis(
     config.includeTests = context.includeTests;
   }
 
-  return analyzeRepo(config, logger);
+  // Check if we received a ToolContext or just a Logger
+  const toolContext: ToolContext =
+    'sampling' in loggerOrContext
+      ? loggerOrContext
+      : {
+          logger: loggerOrContext,
+          sampling: {
+            createMessage: async () => ({
+              role: 'assistant' as const,
+              content: [{ type: 'text', text: '' }],
+            }),
+          },
+          getPrompt: async () => ({
+            messages: [],
+            name: '',
+            description: '',
+          }),
+          progress: undefined,
+        };
+
+  return analyzeRepo(config, toolContext);
 }
 
 /**
@@ -682,9 +703,8 @@ export function createDeploymentStrategy(logger: Logger): AnalysisStrategy {
   };
 }
 
-
 /**
- * Analysis strategies registry - simplified functional API
+ * Analysis strategies registry - functional API
  */
 export const analysisStrategies = {
   comprehensive: createComprehensiveStrategy,
@@ -746,28 +766,4 @@ export async function executeMultipleAnalysisStrategies(
  */
 export function getAvailableAnalysisStrategies(): AnalysisStrategyName[] {
   return Object.keys(analysisStrategies) as AnalysisStrategyName[];
-}
-
-/**
- * Strategy engine for backward compatibility
- */
-export class AnalysisStrategyEngine {
-  constructor(private logger: Logger) {}
-
-  getAvailableStrategies(): string[] {
-    return getAvailableAnalysisStrategies();
-  }
-
-  getStrategy(name: string): AnalysisStrategy | undefined {
-    const strategyFactory = analysisStrategies[name as AnalysisStrategyName];
-    return strategyFactory ? strategyFactory(this.logger) : undefined;
-  }
-
-  async generateVariants(
-    context: AnalysisContext,
-    strategyNames?: string[],
-  ): Promise<Result<AnalysisVariant[]>> {
-    const names = strategyNames || getAvailableAnalysisStrategies();
-    return executeMultipleAnalysisStrategies(names as AnalysisStrategyName[], context, this.logger);
-  }
 }

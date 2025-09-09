@@ -10,7 +10,6 @@ import type {
   SamplingResult,
   DockerfileContext,
   ScoringCriteria,
-  SamplingStrategy,
   DockerfileVariant,
   ScoredVariant,
 } from './types';
@@ -34,10 +33,11 @@ interface AnalysisData {
   dependencies?: (string | { name: string })[];
   files?: AnalysisFiles;
 }
-import { StrategyEngine } from './strategy-engine';
-import { PromptRegistry } from '@prompts/prompt-registry';
+import { executeMultipleSamplingStrategies } from './strategy-engine';
+import { PromptRegistry } from '../../core/prompts/registry';
 import { VariantScorer } from './scorer';
 import { analyzeRepo } from '@tools/analyze-repo';
+import type { ToolContext } from '../../mcp/context/types';
 import { validateSamplingConfig, validateScoringCriteria } from './validation';
 import {
   createMCPAIOrchestrator,
@@ -48,7 +48,6 @@ import {
  * Main generation pipeline for Dockerfile sampling with AI validation
  */
 export class VariantGenerationPipeline {
-  private strategyEngine: StrategyEngine;
   private scorer: VariantScorer;
   private aiOrchestrator: MCPAIOrchestrator;
 
@@ -57,7 +56,6 @@ export class VariantGenerationPipeline {
     promptRegistry?: PromptRegistry,
     aiOrchestrator?: MCPAIOrchestrator,
   ) {
-    this.strategyEngine = new StrategyEngine(logger, promptRegistry ? {} : undefined);
     this.scorer = new VariantScorer(logger);
     this.aiOrchestrator =
       aiOrchestrator ||
@@ -71,7 +69,7 @@ export class VariantGenerationPipeline {
     const startTime = Date.now();
 
     try {
-      // Step 0: AI-enhanced parameter validation
+      // Step 0: AI-powered parameter validation
       const aiValidationResult = await this.aiOrchestrator.validateParameters(
         'dockerfile-sampling',
         config as unknown as Record<string, unknown>,
@@ -124,7 +122,16 @@ export class VariantGenerationPipeline {
 
       // Step 2: Generate variants
       const generationStart = Date.now();
-      const variantsResult = await this.strategyEngine.generateVariants(context, config.strategies);
+      const variantsResult = await executeMultipleSamplingStrategies(
+        (config.strategies || ['balanced', 'security-first']) as (
+          | 'balanced'
+          | 'security-first'
+          | 'performance-optimized'
+          | 'size-optimized'
+        )[],
+        context,
+        this.logger,
+      );
       if (!variantsResult.ok) {
         return Failure(`Variant generation failed: ${variantsResult.error}`);
       }
@@ -214,6 +221,21 @@ export class VariantGenerationPipeline {
   private async buildSamplingContext(config: SamplingConfig): Promise<Result<DockerfileContext>> {
     try {
       // Analyze repository
+      const toolContext: ToolContext = {
+        logger: this.logger,
+        sampling: {
+          createMessage: async () => ({
+            role: 'assistant' as const,
+            content: [{ type: 'text', text: '' }],
+          }),
+        },
+        getPrompt: async () => ({
+          messages: [],
+          name: '',
+          description: '',
+        }),
+        progress: undefined,
+      };
       const analysisResult = await analyzeRepo(
         {
           sessionId: config.sessionId,
@@ -221,7 +243,7 @@ export class VariantGenerationPipeline {
           depth: 2,
           includeTests: false,
         },
-        this.logger,
+        toolContext,
       );
 
       if (!analysisResult.ok) {
@@ -390,27 +412,20 @@ export class VariantGenerationPipeline {
   }
 
   private determineEnvironment(_config: SamplingConfig): 'development' | 'staging' | 'production' {
-    // Could be enhanced to detect from repo structure or config
+    // Could be extended to detect from repo structure or config
     return 'production'; // Default to production for sampling
   }
 
   private determineSecurityLevel(_config: SamplingConfig): 'basic' | 'standard' | 'strict' {
-    // Could be enhanced based on detected security requirements
-    return 'standard'; // Default to enhanced security
+    // Could be extended based on detected security requirements
+    return 'standard'; // Default to standard security
   }
 
   /**
    * Get available sampling strategies
    */
   getAvailableStrategies(): string[] {
-    return this.strategyEngine.getAvailableStrategies();
-  }
-
-  /**
-   * Register a custom sampling strategy
-   */
-  registerStrategy(strategy: SamplingStrategy): void {
-    this.strategyEngine.registerStrategy(strategy);
+    return ['security-first', 'performance-optimized', 'size-optimized', 'balanced'];
   }
 
   /**

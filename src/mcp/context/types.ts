@@ -97,15 +97,58 @@ export type ProgressReporter = (
 ) => Promise<void>;
 
 /**
- * Main context object passed to tools
- * Provides AI sampling and prompt access through proper MCP protocols
+ * Main context object passed to tools - Unified interface for all tool implementations
+ *
+ * This interface provides AI sampling and prompt access through proper MCP protocols,
+ * replacing the previous complex context inheritance chain with a single, well-defined interface.
+ *
+ * @example
+ * ```typescript
+ * export async function myTool(
+ *   params: MyToolParams,
+ *   context: ToolContext,
+ *   logger: Logger
+ * ): Promise<Result<MyToolResult>> {
+ *   // Use AI sampling
+ *   const response = await context.sampling.createMessage({
+ *     messages: [{ role: 'user', content: [{ type: 'text', text: 'Analyze this code' }] }]
+ *   });
+ *
+ *   // Get prompts
+ *   const prompt = await context.getPrompt('dockerfile-generation', { language: 'node' });
+ *
+ *   // Report progress
+ *   await context.progress?.('Processing...', 50, 100);
+ *
+ *   return Success(result);
+ * }
+ * ```
+ *
+ * @since 2.0.0
  */
 export interface ToolContext {
-  /** AI sampling capabilities */
+  /**
+   * AI sampling capabilities for generating responses using the MCP host's AI models
+   *
+   * @example
+   * ```typescript
+   * const response = await context.sampling.createMessage({
+   *   messages: [{
+   *     role: 'user',
+   *     content: [{ type: 'text', text: 'Generate a Dockerfile for Node.js' }]
+   *   }],
+   *   maxTokens: 1000
+   * });
+   * ```
+   */
   sampling: {
     /**
      * Create a message using the MCP host's AI capabilities
      * Replaces direct AI service usage with proper MCP protocol
+     *
+     * @param request - The sampling request with messages and options
+     * @returns Promise resolving to the AI response
+     * @throws Never throws - errors are returned in the response metadata
      */
     createMessage(request: SamplingRequest): Promise<SamplingResponse>;
   };
@@ -113,14 +156,70 @@ export interface ToolContext {
   /**
    * Get a prompt with arguments from the prompt registry
    * Uses proper MCP server/prompts protocol
+   *
+   * @param name - Name of the prompt to retrieve
+   * @param args - Optional arguments to substitute in the prompt template
+   * @returns Promise resolving to the prompt with processed messages
+   *
+   * @example
+   * ```typescript
+   * const prompt = await context.getPrompt('dockerfile-generation', {
+   *   language: 'typescript',
+   *   dependencies: ['express', '@types/node']
+   * });
+   * ```
    */
   getPrompt(name: string, args?: Record<string, unknown>): Promise<PromptWithMessages>;
 
-  /** Optional abort signal for cancellation */
+  /**
+   * Optional abort signal for cancellation support
+   * Tools should check this signal periodically for long-running operations
+   *
+   * @example
+   * ```typescript
+   * if (context.signal?.aborted) {
+   *   return Failure('Operation cancelled');
+   * }
+   * ```
+   */
   signal?: AbortSignal | undefined;
 
-  /** Optional progress reporting function */
+  /**
+   * Optional progress reporting function for user feedback
+   * Should be called at regular intervals during long operations
+   *
+   * @example
+   * ```typescript
+   * await context.progress?.('Building Docker image...', 3, 5);
+   * ```
+   */
   progress?: ProgressReporter | undefined;
+
+  /**
+   * Session manager for workflow state tracking
+   * Used to maintain state across multiple tool calls in a workflow
+   *
+   * @example
+   * ```typescript
+   * const session = await context.sessionManager?.getSession(params.sessionId);
+   * await context.sessionManager?.updateSession(params.sessionId, {
+   *   currentStep: 'dockerfile-created'
+   * });
+   * ```
+   */
+  sessionManager?: import('../../lib/session').SessionManager;
+
+  /**
+   * Logger for debugging and error tracking - Required for all tools
+   * Use this for structured logging instead of console.log
+   *
+   * @example
+   * ```typescript
+   * context.logger.info('Starting dockerfile generation', { language: params.language });
+   * context.logger.error('Failed to parse package.json', { error: error.message });
+   * ```
+   */
+  logger: import('../../lib/logger').Logger;
 }
 
 /**

@@ -1,26 +1,16 @@
 /**
- * Domain Types - Unified exports
+ * Domain Types - Core exports
  *
- * Central export point for all domain types including the new unified ToolContext
+ * Central export point for all domain types including ToolContext
  */
 
-// Unified ToolContext (NEW - replaces all previous context types)
+// Re-export ToolContext from MCP types (main definition)
 export type {
   ToolContext,
   ToolContextFactory,
-  ToolContextOptions,
-  ServiceContainer,
+  ToolContextConfig,
   SamplingRequest,
   SamplingResponse,
   PromptWithMessages,
   ProgressReporter,
-  SamplingService,
-  PromptService,
-  // Backward compatibility (deprecated)
-  ExtendedToolContext,
-  LegacyToolContext,
-  MCPToolContext,
-} from './tool-context';
-
-// Re-export existing domain types that are still valid
-export type { MCPContext, EnhancedMCPContext } from '../types';
+} from '../../mcp/context/types';

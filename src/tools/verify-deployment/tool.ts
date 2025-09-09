@@ -20,11 +20,10 @@
  * ```
  */
 
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
-import type { ExtendedToolContext } from '../shared-types';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import type { ToolContext } from '../../mcp/context/types';
 import { createKubernetesClient, type KubernetesClient } from '../../lib/kubernetes';
-import { createTimer, type Logger } from '../../lib/logger';
+import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
 import type { VerifyDeploymentParams } from './schema';
@@ -146,13 +145,17 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
 }
 
 /**
- * Core deployment verification implementation
+ * Deployment verification implementation - direct execution without wrapper
  */
 async function verifyDeploymentImpl(
   params: VerifyDeploymentParams,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<VerifyDeploymentResult>> {
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+  const logger = context.logger || createLogger({ name: 'verify-deployment' });
   const timer = createTimer(logger, 'verify-deployment');
 
   try {
@@ -170,11 +173,7 @@ async function verifyDeploymentImpl(
     );
 
     // Resolve session (now always optional)
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: 'verify-deployment',
-      createIfNotExists: true,
-    });
+    const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
@@ -247,7 +246,7 @@ async function verifyDeploymentImpl(
           : 'unknown';
 
     // Update session with verification results using standardized helper
-    const updateResult = await updateSessionData(
+    const updateResult = await updateSession(
       sessionId,
       {
         verification_result: {
@@ -277,7 +276,6 @@ async function verifyDeploymentImpl(
         },
         completed_steps: [...(session.completed_steps || []), 'verify-deployment'],
       },
-      logger,
       context,
     );
 
@@ -342,17 +340,11 @@ async function verifyDeploymentImpl(
 }
 
 /**
- * Wrapped verify deployment tool with standardized behavior
+ * Verify deployment tool
  */
-export const verifyDeploymentTool = wrapTool('verify-deployment', verifyDeploymentImpl);
+export const verifyDeployment = verifyDeploymentImpl;
 
 /**
- * Legacy export for backward compatibility during migration
+ * Default export
  */
-export const verifyDeployment = async (
-  params: VerifyDeploymentParams,
-  logger: Logger,
-  context?: ExtendedToolContext,
-): Promise<Result<VerifyDeploymentResult>> => {
-  return verifyDeploymentImpl(params, context || {}, logger);
-};
+export default verifyDeployment;

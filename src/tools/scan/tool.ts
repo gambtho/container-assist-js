@@ -5,11 +5,11 @@
  * Uses standardized helpers for consistency
  */
 
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
-import type { ExtendedToolContext } from '../shared-types';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+// Removed wrapTool - using direct implementation
+import type { ToolContext } from '../../mcp/context/types';
 import { createSecurityScanner } from '../../lib/scanner';
-import { createTimer, type Logger } from '../../lib/logger';
+import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import type { ScanImageParams } from './schema';
 
@@ -52,13 +52,17 @@ export interface ScanImageResult {
 }
 
 /**
- * Core scan image implementation
+ * Scan image implementation - direct execution without wrapper
  */
 async function scanImageImpl(
   params: ScanImageParams,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<ScanImageResult>> {
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+  const logger = context.logger || createLogger({ name: 'scan' });
   const timer = createTimer(logger, 'scan-image');
 
   try {
@@ -75,11 +79,7 @@ async function scanImageImpl(
     );
 
     // Resolve session (now always optional)
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: 'scan-image',
-      createIfNotExists: true,
-    });
+    const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
@@ -181,7 +181,7 @@ async function scanImageImpl(
     const passed = vulnerabilityCount === 0;
 
     // Update session with scan results using standardized helper
-    const updateResult = await updateSessionData(
+    const updateResult = await updateSession(
       sessionId,
       {
         scan_result: {
@@ -204,7 +204,6 @@ async function scanImageImpl(
           scanPassed: passed,
         },
       },
-      logger,
       context,
     );
 
@@ -251,17 +250,11 @@ async function scanImageImpl(
 }
 
 /**
- * Wrapped scan image tool with standardized behavior
+ * Scan image tool
  */
-export const scanImageTool = wrapTool('scan', scanImageImpl);
+export const scanImage = scanImageImpl;
 
 /**
- * Legacy export for backward compatibility during migration
+ * Default export
  */
-export const scanImage = async (
-  params: ScanImageParams,
-  logger: Logger,
-  context?: ExtendedToolContext,
-): Promise<Result<ScanImageResult>> => {
-  return scanImageImpl(params, context || {}, logger);
-};
+export default scanImage;

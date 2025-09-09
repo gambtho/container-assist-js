@@ -9,9 +9,9 @@ import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '../domain/types';
 
 /**
- * Security scan result
+ * Basic security scan result for scanner tool
  */
-export interface ScanResult {
+export interface BasicScanResult {
   imageId: string;
   vulnerabilities: Array<{
     id: string;
@@ -30,7 +30,7 @@ export interface ScanResult {
 }
 
 interface SecurityScanner {
-  scanImage: (imageId: string) => Promise<Result<ScanResult>>;
+  scanImage: (imageId: string) => Promise<Result<BasicScanResult>>;
   ping: () => Promise<Result<boolean>>;
 }
 
@@ -42,12 +42,12 @@ export const createSecurityScanner = (logger: Logger, scannerType?: string): Sec
     /**
      * Scan Docker image for vulnerabilities
      */
-    async scanImage(imageId: string): Promise<Result<ScanResult>> {
+    async scanImage(imageId: string): Promise<Result<BasicScanResult>> {
       try {
         logger.info({ imageId, scanner: scannerType }, 'Starting security scan');
 
         // Simplified implementation - can be enhanced with specific scanner integrations
-        const result: ScanResult = {
+        const result: BasicScanResult = {
           imageId,
           vulnerabilities: [],
           totalVulnerabilities: 0,

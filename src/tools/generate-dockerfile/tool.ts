@@ -4,15 +4,14 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import crypto from 'node:crypto';
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
+// crypto import removed - was unused after tool wrapper elimination
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import { createStandardProgress } from '@mcp/utils/progress-helper';
+// Removed wrapTool - using direct implementation with selective progress
 import { aiGenerate } from '@mcp/tools/ai-helpers';
-import { reportProgress } from '@mcp/utils/progress-helper';
-import { createTimer, type Logger } from '@lib/logger';
+import { createTimer, createLogger } from '@lib/logger';
 import type { SessionData } from '../session-types';
-import type { ToolContext } from '../../domain/types/tool-context';
-import type { ProgressReporter } from '@mcp/context/types';
+import type { ToolContext } from '../../mcp/context/types';
 import { Success, Failure, type Result } from '../../domain/types';
 import { getDefaultPort } from '@config/defaults';
 import { getRecommendedBaseImage } from '@lib/base-images';
@@ -232,49 +231,41 @@ function buildArgsFromAnalysis(analysisResult: any): Record<string, any> {
   };
 }
 
-/**
- * Compute hash for default session ID
- */
-function computeHash(input: string): string {
-  return crypto.createHash('sha256').update(input).digest('hex').substring(0, 8);
-}
+// computeHash function removed - was unused after tool wrapper elimination
 
 /**
- * Core implementation of generate Dockerfile
+ * Generate Dockerfile implementation - direct execution with selective progress
  */
 async function generateDockerfileImpl(
   params: GenerateDockerfileConfig,
   context: ToolContext,
 ): Promise<Result<GenerateDockerfileResult>> {
-  const logger = context.logger;
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+
+  // Optional progress reporting for complex operations (AI generation)
+  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
+  const logger = context.logger || createLogger({ name: 'generate-dockerfile' });
   const timer = createTimer(logger, 'generate-dockerfile');
 
   try {
     const { optimization = true, multistage = true, securityHardening = true } = params;
 
-    // Progress: Analyzing
-    if (context && 'progressReporter' in context && context.progressReporter) {
-      await reportProgress(
-        context.progressReporter as ProgressReporter,
-        'Analyzing repository structure',
-        10,
-      );
-    }
+    // Progress: Starting validation and analysis
+    if (progress) await progress('VALIDATING');
 
-    // Resolve session with optional sessionId
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: computeHash(params.repoPath || process.cwd()),
-    });
-
+    // Get or create session
+    const sessionResult = await getSession(params.sessionId, context);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
 
-    const session = sessionResult.value;
+    const { id: sessionId, state: session } = sessionResult.value;
 
     // Get analysis result from session
-    const sessionData = session.state as unknown as SessionData;
+    const sessionData = session as unknown as SessionData;
     const analysisResult =
       sessionData?.analysis_result || sessionData?.workflow_state?.analysis_result;
 
@@ -284,14 +275,8 @@ async function generateDockerfileImpl(
       );
     }
 
-    // Progress: Processing
-    if (context && 'progressReporter' in context && context.progressReporter) {
-      await reportProgress(
-        context.progressReporter as ProgressReporter,
-        'Generating Dockerfile',
-        50,
-      );
-    }
+    // Progress: Main generation phase (AI or template)
+    if (progress) await progress('EXECUTING');
 
     // Generate Dockerfile with AI or fallback
     const aiResult = await aiGenerate(logger, context as any, {
@@ -335,10 +320,8 @@ async function generateDockerfileImpl(
       baseImageUsed = fallbackResult.value.baseImage;
     }
 
-    // Progress: Finalizing
-    if (context && 'progressReporter' in context && context.progressReporter) {
-      await reportProgress(context.progressReporter as ProgressReporter, 'Writing Dockerfile', 90);
-    }
+    // Progress: Finalizing and writing to disk
+    if (progress) await progress('FINALIZING');
 
     // Determine output path
     const repoPath =
@@ -372,9 +355,9 @@ async function generateDockerfileImpl(
       fixes: [],
     };
 
-    // Update session with Dockerfile result using standardized helper
-    const updateResult = await updateSessionData(
-      session.id,
+    // Update session with Dockerfile result using simplified helper
+    const updateResult = await updateSession(
+      sessionId,
       {
         dockerfile_result: dockerfileResult,
         completed_steps: [...((sessionData as any)?.completed_steps || []), 'dockerfile'],
@@ -386,7 +369,6 @@ async function generateDockerfileImpl(
           ai_enhancement_used: aiUsed,
         },
       },
-      logger,
       context,
     );
 
@@ -398,13 +380,7 @@ async function generateDockerfileImpl(
     }
 
     // Progress: Complete
-    if (context && 'progressReporter' in context && context.progressReporter) {
-      await reportProgress(
-        context.progressReporter as ProgressReporter,
-        'Dockerfile generated successfully',
-        100,
-      );
-    }
+    if (progress) await progress('COMPLETE');
 
     timer.end({ path: dockerfilePath });
 
@@ -416,7 +392,7 @@ async function generateDockerfileImpl(
       optimization,
       multistage,
       ...(warnings.length > 0 && { warnings }),
-      sessionId: session.id,
+      sessionId,
     });
   } catch (error) {
     timer.error(error);
@@ -426,18 +402,11 @@ async function generateDockerfileImpl(
 }
 
 /**
- * Wrapped generate Dockerfile tool with standardized behavior
+ * Generate Dockerfile tool with selective progress reporting
  */
-export const generateDockerfileTool = wrapTool('generate-dockerfile', generateDockerfileImpl);
+export const generateDockerfile = generateDockerfileImpl;
 
 /**
- * Legacy function export for backward compatibility during migration
+ * Default export
  */
-export async function generateDockerfile(
-  config: GenerateDockerfileConfig,
-  logger: Logger,
-  context?: ToolContext,
-): Promise<Result<GenerateDockerfileResult>> {
-  const unifiedContext: ToolContext = context || { logger };
-  return generateDockerfileImpl(config, unifiedContext);
-}
+export default generateDockerfile;

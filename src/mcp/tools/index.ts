@@ -6,30 +6,30 @@
  *
  * @example Basic tool implementation using helpers
  * ```typescript
- * import { wrapTool, resolveSession, aiGenerate, formatStandardResponse } from '@mcp/tools';
+ * import { getSession, updateSession, aiGenerate, formatStandardResponse } from '@mcp/tools';
  *
- * export const myTool = wrapTool('my-tool', async (params, context, logger) => {
- *   // 1. Session resolution (optional sessionId)
- *   const sess = await resolveSession(logger, context, {
- *     sessionId: params.sessionId,
- *     defaultIdHint: computeHash(params)
- *   });
+ * export const myTool = async (params, context) => {
+ *   // 1. Simple session resolution
+ *   const sess = await getSession(params.sessionId, context);
+ *   if (!sess.ok) return Failure(sess.error);
  *
  *   // 2. AI generation with registry
- *   const result = await aiGenerate(logger, context, {
+ *   const result = await aiGenerate(context.logger, context, {
  *     promptName: 'my-prompt',
  *     promptArgs: params,
  *     expectation: 'json'
  *   });
  *
- *   // 3. Session mutation
+ *   // 3. Simple session update
  *   if (result.ok) {
- *     await appendCompletedStep(sess.value.id, 'my-step');
+ *     await updateSession(sess.value.id, {
+ *       completed_steps: [...(sess.value.state.completed_steps || []), 'my-step']
+ *     }, context);
  *   }
  *
  *   // 4. Return standardized response
  *   return formatStandardResponse(result, sess.value.id);
- * });
+ * };
  * ```
  */
 
@@ -40,12 +40,11 @@
 /**
  * Session management utilities for consistent session handling across tools.
  *
- * @example Resolving a session with optional sessionId
+ * @example Getting a session with optional sessionId
  * ```typescript
- * const sess = await resolveSession(logger, context, {
- *   sessionId: params.sessionId,  // Always optional
- *   defaultIdHint: computeHash(params.repoPath)
- * });
+ * const sess = await getSession(params.sessionId, context);
+ * if (!sess.ok) return Failure(sess.error);
+ * const { id: sessionId, state } = sess.value;
  * ```
  */
 export * from './session-helpers';
@@ -75,21 +74,21 @@ export * from './ai-helpers';
 // =============================================================================
 
 /**
- * Consistent tool execution wrapper with standardized error handling and progress reporting.
+ * DEPRECATED: Tool wrapper has been eliminated. All tools now use direct implementation.
+ * Use selective progress reporting with createStandardProgress() instead.
  *
- * @example Wrapping a tool implementation
+ * @example Direct tool implementation (current pattern)
  * ```typescript
- * export const myTool = wrapTool('my-tool', async (params, context, logger) => {
- *   // Implementation automatically gets:
- *   // - Standard progress reporting (4 stages)
- *   // - Consistent error handling
- *   // - Unified logging context
- *   // - Structured response formatting
- *   return await doMyToolLogic(params);
- * });
+ * async function myToolImpl(params: MyParams, context: ToolContext): Promise<Result<MyResult>> {
+ *   const progress = context.progress ? createStandardProgress(context.progress) : undefined;
+ *   if (progress) await progress('VALIDATING');
+ *   // Implementation logic
+ *   if (progress) await progress('COMPLETE');
+ *   return Success(result);
+ * }
+ * export const myTool = myToolImpl;
  * ```
  */
-export { wrapTool } from './tool-wrapper';
 
 // =============================================================================
 // RESPONSE FORMATTING
@@ -136,18 +135,9 @@ export { createStandardProgress, STANDARD_STAGES } from '../utils/progress-helpe
 /**
  * Re-export commonly used types for convenience
  */
-export type { SessionResolutionOptions, ResolvedSession } from './session-helpers';
-
 export type { AIGenerateOptions, AIResponse } from './ai-helpers';
 
-export type { StandardToolResponse, ToolImplementation, ToolHandler } from './tool-wrapper';
-
-export type {
-  StandardToolResponse as ToolResponse,
-  DockerfileResponse,
-  ManifestResponse,
-  AnalysisResponse,
-} from './response-formatter';
+export type { DockerfileResponse, ManifestResponse, AnalysisResponse } from './response-formatter';
 
 // =============================================================================
 // UTILITY EXPORTS

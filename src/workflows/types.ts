@@ -1,19 +1,41 @@
-// Workflow types - simplified for core functionality
+/**
+ * Workflow type definitions for containerization pipelines
+ *
+ * Provides standardized interfaces for multi-step containerization workflows
+ * including progress tracking, error handling, and result reporting.
+ */
 
 import type { Logger } from 'pino';
 
+/**
+ * Base parameters required by all workflow implementations
+ *
+ * Common configuration shared across different workflow types.
+ */
 export interface BaseWorkflowParams {
   sessionId: string;
   repoPath: string;
   logger: Logger;
 }
 
+/**
+ * Standard result format for workflow execution
+ *
+ * Provides consistent success/failure reporting with optional data and error details.
+ * All workflows should return this interface for predictable handling.
+ */
 export interface WorkflowResult {
   success: boolean;
   data?: unknown;
   error?: string;
 }
 
+/**
+ * Individual step within a workflow execution
+ *
+ * Tracks the lifecycle and results of each stage in a multi-step workflow.
+ * Used for progress reporting and debugging failed executions.
+ */
 export interface WorkflowStep {
   name: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
@@ -23,6 +45,12 @@ export interface WorkflowStep {
   output?: unknown;
 }
 
+/**
+ * Execution context shared across all steps in a workflow
+ *
+ * Maintains state, artifacts, and metadata throughout workflow execution.
+ * Provides a communication channel between workflow steps.
+ */
 export interface WorkflowContext {
   sessionId: string;
   steps: WorkflowStep[];
@@ -34,7 +62,12 @@ export interface WorkflowContext {
   currentStep?: string;
 }
 
-// Containerization workflow types
+/**
+ * Parameters for containerization workflow execution
+ *
+ * Defines the configuration and options for the complete containerization pipeline
+ * from repository analysis through image building and tagging.
+ */
 export interface ContainerizationWorkflowParams {
   sessionId: string;
   projectPath: string;

@@ -5,14 +5,22 @@
  * Uses standardized helpers for consistency
  */
 
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
-// import { formatStandardResponse } from '@mcp/tools/response-formatter'; // Not used directly, wrapped by wrapTool
-import type { ToolContext } from '../../domain/types/tool-context';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+// Removed wrapTool - using direct implementation
+import type { ToolContext } from '../../mcp/context/types';
 import { createDockerClient } from '../../lib/docker';
-import { createTimer, type Logger } from '../../lib/logger';
+import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
-import type { TagImageParams } from './schema';
+import { z } from 'zod';
+
+// Schema definition (consolidated from schema.ts)
+export const tagImageSchema = z.object({
+  sessionId: z.string().optional().describe('Session identifier for tracking operations'),
+  imageId: z.string().optional().describe('Docker image ID to tag'),
+  tag: z.string().optional().describe('New tag to apply'),
+});
+
+export type TagImageParams = z.infer<typeof tagImageSchema>;
 
 export interface TagImageResult {
   success: boolean;
@@ -22,13 +30,17 @@ export interface TagImageResult {
 }
 
 /**
- * Core tag image implementation
+ * Tag image implementation - direct execution without wrapper
  */
 async function tagImageImpl(
   params: TagImageParams,
   context: ToolContext,
 ): Promise<Result<TagImageResult>> {
-  const logger = context.logger;
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+  const logger = context.logger || createLogger({ name: 'tag-image' });
   const timer = createTimer(logger, 'tag-image');
 
   try {
@@ -39,11 +51,7 @@ async function tagImageImpl(
     }
 
     // Resolve session (now always optional)
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: 'tag-image',
-      createIfNotExists: true,
-    });
+    const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
@@ -82,7 +90,7 @@ async function tagImageImpl(
     const tags = [tag];
 
     // Update session with tag information using standardized helper
-    const updateResult = await updateSessionData(
+    const updateResult = await updateSession(
       sessionId,
       {
         build_result: {
@@ -92,7 +100,6 @@ async function tagImageImpl(
         },
         completed_steps: [...(session.completed_steps || []), 'tag'],
       },
-      logger,
       context,
     );
 
@@ -118,19 +125,11 @@ async function tagImageImpl(
 }
 
 /**
- * Wrapped tag image tool with standardized behavior
+ * Tag image tool
  */
-export const tagImageTool = wrapTool('tag-image', tagImageImpl);
+export const tagImage = tagImageImpl;
 
 /**
- * Legacy export for backward compatibility during migration
+ * Default export
  */
-export const tagImage = async (
-  params: TagImageParams,
-  logger: Logger,
-  context?: ToolContext,
-): Promise<Result<TagImageResult>> => {
-  // Create minimal context if not provided
-  const unifiedContext: ToolContext = context || { logger };
-  return tagImageImpl(params, unifiedContext);
-};
+export default tagImage;

@@ -5,12 +5,11 @@
  * Uses standardized helpers for consistency
  */
 
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
-// import { formatStandardResponse } from '@mcp/tools/response-formatter'; // Not used directly, wrapped by wrapTool
-import type { ExtendedToolContext } from '../shared-types';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+// Removed wrapTool - using direct implementation
+import type { ToolContext } from '../../mcp/context/types';
 import { createDockerClient } from '../../lib/docker';
-import { createTimer, type Logger } from '../../lib/logger';
+import { createTimer, createLogger } from '../../lib/logger';
 import {
   Success,
   Failure,
@@ -18,7 +17,23 @@ import {
   // updateWorkflowState, // Not used directly
   // type WorkflowState, // Not used directly
 } from '../../domain/types';
-import type { PushImageParams } from './schema';
+import { z } from 'zod';
+
+// Schema definition (consolidated from schema.ts)
+export const pushImageSchema = z.object({
+  sessionId: z.string().optional().describe('Session identifier for tracking operations'),
+  imageId: z.string().optional().describe('Docker image ID to push'),
+  registry: z.string().optional().describe('Target registry URL'),
+  credentials: z
+    .object({
+      username: z.string(),
+      password: z.string(),
+    })
+    .optional()
+    .describe('Registry credentials'),
+});
+
+export type PushImageParams = z.infer<typeof pushImageSchema>;
 
 export interface PushImageResult {
   success: boolean;
@@ -29,25 +44,24 @@ export interface PushImageResult {
 }
 
 /**
- * Core push image implementation
+ * Push image implementation - direct execution without wrapper
  */
 async function pushImageImpl(
   params: PushImageParams,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<PushImageResult>> {
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+  const logger = context.logger || createLogger({ name: 'push-image' });
   const timer = createTimer(logger, 'push-image');
 
   try {
     const { registry = 'docker.io' } = params;
-    // const { credentials } = params; // TODO: implement credential handling
 
     // Resolve session (now always optional)
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: 'push-image',
-      createIfNotExists: true,
-    });
+    const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
@@ -89,7 +103,7 @@ async function pushImageImpl(
     const { digest } = pushResult.value;
 
     // Update session with push results using standardized helper
-    const updateResult = await updateSessionData(
+    const updateResult = await updateSession(
       sessionId,
       {
         completed_steps: [...(session.completed_steps || []), 'push'],
@@ -103,7 +117,6 @@ async function pushImageImpl(
           },
         },
       },
-      logger,
       context,
     );
 
@@ -142,17 +155,11 @@ async function pushImageImpl(
 }
 
 /**
- * Wrapped push image tool with standardized behavior
+ * Push image tool
  */
-export const pushImageTool = wrapTool('push-image', pushImageImpl);
+export const pushImage = pushImageImpl;
 
 /**
- * Legacy export for backward compatibility during migration
+ * Default export
  */
-export const pushImage = async (
-  params: PushImageParams,
-  logger: Logger,
-  context?: ExtendedToolContext,
-): Promise<Result<PushImageResult>> => {
-  return pushImageImpl(params, context || {}, logger);
-};
+export default pushImage;

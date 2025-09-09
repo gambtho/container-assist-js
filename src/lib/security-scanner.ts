@@ -25,7 +25,7 @@ export interface VulnerabilityFinding {
   description?: string;
 }
 
-export interface ScanResult {
+export interface SecurityScanResult {
   vulnerabilities: VulnerabilityFinding[];
   summary: {
     total: number;
@@ -57,7 +57,7 @@ export interface SecretScanResult {
 }
 
 export interface SecurityReport {
-  vulnerabilityResults: ScanResult;
+  vulnerabilityResults: SecurityScanResult;
   secretResults: SecretScanResult;
   summary: {
     totalIssues: number;
@@ -74,11 +74,11 @@ export async function scanImage(
   imageId: string,
   options: ScanOptions,
   logger: Logger,
-): Promise<Result<ScanResult>> {
+): Promise<Result<SecurityScanResult>> {
   logger.info({ imageId, options }, 'Mock security scan');
 
   // Mock implementation - replace with actual scanner integration
-  const result: ScanResult = {
+  const result: SecurityScanResult = {
     vulnerabilities: [],
     summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, unknown: 0 },
     passed: true,
@@ -110,7 +110,7 @@ export class SecurityScanner {
   /**
    * Scan Docker image for vulnerabilities
    */
-  async scanImage(imageId: string, options?: ScanOptions): Promise<Result<ScanResult>> {
+  async scanImage(imageId: string, options?: ScanOptions): Promise<Result<SecurityScanResult>> {
     try {
       const validationResult = this.validateScanOptions(options);
       if (isFail(validationResult)) {
@@ -174,7 +174,7 @@ export class SecurityScanner {
   /**
    * Scan filesystem for vulnerabilities
    */
-  async scanFilesystem(path: string, options?: ScanOptions): Promise<Result<ScanResult>> {
+  async scanFilesystem(path: string, options?: ScanOptions): Promise<Result<SecurityScanResult>> {
     try {
       this.logger.info({ path }, 'Starting filesystem scan');
 
@@ -341,7 +341,7 @@ export class SecurityScanner {
     return severityLevels[minSeverity as keyof typeof severityLevels] || 'CRITICAL,HIGH,MEDIUM,LOW';
   }
 
-  private parseTrivyOutput(output: string): Result<ScanResult> {
+  private parseTrivyOutput(output: string): Result<SecurityScanResult> {
     try {
       const trivyResult = JSON.parse(output);
       const vulnerabilities: VulnerabilityFinding[] = [];
@@ -457,7 +457,10 @@ export class SecurityScanner {
     }
   }
 
-  private calculateRiskScore(vulnResult: ScanResult, secretResult: SecretScanResult): number {
+  private calculateRiskScore(
+    vulnResult: SecurityScanResult,
+    secretResult: SecretScanResult,
+  ): number {
     const vulnerabilityScore =
       vulnResult.summary.critical * 10 +
       vulnResult.summary.high * 7 +
@@ -472,7 +475,10 @@ export class SecurityScanner {
     return vulnerabilityScore + secretScore;
   }
 
-  private getHighestSeverity(vulnResult: ScanResult, secretResult: SecretScanResult): string {
+  private getHighestSeverity(
+    vulnResult: SecurityScanResult,
+    secretResult: SecretScanResult,
+  ): string {
     if (vulnResult.summary.critical > 0) return 'CRITICAL';
     if (vulnResult.summary.high > 0 || secretResult.summary.high > 0) return 'HIGH';
     if (vulnResult.summary.medium > 0 || secretResult.summary.medium > 0) return 'MEDIUM';

@@ -48,9 +48,9 @@ export const ANALYSIS_PERSPECTIVES: Record<AnalysisPerspective, PerspectiveConfi
 };
 
 /**
- * Enhance analysis result with perspective-specific insights
+ * Apply perspective-specific insights to analysis result
  */
-export function enhanceAnalysisWithPerspective(
+export function applyAnalysisPerspective(
   baseAnalysis: AnalyzeRepoResult,
   perspective: AnalysisPerspective,
   logger: Logger,
@@ -58,18 +58,18 @@ export function enhanceAnalysisWithPerspective(
   try {
     const config = ANALYSIS_PERSPECTIVES[perspective];
 
-    // Create enhanced recommendations based on perspective
-    const enhancedRecommendations = {
+    // Create perspective-based recommendations
+    const perspectiveRecommendations = {
       ...baseAnalysis.recommendations,
       perspective,
       perspectiveInsights: config.emphasis,
       additionalRecommendations: generatePerspectiveRecommendations(baseAnalysis, config, logger),
     };
 
-    // Create enhanced result
-    const enhancedResult: AnalyzeRepoResult = {
+    // Create result with perspective applied
+    const analysisWithPerspective: AnalyzeRepoResult = {
       ...baseAnalysis,
-      recommendations: enhancedRecommendations,
+      recommendations: perspectiveRecommendations,
       metadata: baseAnalysis.metadata
         ? {
             repoPath: baseAnalysis.metadata.repoPath,
@@ -92,16 +92,16 @@ export function enhanceAnalysisWithPerspective(
       {
         perspective,
         insights: config.emphasis.length,
-        recommendations: enhancedRecommendations.additionalRecommendations.length,
+        recommendations: perspectiveRecommendations.additionalRecommendations.length,
       },
-      'Analysis enhanced with perspective',
+      'Analysis with perspective applied',
     );
 
-    return Success(enhancedResult);
+    return Success(analysisWithPerspective);
   } catch (error) {
-    logger.error({ error, perspective }, 'Failed to enhance analysis with perspective');
+    logger.error({ error, perspective }, 'Failed to apply analysis perspective');
     return Failure(
-      `Perspective enhancement failed: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to apply perspective: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }

@@ -20,26 +20,14 @@
  */
 
 import * as yaml from 'js-yaml';
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
-import type { ToolContext } from '../../domain/types/tool-context';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import { createStandardProgress } from '@mcp/utils/progress-helper';
+import type { ToolContext } from '../../mcp/context/types';
 import { createKubernetesClient } from '../../lib/kubernetes';
-import { createTimer, type Logger } from '../../lib/logger';
+import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
 import type { DeployApplicationParams } from './schema';
-
-// interface K8sManifest {
-//   apiVersion: string;
-//   kind: string;
-//   metadata: {
-//     name: string;
-//     namespace?: string;
-//     labels?: Record<string, string>;
-//     annotations?: Record<string, string>;
-//   };
-//   spec?: Record<string, unknown>;
-// }
 
 export interface DeployApplicationResult {
   success: boolean;
@@ -104,26 +92,26 @@ function orderManifests(manifests: unknown[]): unknown[] {
 }
 
 /**
- * Core deployment implementation
+ * Deploy application implementation with selective progress reporting
  */
 async function deployApplicationImpl(
   params: DeployApplicationParams,
   context: ToolContext,
 ): Promise<Result<DeployApplicationResult>> {
-  const logger = context.logger;
+  // Basic parameter validation
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+
+  // Progress reporting for complex deployment operations
+  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
+  const logger = context.logger || createLogger({ name: 'deploy-application' });
   const timer = createTimer(logger, 'deploy-application');
 
   // Extract abort signal from context if available
-  // const abortSignal = context?.abortSignal; // TODO: implement abort handling
 
   try {
-    const {
-      // imageId, // TODO: use imageId when implementing actual deployment
-      namespace = 'default',
-      replicas = 1,
-      // port = 8080, // TODO: use port when implementing actual deployment
-      environment = 'development',
-    } = params;
+    const { namespace = 'default', replicas = 1, environment = 'development' } = params;
 
     const cluster = 'default';
     const dryRun = false;
@@ -132,12 +120,11 @@ async function deployApplicationImpl(
 
     logger.info({ namespace, cluster, dryRun, environment }, 'Starting application deployment');
 
+    // Progress: Validation phase
+    if (progress) await progress('VALIDATING');
+
     // Resolve session (now always optional)
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: 'deploy',
-      createIfNotExists: true,
-    });
+    const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
@@ -170,6 +157,9 @@ async function deployApplicationImpl(
       { manifestCount: orderedManifests.length, dryRun, namespace },
       'Deploying manifests to Kubernetes',
     );
+
+    // Progress: Main execution phase
+    if (progress) await progress('EXECUTING');
 
     // Deploy manifests
     const deployedResources: Array<{ kind: string; name: string; namespace: string }> = [];
@@ -298,7 +288,7 @@ async function deployApplicationImpl(
     }
 
     // Update session with deployment result using standardized helper
-    const updateResult = await updateSessionData(
+    const updateResult = await updateSession(
       sessionId,
       {
         deployment_result: {
@@ -323,7 +313,6 @@ async function deployApplicationImpl(
         },
         completed_steps: [...(session.completed_steps || []), 'deploy'],
       },
-      logger,
       context,
     );
 
@@ -334,11 +323,17 @@ async function deployApplicationImpl(
       );
     }
 
+    // Progress: Finalizing results
+    if (progress) await progress('FINALIZING');
+
     timer.end({ deploymentName, ready, sessionId });
     logger.info(
       { sessionId, deploymentName, serviceName, ready, namespace },
       'Kubernetes deployment completed',
     );
+
+    // Progress: Complete
+    if (progress) await progress('COMPLETE');
 
     return Success({
       success: true,
@@ -370,18 +365,11 @@ async function deployApplicationImpl(
 }
 
 /**
- * Wrapped deploy tool with standardized behavior
+ * Deploy application tool with selective progress reporting
  */
-export const deployApplicationTool = wrapTool('deploy', deployApplicationImpl);
+export const deployApplication = deployApplicationImpl;
 
 /**
- * Legacy export for backward compatibility during migration
+ * Default export
  */
-export const deployApplication = async (
-  params: DeployApplicationParams,
-  logger: Logger,
-  context?: ToolContext,
-): Promise<Result<DeployApplicationResult>> => {
-  const unifiedContext: ToolContext = context || { logger };
-  return deployApplicationImpl(params, unifiedContext);
-};
+export default deployApplication;

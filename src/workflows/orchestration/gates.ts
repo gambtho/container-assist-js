@@ -32,9 +32,9 @@ export interface AnalysisResult {
 }
 
 /**
- * Scan result interface for gate checking
+ * Gate scan result interface for gate checking
  */
-export interface ScanResult {
+export interface GateScanResult {
   vulnerabilities: {
     critical: number;
     high: number;
@@ -122,7 +122,7 @@ export class StageGates {
   /**
    * Check if scan results meet security thresholds
    */
-  async checkScanGate(scanResult: ScanResult): Promise<Result<GateResult>> {
+  async checkScanGate(scanResult: GateScanResult): Promise<Result<GateResult>> {
     const { critical, high, medium } = scanResult.vulnerabilities;
     const thresholds = config.orchestrator.scanThresholds;
 
@@ -303,7 +303,7 @@ export class StageGates {
       case 'analysis':
         return this.checkAnalysisGate(data as AnalysisResult);
       case 'scan':
-        return this.checkScanGate(data as ScanResult);
+        return this.checkScanGate(data as GateScanResult);
       case 'build':
         return this.checkBuildGate(data as BuildResult);
       case 'deploy':

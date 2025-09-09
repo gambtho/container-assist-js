@@ -84,7 +84,7 @@ describe('tagImage', () => {
     });
 
     it('should successfully tag image with repository and tag', async () => {
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -119,7 +119,7 @@ describe('tagImage', () => {
     it('should handle tag without explicit version (defaults to latest)', async () => {
       config.tag = 'myapp';
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -141,7 +141,7 @@ describe('tagImage', () => {
       for (const testCase of testCases) {
         config.tag = testCase.input;
 
-        const result = await tagImage(config, mockLogger);
+        const result = await tagImage(config, { logger: mockLogger });
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -180,7 +180,7 @@ describe('tagImage', () => {
         repo_path: '/test/repo',
       });
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockSessionManager.update).toHaveBeenCalledWith(
@@ -230,7 +230,7 @@ describe('tagImage', () => {
 
       for (const tag of validTags) {
         config.tag = tag;
-        const result = await tagImage(config, mockLogger);
+        const result = await tagImage(config, { logger: mockLogger });
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -256,7 +256,7 @@ describe('tagImage', () => {
       for (const testCase of testCases) {
         config.tag = testCase.tag;
         
-        const result = await tagImage(config, mockLogger);
+        const result = await tagImage(config, { logger: mockLogger });
 
         expect(result.ok).toBe(true);
         expect(mockDockerClient.tagImage).toHaveBeenCalledWith(
@@ -287,7 +287,7 @@ describe('tagImage', () => {
       "updatedAt": "2025-09-08T11:12:40.362Z"
 });
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(mockSessionManager.get).toHaveBeenCalledWith('test-session-123');
       expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
@@ -299,7 +299,7 @@ describe('tagImage', () => {
         repo_path: '/test/repo',
       });
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -322,7 +322,7 @@ describe('tagImage', () => {
         repo_path: '/test/repo',
       });
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -345,7 +345,7 @@ describe('tagImage', () => {
 
       config.tag = ''; // Empty tag
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -370,7 +370,7 @@ describe('tagImage', () => {
         createFailureResult('Failed to create tag: image not found')
       );
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -395,7 +395,7 @@ describe('tagImage', () => {
         createFailureResult(null as any) // No error message
       );
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -418,7 +418,7 @@ describe('tagImage', () => {
 
       mockDockerClient.tagImage.mockRejectedValue(new Error('Docker daemon not responding'));
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -444,7 +444,7 @@ describe('tagImage', () => {
       mockDockerClient.tagImage.mockResolvedValue(createSuccessResult({}));
       mockSessionManager.update.mockRejectedValue(new Error('Failed to update session state'));
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       // Should still succeed even if session update fails
       expect(result.ok).toBe(true);
@@ -479,7 +479,7 @@ describe('tagImage', () => {
         repo_path: '/test/repo',
       });
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockSessionManager.update).toHaveBeenCalledWith(
@@ -508,7 +508,7 @@ describe('tagImage', () => {
         repo_path: '/test/repo',
       });
 
-      const result = await tagImage(config, mockLogger);
+      const result = await tagImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockSessionManager.update).toHaveBeenCalledWith(
@@ -569,7 +569,7 @@ describe('tagImage', () => {
 
       for (const tag of tags) {
         config.tag = tag;
-        const result = await tagImage(config, mockLogger);
+        const result = await tagImage(config, { logger: mockLogger });
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -593,7 +593,7 @@ describe('tagImage', () => {
 
   describe('Tool Instance', () => {
     it('should provide correctly configured tool instance', async () => {
-      const { tagImageTool } = await import('../../../src/tools/tag-image');
+      const { tagImage: tagImageTool } = await import('../../../src/tools/tag-image');
 
       // The wrapped tool is now a function directly
       expect(typeof tagImageTool).toBe('function');

@@ -22,11 +22,11 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
-import type { ToolContext } from '../../domain/types/tool-context';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import { createStandardProgress } from '@mcp/utils/progress-helper';
+import type { ToolContext } from '../../mcp/context/types';
 import { createDockerClient } from '../../lib/docker';
-import { createTimer, type Logger } from '../../lib/logger';
+import { createTimer, createLogger } from '../../lib/logger';
 import { type Result, Success, Failure } from '../../domain/types';
 import type { BuildImageParams } from './schema';
 /**
@@ -149,13 +149,20 @@ function analyzeBuildSecurity(dockerfile: string, buildArgs: Record<string, stri
 }
 
 /**
- * Core build image implementation
+ * Build image implementation - direct execution with selective progress
  */
 async function buildImageImpl(
   params: BuildImageParams,
   context: ToolContext,
 ): Promise<Result<BuildImageResult>> {
-  const logger = context.logger;
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+
+  // Optional progress reporting for complex operations (Docker build process)
+  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
+  const logger = context.logger || createLogger({ name: 'build-image' });
   const timer = createTimer(logger, 'build-image');
 
   try {
@@ -171,15 +178,13 @@ async function buildImageImpl(
 
     logger.info({ context: buildContext, dockerfile, tags }, 'Starting Docker image build');
 
+    // Progress: Validating build parameters and environment
+    if (progress) await progress('VALIDATING');
+
     const startTime = Date.now();
 
-    // Resolve session (now always optional)
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: 'build-image',
-      createIfNotExists: true,
-    });
-
+    // Get or create session
+    const sessionResult = await getSession(params.sessionId, context);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
@@ -253,6 +258,9 @@ async function buildImageImpl(
       }
     }
 
+    // Progress: Main build phase (Docker build execution)
+    if (progress) await progress('EXECUTING');
+
     // Build the image
     const buildResult = await dockerClient.buildImage(buildOptions);
 
@@ -262,9 +270,12 @@ async function buildImageImpl(
 
     const buildTime = Date.now() - startTime;
 
-    // Update session with build result using standardized helper
+    // Progress: Finalizing build results and updating session
+    if (progress) await progress('FINALIZING');
+
+    // Update session with build result using simplified helper
     const finalTags = tags.length > 0 ? tags : imageName ? [imageName] : [];
-    const updateResult = await updateSessionData(
+    const updateResult = await updateSession(
       sessionId,
       {
         build_result: {
@@ -281,7 +292,6 @@ async function buildImageImpl(
         },
         completed_steps: [...(session.completed_steps || []), 'build-image'],
       },
-      logger,
       context,
     );
 
@@ -291,6 +301,9 @@ async function buildImageImpl(
 
     timer.end({ imageId: buildResult.value.imageId, buildTime });
     logger.info({ imageId: buildResult.value.imageId, buildTime }, 'Docker image build completed');
+
+    // Progress: Complete
+    if (progress) await progress('COMPLETE');
 
     return Success({
       success: true,
@@ -314,18 +327,6 @@ async function buildImageImpl(
 }
 
 /**
- * Wrapped build image tool with standardized behavior
+ * Build image tool with selective progress reporting
  */
-export const buildImageTool = wrapTool('build-image', buildImageImpl);
-
-/**
- * Legacy export for backward compatibility during migration
- */
-export const buildImage = async (
-  params: BuildImageParams,
-  logger: Logger,
-  context?: ToolContext,
-): Promise<Result<BuildImageResult>> => {
-  const unifiedContext: ToolContext = context || { logger };
-  return buildImageImpl(params, unifiedContext);
-};
+export const buildImage = buildImageImpl;

@@ -29,7 +29,7 @@ export interface AIGenerateOptions {
   /** Required prompt name from the registry */
   promptName: string;
   /** Arguments to pass to the prompt template */
-  promptArgs: Record<string, any>;
+  promptArgs: Record<string, unknown>;
   /** Expected response format for validation */
   expectation?: 'dockerfile' | 'yaml' | 'json' | 'text';
   /** Fallback behavior when AI fails */
@@ -333,7 +333,7 @@ export async function withAIFallback<T>(
  * @param context - Additional context for the error
  * @returns Structured error message
  */
-export function structureError(error: unknown, context?: Record<string, any>): string {
+export function structureError(error: unknown, context?: Record<string, unknown>): string {
   const baseError = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 
   if (!context || Object.keys(context).length === 0) {
@@ -358,7 +358,7 @@ export function structureError(error: unknown, context?: Record<string, any>): s
 export function aiError<T>(
   phase: 'prompt' | 'sampling' | 'validation' | 'processing',
   error: unknown,
-  context?: Record<string, any>,
+  context?: Record<string, unknown>,
 ): Result<T> {
   const message = structureError(error, { ...context, phase });
   return Failure(`AI ${phase} error: ${message}`);

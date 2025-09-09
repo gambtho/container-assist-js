@@ -21,16 +21,16 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import { createStandardProgress } from '@mcp/utils/progress-helper';
 import { aiGenerate } from '@mcp/tools/ai-helpers';
 import { getRecommendedBaseImage } from '../../lib/base-images';
-import type { ToolContext } from '../../domain/types/tool-context';
-import { createTimer, type Logger } from '../../lib/logger';
+import type { ToolContext } from '../../mcp/context/types';
+import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import type { AnalyzeRepoParams } from './schema';
 import { DEFAULT_PORTS } from '../../config/defaults';
-import { enhanceAnalysisWithPerspective, selectBestPerspective } from '../analysis-perspectives';
+import { applyAnalysisPerspective, selectBestPerspective } from '../analysis-perspectives';
 import type { AnalyzeRepoResult } from '../types';
 
 // Re-export for backward compatibility
@@ -343,13 +343,20 @@ function getSecurityRecommendations(
 }
 
 /**
- * Core repository analysis implementation
+ * Repository analysis implementation - direct execution with selective progress
  */
 async function analyzeRepoImpl(
   params: AnalyzeRepoParams,
   context: ToolContext,
 ): Promise<Result<AnalyzeRepoResult>> {
-  const logger = context.logger;
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+
+  // Optional progress reporting for complex operations
+  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
+  const logger = context.logger || createLogger({ name: 'analyze-repo' });
   const timer = createTimer(logger, 'analyze-repo');
 
   try {
@@ -357,19 +364,17 @@ async function analyzeRepoImpl(
 
     logger.info({ repoPath, depth, includeTests }, 'Starting repository analysis');
 
+    // Progress: Starting analysis
+    if (progress) await progress('VALIDATING');
+
     // Validate repository path
     const validation = await validateRepositoryPath(repoPath);
     if (!validation.valid) {
       return Failure(validation.error ?? 'Invalid repository path');
     }
 
-    // Resolve session (now always optional)
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: 'analyze-repo',
-      createIfNotExists: true,
-    });
-
+    // Get or create session
+    const sessionResult = await getSession(params.sessionId, context);
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
     }
@@ -377,8 +382,15 @@ async function analyzeRepoImpl(
     const { id: sessionId, state: session } = sessionResult.value;
     logger.info({ sessionId, repoPath }, 'Starting repository analysis with session');
 
+    // Progress: Main analysis phase
+    if (progress) await progress('EXECUTING');
+
     // AI enhancement available through context
-    const hasAI = context.sampling && context.prompts;
+    const hasAI =
+      context.sampling &&
+      context.getPrompt &&
+      context.sampling !== null &&
+      context.getPrompt !== null;
 
     // Perform analysis
     const languageInfo = await detectLanguage(repoPath);
@@ -482,8 +494,8 @@ async function analyzeRepoImpl(
       },
     };
 
-    // Update session with analysis result using standardized helper
-    const updateResult = await updateSessionData(
+    // Update session with analysis result using simplified helper
+    const updateResult = await updateSession(
       sessionId,
       {
         analysis_result: {
@@ -519,7 +531,6 @@ async function analyzeRepoImpl(
         },
         completed_steps: [...(session?.completed_steps ?? []), 'analyze-repo'],
       },
-      logger,
       context,
     );
 
@@ -527,12 +538,15 @@ async function analyzeRepoImpl(
       logger.warn({ error: updateResult.error }, 'Failed to update session with analysis result');
     }
 
+    // Progress: Finalizing results
+    if (progress) await progress('FINALIZING');
+
     // Apply perspective enhancement if requested
     if ((params as any).usePerspectives) {
       const selectedPerspective = (params as any).perspective || selectBestPerspective(result, {});
 
-      const enhancedResult = enhanceAnalysisWithPerspective(result, selectedPerspective, logger);
-      if (enhancedResult.ok) {
+      const perspectiveResult = applyAnalysisPerspective(result, selectedPerspective, logger);
+      if (perspectiveResult.ok) {
         timer.end({ language: languageInfo.language, perspective: selectedPerspective });
         logger.info(
           {
@@ -542,17 +556,20 @@ async function analyzeRepoImpl(
           'Repository analysis completed with perspective',
         );
 
-        return Success(enhancedResult.value);
+        return Success(perspectiveResult.value);
       } else {
         logger.warn(
-          { error: enhancedResult.error },
-          'Perspective enhancement failed, returning base analysis',
+          { error: perspectiveResult.error },
+          'Failed to apply perspective, returning base analysis',
         );
       }
     }
 
     timer.end({ language: languageInfo.language });
     logger.info({ language: languageInfo.language }, 'Repository analysis completed');
+
+    // Progress: Complete
+    if (progress) await progress('COMPLETE');
 
     return Success(result);
   } catch (error) {
@@ -564,18 +581,11 @@ async function analyzeRepoImpl(
 }
 
 /**
- * Wrapped analyze repo tool with standardized behavior
+ * Analyze repository tool with selective progress reporting
  */
-export const analyzeRepoTool = wrapTool('analyze-repo', analyzeRepoImpl);
+export const analyzeRepo = analyzeRepoImpl;
 
 /**
- * Legacy export for backward compatibility during migration
+ * Default export
  */
-export const analyzeRepo = async (
-  params: AnalyzeRepoParams,
-  logger: Logger,
-  context?: ToolContext,
-): Promise<Result<AnalyzeRepoResult>> => {
-  const unifiedContext: ToolContext = context || { logger };
-  return analyzeRepoImpl(params, unifiedContext);
-};
+export default analyzeRepo;

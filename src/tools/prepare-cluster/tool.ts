@@ -19,11 +19,10 @@
  * ```
  */
 
-import { wrapTool } from '@mcp/tools/tool-wrapper';
-import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
-import type { ExtendedToolContext } from '../shared-types';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import type { ToolContext } from '../../mcp/context/types';
 import { createKubernetesClient } from '../../lib/kubernetes';
-import { createTimer, type Logger } from '../../lib/logger';
+import { createTimer, createLogger, type Logger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import type { PrepareClusterParams } from './schema';
 
@@ -182,13 +181,17 @@ async function checkIngressController(
 }
 
 /**
- * Core cluster preparation implementation
+ * Cluster preparation implementation - direct execution without wrapper
  */
 async function prepareClusterImpl(
   params: PrepareClusterParams,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<PrepareClusterResult>> {
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+  const logger = context.logger || createLogger({ name: 'prepare-cluster' });
   const timer = createTimer(logger, 'prepare-cluster');
 
   try {
@@ -203,11 +206,7 @@ async function prepareClusterImpl(
     logger.info({ cluster, namespace, environment }, 'Starting cluster preparation');
 
     // Resolve session (now always optional)
-    const sessionResult = await resolveSession(logger, context, {
-      ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-      defaultIdHint: 'prepare-cluster',
-      createIfNotExists: true,
-    });
+    const sessionResult = await getSession(params.sessionId, context);
 
     if (!sessionResult.ok) {
       return Failure(sessionResult.error);
@@ -267,7 +266,7 @@ async function prepareClusterImpl(
     const clusterReady = checks.connectivity && checks.permissions && checks.namespaceExists;
 
     // Update session with cluster preparation status using standardized helper
-    const updateResult = await updateSessionData(
+    const updateResult = await updateSession(
       sessionId,
       {
         cluster_preparation: {
@@ -287,7 +286,6 @@ async function prepareClusterImpl(
         },
         completed_steps: [...(session.completed_steps || []), 'prepare-cluster'],
       },
-      logger,
       context,
     );
 
@@ -330,17 +328,11 @@ async function prepareClusterImpl(
 }
 
 /**
- * Wrapped prepare cluster tool with standardized behavior
+ * Prepare cluster tool
  */
-export const prepareClusterTool = wrapTool('prepare-cluster', prepareClusterImpl);
+export const prepareCluster = prepareClusterImpl;
 
 /**
- * Legacy export for backward compatibility during migration
+ * Default export
  */
-export const prepareCluster = async (
-  params: PrepareClusterParams,
-  logger: Logger,
-  context?: ExtendedToolContext,
-): Promise<Result<PrepareClusterResult>> => {
-  return prepareClusterImpl(params, context || {}, logger);
-};
+export default prepareCluster;

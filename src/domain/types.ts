@@ -6,8 +6,6 @@
  */
 
 import type { Logger } from 'pino';
-import type { PromptRegistry } from '../prompts/prompt-registry';
-import type { SDKResourceManager } from '../resources/manager';
 import type { ToolContext } from '../mcp/context/types';
 
 // ===== RESULT TYPE SYSTEM =====
@@ -43,37 +41,6 @@ export type {
   PromptWithMessages,
   ProgressReporter,
 } from '../mcp/context/types';
-
-/**
- * MCP execution context for tools (legacy)
- * @deprecated Use ToolContext for new AI-enabled tools
- */
-export interface MCPContext {
-  /** Progress reporting token */
-  progressToken?: string | number;
-  /** Abort signal for cancellation */
-  abortSignal?: AbortSignal;
-  /** Prompt registry access */
-  promptRegistry?: PromptRegistry;
-  /** Resource manager access */
-  resourceManager?: SDKResourceManager;
-  /** Session manager access */
-  sessionManager?: SessionManager;
-  /** Application dependencies */
-  deps?: Record<string, unknown>;
-  /** Additional context properties */
-  [key: string]: unknown;
-}
-
-/**
- * Enhanced MCP context that includes both legacy and new AI capabilities
- * This allows gradual migration from MCPContext to ToolContext
- * @deprecated Use ToolContext directly for new implementations
- */
-export interface EnhancedMCPContext extends MCPContext {
-  /** New ToolContext for AI-enabled tools */
-  toolContext?: import('../mcp/context/types').ToolContext;
-}
 
 /**
  * Tool definition for MCP server operations.

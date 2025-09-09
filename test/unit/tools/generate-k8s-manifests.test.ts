@@ -52,13 +52,13 @@ jest.mock('../../../src/lib/session', () => ({
   createSessionManager: jest.fn(() => mockSessionManager),
 }));
 
-// Legacy ai-service module removed - using ToolContext pattern now
 
 jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => ({
     end: jest.fn(),
     error: jest.fn(),
   })),
+  createLogger: jest.fn(() => createMockLogger()),
 }));
 
 const mockFs = fs as jest.Mocked<typeof fs>;
@@ -106,20 +106,19 @@ build_result: {
     });
 
     it('should generate basic Kubernetes manifests with defaults', async () => {
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.ok).toBe(true);
         expect(result.value.sessionId).toBe('test-session-123');
-        expect(result.value.path).toMatch(/k8s\/manifests\.yaml$/);
+        expect(result.value.outputPath).toMatch(/k8s\/manifests\.yaml$/);
         expect(result.value.resources).toEqual([
           { kind: 'Deployment', name: 'myapp', namespace: 'production' },
           { kind: 'Service', name: 'myapp', namespace: 'production' },
         ]);
-        expect(result.value.manifests).toContain('"apiVersion": "apps/v1"');
-        expect(result.value.manifests).toContain('"kind": "Deployment"');
-        expect(result.value.manifests).toContain('"kind": "Service"');
+        expect(result.value.manifests).toContain('apiVersion: apps/v1');
+        expect(result.value.manifests).toContain('kind: Deployment');
+        expect(result.value.manifests).toContain('kind: Service');
         expect(result.value.manifests).toContain('myapp:v1.0');
       }
     });
@@ -145,7 +144,7 @@ build_result: {
     });
 
     it('should use image from build result', async () => {
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -159,7 +158,7 @@ build_result: {
         repo_path: '/test/repo',
       });
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -182,7 +181,7 @@ build_result: {
     it('should configure replicas correctly', async () => {
       config.replicas = 5;
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -193,7 +192,7 @@ build_result: {
     it('should configure container port correctly', async () => {
       config.port = 8080;
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -215,7 +214,7 @@ build_result: {
         },
       };
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -239,7 +238,7 @@ build_result: {
     });
 
     it('should generate ClusterIP service by default', async () => {
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -250,7 +249,7 @@ build_result: {
     it('should generate NodePort service when specified', async () => {
       config.serviceType = 'NodePort';
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -261,7 +260,7 @@ build_result: {
     it('should generate LoadBalancer service when specified', async () => {
       config.serviceType = 'LoadBalancer';
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -283,7 +282,7 @@ build_result: {
     });
 
     it('should not generate ingress by default', async () => {
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -296,7 +295,7 @@ build_result: {
       config.ingressEnabled = true;
       config.ingressHost = 'myapp.example.com';
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -314,7 +313,7 @@ build_result: {
     it('should generate ingress without host', async () => {
       config.ingressEnabled = true;
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -336,7 +335,7 @@ build_result: {
     });
 
     it('should not generate HPA by default', async () => {
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -353,7 +352,7 @@ build_result: {
         targetCPU: 70,
       };
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -374,7 +373,7 @@ build_result: {
         enabled: true,
       };
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -400,7 +399,7 @@ build_result: {
     it('should warn about single replica configuration', async () => {
       config.replicas = 1;
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -413,7 +412,7 @@ build_result: {
     it('should warn about missing resource limits', async () => {
       // No resources specified
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -431,7 +430,7 @@ build_result: {
         },
       };
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -444,7 +443,7 @@ build_result: {
     it('should warn about LoadBalancer costs', async () => {
       config.serviceType = 'LoadBalancer';
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -458,7 +457,7 @@ build_result: {
       config.ingressEnabled = true;
       // No ingressHost specified
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -479,7 +478,7 @@ build_result: {
     });
 
     it('should create k8s directory and write manifests', async () => {
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockFs.mkdir).toHaveBeenCalledWith('/test/repo/k8s', { recursive: true });
@@ -499,7 +498,7 @@ build_result: {
         repo_path: null,
       });
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockFs.mkdir).toHaveBeenCalledWith('k8s', { recursive: true });
@@ -523,7 +522,7 @@ build_result: {
     });
 
     it('should update session with K8s manifest results', async () => {
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockSessionManager.update).toHaveBeenCalledWith('test-session-123', {
@@ -564,7 +563,7 @@ build_result: {
       "updatedAt": "2025-09-08T11:12:40.362Z"
 });
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(mockSessionManager.get).toHaveBeenCalledWith('test-session-123');
       expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
@@ -581,7 +580,7 @@ build_result: {
 
       mockFs.mkdir.mockRejectedValue(new Error('Permission denied'));
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -600,7 +599,7 @@ build_result: {
 
       mockFs.writeFile.mockRejectedValue(new Error('Disk full'));
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -619,7 +618,7 @@ build_result: {
 
       mockAIService.generate.mockRejectedValue(new Error('AI service unavailable'));
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       // Should still generate manifests even if AI fails
@@ -643,7 +642,7 @@ build_result: {
     it('should generate properly formatted YAML with separators', async () => {
       config.ingressEnabled = true;
 
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -654,7 +653,7 @@ build_result: {
     });
 
     it('should include all required Kubernetes fields', async () => {
-      const result = await generateK8sManifests(config, mockLogger);
+      const result = await generateK8sManifests(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {

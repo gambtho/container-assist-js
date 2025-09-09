@@ -20,13 +20,13 @@
  * ```
  */
 
-import type { Logger } from 'pino';
 import { Result, Success, Failure } from '@types';
 import { analyzeRepo } from '@tools/analyze-repo';
 import { generateDockerfile } from '@tools/generate-dockerfile';
 import { buildImage } from '@tools/build-image';
 import { scanImage } from '@tools/scan';
 import { generateBestDockerfile } from './dockerfile-sampling';
+import type { ToolContext } from '../mcp/context/types';
 
 /**
  * Configuration for containerization workflow execution
@@ -92,11 +92,12 @@ export interface ContainerizationResult {
  */
 export const runContainerizationWorkflow = async (
   repoPath: string,
-  logger: Logger,
+  context: ToolContext,
   config: ContainerizationConfig = {},
 ): Promise<Result<ContainerizationResult>> => {
   const startTime = Date.now();
   const sessionId = `workflow-${Date.now()}`;
+  const logger = context.logger;
 
   logger.info({ repoPath, sessionId }, 'Starting containerization workflow');
 
@@ -123,7 +124,7 @@ export const runContainerizationWorkflow = async (
       }),
     };
 
-    const analysis = await analyzeRepo(analysisConfig, logger);
+    const analysis = await analyzeRepo(analysisConfig, context);
 
     if (!analysis.ok) {
       return Failure(`Analysis failed: ${analysis.error}`);
@@ -145,7 +146,7 @@ export const runContainerizationWorkflow = async (
           repoPath,
         },
         { environment: 'production' },
-        logger,
+        context.logger,
       );
     } else {
       // Standard approach: single Dockerfile with optimization and multi-stage build patterns
@@ -155,7 +156,7 @@ export const runContainerizationWorkflow = async (
           optimization: true,
           multistage: true,
         },
-        logger,
+        context,
       );
     }
 
@@ -179,7 +180,7 @@ export const runContainerizationWorkflow = async (
         tags: [`${sessionId}:latest`],
         buildArgs: config.buildArgs || {},
       },
-      logger,
+      context,
     );
 
     if (!buildResult.ok) {
@@ -196,7 +197,7 @@ export const runContainerizationWorkflow = async (
         scanner: 'trivy',
         severity: config.maxVulnerabilityLevel || 'high',
       },
-      logger,
+      context,
     );
 
     if (!scanResult.ok) {
@@ -261,11 +262,12 @@ export const runContainerizationWorkflow = async (
  */
 export const runBuildOnlyWorkflow = async (
   repoPath: string,
-  logger: Logger,
+  context: ToolContext,
   config: ContainerizationConfig = {},
 ): Promise<Result<{ imageId: string; duration: number }>> => {
   const startTime = Date.now();
   const sessionId = `build-${Date.now()}`;
+  const logger = context.logger;
 
   logger.info({ repoPath, sessionId }, 'Starting build-only workflow');
 
@@ -283,13 +285,13 @@ export const runBuildOnlyWorkflow = async (
       }),
     };
 
-    const analysis = await analyzeRepo(analysisConfig, logger);
+    const analysis = await analyzeRepo(analysisConfig, context);
     if (!analysis.ok) {
       return Failure(`Analysis failed: ${analysis.error}`);
     }
 
     // Generate Dockerfile
-    const dockerfileResult = await generateDockerfile({ sessionId }, logger);
+    const dockerfileResult = await generateDockerfile({ sessionId }, context);
     if (!dockerfileResult.ok) {
       return Failure(`Dockerfile generation failed: ${dockerfileResult.error}`);
     }
@@ -301,7 +303,7 @@ export const runBuildOnlyWorkflow = async (
         context: repoPath,
         buildArgs: config.buildArgs || {},
       },
-      logger,
+      context,
     );
 
     if (!buildResult.ok) {

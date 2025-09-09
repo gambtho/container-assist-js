@@ -1,2 +1,6 @@
-export { pushImageTool, pushImage } from './tool';
-export { pushImageSchema, type PushImageParams } from './schema';
+/**
+ * Push Image Tool - Public exports
+ */
+
+export { pushImage, pushImageSchema } from './tool';
+export type { PushImageParams, PushImageResult } from './tool';

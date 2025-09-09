@@ -1,14 +1,14 @@
 /**
- * Simplified Prompt Registry
+ * Prompt Registry
  *
- * Replaces the complex 1000+ line prompt registry with a simple file-based system.
- * Loads prompts from external YAML files and provides SDK-compatible interface.
+ * File-based prompt management system that loads prompts from external YAML files
+ * and provides SDK-compatible interface for containerization workflows.
  *
- * Key improvements:
- * - 80% reduction in code size (from ~1000 lines to ~200 lines)
- * - External prompt files for easy editing
- * - Simple template rendering
- * - Maintains backward compatibility
+ * Key features:
+ * - External YAML prompt files for easy editing
+ * - Template rendering with parameter substitution
+ * - MCP SDK compatibility
+ * - Validation and error handling
  */
 
 import type { Logger } from 'pino';
@@ -21,19 +21,34 @@ import {
   McpError,
   ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
-import { SimplePromptLoader, type PromptFile } from './loader';
-import { Result, Success, Failure } from '../../domain/types';
+import { SimplePromptLoader, type PromptFile, type ParameterSpec } from './loader';
+import { Result } from '../../domain/types';
 
 /**
- * Simplified Prompt Registry using external YAML files
+ * Prompt Registry for managing external YAML-based prompt templates
+ *
+ * This registry loads prompt templates from YAML files and provides a
+ * standardized interface for retrieving and formatting them. Supports
+ * parameterized prompts with argument substitution and validation.
+ *
+ * @example
+ * ```typescript
+ * const registry = new PromptRegistry(logger);
+ * await registry.initialize('./src/prompts');
+ *
+ * const prompt = await registry.getPrompt('dockerfile-generation', {
+ *   language: 'nodejs',
+ *   baseImage: 'node:18'
+ * });
+ * ```
  */
-export class SimplifiedPromptRegistry {
+export class PromptRegistry {
   private loader: SimplePromptLoader;
   private logger: Logger;
   private initialized = false;
 
   constructor(logger: Logger) {
-    this.logger = logger.child({ component: 'SimplifiedPromptRegistry' });
+    this.logger = logger.child({ component: 'PromptRegistry' });
     this.loader = new SimplePromptLoader(logger);
   }
 
@@ -43,7 +58,7 @@ export class SimplifiedPromptRegistry {
   async initialize(promptsDirectory?: string): Promise<Result<void>> {
     const directory = promptsDirectory || join(process.cwd(), 'src', 'prompts');
 
-    this.logger.info({ directory }, 'Initializing simplified prompt registry');
+    this.logger.info({ directory }, 'Initializing prompt registry');
 
     const result = await this.loader.loadFromDirectory(directory);
     if (result.ok) {
@@ -89,7 +104,7 @@ export class SimplifiedPromptRegistry {
   /**
    * Get a specific prompt (SDK-compatible)
    */
-  async getPrompt(name: string, args?: Record<string, any>): Promise<GetPromptResult> {
+  async getPrompt(name: string, args?: Record<string, unknown>): Promise<GetPromptResult> {
     this.ensureInitialized();
 
     const prompt = this.loader.getPrompt(name);
@@ -202,17 +217,6 @@ export class SimplifiedPromptRegistry {
   }
 
   /**
-   * Register a new prompt (for backward compatibility, not recommended)
-   * @deprecated Use external YAML files instead
-   */
-  register(prompt: any): void {
-    this.logger.warn(
-      { promptName: prompt.name },
-      'register() is deprecated, use external YAML files instead',
-    );
-  }
-
-  /**
    * Ensure registry is initialized before operations
    */
   private ensureInitialized(): void {
@@ -224,8 +228,8 @@ export class SimplifiedPromptRegistry {
   /**
    * Convert our parameter format to SDK PromptArgument format
    */
-  private convertParameters(parameters: any[]): PromptArgument[] {
-    return parameters.map(param => ({
+  private convertParameters(parameters: ParameterSpec[]): PromptArgument[] {
+    return parameters.map((param) => ({
       name: param.name,
       description: param.description,
       required: param.required || false,
@@ -236,11 +240,11 @@ export class SimplifiedPromptRegistry {
 /**
  * Factory function to create and initialize the registry
  */
-export async function createSimplifiedPromptRegistry(
+export async function createPromptRegistry(
   logger: Logger,
   promptsDirectory?: string,
-): Promise<SimplifiedPromptRegistry> {
-  const registry = new SimplifiedPromptRegistry(logger);
+): Promise<PromptRegistry> {
+  const registry = new PromptRegistry(logger);
   const result = await registry.initialize(promptsDirectory);
 
   if (!result.ok) {

@@ -43,6 +43,7 @@ jest.mock('../../../src/lib/docker', () => ({
 
 jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
+  createLogger: jest.fn(() => createMockLogger()),
 }));
 
 describe('pushImage', () => {
@@ -83,7 +84,7 @@ build_result: {
     });
 
     it('should successfully push image to registry', async () => {
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -145,7 +146,7 @@ build_result: {
         repo_path: '/test/repo',
       });
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -166,7 +167,7 @@ build_result: {
         repo_path: '/test/repo',
       });
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -187,7 +188,7 @@ build_result: {
         repo_path: '/test/repo',
       });
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -224,7 +225,7 @@ build_result: {
 
       for (const registry of registries) {
         config.registry = registry;
-        const result = await pushImage(config, mockLogger);
+        const result = await pushImage(config, { logger: mockLogger });
 
         expect(result.ok).toBe(true);
         if (result.ok) {
@@ -244,7 +245,7 @@ build_result: {
       config.username = 'myuser';
       config.password = 'mypassword';
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       // Authentication is typically handled by the Docker client internally
@@ -266,7 +267,7 @@ build_result: {
       "updatedAt": "2025-09-08T11:12:40.362Z"
 });
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(mockSessionManager.get).toHaveBeenCalledWith('test-session-123');
       expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
@@ -278,7 +279,7 @@ build_result: {
         repo_path: '/test/repo',
       });
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -296,7 +297,7 @@ build_result: {
         repo_path: '/test/repo',
       });
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -314,7 +315,7 @@ build_result: {
         repo_path: '/test/repo',
       });
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -332,7 +333,7 @@ build_result: {
         repo_path: '/test/repo',
       });
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -355,7 +356,7 @@ build_result: {
         createFailureResult('Registry authentication failed')
       );
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -377,7 +378,7 @@ build_result: {
         createFailureResult(null as any) // No error message
       );
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -397,7 +398,7 @@ build_result: {
 
       mockDockerClient.pushImage.mockRejectedValue(new Error('Network timeout'));
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -423,7 +424,7 @@ build_result: {
 
       mockSessionManager.update.mockRejectedValue(new Error('Failed to update session'));
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       // Should still succeed even if session update fails
       expect(result.ok).toBe(true);
@@ -453,7 +454,7 @@ build_result: {
         mockDockerClient.pushImage.mockResolvedValue(createSuccessResult({
 digest: 'sha256:abc123def456',
         }));
-        const result = await pushImage(config, mockLogger);
+        const result = await pushImage(config, { logger: mockLogger });
         expect(result.ok).toBe(true);
         expect(mockDockerClient.pushImage).toHaveBeenCalledWith(
 testCase.expectedRepo,
@@ -494,7 +495,7 @@ testCase.expectedTag
         mockDockerClient.pushImage.mockResolvedValue(createSuccessResult({
 digest: 'sha256:abc123def456',
         }));
-        const result = await pushImage(config, mockLogger);
+        const result = await pushImage(config, { logger: mockLogger });
         expect(result.ok).toBe(true);
         expect(mockDockerClient.pushImage).toHaveBeenCalledWith(
 testCase.expectedRepo,
@@ -527,7 +528,7 @@ metadata: {
     });
 
     it('should preserve existing workflow state when updating', async () => {
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockSessionManager.update).toHaveBeenCalledWith(
@@ -558,7 +559,7 @@ build_result: {
         repo_path: '/test/repo',
       });
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockSessionManager.update).toHaveBeenCalledWith(
@@ -580,7 +581,7 @@ build_result: {
         repo_path: '/test/repo',
       });
 
-      const result = await pushImage(config, mockLogger);
+      const result = await pushImage(config, { logger: mockLogger });
 
       expect(result.ok).toBe(true);
       expect(mockSessionManager.update).toHaveBeenCalledWith(

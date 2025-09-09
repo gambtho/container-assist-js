@@ -12,18 +12,35 @@ import type { Logger } from 'pino';
 import { Result, Success, Failure } from '../../domain/types';
 
 /**
- * Parameter specification for prompts
+ * Parameter specification for prompt templates
+ *
+ * Defines the structure and validation rules for parameters that can be
+ * substituted into prompt templates during rendering.
+ *
+ * @example
+ * ```typescript
+ * const param: ParameterSpec = {
+ *   name: 'language',
+ *   type: 'string',
+ *   required: true,
+ *   description: 'Programming language for the project',
+ *   default: 'javascript'
+ * };
+ * ```
  */
 export interface ParameterSpec {
   name: string;
   type: 'string' | 'number' | 'boolean' | 'array' | 'object';
   required: boolean;
   description: string;
-  default?: any;
+  default?: string | number | boolean | unknown[] | Record<string, unknown>;
 }
 
 /**
- * Prompt metadata from YAML files
+ * Prompt metadata extracted from YAML template files
+ *
+ * Contains descriptive information and parameter definitions for a prompt template.
+ * Used for validation, documentation, and dynamic UI generation.
  */
 export interface PromptMetadata {
   name: string;
@@ -34,7 +51,10 @@ export interface PromptMetadata {
 }
 
 /**
- * Complete prompt definition loaded from YAML
+ * Complete prompt template definition loaded from YAML files
+ *
+ * Represents a fully parsed prompt template including metadata, content template,
+ * and parameter specifications. Ready for rendering with user-provided arguments.
  */
 export interface PromptFile {
   metadata: PromptMetadata;
@@ -60,7 +80,7 @@ export class SimplePromptLoader {
     try {
       this.logger.info({ directory }, 'Loading prompts from directory');
 
-      const categories = await this.getCategories(directory);
+      const categories = await this.getDirectoryCategories(directory);
       let totalLoaded = 0;
 
       for (const category of categories) {
@@ -87,7 +107,10 @@ export class SimplePromptLoader {
               'Loaded prompt',
             );
           } else {
-            this.logger.warn({ file: filePath, error: loadResult.error }, 'Failed to load prompt file');
+            this.logger.warn(
+              { file: filePath, error: loadResult.error },
+              'Failed to load prompt file',
+            );
           }
         }
       }
@@ -126,7 +149,7 @@ export class SimplePromptLoader {
    * Get prompts by category
    */
   getPromptsByCategory(category: string): PromptFile[] {
-    return this.getAllPrompts().filter(prompt => prompt.metadata.category === category);
+    return this.getAllPrompts().filter((prompt) => prompt.metadata.category === category);
   }
 
   /**
@@ -158,18 +181,15 @@ export class SimplePromptLoader {
    * Simple template rendering with mustache-style variables
    * Supports {{variable}} and {{#condition}}...{{/condition}}
    */
-  renderTemplate(template: string, params: Record<string, any>): string {
+  renderTemplate(template: string, params: Record<string, unknown>): string {
     let rendered = template;
 
     // Handle conditional blocks {{#var}}...{{/var}}
-    rendered = rendered.replace(
-      /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
-      (_, key, content) => {
-        const value = params[key];
-        // Include content if variable is truthy (exists and not false/empty)
-        return value && value !== false && value !== '' ? content : '';
-      },
-    );
+    rendered = rendered.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, key, content) => {
+      const value = params[key];
+      // Include content if variable is truthy (exists and not false/empty)
+      return value && value !== false && value !== '' ? content : '';
+    });
 
     // Handle simple variable replacement {{var}}
     rendered = rendered.replace(/\{\{(\w+)\}\}/g, (_, key) => {
@@ -186,7 +206,7 @@ export class SimplePromptLoader {
   /**
    * Get directory categories (subdirectories)
    */
-  private async getCategories(directory: string): Promise<string[]> {
+  private async getDirectoryCategories(directory: string): Promise<string[]> {
     const entries = await readdir(directory);
     const categories: string[] = [];
 
@@ -208,8 +228,8 @@ export class SimplePromptLoader {
   private async getPromptFiles(categoryPath: string): Promise<string[]> {
     try {
       const files = await readdir(categoryPath);
-      return files.filter(file =>
-        extname(file).toLowerCase() === '.yaml' || extname(file).toLowerCase() === '.yml',
+      return files.filter(
+        (file) => extname(file).toLowerCase() === '.yaml' || extname(file).toLowerCase() === '.yml',
       );
     } catch (error) {
       this.logger.debug({ categoryPath, error }, 'Could not read category directory');
@@ -223,7 +243,16 @@ export class SimplePromptLoader {
   private async loadPromptFile(filePath: string): Promise<Result<PromptFile>> {
     try {
       const content = await readFile(filePath, 'utf8');
-      const parsed = load(content) as any;
+      const parsed = load(content) as {
+        metadata?: {
+          name?: string;
+          category?: string;
+          description?: string;
+          version?: string;
+          parameters?: ParameterSpec[];
+        };
+        template?: string;
+      };
 
       // Validate structure
       if (!parsed?.metadata || !parsed.template) {
@@ -253,7 +282,9 @@ export class SimplePromptLoader {
 
       return Success(promptFile);
     } catch (error) {
-      return Failure(`Failed to parse prompt file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return Failure(
+        `Failed to parse prompt file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 }

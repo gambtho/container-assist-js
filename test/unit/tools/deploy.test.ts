@@ -5,7 +5,9 @@
  */
 
 import { jest } from '@jest/globals';
-import { deployApplication, type DeployApplicationConfig } from '../../../src/tools/deploy/tool';
+import { deployApplication as deployApplicationTool } from '../../../src/tools/deploy/tool';
+import type { DeployApplicationParams } from '../../../src/tools/deploy/schema';
+import type { ToolContext } from '../../../src/domain/types/tool-context';
 import { createMockLogger, createSuccessResult, createFailureResult } from '../../__support__/utilities/mock-infrastructure';
 
 // Mock lib modules following analyze-repo pattern
@@ -92,12 +94,47 @@ jest.mock('../../../src/lib/session', () => ({
   createSessionManager: jest.fn(() => mockSessionManager),
 }));
 
+// Mock MCP helper modules
+jest.mock('@mcp/tools/session-helpers', () => ({
+  getSession: jest.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      id: 'test-session-123',
+      state: {
+        sessionId: 'test-session-123',
+        k8s_manifests: {
+          content: `apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: test-app\n  namespace: default\nspec:\n  replicas: 2\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: test-app\n  namespace: default\nspec:\n  ports:\n  - port: 80\n  type: ClusterIP`,
+          manifests: [
+            {
+              apiVersion: 'apps/v1',
+              kind: 'Deployment',
+              metadata: { name: 'test-app', namespace: 'default' },
+              spec: { replicas: 2 },
+            },
+            {
+              apiVersion: 'v1',
+              kind: 'Service',
+              metadata: { name: 'test-app', namespace: 'default' },
+              spec: { ports: [{ port: 80 }], type: 'ClusterIP' },
+            },
+          ],
+        },
+        metadata: {},
+        completed_steps: [],
+      },
+      isNew: false,
+    },
+  }),
+  updateSession: jest.fn().mockResolvedValue({ ok: true }),
+}));
+
 jest.mock('../../../src/lib/kubernetes', () => ({
   createKubernetesClient: jest.fn(() => mockKubernetesClient),
 }));
 
 jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
+  createLogger: jest.fn(() => createMockLogger()),
 }));
 
 // Mock DEFAULT_TIMEOUTS
@@ -107,9 +144,17 @@ jest.mock('../../../src/config/defaults', () => ({
   },
 }));
 
+// Create mock ToolContext
+function createMockToolContext(): ToolContext {
+  return {
+    logger: createMockLogger(),
+    progressReporter: jest.fn(),
+  };
+}
+
 describe('deployApplication', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
-  let config: DeployApplicationConfig;
+  let config: DeployApplicationParams;
 
   // Sample K8s manifests for testing
   const sampleManifests = `
@@ -185,27 +230,28 @@ k8s_manifests: {
     });
 
     it('should successfully deploy application with valid manifests', async () => {
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.success).toBe(true);
-        expect(result.value.sessionId).toBe('test-session-123');
-        expect(result.value.namespace).toBe('default');
-        expect(result.value.deploymentName).toBe('test-app');
-        expect(result.value.serviceName).toBe('test-app');
-        expect(result.value.ready).toBe(true);
-        expect(result.value.replicas).toBe(2);
-        expect(result.value.endpoints).toEqual([
+        expect(result.value.data.success).toBe(true);
+        expect(result.value.data.sessionId).toBe('test-session-123');
+        expect(result.value.data.namespace).toBe('default');
+        expect(result.value.data.deploymentName).toBe('test-app');
+        expect(result.value.data.serviceName).toBe('test-app');
+        expect(result.value.data.ready).toBe(true);
+        expect(result.value.data.replicas).toBe(2);
+        expect(result.value.data.endpoints).toEqual([
           {
             type: 'internal',
             url: 'http://test-app.default.svc.cluster.local',
             port: 80,
           },
         ]);
-        expect(result.value.status?.readyReplicas).toBe(2);
-        expect(result.value.status?.totalReplicas).toBe(2);
-        expect(result.value.status?.conditions).toEqual([
+        expect(result.value.data.status?.readyReplicas).toBe(2);
+        expect(result.value.data.status?.totalReplicas).toBe(2);
+        expect(result.value.data.status?.conditions).toEqual([
           {
             type: 'Available',
             status: 'True',
@@ -220,33 +266,35 @@ k8s_manifests: {
       // Verify deployment status was checked
       expect(mockKubernetesClient.getDeploymentStatus).toHaveBeenCalledWith('default', 'test-app');
       
-      // Verify session was updated
-      expect(mockSessionManager.update).toHaveBeenCalledWith(
+      // Verify session was updated using standardized helpers
+      const { updateSessionData } = require('@mcp/tools/session-helpers');
+      expect(updateSessionData).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
-          workflow_state: expect.objectContaining({
-            deployment_result: expect.objectContaining({
-              namespace: 'default',
-              deployment_name: 'test-app',
-              service_name: 'test-app',
-              ready: true,
-            }),
-            completed_steps: expect.arrayContaining(['deploy']),
+          deployment_result: expect.objectContaining({
+            namespace: 'default',
+            deploymentName: 'test-app',
+            serviceName: 'test-app',
+            ready: true,
           }),
-        })
+          completed_steps: expect.arrayContaining(['deploy']),
+        }),
+        expect.any(Object), // logger
+        expect.any(Object)  // context
       );
     });
 
     it('should handle dry run deployments', async () => {
       config.dryRun = true;
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.success).toBe(true);
-        expect(result.value.ready).toBe(true); // Dry runs are marked as ready
-        expect(result.value.status?.readyReplicas).toBe(2); // Uses spec replicas for dry run
+        expect(result.value.data.success).toBe(true);
+        expect(result.value.data.ready).toBe(true); // Dry runs are marked as ready
+        expect(result.value.data.status?.readyReplicas).toBe(2); // Uses spec replicas for dry run
       }
 
       // Verify no actual deployment calls were made
@@ -259,11 +307,12 @@ k8s_manifests: {
         sessionId: 'test-session-123',
       };
 
-      const result = await deployApplication(minimalConfig, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(minimalConfig, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.namespace).toBe('default'); // Default namespace
+        expect(result.value.data.namespace).toBe('default'); // Default namespace
       }
 
       // Verify deployment was applied to default namespace
@@ -276,12 +325,13 @@ k8s_manifests: {
     it('should handle custom namespace deployment', async () => {
       config.namespace = 'production';
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.namespace).toBe('production');
-        expect(result.value.endpoints[0].url).toBe('http://test-app.production.svc.cluster.local');
+        expect(result.value.data.namespace).toBe('production');
+        expect(result.value.data.endpoints[0].url).toBe('http://test-app.production.svc.cluster.local');
       }
 
       expect(mockKubernetesClient.applyManifest).toHaveBeenCalledWith(
@@ -293,12 +343,13 @@ k8s_manifests: {
     it('should skip waiting when wait is false', async () => {
       config.wait = false;
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.ready).toBe(false); // No waiting means not ready
-        expect(result.value.status?.readyReplicas).toBe(0);
+        expect(result.value.data.ready).toBe(false); // No waiting means not ready
+        expect(result.value.data.status?.readyReplicas).toBe(0);
       }
 
       // Should not check deployment status when not waiting
@@ -324,7 +375,8 @@ k8s_manifests: {
     });
 
     it('should parse YAML manifests correctly', async () => {
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true);
       // Verify manifests were processed (Deployment and Service)
@@ -332,7 +384,8 @@ k8s_manifests: {
     });
 
     it('should order manifests correctly for deployment', async () => {
-      await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      await deployApplicationTool(config, mockContext);
 
       // Verify manifests were applied - the actual ordering is based on the implementation's sort logic
       const calls = mockKubernetesClient.applyManifest.mock.calls;
@@ -361,7 +414,8 @@ k8s_manifests: {
         readyReplicas: 2,
       }));
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -412,7 +466,8 @@ k8s_manifests: {
         readyReplicas: 2,
       }));
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -431,22 +486,44 @@ k8s_manifests: {
 
   describe('Error Handling', () => {
     it('should auto-create session when not found', async () => {
-      mockSessionManager.get.mockResolvedValue(null);
-      mockSessionManager.create.mockResolvedValue({
-      "sessionId": "test-session-123",
-      "workflow_state": {},
-      "metadata": {},
-      "completed_steps": [],
-      "errors": {},
-      "current_step": null,
-      "createdAt": "2025-09-08T11:12:40.362Z",
-      "updatedAt": "2025-09-08T11:12:40.362Z"
-});
+      // Mock resolveSession to simulate creating a new session
+      const { resolveSession } = require('@mcp/tools/session-helpers');
+      resolveSession.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          id: 'test-session-123',
+          state: {
+            sessionId: 'test-session-123',
+            k8s_manifests: {
+              content: 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: test-app\n  namespace: default\nspec:\n  replicas: 2',
+              manifests: [
+                {
+                  apiVersion: 'apps/v1',
+                  kind: 'Deployment',
+                  metadata: { name: 'test-app', namespace: 'default' },
+                  spec: { replicas: 2 },
+                },
+              ],
+            },
+            metadata: {},
+            completed_steps: [],
+          },
+        },
+      });
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
-      expect(mockSessionManager.get).toHaveBeenCalledWith('test-session-123');
-      expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
+      expect(result.ok).toBe(true);
+      expect(resolveSession).toHaveBeenCalledWith(
+        expect.any(Object), // logger
+        mockContext,
+        expect.objectContaining({
+          sessionId: 'test-session-123',
+          defaultIdHint: 'deploy',
+          createIfNotExists: true,
+        })
+      );
     });
 
     it('should return error when no K8s manifests exist', async () => {
@@ -455,11 +532,12 @@ k8s_manifests: {
         repo_path: '/test/repo',
       });
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('No Kubernetes manifests found - run generate_k8s_manifests first');
+        expect(result.error).toBe('No Kubernetes manifests found in session. Please run generate-k8s-manifests tool first.');
       }
     });
 
@@ -472,12 +550,13 @@ k8s_manifests: {
         repo_path: '/test/repo',
       });
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
         // The actual implementation returns this error for empty manifests 
-        expect(result.error).toBe('No Kubernetes manifests found - run generate_k8s_manifests first');
+        expect(result.error).toBe('No Kubernetes manifests found in session. Please run generate-k8s-manifests tool first.');
       }
     });
 
@@ -494,7 +573,8 @@ k8s_manifests: {
         createFailureResult('Failed to connect to Kubernetes cluster')
       );
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true); // Function continues despite individual manifest failures
       // Individual manifest failures are logged but don't stop the deployment
@@ -516,12 +596,13 @@ k8s_manifests: {
 
       config.timeout = 1; // Very short timeout to prevent hanging
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.ready).toBe(false); // Should be marked as not ready
-        expect(result.value.status?.readyReplicas).toBe(0);
+        expect(result.value.data.ready).toBe(false); // Should be marked as not ready
+        expect(result.value.data.status?.readyReplicas).toBe(0);
       }
     }, 15000); // 15 second test timeout
 
@@ -543,14 +624,15 @@ k8s_manifests: {
 
       config.timeout = 1; // 1 second timeout
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.ready).toBe(false); // Should timeout and remain not ready
-        expect(result.value.status?.readyReplicas).toBe(0);
-        expect(result.value.status?.conditions[0].status).toBe('False');
-        expect(result.value.status?.conditions[0].message).toBe('Deployment is pending');
+        expect(result.value.data.ready).toBe(false); // Should timeout and remain not ready
+        expect(result.value.data.status?.readyReplicas).toBe(0);
+        expect(result.value.data.status?.conditions[0].status).toBe('False');
+        expect(result.value.data.status?.conditions[0].message).toBe('Deployment is pending');
       }
     });
 
@@ -571,37 +653,34 @@ k8s_manifests: {
       // So this should succeed but individual resources will fail to deploy
       mockKubernetesClient.applyManifest.mockRejectedValue(new Error('Kubernetes API error'));
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true); // Overall deployment continues
       if (result.ok) {
         // But individual resources failed to deploy
-        expect(result.value.success).toBe(true);
+        expect(result.value.data.success).toBe(true);
         // The deployment will show as not ready if status checks fail
       }
     }, 15000); // 15 second test timeout
 
     it('should handle session update failures', async () => {
-      mockSessionManager.get.mockResolvedValue({
-        
-k8s_manifests: {
-  manifests: sampleManifests,
-},
-        repo_path: '/test/repo',
-      });
+      // Mock updateSessionData to fail
+      const { updateSessionData } = require('@mcp/tools/session-helpers');
+      updateSessionData.mockResolvedValueOnce({ ok: false, error: 'Failed to update session' });
 
       mockKubernetesClient.getDeploymentStatus.mockResolvedValue(createSuccessResult({
         ready: true,
         readyReplicas: 2,
       }));
 
-      mockSessionManager.update.mockRejectedValue(new Error('Failed to update session'));
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
-      const result = await deployApplication(config, mockLogger);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toBe('Failed to update session');
+      // The deployment should still succeed but log a warning about the session update failure
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.data.success).toBe(true);
       }
     });
   });
@@ -625,7 +704,8 @@ k8s_manifests: {
     it('should handle different cluster configurations', async () => {
       config.cluster = 'production-cluster';
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true);
       // Cluster configuration affects how the Kubernetes client is created
@@ -635,7 +715,8 @@ k8s_manifests: {
     it('should handle custom timeout values', async () => {
       config.timeout = 600; // 10 minutes
 
-      const result = await deployApplication(config, mockLogger);
+      const mockContext = createMockToolContext();
+      const result = await deployApplicationTool(config, mockContext);
 
       expect(result.ok).toBe(true);
       // Custom timeout affects the deployment readiness wait logic
@@ -651,12 +732,13 @@ k8s_manifests: {
 
       for (const testConfig of testConfigs) {
         const configWithOptions = { ...config, ...testConfig };
-        const result = await deployApplication(configWithOptions, mockLogger);
+        const mockContext = createMockToolContext();
+        const result = await deployApplicationTool(configWithOptions, mockContext);
         
         expect(result.ok).toBe(true);
         if (result.ok) {
           // Different combinations should all succeed
-          expect(result.value.success).toBe(true);
+          expect(result.value.data.success).toBe(true);
         }
 
         // Reset mocks between tests

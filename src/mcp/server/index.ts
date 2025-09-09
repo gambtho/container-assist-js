@@ -7,7 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import type { ToolContext, SamplingResponse } from '../context/types';
+import { createToolContextWithProgress } from '../context/tool-context';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { analyzeRepoSchema } from '../../tools/analyze-repo/schema';
@@ -15,8 +15,8 @@ import { generateDockerfileSchema } from '../../tools/generate-dockerfile/schema
 import { buildImageSchema } from '../../tools/build-image/schema';
 import { scanImageSchema } from '../../tools/scan/schema';
 import { deployApplicationSchema } from '../../tools/deploy/schema';
-import { pushImageSchema } from '../../tools/push-image/schema';
-import { tagImageSchema } from '../../tools/tag-image/schema';
+import { pushImageSchema, pushImage } from '../../tools/push-image';
+import { tagImageSchema, tagImage } from '../../tools/tag-image';
 import { workflowSchema } from '../../tools/workflow/schema';
 import { fixDockerfileSchema } from '../../tools/fix-dockerfile/schema';
 import { resolveBaseImagesSchema } from '../../tools/resolve-base-images/schema';
@@ -24,11 +24,7 @@ import { prepareClusterSchema } from '../../tools/prepare-cluster/schema';
 import { opsToolSchema } from '../../tools/ops/schema';
 import { generateK8sManifestsSchema } from '../../tools/generate-k8s-manifests/schema';
 import { verifyDeploymentSchema } from '../../tools/verify-deployment/schema';
-import {
-  containerizationWorkflowSchema,
-  deploymentWorkflowSchema,
-  toolSchemas as zodToolSchemas,
-} from './schemas';
+import { containerizationWorkflowSchema, deploymentWorkflowSchema } from './schemas';
 import { containerizationWorkflow } from '../../workflows/containerization';
 import { deploymentWorkflow } from '../../workflows/deployment';
 import { getContainerStatus, type Deps } from '../../app/container';
@@ -39,11 +35,9 @@ import { generateDockerfile } from '../../tools/generate-dockerfile';
 import { buildImage } from '../../tools/build-image';
 import { scanImage } from '../../tools/scan';
 import { deployApplication } from '../../tools/deploy';
-import { pushImage } from '../../tools/push-image';
-import { tagImage } from '../../tools/tag-image';
-import { workflowTool } from '../../tools/workflow';
+import { workflow } from '../../tools/workflow';
 import { fixDockerfile } from '../../tools/fix-dockerfile';
-import { resolveBaseImagesTool } from '../../tools/resolve-base-images';
+import { resolveBaseImages } from '../../tools/resolve-base-images';
 import { prepareCluster } from '../../tools/prepare-cluster';
 import { opsTool } from '../../tools/ops';
 import { generateK8sManifests } from '../../tools/generate-k8s-manifests';
@@ -78,11 +72,11 @@ const toolFunctions = {
   deploy: deployApplication,
   'push-image': pushImage,
   'tag-image': tagImage,
-  workflow: workflowTool,
+  workflow,
   'fix-dockerfile': fixDockerfile,
-  'resolve-base-images': resolveBaseImagesTool,
+  'resolve-base-images': resolveBaseImages,
   'prepare-cluster': prepareCluster,
-  ops: (params: any, logger: any, _context: any) => opsTool.execute(params, logger),
+  ops: (params: any, context: any) => opsTool.execute(params, context.logger),
   'generate-k8s-manifests': generateK8sManifests,
   'verify-deployment': verifyDeployment,
 } as const;
@@ -96,6 +90,8 @@ export class MCPServer {
   private transport: StdioServerTransport;
   private deps: Deps;
   private isRunning: boolean = false;
+  private registeredToolCount: number = 0;
+  private registeredResourceCount: number = 0;
 
   constructor(
     deps: Deps,
@@ -161,6 +157,9 @@ export class MCPServer {
       },
     );
 
+    // Count this as a registered resource
+    this.registeredResourceCount = 1;
+
     // Register prompts dynamically from the prompt registry
     this.registerPromptsFromRegistry();
 
@@ -174,15 +173,14 @@ export class MCPServer {
    */
   private registerAllTools(): void {
     // Register each tool directly with the McpServer using JSON schemas
-    for (const [name, _schema] of Object.entries(toolSchemas)) {
+    for (const [name, schema] of Object.entries(toolSchemas)) {
       // Skip workflow schemas as they're handled separately
       if (name === 'containerization' || name === 'deployment') {
         continue;
       }
 
       // Get the Zod schema shape for this tool
-      const zodSchema = zodToolSchemas[name as keyof typeof zodToolSchemas];
-      const schemaShape = zodSchema?.shape || {};
+      const schemaShape = schema?.shape || {};
 
       // Use the SDK's tool() method with Zod shape (SDK handles conversion)
       this.server.tool(name, `${name} tool`, schemaShape, async (params: any) => {
@@ -211,96 +209,18 @@ export class MCPServer {
             throw new McpError(ErrorCode.MethodNotFound, `Tool function not found: ${name}`);
           }
 
-          // Create proper ToolContext using bridge pattern
-          // Note: The bridge getPrompt is not yet implemented, so we need a custom context
-          const deps = this.deps;
-          const context: ToolContext = {
-            sampling: {
-              createMessage: async (samplingRequest): Promise<SamplingResponse> => {
-                // Use the MCP server's createMessage capability
-                try {
-                  const sdkMessages = samplingRequest.messages.map((msg) => ({
-                    role: msg.role,
-                    content: {
-                      type: 'text' as const,
-                      text: msg.content.map((c) => c.text).join('\n'),
-                    },
-                  }));
+          // Create ToolContext with sessionManager included
+          const context = createToolContextWithProgress(
+            this.getServer(),
+            {}, // empty request object since we don't have access to it here
+            this.deps.logger.child({ tool: name }),
+            undefined, // signal
+            undefined, // config
+            this.deps.promptRegistry,
+            this.deps.sessionManager, // Pass sessionManager directly
+          );
 
-                  const response = await this.getServer().createMessage({
-                    messages: sdkMessages,
-                    maxTokens: samplingRequest.maxTokens || 2048,
-                    stopSequences: samplingRequest.stopSequences,
-                    includeContext: samplingRequest.includeContext || 'thisServer',
-                    modelPreferences: samplingRequest.modelPreferences,
-                  });
-
-                  if (!response?.content || response.content.type !== 'text') {
-                    throw new Error('Invalid response from MCP sampling');
-                  }
-
-                  return {
-                    role: 'assistant',
-                    content: [{ type: 'text', text: response.content.text }],
-                    metadata: {
-                      model: (response as any).model,
-                      usage: (response as any).usage,
-                      finishReason: (response as any).finishReason || 'stop',
-                    },
-                  };
-                } catch (error) {
-                  // Fallback response if sampling fails
-                  return {
-                    role: 'assistant',
-                    content: [
-                      {
-                        type: 'text',
-                        text: `Sampling failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                      },
-                    ],
-                  };
-                }
-              },
-            },
-            async getPrompt(name: string, args?: Record<string, unknown>) {
-              const prompt = await deps.promptRegistry.getPrompt(name, args || {});
-
-              // Extract text from the content object
-              const messageContent = prompt.messages[0]?.content;
-              let textContent = '';
-
-              if (typeof messageContent === 'string') {
-                textContent = messageContent;
-              } else if (
-                messageContent &&
-                typeof messageContent === 'object' &&
-                'text' in messageContent
-              ) {
-                textContent = String(messageContent.text);
-              } else {
-                deps.logger.warn({ messageContent }, 'Unexpected message content format');
-                textContent = JSON.stringify(messageContent);
-              }
-
-              return {
-                description: prompt.description ?? 'Generated prompt',
-                messages: [
-                  {
-                    role: 'user',
-                    content: [{ type: 'text', text: textContent }],
-                  },
-                ],
-              };
-            },
-          };
-
-          // Add sessionManager to the context so tools can share session state
-          const extendedContext = {
-            ...context,
-            sessionManager: this.deps.sessionManager,
-          };
-
-          const result = await toolFunction(params, this.deps.logger, extendedContext);
+          const result = await toolFunction(params, context);
 
           if ('ok' in result) {
             if (result.ok) {
@@ -340,8 +260,11 @@ export class MCPServer {
       });
     }
 
+    // Count registered tools (excluding workflows)
+    this.registeredToolCount = Object.keys(toolSchemas).length - 2;
+
     this.deps.logger.info(
-      { count: Object.keys(toolSchemas).length - 2 }, // -2 for containerization and deployment workflows
+      { count: this.registeredToolCount },
       'Tools registered with McpServer SDK',
     );
   }
@@ -375,9 +298,28 @@ export class MCPServer {
           );
         }
 
-        const result = await containerizationWorkflow.execute(workflowParams, this.deps.logger, {
+        // Create ToolContext for the workflow with sessionManager
+        const toolContext = createToolContextWithProgress(
+          this.getServer(),
+          {}, // empty request object since we don't have access to it here
+          this.deps.logger.child({ workflow: 'containerization' }),
+          undefined, // signal
+          undefined, // config
+          this.deps.promptRegistry,
+          this.deps.sessionManager, // Pass sessionManager directly
+        );
+
+        // Add deps for backward compatibility
+        const extendedContext = {
+          ...toolContext,
           deps: this.deps,
-        });
+        };
+
+        const result = await containerizationWorkflow.execute(
+          workflowParams,
+          this.deps.logger,
+          extendedContext,
+        );
 
         return {
           content: [
@@ -419,9 +361,28 @@ export class MCPServer {
           },
         };
 
-        const result = await deploymentWorkflow.execute(workflowParams, this.deps.logger, {
+        // Create ToolContext for the workflow with sessionManager
+        const toolContext = createToolContextWithProgress(
+          this.getServer(),
+          {}, // empty request object since we don't have access to it here
+          this.deps.logger.child({ workflow: 'deployment' }),
+          undefined, // signal
+          undefined, // config
+          this.deps.promptRegistry,
+          this.deps.sessionManager, // Pass sessionManager directly
+        );
+
+        // Add deps for backward compatibility
+        const extendedContext = {
+          ...toolContext,
           deps: this.deps,
-        });
+        };
+
+        const result = await deploymentWorkflow.execute(
+          workflowParams,
+          this.deps.logger,
+          extendedContext,
+        );
 
         return {
           content: [
@@ -433,6 +394,9 @@ export class MCPServer {
         };
       },
     );
+
+    // Add workflow tools to the count
+    this.registeredToolCount += 2;
 
     this.deps.logger.info('Workflow tools registered with McpServer');
   }
@@ -509,12 +473,14 @@ export class MCPServer {
 
       this.deps.logger.info('MCP server connection established successfully');
 
-      // Get current status from container for consistent logging
-      const status = getContainerStatus(this.deps, this.isRunning);
+      // Log actual registered counts
       this.deps.logger.info(
         {
-          ...status.stats,
-          healthy: status.healthy,
+          tools: this.registeredToolCount,
+          resources: this.registeredResourceCount,
+          prompts: this.deps.promptRegistry.getPromptNames().length,
+          workflows: 2,
+          healthy: true,
         },
         'MCP server started',
       );
@@ -562,13 +528,12 @@ export class MCPServer {
     prompts: number;
     workflows: number;
   } {
-    const status = getContainerStatus(this.deps, this.isRunning);
     return {
-      running: status.running,
-      tools: status.stats.tools,
-      resources: status.stats.resources,
-      prompts: status.stats.prompts,
-      workflows: status.stats.workflows,
+      running: this.isRunning,
+      tools: this.registeredToolCount,
+      resources: this.registeredResourceCount,
+      prompts: this.deps.promptRegistry.getPromptNames().length,
+      workflows: 2,
     };
   }
 
