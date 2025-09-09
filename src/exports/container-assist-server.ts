@@ -208,7 +208,7 @@ export class ContainerAssistServer {
           const toolContext = this.createContext(params);
 
           const result = await tool.execute(params || {}, toolLogger, toolContext);
-          return this.formatResult(result, tool.name);
+          return this.formatResult(result);
         } catch (error) {
           return {
             content: [
@@ -228,52 +228,19 @@ export class ContainerAssistServer {
   /**
    * Format tool results consistently
    */
-  private formatResult(result: any, toolName?: string): MCPToolResult {
+  private formatResult(result: any): MCPToolResult {
     // Handle Result<T> pattern
     if (result && typeof result === 'object' && 'ok' in result) {
       if (result.ok) {
         const value = result.value;
 
-        // Tool-specific formatting (simplified)
-        if (toolName === 'generate_dockerfile' && value.path) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `✅ Dockerfile generated at ${value.path}`,
-              },
-            ],
-          };
-        }
-
-        if (toolName === 'analyze_repo' && value.language) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `✅ Repository analyzed: ${value.language} project`,
-              },
-            ],
-          };
-        }
-
-        if (toolName === 'build_image' && value.imageId) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `✅ Image built: ${value.imageId}`,
-              },
-            ],
-          };
-        }
-
-        // Default formatting
+        // Tools now provide their own enrichment (chain hints, file indicators)
+        // Just return the value as JSON
         return {
           content: [
             {
               type: 'text',
-              text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
+              text: JSON.stringify(value, null, 2),
             },
           ],
         };

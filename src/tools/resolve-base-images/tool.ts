@@ -171,7 +171,15 @@ async function resolveBaseImagesImpl(
       'Base image resolution completed',
     );
 
-    return Success(recommendation);
+    // Add chain hint to the recommendation
+    const enrichedRecommendation = {
+      ...recommendation,
+      sessionId,
+      _chainHint:
+        'Next: generate_dockerfile with recommended base image or update existing Dockerfile',
+    };
+
+    return Success(enrichedRecommendation);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Base image resolution failed');

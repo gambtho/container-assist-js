@@ -430,7 +430,7 @@ async function generateDockerfileImpl(
 
     timer.end({ path: dockerfilePath });
 
-    // Return result
+    // Return result with file write indicator and chain hint
     return Success({
       content: dockerfileContent,
       path: dockerfilePath,
@@ -439,6 +439,9 @@ async function generateDockerfileImpl(
       multistage,
       ...(warnings.length > 0 && { warnings }),
       sessionId,
+      _fileWritten: true,
+      _fileWrittenPath: dockerfilePath,
+      _chainHint: 'Next: build_image with the generated Dockerfile',
     });
   } catch (error) {
     timer.error(error);

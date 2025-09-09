@@ -176,6 +176,7 @@ describe('resolveBaseImagesTool', () => {
           performanceNotes: [
             'Alpine images are smaller but may have compatibility issues with some packages',
           ],
+          _chainHint: 'Next: generate_dockerfile with recommended base image or update existing Dockerfile',
         });
       }
     });

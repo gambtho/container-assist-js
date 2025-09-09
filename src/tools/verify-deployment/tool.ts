@@ -7,15 +7,17 @@
  * @example
  * ```typescript
  * const result = await verifyDeployment({
- *   sessionId: 'session-123', // optional
+ *   sessionId: 'session-123',
  *   deploymentName: 'my-app',
  *   namespace: 'production',
  *   checks: ['pods', 'services', 'health']
  * }, context, logger);
  *
  * if (result.success) {
- *   console.log('Deployment ready:', result.ready);
- *   console.log('Endpoints:', result.endpoints);
+ *   logger.info('Deployment verified', {
+ *     ready: result.ready,
+ *     endpoints: result.endpoints
+ *   });
  * }
  * ```
  */
@@ -330,7 +332,18 @@ async function verifyDeploymentImpl(
       },
     };
 
-    return Success(result);
+    // Add chain hint based on verification status
+    const enrichedResult = {
+      ...result,
+      _chainHint:
+        health.ready && overallStatus === 'healthy'
+          ? 'Deployment verified successfully! Your application is running.'
+          : overallStatus === 'healthy'
+            ? 'Deployment is starting up. Wait and verify again, or check logs for issues.'
+            : 'Deployment has issues. Check healthCheck details and pod logs for troubleshooting.',
+    };
+
+    return Success(enrichedResult);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Deployment verification failed');

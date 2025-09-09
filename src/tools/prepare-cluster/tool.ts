@@ -7,14 +7,16 @@
  * @example
  * ```typescript
  * const result = await prepareCluster({
- *   sessionId: 'session-123', // optional
+ *   sessionId: 'session-123',
  *   namespace: 'my-app',
  *   environment: 'production'
  * }, context, logger);
  *
  * if (result.success) {
- *   console.log('Cluster ready:', result.clusterReady);
- *   console.log('Checks:', result.checks);
+ *   logger.info('Cluster ready', {
+ *     ready: result.clusterReady,
+ *     checks: result.checks
+ *   });
  * }
  * ```
  */
@@ -550,6 +552,9 @@ async function prepareClusterImpl(
       },
       ...(warnings.length > 0 && { warnings }),
       ...(localRegistryUrl && { localRegistryUrl }),
+      _chainHint: clusterReady
+        ? 'Next: deploy_application to deploy your containerized app'
+        : 'Cluster setup incomplete. Review warnings and retry or proceed with caution',
     });
   } catch (error) {
     timer.error(error);

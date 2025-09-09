@@ -14,8 +14,10 @@
  * );
  *
  * if (result.ok) {
- *   console.log('Dockerfile generated:', result.dockerfile);
- *   console.log('Image built:', result.imageId);
+ *   logger.info('Workflow completed', {
+ *     dockerfile: result.dockerfile,
+ *     imageId: result.imageId
+ *   });
  * }
  * ```
  */

@@ -15,19 +15,13 @@ import {
  * Example 1: Register all tools with default names
  */
 async function registerAllToolsExample() {
-  console.log('=== Register All Tools Example ===\n');
-  
   const server = new Server({
     name: 'my-mcp-server',
     version: '1.0.0'
   });
   
-  // Create Container Assist instance and bind all tools
   const caServer = new ContainerAssistServer();
   caServer.bindAll({ server });
-  
-  console.log('All tools registered successfully!\n');
-  console.log('Tools now have access to AI sampling through your server\n');
   
   // Start the server
   await server.start();
@@ -37,7 +31,6 @@ async function registerAllToolsExample() {
  * Example 2: Register specific tools with custom names
  */
 async function registerCustomToolsExample() {
-  console.log('=== Custom Tool Registration Example ===\n');
   
   const server = new Server({
     name: 'my-custom-server',

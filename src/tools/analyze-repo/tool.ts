@@ -32,12 +32,7 @@ import type { AnalyzeRepoParams } from './schema';
 import { DEFAULT_PORTS } from '../../config/defaults';
 import type { AnalyzeRepoResult } from '../types';
 
-// Re-export for backward compatibility
 export type { AnalyzeRepoResult } from '../types';
-
-// AnalyzeRepoResult is imported from ./types to avoid circular dependency
-
-// Language detection configuration
 const LANGUAGE_SIGNATURES: Record<string, { extensions: string[]; files: string[] }> = {
   javascript: {
     extensions: ['', '.mjs', '.cjs'],
@@ -546,7 +541,13 @@ async function analyzeRepoImpl(
     // Progress: Complete
     if (progress) await progress('COMPLETE');
 
-    return Success(result);
+    // Add chain hint for workflow guidance
+    const enrichedResult = {
+      ...result,
+      _chainHint: 'Next: generate_dockerfile or fix existing issues',
+    };
+
+    return Success(enrichedResult);
   } catch (error) {
     timer.error(error);
     logger.error({ error }, 'Repository analysis failed');
