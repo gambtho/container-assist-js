@@ -236,11 +236,14 @@ export class PromptRegistry {
   /**
    * Get the default prompts directory relative to this package
    */
-  private getDefaultPromptsDirectory(): string {
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    return path.resolve(__dirname, '../../prompts');
-  }
+  getDefaultPromptsDirectory = (): string => {
+    if (typeof __dirname !== 'undefined') {
+      return path.resolve(__dirname, '../../prompts');
+    } else {
+      const __filename = fileURLToPath(import.meta.url);
+      return path.resolve(path.dirname(__filename), '../../prompts');
+    }
+  };
 
   /**
    * Ensure registry is initialized before operations

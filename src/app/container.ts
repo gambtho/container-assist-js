@@ -125,7 +125,7 @@ export async function createContainer(
   // Create prompt registry
   const promptRegistry = depsOverrides.promptRegistry ?? new PromptRegistry(logger);
   if (!depsOverrides.promptRegistry) {
-    await promptRegistry.initialize(appConfig.workspace.promptsDir);
+    await promptRegistry.initialize(appConfig.workspace.promptsDir?.trim() || undefined);
   }
 
   // Create resource manager using simple functions
