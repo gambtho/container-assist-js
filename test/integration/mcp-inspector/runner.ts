@@ -13,7 +13,7 @@ import { createResourceManagementTests } from './suites/resource-management/reso
 import { createLoadTestingTests } from './suites/load-testing/concurrent-tests';
 import { createIntegrationFlowTests } from './suites/integration-flows/workflow-tests';
 import { createContainerizationWorkflowTests } from './suites/integration-flows/containerization-workflow';
-import { createDeploymentPipelineTests } from './suites/integration-flows/deployment-pipeline';
+// import { createDeploymentPipelineTests } from './suites/integration-flows/deployment-pipeline'; // Disabled - requires K8s cluster
 import { createOrchestratorEventTests } from './suites/orchestrator/event-flow-tests';
 import { createPhaseGateTests } from './suites/orchestrator/phase-gate-tests';
 import { createSamplingDecisionTests } from './suites/sampling/decision-tests';
@@ -40,7 +40,7 @@ async function main() {
     const loadTests = createLoadTestingTests(testRunner);
     const integrationTests = createIntegrationFlowTests(testRunner);
     const containerizationTests = createContainerizationWorkflowTests(testRunner);
-    const deploymentTests = createDeploymentPipelineTests(testRunner);
+    // const deploymentTests = createDeploymentPipelineTests(testRunner); // Disabled - requires K8s cluster
     const orchestratorEventTests = createOrchestratorEventTests(testRunner);
     const phaseGateTests = createPhaseGateTests(testRunner);
     const samplingDecisionTests = createSamplingDecisionTests(testRunner);
@@ -72,7 +72,7 @@ async function main() {
           testsToRegister = loadTests;
           break;
         case 'integration-flows':
-          testsToRegister = [...integrationTests, ...containerizationTests, ...deploymentTests];
+          testsToRegister = [...integrationTests, ...containerizationTests]; // deploymentTests disabled - requires K8s
           break;
         case 'orchestrator':
           testsToRegister = [...orchestratorEventTests, ...phaseGateTests];
@@ -88,7 +88,7 @@ async function main() {
           process.exit(1);
       }
     } else {
-      testsToRegister = [...basicTests, ...comprehensiveTests, ...errorHandlingTests, ...samplingTests, ...resourceTests, ...loadTests, ...integrationTests, ...containerizationTests, ...deploymentTests, ...orchestratorEventTests, ...phaseGateTests, ...samplingDecisionTests, ...artifactTests, ...remediationTests];
+      testsToRegister = [...basicTests, ...comprehensiveTests, ...errorHandlingTests, ...samplingTests, ...resourceTests, ...loadTests, ...integrationTests, ...containerizationTests, /* ...deploymentTests, */ ...orchestratorEventTests, ...phaseGateTests, ...samplingDecisionTests, ...artifactTests, ...remediationTests];
     }
 
     testsToRegister.forEach(test => testRunner.register(test));

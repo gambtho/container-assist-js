@@ -5,6 +5,6 @@
  */
 
 // Re-export from infrastructure
-export { createDockerClient } from '../infrastructure/docker/client';
+export { createDockerClient, type DockerBuildOptions } from '../infrastructure/docker/client';
 
 export { createDockerRegistryClient } from '../infrastructure/docker/registry';
