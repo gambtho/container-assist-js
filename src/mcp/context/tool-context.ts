@@ -16,6 +16,8 @@ import type {
   ToolContextConfig,
 } from './types';
 import { extractProgressToken, createProgressReporter } from './progress';
+import { SessionManager } from '@lib/index';
+import { PromptRegistry } from '../../core/prompts/registry';
 
 const DEFAULT_CONFIG: Required<ToolContextConfig> = {
   debug: false,
@@ -32,16 +34,16 @@ export class SimpleToolContext implements ToolContext {
   public sampling: {
     createMessage(request: SamplingRequest): Promise<SamplingResponse>;
   };
-  public sessionManager?: import('../../lib/session').SessionManager;
+  public sessionManager?: SessionManager;
 
   constructor(
     public server: Server,
     logger: Logger,
-    public promptRegistry?: import('../../core/prompts/registry').PromptRegistry,
+    public promptRegistry?: PromptRegistry,
     public signal?: AbortSignal,
     public progress?: ProgressReporter,
     private config: Required<ToolContextConfig> = DEFAULT_CONFIG,
-    sessionManager?: import('../../lib/session').SessionManager,
+    sessionManager?: SessionManager,
   ) {
     this.logger = config.debug ? logger.child({ component: 'ToolContext' }) : logger;
     if (sessionManager) {
@@ -215,8 +217,8 @@ export function createToolContext(
   signal?: AbortSignal,
   progress?: ProgressReporter,
   config: Partial<ToolContextConfig> = {},
-  promptRegistry?: import('../../core/prompts/registry').PromptRegistry,
-  sessionManager?: import('../../lib/session').SessionManager,
+  promptRegistry?: PromptRegistry,
+  sessionManager?: SessionManager,
 ): ToolContext {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
   return new SimpleToolContext(
@@ -239,8 +241,8 @@ export function createToolContextWithProgress(
   logger: Logger,
   signal?: AbortSignal,
   config?: Partial<ToolContextConfig>,
-  promptRegistry?: import('../../core/prompts/registry').PromptRegistry,
-  sessionManager?: import('../../lib/session').SessionManager,
+  promptRegistry?: PromptRegistry,
+  sessionManager?: SessionManager,
 ): ToolContext {
   const progressToken = extractProgressToken(request);
   const progressReporter = createProgressReporter(server, progressToken, logger);

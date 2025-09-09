@@ -24,6 +24,20 @@ import { createStandardProgress } from '@mcp/utils/progress-helper';
 import type { ToolContext } from '../../mcp/context/types';
 import { createTimer, createLogger, type Logger } from '../../lib/logger';
 import { Success, Failure, type Result, type Tool } from '../../domain/types';
+
+// Import tool registry at the module level
+import { analyzeRepo } from '@tools/analyze-repo';
+import { generateDockerfile } from '@tools/generate-dockerfile';
+import { buildImage } from '@tools/build-image';
+import { scanImage } from '@tools/scan';
+import { pushImage } from '@tools/push-image';
+import { tagImage } from '@tools/tag-image';
+import { fixDockerfile } from '@tools/fix-dockerfile';
+import { resolveBaseImages } from '@tools/resolve-base-images';
+import { prepareCluster } from '@tools/prepare-cluster';
+import { deployApplication } from '@tools/deploy';
+import { generateK8sManifests } from '@tools/generate-k8s-manifests';
+import { verifyDeployment } from '@tools/verify-deployment';
 import type { WorkflowParams } from './schema';
 
 // Export specific workflow tool result
@@ -136,27 +150,6 @@ function estimateWorkflowDuration(steps: string[]): number {
 
   return steps.reduce((total, step) => total + (stepDurations[step] ?? 5), 0);
 }
-
-// Import tool registry at the module level
-import { analyzeRepo } from '@tools/analyze-repo';
-import { generateDockerfile } from '@tools/generate-dockerfile';
-import { buildImage } from '@tools/build-image';
-import { scanImage } from '@tools/scan';
-import { pushImage } from '@tools/push-image';
-import { tagImage } from '@tools/tag-image';
-import { fixDockerfile } from '@tools/fix-dockerfile';
-import { resolveBaseImages } from '@tools/resolve-base-images';
-import { prepareCluster } from '@tools/prepare-cluster';
-import { deployApplication } from '@tools/deploy';
-import { generateK8sManifests } from '@tools/generate-k8s-manifests';
-import { verifyDeployment } from '@tools/verify-deployment';
-
-// Import proper ToolContext from MCP middleware since that's what deploy tool uses
-
-// Define ResolveBaseImagesContext interface locally
-// interface ResolveBaseImagesContext {
-//   sessionManager?: import('@lib/session').SessionManager;
-// }
 
 // Type guard to safely cast params
 const castParams = <T>(params: Record<string, unknown>): T => {

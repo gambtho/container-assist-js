@@ -27,6 +27,8 @@ import { buildImage } from '@tools/build-image';
 import { scanImage } from '@tools/scan';
 import { generateBestDockerfile } from './dockerfile-sampling';
 import type { ToolContext } from '../mcp/context/types';
+import type { SamplingResult } from './sampling/types';
+import type { GenerateDockerfileResult } from '../tools/generate-dockerfile/tool';
 
 /**
  * Configuration for containerization workflow execution
@@ -164,11 +166,11 @@ export const runContainerizationWorkflow = async (
       return Failure(`Dockerfile generation failed: ${dockerfileResult.error}`);
     }
 
-    result.dockerfile = config.enableSampling
-      ? (dockerfileResult.value as import('./sampling/types').SamplingResult).bestVariant.content
-      : (
-          dockerfileResult.value as import('../tools/generate-dockerfile/tool').GenerateDockerfileResult
-        ).content;
+    if (config.enableSampling) {
+      result.dockerfile = (dockerfileResult.value as SamplingResult).bestVariant.content;
+    } else {
+      result.dockerfile = (dockerfileResult.value as GenerateDockerfileResult).content;
+    }
 
     // Step 3: Build image
     logger.info('Step 3: Building Docker image');

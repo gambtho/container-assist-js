@@ -17,7 +17,7 @@ import { verifyDeployment } from '@tools/verify-deployment';
 import { isFail } from '@types';
 import { createTimer, type Logger } from '@lib/logger';
 import type { ToolContext } from '../mcp/context/types';
-import type { SessionManager } from '../lib/session';
+import { createSessionManager, type SessionManager } from '../lib/session';
 import type {
   DeploymentWorkflowParams,
   DeploymentWorkflowResult,
@@ -36,8 +36,7 @@ export async function runDeploymentWorkflow(
   const logger = toolContext.logger;
   const timer = createTimer(logger, 'deployment-workflow');
   // Access sessionManager through context if available
-  const sessionManager: SessionManager =
-    toolContext.sessionManager || (await import('../lib/session')).createSessionManager(logger);
+  const sessionManager: SessionManager = toolContext.sessionManager || createSessionManager(logger);
   const { sessionId, imageId, clusterConfig, deploymentOptions } = params;
 
   // Initialize workflow context

@@ -1,5 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import type { Logger } from 'pino';
+import { createKubernetesClient } from '../../../src/lib/kubernetes';
 
 const mockLogger: Logger = {
   info: jest.fn(),
@@ -19,22 +20,19 @@ const mockLogger: Logger = {
  * these tests focus on what we can verify without deep mocking.
  */
 describe('Kubernetes Client', () => {
-  
+
   it('should be importable without errors', async () => {
-    const { createKubernetesClient } = await import('../../../src/lib/kubernetes');
     expect(createKubernetesClient).toBeDefined();
     expect(typeof createKubernetesClient).toBe('function');
   });
 
   it('should attempt to create a client instance', async () => {
-    const { createKubernetesClient } = await import('../../../src/lib/kubernetes');
-    
     // This may fail due to kubeconfig issues in test environment, 
     // but the function should be callable
     try {
       const client = createKubernetesClient(mockLogger);
       expect(client).toBeDefined();
-      
+
       // If client creation succeeds, verify it has the expected interface
       if (client && typeof client === 'object') {
         expect(client.applyManifest).toBeDefined();
@@ -47,9 +45,8 @@ describe('Kubernetes Client', () => {
   });
 
   it('should handle custom kubeconfig parameter', async () => {
-    const { createKubernetesClient } = await import('../../../src/lib/kubernetes');
     const customConfig = 'apiVersion: v1\nkind: Config\nclusters: []';
-    
+
     try {
       const client = createKubernetesClient(mockLogger, customConfig);
       expect(client).toBeDefined();
@@ -61,23 +58,22 @@ describe('Kubernetes Client', () => {
 
   // Test basic type safety of the module
   it('should export createKubernetesClient function', async () => {
-    const module = await import('../../../src/lib/kubernetes');
-    expect(module.createKubernetesClient).toBeDefined();
-    expect(typeof module.createKubernetesClient).toBe('function');
+    expect(createKubernetesClient).toBeDefined();
+    expect(typeof createKubernetesClient).toBe('function');
   });
 
   // Test that the function signature is correct
   it('should accept logger and optional kubeconfig parameters', async () => {
     const { createKubernetesClient } = await import('../../../src/lib/kubernetes');
-    
+
     // Should not throw when called with valid parameters
     try {
       // Test with just logger
       createKubernetesClient(mockLogger);
-      
+
       // Test with logger and kubeconfig
       createKubernetesClient(mockLogger, 'fake-config');
-      
+
       // The calls themselves validate the function signature
       expect(true).toBe(true);
     } catch (error) {
