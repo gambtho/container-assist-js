@@ -5,7 +5,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk';
 import { 
-  configureTools,
+  ContainerAssistServer,
   registerAllTools, 
   registerTool,
   tools 
@@ -22,11 +22,9 @@ async function registerAllToolsExample() {
     version: '1.0.0'
   });
   
-  // IMPORTANT: Configure tools with your server for AI sampling support
-  configureTools({ server });
-  
-  // Register all Container Assist tools at once
-  registerAllTools(server);
+  // Create Container Assist instance and bind all tools
+  const caServer = new ContainerAssistServer();
+  caServer.bindAll({ server });
   
   console.log('All tools registered successfully!\n');
   console.log('Tools now have access to AI sampling through your server\n');
@@ -46,13 +44,20 @@ async function registerCustomToolsExample() {
     version: '1.0.0'
   });
   
-  // Configure tools first
-  configureTools({ server });
-  
-  // Register specific tools with custom names
-  registerTool(server, tools.analyzeRepo, 'analyze_repository');
-  registerTool(server, tools.buildImage, 'docker_build');
-  registerTool(server, tools.deployApplication, 'k8s_deploy');
+  // Create Container Assist instance and register specific tools
+  const caServer = new ContainerAssistServer();
+  caServer.bindSampling({ server });
+  caServer.registerTools(
+    { server },
+    {
+      tools: ['analyze_repo', 'build_image', 'deploy_application'],
+      nameMapping: {
+        'analyze_repo': 'analyze_repository',
+        'build_image': 'docker_build',
+        'deploy_application': 'k8s_deploy'
+      }
+    }
+  );
   
   console.log('Custom tools registered:');
   console.log('- analyze_repository (was: analyze_repo)');
@@ -73,18 +78,22 @@ async function registerWithMappingExample() {
     version: '1.0.0'
   });
   
+  // Create Container Assist instance
+  const caServer = new ContainerAssistServer();
+  
   // Define custom names for all tools
   const nameMapping = {
-    analyzeRepo: 'project_analyze',
-    generateDockerfile: 'dockerfile_create',
-    buildImage: 'image_build',
-    scanImage: 'security_scan',
-    deployApplication: 'app_deploy',
-    verifyDeployment: 'deployment_check'
+    analyze_repo: 'project_analyze',
+    generate_dockerfile: 'dockerfile_create',
+    build_image: 'image_build',
+    scan_image: 'security_scan',
+    deploy_application: 'app_deploy',
+    verify_deployment: 'deployment_check'
   };
   
   // Register all tools with custom names
-  registerAllTools(server, nameMapping);
+  caServer.bindSampling({ server });
+  caServer.registerTools({ server }, { nameMapping });
   
   console.log('Tools registered with custom names:');
   Object.entries(nameMapping).forEach(([original, custom]) => {

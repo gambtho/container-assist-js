@@ -89,8 +89,5 @@ export function createSession(): string {
   return `session-${timestamp}-${random}`;
 }
 
-// Re-export adaptTool for advanced users
-export { adaptTool } from './adapter.js';
-
 // Re-export getAllTools for convenience
 export { getAllTools } from './tools.js';

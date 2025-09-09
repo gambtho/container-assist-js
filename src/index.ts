@@ -38,11 +38,10 @@ export {
   registerAllTools,
   convertZodToJsonSchema,
   createSession,
-  adaptTool,
 } from './exports/helpers.js';
 
-// Export configuration function for external MCP servers
-export { configureTools } from './exports/configure.js';
+// Export the new clean API
+export { ContainerAssistServer } from './exports/container-assist-server.js';
 
 // Export types for external use
 export type { MCPTool, MCPToolMetadata, MCPToolResult, MCPServer } from './exports/types.js';

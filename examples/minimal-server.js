@@ -9,13 +9,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 // Import Container Assist tools
-import { 
-  configureTools, 
-  analyzeRepo,
-  generateDockerfile,
-  buildImage,
-  registerTool 
-} from '@thgamble/containerization-assist-mcp';
+import { ContainerAssistServer } from '@thgamble/containerization-assist-mcp';
 
 async function main() {
   console.error('Starting MCP server with Container Assist tools...');
@@ -34,15 +28,16 @@ async function main() {
       }
     );
 
-    // IMPORTANT: Configure tools with the server for AI sampling
-    console.error('Configuring tools...');
-    configureTools({ server });
+    // Create Container Assist instance and bind tools
+    console.error('Setting up Container Assist tools...');
+    const caServer = new ContainerAssistServer();
     
-    // Register the tools you want
-    console.error('Registering tools...');
-    registerTool(server, analyzeRepo);
-    registerTool(server, generateDockerfile);
-    registerTool(server, buildImage);
+    // Register specific tools (or use bindAll for all tools)
+    caServer.bindSampling({ server });
+    caServer.registerTools(
+      { server },
+      { tools: ['analyze_repo', 'generate_dockerfile', 'build_image'] }
+    );
     
     // Create stdio transport
     const transport = new StdioServerTransport();

@@ -2,7 +2,6 @@
  * Tool collection and registry for external consumption
  */
 
-import { adaptTool } from './adapter.js';
 import type { MCPTool } from './types.js';
 
 // Import all tool implementations
@@ -35,10 +34,31 @@ import { opsToolSchema } from '../tools/ops/schema.js';
 import { workflow } from '../tools/workflow/tool.js';
 import { workflowSchema } from '../tools/workflow/schema.js';
 import type { Tool } from '../domain/types.js';
-import { createStandaloneContext } from './standalone-context.js';
-import { createLogger } from '../lib/logger.js';
 
-// Helper to create tool wrapper with standalone context support
+/**
+ * Get all internal tool implementations
+ * Used by ContainerAssistServer for registration
+ */
+export function getAllInternalTools(): Tool[] {
+  return [
+    analyzeRepoTool,
+    generateDockerfileTool,
+    buildImageTool,
+    scanImageTool,
+    tagImageTool,
+    pushImageTool,
+    generateK8sManifestsTool,
+    prepareClusterTool,
+    deployApplicationTool,
+    verifyDeploymentTool,
+    fixDockerfileTool,
+    resolveBaseImagesTool,
+    opsToolWrapper,
+    workflowTool,
+  ];
+}
+
+// Helper to create tool wrapper
 const createToolWrapper = (
   name: string,
   description: string,
@@ -48,9 +68,14 @@ const createToolWrapper = (
   name,
   description,
   schema,
-  execute: async (params, logger, context) => {
-    const ctx = context || createStandaloneContext(params as any, logger || createLogger({ name }));
-    return executeFn(params as any, ctx);
+  execute: async (params, _logger, context) => {
+    // Context must be provided by the calling code (ContainerAssistServer)
+    if (!context) {
+      throw new Error(
+        `Context is required for ${name} tool execution. Use ContainerAssistServer for proper integration.`,
+      );
+    }
+    return executeFn(params as any, context);
   },
 });
 
@@ -153,22 +178,43 @@ const workflowTool = createToolWrapper(
   workflow,
 );
 
+/**
+ * Simple MCPTool adapter for backward compatibility
+ * Note: These tools require ContainerAssistServer for proper context management
+ */
+function createSimpleMCPTool(tool: Tool): MCPTool {
+  return {
+    name: tool.name,
+    metadata: {
+      title: tool.name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+      description: tool.description || `${tool.name} tool`,
+      inputSchema: tool.schema || { type: 'object', properties: {} },
+    },
+    handler: async () => {
+      throw new Error(
+        `${tool.name} requires ContainerAssistServer for execution. ` +
+          `Please use: const caServer = new ContainerAssistServer(); caServer.bindAll({ server });`,
+      );
+    },
+  };
+}
+
 // Adapt all tools to MCPTool interface
 const adaptedTools = {
-  analyzeRepo: adaptTool(analyzeRepoTool),
-  generateDockerfile: adaptTool(generateDockerfileTool),
-  buildImage: adaptTool(buildImageTool),
-  scanImage: adaptTool(scanImageTool),
-  tagImage: adaptTool(tagImageTool),
-  pushImage: adaptTool(pushImageTool),
-  generateK8sManifests: adaptTool(generateK8sManifestsTool),
-  prepareCluster: adaptTool(prepareClusterTool),
-  deployApplication: adaptTool(deployApplicationTool),
-  verifyDeployment: adaptTool(verifyDeploymentTool),
-  fixDockerfile: adaptTool(fixDockerfileTool),
-  resolveBaseImages: adaptTool(resolveBaseImagesTool),
-  ops: adaptTool(opsToolWrapper),
-  workflow: adaptTool(workflowTool),
+  analyzeRepo: createSimpleMCPTool(analyzeRepoTool),
+  generateDockerfile: createSimpleMCPTool(generateDockerfileTool),
+  buildImage: createSimpleMCPTool(buildImageTool),
+  scanImage: createSimpleMCPTool(scanImageTool),
+  tagImage: createSimpleMCPTool(tagImageTool),
+  pushImage: createSimpleMCPTool(pushImageTool),
+  generateK8sManifests: createSimpleMCPTool(generateK8sManifestsTool),
+  prepareCluster: createSimpleMCPTool(prepareClusterTool),
+  deployApplication: createSimpleMCPTool(deployApplicationTool),
+  verifyDeployment: createSimpleMCPTool(verifyDeploymentTool),
+  fixDockerfile: createSimpleMCPTool(fixDockerfileTool),
+  resolveBaseImages: createSimpleMCPTool(resolveBaseImagesTool),
+  ops: createSimpleMCPTool(opsToolWrapper),
+  workflow: createSimpleMCPTool(workflowTool),
 };
 
 /**
