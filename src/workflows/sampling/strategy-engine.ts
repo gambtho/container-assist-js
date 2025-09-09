@@ -630,50 +630,138 @@ export async function scoreVariants(
 }
 
 /**
+ * Sampling strategies registry - simplified functional API
+ */
+export const samplingStrategies = {
+  'security-first': createSecurityFirstStrategy,
+  'performance-optimized': createPerformanceStrategy,
+  'size-optimized': createSizeOptimizedStrategy,
+  balanced: createBalancedStrategy,
+} as const;
+
+export type SamplingStrategyName = keyof typeof samplingStrategies;
+
+/**
+ * Execute a single sampling strategy by name
+ */
+export async function executeSamplingStrategy(
+  strategyName: SamplingStrategyName,
+  context: DockerfileContext,
+  logger: Logger,
+): Promise<Result<DockerfileVariant>> {
+  const strategyFactory = samplingStrategies[strategyName];
+  if (!strategyFactory) {
+    return Failure(`Unknown sampling strategy: ${strategyName}`);
+  }
+
+  const strategy = strategyFactory(logger);
+  return strategy.generateVariant(context, logger);
+}
+
+/**
+ * Execute multiple sampling strategies
+ */
+export async function executeMultipleSamplingStrategies(
+  strategyNames: SamplingStrategyName[],
+  context: DockerfileContext,
+  logger: Logger,
+): Promise<Result<DockerfileVariant[]>> {
+  const variants: DockerfileVariant[] = [];
+  const errors: string[] = [];
+
+  for (const strategyName of strategyNames) {
+    const result = await executeSamplingStrategy(strategyName, context, logger);
+    if (result.ok) {
+      variants.push(result.value);
+    } else {
+      errors.push(`${strategyName}: ${result.error}`);
+    }
+  }
+
+  if (variants.length === 0) {
+    return Failure(`No variants generated. Errors: ${errors.join('; ')}`);
+  }
+
+  logger.info({ count: variants.length }, 'Sampling variants generated');
+  return Success(variants);
+}
+
+/**
+ * Get list of available sampling strategies
+ */
+export function getAvailableSamplingStrategies(): SamplingStrategyName[] {
+  return Object.keys(samplingStrategies) as SamplingStrategyName[];
+}
+
+/**
  * Simple strategy manager for backward compatibility
  */
 export class StrategyEngine {
-  private strategies: Map<string, SamplingStrategy> = new Map();
+  private customStrategies: Map<string, SamplingStrategy> = new Map();
 
   constructor(
     private logger: Logger,
     _promptRegistry?: Record<string, unknown>,
-  ) {
-    this.registerDefaultStrategies();
-  }
-
-  private registerDefaultStrategies(): void {
-    const strategies = getDefaultStrategies(this.logger);
-    strategies.forEach((strategy) => {
-      this.strategies.set(strategy.name, strategy);
-    });
-    this.logger.info({ count: strategies.length }, 'Default strategies registered');
-  }
+  ) {}
 
   registerStrategy(strategy: SamplingStrategy): void {
-    this.strategies.set(strategy.name, strategy);
+    this.customStrategies.set(strategy.name, strategy);
     this.logger.info({ strategy: strategy.name }, 'Custom strategy registered');
   }
 
   getAvailableStrategies(): string[] {
-    return Array.from(this.strategies.keys());
+    return [...getAvailableSamplingStrategies(), ...Array.from(this.customStrategies.keys())];
   }
 
   getStrategy(name: string): SamplingStrategy | undefined {
-    return this.strategies.get(name);
+    // Check custom strategies first
+    const customStrategy = this.customStrategies.get(name);
+    if (customStrategy) return customStrategy;
+
+    // Then check built-in strategies
+    const strategyFactory = samplingStrategies[name as SamplingStrategyName];
+    return strategyFactory ? strategyFactory(this.logger) : undefined;
   }
 
   async generateVariants(
     context: DockerfileContext,
     strategyNames?: string[],
   ): Promise<Result<DockerfileVariant[]>> {
-    const selectedStrategies = strategyNames
-      ? (strategyNames
-          .map((name) => this.strategies.get(name))
-          .filter(Boolean) as SamplingStrategy[])
-      : Array.from(this.strategies.values());
+    if (!strategyNames) {
+      const names = getAvailableSamplingStrategies();
+      return executeMultipleSamplingStrategies(names, context, this.logger);
+    }
 
-    return generateVariants(context, selectedStrategies, this.logger);
+    // Handle mix of built-in and custom strategies
+    const variants: DockerfileVariant[] = [];
+    const errors: string[] = [];
+
+    for (const strategyName of strategyNames) {
+      try {
+        const strategy = this.getStrategy(strategyName);
+        if (!strategy) {
+          errors.push(`Unknown strategy: ${strategyName}`);
+          continue;
+        }
+
+        const result = await strategy.generateVariant(context, this.logger);
+        if (result.ok) {
+          variants.push(result.value);
+        } else {
+          errors.push(`${strategyName}: ${result.error}`);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`${strategyName}: ${message}`);
+      }
+    }
+
+    if (variants.length === 0) {
+      return Failure(`No variants generated. Errors: ${errors.join('; ')}`);
+    }
+
+    this.logger.info({ count: variants.length }, 'Strategy variants generated');
+    return Success(variants);
   }
 
   async scoreVariants(

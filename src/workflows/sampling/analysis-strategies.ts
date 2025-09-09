@@ -696,56 +696,90 @@ export function getAllStrategies(logger: Logger): AnalysisStrategy[] {
 }
 
 /**
+ * Analysis strategies registry - simplified functional API
+ */
+export const analysisStrategies = {
+  comprehensive: createComprehensiveStrategy,
+  security: createSecurityStrategy,
+  performance: createPerformanceStrategy,
+  architecture: createArchitectureStrategy,
+  deployment: createDeploymentStrategy,
+} as const;
+
+export type AnalysisStrategyName = keyof typeof analysisStrategies;
+
+/**
+ * Execute a single analysis strategy by name
+ */
+export async function executeAnalysisStrategy(
+  strategyName: AnalysisStrategyName,
+  context: AnalysisContext,
+  logger: Logger,
+): Promise<Result<AnalysisVariant>> {
+  const strategyFactory = analysisStrategies[strategyName];
+  if (!strategyFactory) {
+    return Failure(`Unknown analysis strategy: ${strategyName}`);
+  }
+
+  const strategy = strategyFactory(logger);
+  return strategy.analyzeRepository(context, logger);
+}
+
+/**
+ * Execute multiple analysis strategies
+ */
+export async function executeMultipleAnalysisStrategies(
+  strategyNames: AnalysisStrategyName[],
+  context: AnalysisContext,
+  logger: Logger,
+): Promise<Result<AnalysisVariant[]>> {
+  const variants: AnalysisVariant[] = [];
+  const errors: string[] = [];
+
+  for (const strategyName of strategyNames) {
+    const result = await executeAnalysisStrategy(strategyName, context, logger);
+    if (result.ok) {
+      variants.push(result.value);
+    } else {
+      errors.push(`${strategyName}: ${result.error}`);
+    }
+  }
+
+  if (variants.length === 0) {
+    return Failure(`No variants generated. Errors: ${errors.join('; ')}`);
+  }
+
+  logger.info({ count: variants.length }, 'Analysis variants generated');
+  return Success(variants);
+}
+
+/**
+ * Get list of available analysis strategies
+ */
+export function getAvailableAnalysisStrategies(): AnalysisStrategyName[] {
+  return Object.keys(analysisStrategies) as AnalysisStrategyName[];
+}
+
+/**
  * Strategy engine for backward compatibility
  */
 export class AnalysisStrategyEngine {
-  private strategies: Map<string, AnalysisStrategy> = new Map();
-
-  constructor(private logger: Logger) {
-    const strategies = getAllStrategies(logger);
-    strategies.forEach((s) => this.strategies.set(s.name, s));
-  }
+  constructor(private logger: Logger) {}
 
   getAvailableStrategies(): string[] {
-    return Array.from(this.strategies.keys());
+    return getAvailableAnalysisStrategies();
   }
 
   getStrategy(name: string): AnalysisStrategy | undefined {
-    return this.strategies.get(name);
+    const strategyFactory = analysisStrategies[name as AnalysisStrategyName];
+    return strategyFactory ? strategyFactory(this.logger) : undefined;
   }
 
   async generateVariants(
     context: AnalysisContext,
     strategyNames?: string[],
   ): Promise<Result<AnalysisVariant[]>> {
-    const selectedStrategies = strategyNames
-      ? (strategyNames
-          .map((name) => this.strategies.get(name))
-          .filter(Boolean) as AnalysisStrategy[])
-      : Array.from(this.strategies.values());
-
-    const variants: AnalysisVariant[] = [];
-    const errors: string[] = [];
-
-    for (const strategy of selectedStrategies) {
-      try {
-        const result = await strategy.analyzeRepository(context, this.logger);
-        if (result.ok) {
-          variants.push(result.value);
-        } else {
-          errors.push(`${strategy.name}: ${result.error}`);
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        errors.push(`${strategy.name}: ${message}`);
-      }
-    }
-
-    if (variants.length === 0) {
-      return Failure(`No variants generated. Errors: ${errors.join('; ')}`);
-    }
-
-    this.logger.info({ count: variants.length }, 'Analysis variants generated');
-    return Success(variants);
+    const names = strategyNames || getAvailableAnalysisStrategies();
+    return executeMultipleAnalysisStrategies(names as AnalysisStrategyName[], context, this.logger);
   }
 }

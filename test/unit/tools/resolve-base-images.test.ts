@@ -4,7 +4,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { resolveBaseImagesTool, type ResolveBaseImagesConfig } from '@tools/resolve-base-images/tool';
+import { resolveBaseImages, type ResolveBaseImagesConfig } from '@tools/resolve-base-images/tool';
 import { createMockLogger } from '../../__support__/utilities/mock-factories';
 
 // Mock lib modules
@@ -57,6 +57,32 @@ jest.mock('@lib/base-images', () => ({
   }),
 }));
 
+// Mock MCP helper modules
+jest.mock('@mcp/tools/session-helpers', () => ({
+  resolveSession: jest.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      id: 'test-session-123',
+      state: {
+        sessionId: 'test-session-123',
+        analysis_result: {
+          language: 'javascript',
+          framework: 'react',
+          packageManager: 'npm',
+          mainFile: 'src/index.js',
+        },
+        workflow_state: {},
+        metadata: {},
+      },
+    },
+  }),
+  updateSessionData: jest.fn().mockResolvedValue({ ok: true }),
+}));
+
+jest.mock('@mcp/tools/tool-wrapper', () => ({
+  wrapTool: jest.fn((name: string, fn: any) => fn),
+}));
+
 describe('resolveBaseImagesTool', () => {
   let mockLogger: ReturnType<typeof createMockLogger>;
   let config: ResolveBaseImagesConfig;
@@ -98,7 +124,7 @@ describe('resolveBaseImagesTool', () => {
 
   describe('successful base image resolution', () => {
     it('should resolve base images for JavaScript/React application', async () => {
-      const result = await resolveBaseImagesTool.execute(config, mockLogger);
+      const result = await resolveBaseImages(config, mockLogger);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -142,7 +168,7 @@ describe('resolveBaseImagesTool', () => {
         securityLevel: 'high' as const,
       };
 
-      const result = await resolveBaseImagesTool.execute(highSecurityConfig, mockLogger);
+      const result = await resolveBaseImages(highSecurityConfig, mockLogger);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -167,7 +193,7 @@ describe('resolveBaseImagesTool', () => {
       };
       mockDockerRegistryClient.getImageMetadata.mockResolvedValue(pythonMetadata);
 
-      const result = await resolveBaseImagesTool.execute(config, mockLogger);
+      const result = await resolveBaseImages(config, mockLogger);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -181,7 +207,7 @@ describe('resolveBaseImagesTool', () => {
         sessionId: 'test-session-123',
       };
 
-      const result = await resolveBaseImagesTool.execute(minimalConfig, mockLogger);
+      const result = await resolveBaseImages(minimalConfig, mockLogger);
 
       expect(result.ok).toBe(true);
       expect(mockLogger.info).toHaveBeenCalledWith(
@@ -208,7 +234,7 @@ describe('resolveBaseImagesTool', () => {
         "updatedAt": "2025-09-08T11:12:40.362Z"
       });
 
-      const result = await resolveBaseImagesTool.execute(config, mockLogger);
+      const result = await resolveBaseImages(config, mockLogger);
 
       expect(mockSessionManager.get).toHaveBeenCalledWith('test-session-123');
       expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
@@ -223,7 +249,7 @@ describe('resolveBaseImagesTool', () => {
       };
       mockSessionManager.get.mockResolvedValue(sessionWithoutAnalysis);
 
-      const result = await resolveBaseImagesTool.execute(config, mockLogger);
+      const result = await resolveBaseImages(config, mockLogger);
 
       expect(!result.ok).toBe(true);
       if (!result.ok) {
@@ -234,7 +260,7 @@ describe('resolveBaseImagesTool', () => {
     it('should handle registry client errors', async () => {
       mockDockerRegistryClient.getImageMetadata.mockRejectedValue(new Error('Registry error'));
 
-      const result = await resolveBaseImagesTool.execute(config, mockLogger);
+      const result = await resolveBaseImages(config, mockLogger);
 
       expect(!result.ok).toBe(true);
       expect(mockTimer.error).toHaveBeenCalled();
@@ -243,7 +269,7 @@ describe('resolveBaseImagesTool', () => {
 
   describe('session management', () => {
     it('should update session with base image recommendation', async () => {
-      const result = await resolveBaseImagesTool.execute(config, mockLogger);
+      const result = await resolveBaseImages(config, mockLogger);
 
       expect(mockSessionManager.update).toHaveBeenCalledWith(
         'test-session-123',
@@ -268,7 +294,7 @@ describe('resolveBaseImagesTool', () => {
 
       const context = { sessionManager: contextSessionManager };
 
-      await resolveBaseImagesTool.execute(config, mockLogger, context);
+      await resolveBaseImages(config, mockLogger, context);
 
       expect(contextSessionManager.get).toHaveBeenCalledWith('test-session-123');
       expect(contextSessionManager.update).toHaveBeenCalled();
@@ -285,14 +311,14 @@ describe('resolveBaseImagesTool', () => {
       };
       mockSessionManager.get.mockResolvedValue(sessionWithUnknown);
 
-      const result = await resolveBaseImagesTool.execute(config, mockLogger);
+      const result = await resolveBaseImages(config, mockLogger);
 
       expect(result.ok).toBe(true);
       // Should fall back to ubuntu:20.04 for unknown languages
     });
 
     it('should provide proper alternative image reasons', async () => {
-      const result = await resolveBaseImagesTool.execute(config, mockLogger);
+      const result = await resolveBaseImages(config, mockLogger);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -304,7 +330,7 @@ describe('resolveBaseImagesTool', () => {
 
   describe('logging and timing', () => {
     it('should log resolution start and completion', async () => {
-      await resolveBaseImagesTool.execute(config, mockLogger);
+      await resolveBaseImages(config, mockLogger);
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -324,7 +350,7 @@ describe('resolveBaseImagesTool', () => {
     });
 
     it('should end timer on success', async () => {
-      await resolveBaseImagesTool.execute(config, mockLogger);
+      await resolveBaseImages(config, mockLogger);
 
       expect(mockTimer.end).toHaveBeenCalledWith({ primaryImage: 'node:18-alpine' });
     });
@@ -332,7 +358,7 @@ describe('resolveBaseImagesTool', () => {
     it('should handle errors with timer', async () => {
       mockSessionManager.get.mockRejectedValue(new Error('Session error'));
 
-      const result = await resolveBaseImagesTool.execute(config, mockLogger);
+      const result = await resolveBaseImages(config, mockLogger);
 
       expect(mockTimer.error).toHaveBeenCalled();
       expect(!result.ok).toBe(true);

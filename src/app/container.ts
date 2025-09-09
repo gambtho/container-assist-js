@@ -8,7 +8,7 @@
 import type { Logger } from 'pino';
 import { createLogger } from '../lib/logger';
 import { createSessionManager, SessionManager } from '../lib/session';
-import { PromptRegistry } from '../prompts/prompt-registry';
+import { PromptRegistryCompatAdapter, createTemplateEngine } from '../core/templates';
 import {
   createResourceContext,
   createSDKResourceManager,
@@ -17,6 +17,8 @@ import {
 import { createSDKToolRegistry, type SDKToolRegistry } from '../mcp/tools/registry';
 import type { AIService } from '../domain/types';
 import { createAppConfig, type AppConfig } from '../config/app-config';
+import { createDockerClient, type DockerClient } from '../infrastructure/docker/client';
+import { createKubernetesClient, type KubernetesClient } from '../infrastructure/kubernetes/client';
 
 /**
  * All application dependencies with their types
@@ -29,8 +31,12 @@ export interface Deps {
   logger: Logger;
   sessionManager: SessionManager;
 
+  // Infrastructure clients
+  dockerClient: DockerClient;
+  kubernetesClient: KubernetesClient;
+
   // MCP services
-  promptRegistry: PromptRegistry;
+  promptRegistry: PromptRegistryCompatAdapter;
   resourceManager: SDKResourceManager;
   toolRegistry: SDKToolRegistry;
 
@@ -39,11 +45,19 @@ export interface Deps {
 }
 
 /**
+ * Container environment presets
+ */
+export type ContainerEnvironment = 'default' | 'test' | 'mcp';
+
+/**
  * Configuration overrides for dependency creation
  */
 export interface ContainerConfigOverrides {
   // Use custom configuration instead of default
   config?: AppConfig;
+
+  // Environment preset
+  environment?: ContainerEnvironment;
 
   // AI configuration
   ai?: {
@@ -59,12 +73,23 @@ export type DepsOverrides = Partial<Deps>;
 /**
  * Create application container with all dependencies
  */
-export function createContainer(
+export async function createContainer(
   configOverrides: ContainerConfigOverrides = {},
   depsOverrides: DepsOverrides = {},
-): Deps {
+): Promise<Deps> {
   // Use provided config or create default
   const appConfig = configOverrides.config ?? createAppConfig();
+
+  // Apply environment-specific overrides
+  const environment = configOverrides.environment ?? 'default';
+  if (environment === 'test') {
+    appConfig.server.logLevel = 'error'; // Quiet logs during tests
+    appConfig.session.ttl = 60; // Short TTL for tests
+    appConfig.session.maxSessions = 10;
+    appConfig.workspace.maxFileSize = 1024 * 1024; // 1MB max for tests
+  } else if (environment === 'mcp') {
+    appConfig.mcp.name = 'mcp-server';
+  }
 
   // Create logger first as other services depend on it
   const logger =
@@ -83,8 +108,24 @@ export function createContainer(
       cleanupIntervalMs: appConfig.session.cleanupInterval,
     });
 
-  // Create prompt registry
-  const promptRegistry = depsOverrides.promptRegistry ?? new PromptRegistry(logger);
+  // Create infrastructure clients
+  const dockerClient = depsOverrides.dockerClient ?? createDockerClient(logger);
+  const kubernetesClient = depsOverrides.kubernetesClient ?? createKubernetesClient(logger);
+
+  // Create prompt registry using new template system
+  const promptRegistry =
+    depsOverrides.promptRegistry ??
+    (await (async () => {
+      const engineResult = await createTemplateEngine(logger);
+      if (engineResult.isFailure()) {
+        logger.error(
+          { error: engineResult.error },
+          'Failed to create template engine, using fallback',
+        );
+        throw new Error(`Template engine creation failed: ${engineResult.error}`);
+      }
+      return new PromptRegistryCompatAdapter(engineResult.value, logger);
+    })());
 
   // Create resource manager using config
   const resourceManager =
@@ -108,6 +149,8 @@ export function createContainer(
     config: appConfig,
     logger,
     sessionManager,
+    dockerClient,
+    kubernetesClient,
     promptRegistry,
     resourceManager,
     toolRegistry,
@@ -126,6 +169,8 @@ export function createContainer(
       services: {
         logger: deps.logger !== undefined,
         sessionManager: deps.sessionManager !== undefined,
+        dockerClient: deps.dockerClient !== undefined,
+        kubernetesClient: deps.kubernetesClient !== undefined,
         promptRegistry: deps.promptRegistry !== undefined,
         resourceManager: deps.resourceManager !== undefined,
         toolRegistry: deps.toolRegistry !== undefined,
@@ -142,7 +187,7 @@ export function createContainer(
 /**
  * Create container with test overrides for easy testing
  */
-export function createTestContainer(overrides: DepsOverrides = {}): Deps {
+export async function createTestContainer(overrides: DepsOverrides = {}): Promise<Deps> {
   const testConfig = createAppConfig();
 
   // Apply test-specific overrides
@@ -151,7 +196,7 @@ export function createTestContainer(overrides: DepsOverrides = {}): Deps {
   testConfig.session.maxSessions = 10;
   testConfig.workspace.maxFileSize = 1024 * 1024; // 1MB max for tests
 
-  return createContainer(
+  return await createContainer(
     {
       config: testConfig,
       ai: {
@@ -236,6 +281,8 @@ export function checkContainerHealth(deps: Deps): {
   const requiredServices = {
     logger: deps.logger !== undefined,
     sessionManager: deps.sessionManager !== undefined,
+    dockerClient: deps.dockerClient !== undefined,
+    kubernetesClient: deps.kubernetesClient !== undefined,
     promptRegistry: deps.promptRegistry !== undefined,
     resourceManager: deps.resourceManager !== undefined,
     toolRegistry: deps.toolRegistry !== undefined,

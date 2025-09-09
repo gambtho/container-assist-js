@@ -8,7 +8,7 @@
 import { wrapTool } from '@mcp/tools/tool-wrapper';
 import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
 // import { formatStandardResponse } from '@mcp/tools/response-formatter'; // Not used directly, wrapped by wrapTool
-import type { ExtendedToolContext } from '../shared-types';
+import type { ToolContext } from '../../domain/types/tool-context';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, type Logger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
@@ -26,9 +26,9 @@ export interface TagImageResult {
  */
 async function tagImageImpl(
   params: TagImageParams,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<TagImageResult>> {
+  const logger = context.logger;
   const timer = createTimer(logger, 'tag-image');
 
   try {
@@ -128,7 +128,9 @@ export const tagImageTool = wrapTool('tag-image', tagImageImpl);
 export const tagImage = async (
   params: TagImageParams,
   logger: Logger,
-  context?: ExtendedToolContext,
+  context?: ToolContext,
 ): Promise<Result<TagImageResult>> => {
-  return tagImageImpl(params, context || {}, logger);
+  // Create minimal context if not provided
+  const unifiedContext: ToolContext = context || { logger };
+  return tagImageImpl(params, unifiedContext);
 };

@@ -16,7 +16,7 @@ async function main(): Promise<void> {
 
   try {
     // Create dependency injection container
-    deps = createContainer({});
+    deps = await createContainer({});
 
     deps.logger.info('Starting SDK-Native MCP Server with DI container');
 

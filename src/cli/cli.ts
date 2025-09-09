@@ -360,7 +360,7 @@ async function main(): Promise<void> {
     process.env.MCP_MODE = 'true';
 
     // Create server with DI container
-    const deps = createContainer({});
+    const deps = await createContainer({});
 
     const server = new MCPServer(deps, {
       name: 'containerization-assist',

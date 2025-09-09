@@ -44,6 +44,26 @@ jest.mock('@lib/kubernetes', () => ({
   createKubernetesClient: jest.fn(() => mockK8sClient),
 }));
 
+// Mock MCP helper modules
+jest.mock('@mcp/tools/session-helpers', () => ({
+  resolveSession: jest.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      id: 'test-session-123',
+      state: {
+        sessionId: 'test-session-123',
+        workflow_state: {},
+        metadata: {},
+      },
+    },
+  }),
+  updateSessionData: jest.fn().mockResolvedValue({ ok: true }),
+}));
+
+jest.mock('@mcp/tools/tool-wrapper', () => ({
+  wrapTool: jest.fn((name: string, fn: any) => ({ execute: fn })),
+}));
+
 jest.mock('@lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
 }));
