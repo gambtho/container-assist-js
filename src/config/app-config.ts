@@ -117,6 +117,7 @@ const AppConfigSchema = z.object({
   }),
   workspace: z.object({
     workspaceDir: z.string().default(() => process.cwd()),
+    promptsDir: z.string().optional(),
     tempDir: z.string().default('/tmp'),
     cleanupOnExit: z.boolean().default(true),
     maxFileSize: z.coerce.number().int().positive().default(CONSTANTS.LIMITS.MAX_FILE_SIZE),
@@ -227,6 +228,7 @@ export function createAppConfig(): AppConfig {
     },
     workspace: {
       workspaceDir: getEnvValue('WORKSPACE_DIR') || process.cwd(),
+      promptsDir: getEnvValue('PROMPTS_DIR'),
       tempDir: '/tmp',
       cleanupOnExit: true,
       maxFileSize: CONSTANTS.LIMITS.MAX_FILE_SIZE,

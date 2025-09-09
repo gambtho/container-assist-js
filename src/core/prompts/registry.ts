@@ -12,7 +12,8 @@
  */
 
 import type { Logger } from 'pino';
-import { join } from 'path';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import {
   ListPromptsResult,
   GetPromptResult,
@@ -56,7 +57,7 @@ export class PromptRegistry {
    * Initialize the registry by loading prompts from directory
    */
   async initialize(promptsDirectory?: string): Promise<Result<void>> {
-    const directory = promptsDirectory || join(process.cwd(), 'src', 'prompts');
+    const directory = promptsDirectory || this.getDefaultPromptsDirectory();
 
     this.logger.info({ directory }, 'Initializing prompt registry');
 
@@ -230,6 +231,15 @@ export class PromptRegistry {
           arguments: this.convertParameters(prompt.metadata.parameters),
         }
       : null;
+  }
+
+  /**
+   * Get the default prompts directory relative to this package
+   */
+  private getDefaultPromptsDirectory(): string {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    return path.resolve(__dirname, '../../prompts');
   }
 
   /**
