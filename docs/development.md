@@ -264,60 +264,139 @@ npm run lint:check-baseline
 
 ## Adding New Features
 
-### Adding a New Tool
+### Adding a New Tool (Standardized Pattern)
 
-1. Create tool implementation in `src/tools/`:
+All new tools MUST follow the standardized Golden Path pattern using our helper modules:
+
+1. Create tool folder structure in `src/tools/`:
+
+```bash
+src/tools/my-new-tool/
+├── tool.ts      # Tool implementation
+├── schema.ts    # Zod schema definition
+└── index.ts     # Public exports
+```
+
+2. Define schema using Zod (`schema.ts`):
 
 ```typescript
-// src/tools/my-new-tool.ts
-import { Result, Success, Failure } from '../core/result';
-import type { ToolContext } from '../mcp/types';
+import { z } from 'zod';
 
-export interface MyToolInput {
-  sessionId: string;
-  // ... other parameters
-}
+export const myNewToolSchema = z.object({
+  sessionId: z.string().optional().describe('Session identifier for tracking operations'),
+  // ... other parameters with descriptions
+});
 
-export async function myNewTool(
-  input: MyToolInput,
-  context: ToolContext
-): Promise<Result<MyToolOutput>> {
-  const { logger, progressReporter } = context;
+export type MyNewToolParams = z.infer<typeof myNewToolSchema>;
+```
+
+3. Implement tool using standardized helpers (`tool.ts`):
+
+```typescript
+import { wrapTool } from '@mcp/tools/tool-wrapper';
+import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
+import { aiGenerate } from '@mcp/tools/ai-helpers';
+import { formatStandardResponse } from '@mcp/tools/response-formatter';
+import { reportProgress } from '@mcp/utils/progress-helper';
+import type { MyNewToolParams } from './schema';
+
+async function myNewToolImpl(
+  params: MyNewToolParams,
+  context: ExtendedToolContext,
+  logger: Logger
+): Promise<Result<MyNewToolResult>> {
+  const timer = createTimer(logger, 'my-new-tool');
   
   try {
-    await progressReporter?.report(0, 100, 'Starting operation...');
-    // ... implementation
-    await progressReporter?.report(100, 100, 'Complete');
-    return Success(output);
+    // 1. Resolve session (always optional)
+    const sessionResult = await resolveSession(logger, context, {
+      sessionId: params.sessionId,
+      defaultIdHint: 'my-new-tool',
+      createIfNotExists: true
+    });
+    
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
+    }
+    
+    const { id: sessionId, state: session } = sessionResult.value;
+    
+    // 2. Report progress using standardized 4-stage pattern
+    await reportProgress(context.progressReporter, 'validating', 25);
+    
+    // 3. Use AI if needed (through standardized helper)
+    if (context && 'sampling' in context) {
+      const aiResult = await aiGenerate(logger, context, {
+        promptName: 'my-prompt',
+        promptArgs: { /* ... */ },
+        expectation: 'text',
+        maxRetries: 2
+      });
+      
+      if (aiResult.ok) {
+        // Use AI result
+      }
+    }
+    
+    await reportProgress(context.progressReporter, 'executing', 50);
+    
+    // 4. Your tool logic here
+    const result = /* ... your implementation ... */;
+    
+    // 5. Update session with results
+    await updateSessionData(sessionId, {
+      my_tool_result: result,
+      completed_steps: [...(session?.completed_steps ?? []), 'my-new-tool']
+    }, logger, context);
+    
+    await reportProgress(context.progressReporter, 'complete', 100);
+    
+    // 6. Return standardized response
+    return formatStandardResponse(Success(result), sessionId);
   } catch (error) {
-    return Failure(`Operation failed: ${error.message}`);
+    timer.error(error);
+    return Failure(error instanceof Error ? error.message : String(error));
   }
 }
+
+// Export wrapped tool
+export const myNewToolTool = wrapTool('my-new-tool', myNewToolImpl);
 ```
 
-2. Register in tool registry (`src/mcp/registry.ts`):
+4. Create index exports (`index.ts`):
 
 ```typescript
-import { myNewTool } from '../tools/my-new-tool';
-
-export const TOOL_REGISTRY = {
-  // ... existing tools
-  my_new_tool: {
-    handler: myNewTool,
-    schema: {
-      // ... JSON schema for parameters
-    }
-  }
-};
+export { myNewToolTool } from './tool';
+export { myNewToolSchema, type MyNewToolParams } from './schema';
 ```
 
-3. Add tests in `test/__tests__/unit/tools/`:
+5. Add tests following standardized patterns:
 
 ```typescript
 describe('myNewTool', () => {
-  // ... test cases
+  it('returns structured response', async () => {
+    const result = await myNewToolTool(params, context, logger);
+    expect(result.value.ok).toBe(true);
+    expect(result.value.sessionId).toBeDefined();
+    // No JSON.parse needed - responses are always structured!
+  });
+  
+  it('handles optional sessionId', async () => {
+    const result = await myNewToolTool({ /* no sessionId */ }, context, logger);
+    expect(result.ok).toBe(true);
+    expect(result.value.sessionId).toBeDefined(); // Auto-generated
+  });
 });
 ```
+
+### Key Requirements for New Tools
+
+1. **SessionId is ALWAYS optional** - Use `resolveSession` helper
+2. **Return structured objects** - Never return JSON strings
+3. **Use standardized helpers** - Don't reinvent the wheel
+4. **Follow 4-stage progress pattern** - validating → executing → finalizing → complete
+5. **Use `aiGenerate` for AI calls** - Never call `context.sampling` directly
+6. **Wrap with `wrapTool`** - Provides consistent error handling and logging
 
 ### Adding a New Workflow
 

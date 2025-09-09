@@ -1,7 +1,6 @@
 /**
  * Unit Tests: Image Scanning Tool
  * Tests the scan image tool functionality with mock security scanner
- * Following analyze-repo test structure and Phase 2 completion requirements
  */
 
 import { jest } from '@jest/globals';
@@ -33,16 +32,17 @@ const mockTimer = {
   error: jest.fn(),
 };
 
-jest.mock('../../../src/lib/session', () => ({
+jest.mock('@lib/session', () => ({
   createSessionManager: jest.fn(() => mockSessionManager),
 }));
 
-jest.mock('../../../src/lib/scanner', () => ({
+jest.mock('@lib/scanner', () => ({
   createSecurityScanner: jest.fn(() => mockSecurityScanner),
 }));
 
-jest.mock('../../../src/lib/logger', () => ({
+jest.mock('@lib/logger', () => ({
   createTimer: jest.fn(() => mockTimer),
+  createLogger: jest.fn(() => createMockLogger()),
 }));
 
 describe('scanImage', () => {
@@ -95,7 +95,7 @@ describe('scanImage', () => {
     });
 
     it('should successfully scan image and return results', async () => {
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -114,12 +114,10 @@ describe('scanImage', () => {
       expect(mockSessionManager.update).toHaveBeenCalledWith(
         'test-session-123',
         expect.objectContaining({
-          workflow_state: expect.objectContaining({
-            scan_result: expect.objectContaining({
-              success: false, // Failed due to vulnerability above threshold
-            }),
-            completed_steps: expect.arrayContaining(['scan']),
+          scan_result: expect.objectContaining({
+            success: false, // Failed due to vulnerability above threshold
           }),
+          completed_steps: expect.arrayContaining(['scan']),
         })
       );
     });
@@ -136,7 +134,7 @@ describe('scanImage', () => {
         imageId: 'sha256:mock-image-id',
       }));
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -149,11 +147,11 @@ describe('scanImage', () => {
       config.severityThreshold = 'critical';
       
       // Only high vulnerability, threshold is critical
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.passed).toBe(true); // Should pass since high < critical
+        expect(result.value.success).toBe(true); // Should pass since high < critical
       }
     });
 
@@ -162,7 +160,7 @@ describe('scanImage', () => {
         sessionId: 'test-session-123',
       };
 
-      const result = await scanImage(minimalConfig, mockLogger);
+      const result = await scanImage(minimalConfig, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       expect(mockSecurityScanner.scanImage).toHaveBeenCalled();
@@ -183,7 +181,7 @@ describe('scanImage', () => {
       "updatedAt": "2025-09-08T11:12:40.362Z"
 });
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(mockSessionManager.get).toHaveBeenCalledWith('test-session-123');
       expect(mockSessionManager.create).toHaveBeenCalledWith('test-session-123');
@@ -194,11 +192,11 @@ describe('scanImage', () => {
         repo_path: '/test/repo',
       });
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('No built image found in session - run build_image first');
+        expect(result.error).toBe('No image specified. Provide imageId parameter or ensure session has built image from build-image tool.');
       }
     });
 
@@ -214,11 +212,11 @@ describe('scanImage', () => {
         createFailureResult('Scanner failed to analyze image')
       );
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toBe('Scan failed: Scanner failed to analyze image');
+        expect(result.error).toBe('Failed to scan image: Scanner failed to analyze image');
       }
     });
 
@@ -232,7 +230,7 @@ describe('scanImage', () => {
 
       mockSecurityScanner.scanImage.mockRejectedValue(new Error('Scanner crashed'));
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -267,7 +265,7 @@ describe('scanImage', () => {
         imageId: 'sha256:mock-image-id',
       }));
 
-      const result = await scanImage(config, mockLogger);
+      const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -310,7 +308,7 @@ describe('scanImage', () => {
       
       for (const scanner of scannerTypes) {
         config.scanner = scanner;
-        const result = await scanImage(config, mockLogger);
+        const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
         
         expect(result.ok).toBe(true);
         // Verify the scanner was created with the correct type
@@ -323,7 +321,7 @@ describe('scanImage', () => {
       
       for (const threshold of thresholds) {
         config.severityThreshold = threshold;
-        const result = await scanImage(config, mockLogger);
+        const result = await scanImage(config, { logger: mockLogger, sessionManager: mockSessionManager });
         
         expect(result.ok).toBe(true);
       }

@@ -4,18 +4,58 @@
 
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@types';
-import type {
-  SamplingStrategy,
-  DockerfileContext,
-  DockerfileVariant,
-  ScoringCriteria,
-  ScoreDetails,
-} from './types';
+import type { DockerfileContext, DockerfileVariant, ScoringCriteria, ScoreDetails } from './types';
 import { getBaseImageRecommendations } from '@lib/base-images';
 import { DEFAULT_NETWORK, DEFAULT_CONTAINER, getDefaultPort } from '@config/defaults';
 
 /**
- * Analyze variant and return individual scores
+ * Default scoring configurations
+ */
+export const SCORING_PRESETS: Record<string, ScoringCriteria> = {
+  balanced: { security: 0.25, performance: 0.25, size: 0.25, maintainability: 0.25 },
+  security: { security: 0.5, performance: 0.2, size: 0.15, maintainability: 0.15 },
+  performance: { security: 0.15, performance: 0.5, size: 0.2, maintainability: 0.15 },
+  size: { security: 0.15, performance: 0.2, size: 0.5, maintainability: 0.15 },
+  maintainability: { security: 0.2, performance: 0.15, size: 0.15, maintainability: 0.5 },
+};
+
+export const DEFAULT_SCORING_CRITERIA = SCORING_PRESETS.balanced;
+
+/**
+ * Analyze Dockerfile variant and compute multi-dimensional quality scores
+ *
+ * This function implements a heuristic-based scoring system that evaluates
+ * Dockerfile variants across four key dimensions:
+ *
+ * **Security Scoring Logic:**
+ * - Base score: 50/100
+ * - Non-root user (+20): Detects 'USER' instruction avoiding root
+ * - Secure base images (+15): Alpine/distroless images have smaller attack surface
+ * - Package management (+10): Proper apt-get update && install pattern
+ * - Health monitoring (+5): HEALTHCHECK instruction present
+ *
+ * **Performance Scoring Logic:**
+ * - Base score: 50/100
+ * - Multi-stage builds (+20): Multiple FROM instructions indicate build optimization
+ * - Build artifact copying (+15): COPY --from= indicates efficient layer usage
+ * - Cache mounts (+10): BuildKit cache mount optimization
+ * - Layer cleanup (+5): Proper package cache cleanup
+ *
+ * **Size Scoring Logic:**
+ * - Base score: 50/100
+ * - Minimal base images (+25): Alpine/distroless significantly smaller
+ * - Slim variants (+15): -slim tags are smaller than full images
+ * - Cleanup commands (+10): rm -rf commands reduce final image size
+ *
+ * **Maintainability Scoring Logic:**
+ * - Base score: 50/100
+ * - Multi-stage builds (+20): Cleaner separation of build/runtime concerns
+ * - Explicit versioning (+15): Pinned versions improve reproducibility
+ * - Documentation (+10): LABEL instructions provide metadata
+ * - Port declarations (+5): EXPOSE makes ports discoverable
+ *
+ * @param variant - Dockerfile variant to analyze
+ * @returns Object with individual scores (0-100) for each quality dimension
  */
 function analyzeVariant(variant: DockerfileVariant): {
   security: number;
@@ -114,7 +154,32 @@ function generateRecommendations(
 }
 
 /**
- * Score a Dockerfile variant
+ * Score Dockerfile content directly
+ */
+export function scoreDockerfileContent(
+  content: string,
+  criteria: ScoringCriteria,
+  _variantId?: string,
+): ScoreDetails {
+  const scores = analyzeVariant({ content } as DockerfileVariant);
+
+  const total =
+    scores.security * criteria.security +
+    scores.performance * criteria.performance +
+    scores.size * criteria.size +
+    scores.maintainability * criteria.maintainability;
+
+  return {
+    total: Math.round(total),
+    breakdown: scores,
+    reasons: generateScoringReasons({ content } as DockerfileVariant, scores),
+    warnings: detectWarnings({ content } as DockerfileVariant),
+    recommendations: generateRecommendations({ content } as DockerfileVariant, scores),
+  };
+}
+
+/**
+ * Score a Dockerfile variant (backward compatibility)
  */
 export async function scoreVariant(
   variant: DockerfileVariant,
@@ -122,27 +187,13 @@ export async function scoreVariant(
   logger: Logger,
 ): Promise<Result<ScoreDetails>> {
   try {
-    const scores = analyzeVariant(variant);
-
-    const total =
-      scores.security * criteria.security +
-      scores.performance * criteria.performance +
-      scores.size * criteria.size +
-      scores.maintainability * criteria.maintainability;
-
-    const scoreDetails: ScoreDetails = {
-      total: Math.round(total),
-      breakdown: scores,
-      reasons: generateScoringReasons(variant, scores),
-      warnings: detectWarnings(variant),
-      recommendations: generateRecommendations(variant, scores),
-    };
+    const scoreDetails = scoreDockerfileContent(variant.content, criteria, variant.id);
 
     logger.debug(
       {
         variant: variant.id,
         total: scoreDetails.total,
-        breakdown: scores,
+        breakdown: scoreDetails.breakdown,
       },
       'Variant scored',
     );
@@ -190,25 +241,21 @@ function getBuildCommand(language: string, packageManager: string): string {
 }
 
 /**
- * Create security-first strategy
+ * Generate security-focused Dockerfile
  */
-export function createSecurityFirstStrategy(logger: Logger): SamplingStrategy {
-  return {
-    name: 'security-first',
-    description:
-      'Prioritizes security best practices with non-root users, minimal packages, and security scanning',
-    optimization: 'security',
+export async function generateSecurityDockerfile(
+  context: DockerfileContext,
+  logger: Logger,
+): Promise<Result<DockerfileVariant>> {
+  try {
+    const { language, packageManager, ports } = context.analysis;
+    const baseImage = getBaseImageRecommendations({
+      language,
+      preference: 'security',
+    }).primary;
+    const primaryPort = ports[0] || getDefaultPort(language);
 
-    async generateVariant(context: DockerfileContext): Promise<Result<DockerfileVariant>> {
-      try {
-        const { language, packageManager, ports } = context.analysis;
-        const baseImage = getBaseImageRecommendations({
-          language,
-          preference: 'security',
-        }).primary;
-        const primaryPort = ports[0] || getDefaultPort(language);
-
-        const dockerfileContent = `# Security-focused Dockerfile for ${language}
+    const dockerfileContent = `# Security-focused Dockerfile for ${language}
 FROM ${baseImage}
 
 # Create non-root user
@@ -248,54 +295,46 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["${getStartCommand(language, packageManager)}"]`;
 
-        const variant: DockerfileVariant = {
-          id: `security-${Date.now()}`,
-          content: dockerfileContent,
-          strategy: 'security-first',
-          metadata: {
-            baseImage,
-            optimization: 'security',
-            features: ['non-root-user', 'minimal-packages', 'security-updates', 'healthcheck'],
-            estimatedSize: '< 200MB',
-            buildComplexity: 'medium',
-            securityFeatures: ['non-root', 'minimal-attack-surface', 'security-updates'],
-            aiEnhanced: false,
-          },
-          generated: new Date(),
-        };
+    const variant: DockerfileVariant = {
+      id: `security-${Date.now()}`,
+      content: dockerfileContent,
+      strategy: 'security-first',
+      metadata: {
+        baseImage,
+        optimization: 'security',
+        features: ['non-root-user', 'minimal-packages', 'security-updates', 'healthcheck'],
+        estimatedSize: '< 200MB',
+        buildComplexity: 'medium',
+        securityFeatures: ['non-root', 'minimal-attack-surface', 'security-updates'],
+        aiEnhanced: false,
+      },
+      generated: new Date(),
+    };
 
-        logger.info({ variant: variant.id }, 'Security-first variant generated');
-        return Success(variant);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return Failure(`Security strategy generation failed: ${message}`);
-      }
-    },
-
-    scoreVariant: (variant, criteria) => scoreVariant(variant, criteria, logger),
-  };
+    logger.info({ variant: variant.id }, 'Security-first variant generated');
+    return Success(variant);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return Failure(`Security strategy generation failed: ${message}`);
+  }
 }
 
 /**
- * Create performance-optimized strategy
+ * Generate performance-optimized Dockerfile
  */
-export function createPerformanceStrategy(logger: Logger): SamplingStrategy {
-  return {
-    name: 'performance-optimized',
-    description:
-      'Optimizes for build speed and runtime performance using multi-stage builds and caching',
-    optimization: 'performance',
+export async function generatePerformanceDockerfile(
+  context: DockerfileContext,
+  logger: Logger,
+): Promise<Result<DockerfileVariant>> {
+  try {
+    const { language, packageManager, ports } = context.analysis;
+    const baseImage = getBaseImageRecommendations({
+      language,
+      preference: 'performance',
+    }).primary;
+    const primaryPort = ports[0] || getDefaultPort(language);
 
-    async generateVariant(context: DockerfileContext): Promise<Result<DockerfileVariant>> {
-      try {
-        const { language, packageManager, ports } = context.analysis;
-        const baseImage = getBaseImageRecommendations({
-          language,
-          preference: 'performance',
-        }).primary;
-        const primaryPort = ports[0] || getDefaultPort(language);
-
-        const dockerfileContent = `# Performance-optimized multi-stage Dockerfile
+    const dockerfileContent = `# Performance-optimized multi-stage Dockerfile
 # Build stage
 FROM ${baseImage} AS builder
 
@@ -332,72 +371,58 @@ EXPOSE ${primaryPort}
 # Optimized startup
 CMD ["${language === 'typescript' ? 'node dist/index.js' : 'npm start'}"]`;
 
-        const variant: DockerfileVariant = {
-          id: `performance-${Date.now()}`,
-          content: dockerfileContent,
-          strategy: 'performance-optimized',
-          metadata: {
-            baseImage,
-            optimization: 'performance',
-            features: [
-              'multi-stage-build',
-              'layer-caching',
-              'parallel-builds',
-              'optimized-runtime',
-            ],
-            estimatedSize: '< 300MB',
-            buildComplexity: 'high',
-            securityFeatures: ['non-root'],
-            aiEnhanced: false,
-          },
-          generated: new Date(),
-        };
+    const variant: DockerfileVariant = {
+      id: `performance-${Date.now()}`,
+      content: dockerfileContent,
+      strategy: 'performance-optimized',
+      metadata: {
+        baseImage,
+        optimization: 'performance',
+        features: ['multi-stage-build', 'layer-caching', 'parallel-builds', 'optimized-runtime'],
+        estimatedSize: '< 300MB',
+        buildComplexity: 'high',
+        securityFeatures: ['non-root'],
+        aiEnhanced: false,
+      },
+      generated: new Date(),
+    };
 
-        logger.info({ variant: variant.id }, 'Performance variant generated');
-        return Success(variant);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return Failure(`Performance strategy generation failed: ${message}`);
-      }
-    },
-
-    scoreVariant: (variant, criteria) => scoreVariant(variant, criteria, logger),
-  };
+    logger.info({ variant: variant.id }, 'Performance variant generated');
+    return Success(variant);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return Failure(`Performance strategy generation failed: ${message}`);
+  }
 }
 
 /**
- * Create size-optimized strategy
+ * Generate size-optimized Dockerfile
  */
-export function createSizeOptimizedStrategy(logger: Logger): SamplingStrategy {
-  return {
-    name: 'size-optimized',
-    description:
-      'Minimizes final image size using distroless/alpine images and careful layer optimization',
-    optimization: 'size',
+export async function generateSizeDockerfile(
+  context: DockerfileContext,
+  logger: Logger,
+): Promise<Result<DockerfileVariant>> {
+  try {
+    const { language, packageManager: _packageManager, ports } = context.analysis;
+    const primaryPort = ports[0] || getDefaultPort(language);
+    const baseImage = getBaseImageRecommendations({
+      language,
+      preference: 'size',
+    }).primary;
 
-    async generateVariant(context: DockerfileContext): Promise<Result<DockerfileVariant>> {
-      try {
-        const { language, packageManager: _packageManager, ports } = context.analysis;
-        const primaryPort = ports[0] || getDefaultPort(language);
-        const baseImage = getBaseImageRecommendations({
-          language,
-          preference: 'size',
-        }).primary;
+    // Select minimal production image
+    const minimalImages = {
+      javascript: 'gcr.io/distroless/nodejs18-debian11',
+      typescript: 'gcr.io/distroless/nodejs18-debian11',
+      python: 'gcr.io/distroless/python3-debian11',
+      java: 'gcr.io/distroless/java17-debian11',
+      go: 'gcr.io/distroless/static-debian11',
+      rust: 'gcr.io/distroless/cc-debian11',
+    };
+    const minimalImage =
+      minimalImages[language as keyof typeof minimalImages] || 'gcr.io/distroless/static-debian11';
 
-        // Select minimal production image
-        const minimalImages = {
-          javascript: 'gcr.io/distroless/nodejs18-debian11',
-          typescript: 'gcr.io/distroless/nodejs18-debian11',
-          python: 'gcr.io/distroless/python3-debian11',
-          java: 'gcr.io/distroless/java17-debian11',
-          go: 'gcr.io/distroless/static-debian11',
-          rust: 'gcr.io/distroless/cc-debian11',
-        };
-        const minimalImage =
-          minimalImages[language as keyof typeof minimalImages] ||
-          'gcr.io/distroless/static-debian11';
-
-        const dockerfileContent = `# Size-optimized Dockerfile using distroless
+    const dockerfileContent = `# Size-optimized Dockerfile using distroless
 # Build stage
 FROM ${baseImage} AS builder
 
@@ -434,53 +459,46 @@ EXPOSE ${primaryPort}
 # Run the application
 ${language === 'typescript' ? 'CMD ["dist/index.js"]' : 'CMD ["index.js"]'}`;
 
-        const variant: DockerfileVariant = {
-          id: `size-${Date.now()}`,
-          content: dockerfileContent,
-          strategy: 'size-optimized',
-          metadata: {
-            baseImage: minimalImage,
-            optimization: 'size',
-            features: ['distroless', 'minimal-layers', 'dependency-pruning', 'static-binary'],
-            estimatedSize: '< 100MB',
-            buildComplexity: 'high',
-            securityFeatures: ['distroless', 'minimal-attack-surface'],
-            aiEnhanced: false,
-          },
-          generated: new Date(),
-        };
+    const variant: DockerfileVariant = {
+      id: `size-${Date.now()}`,
+      content: dockerfileContent,
+      strategy: 'size-optimized',
+      metadata: {
+        baseImage: minimalImage,
+        optimization: 'size',
+        features: ['distroless', 'minimal-layers', 'dependency-pruning', 'static-binary'],
+        estimatedSize: '< 100MB',
+        buildComplexity: 'high',
+        securityFeatures: ['distroless', 'minimal-attack-surface'],
+        aiEnhanced: false,
+      },
+      generated: new Date(),
+    };
 
-        logger.info({ variant: variant.id }, 'Size-optimized variant generated');
-        return Success(variant);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return Failure(`Size optimization strategy generation failed: ${message}`);
-      }
-    },
-
-    scoreVariant: (variant, criteria) => scoreVariant(variant, criteria, logger),
-  };
+    logger.info({ variant: variant.id }, 'Size-optimized variant generated');
+    return Success(variant);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return Failure(`Size optimization strategy generation failed: ${message}`);
+  }
 }
 
 /**
- * Create balanced strategy
+ * Generate balanced Dockerfile
  */
-export function createBalancedStrategy(logger: Logger): SamplingStrategy {
-  return {
-    name: 'balanced',
-    description: 'Balanced approach considering security, performance, and size',
-    optimization: 'balanced',
+export async function generateBalancedDockerfile(
+  context: DockerfileContext,
+  logger: Logger,
+): Promise<Result<DockerfileVariant>> {
+  try {
+    const { language, packageManager, ports } = context.analysis;
+    const baseImage = getBaseImageRecommendations({
+      language,
+      preference: 'balanced',
+    }).primary;
+    const primaryPort = ports[0] || getDefaultPort(language);
 
-    async generateVariant(context: DockerfileContext): Promise<Result<DockerfileVariant>> {
-      try {
-        const { language, packageManager, ports } = context.analysis;
-        const baseImage = getBaseImageRecommendations({
-          language,
-          preference: 'balanced',
-        }).primary;
-        const primaryPort = ports[0] || getDefaultPort(language);
-
-        const dockerfileContent = `# Balanced Dockerfile for ${language}
+    const dockerfileContent = `# Balanced Dockerfile for ${language}
 FROM ${baseImage}
 
 # Create non-root user
@@ -512,68 +530,111 @@ HEALTHCHECK --interval=30s --timeout=3s \\
 # Start application
 CMD ["${getStartCommand(language, packageManager)}"]`;
 
-        const variant: DockerfileVariant = {
-          id: `balanced-${Date.now()}`,
-          content: dockerfileContent,
-          strategy: 'balanced',
-          metadata: {
-            baseImage,
-            optimization: 'balanced',
-            features: ['non-root-user', 'healthcheck', 'production-deps', 'clean-cache'],
-            estimatedSize: '< 250MB',
-            buildComplexity: 'low',
-            securityFeatures: ['non-root'],
-            aiEnhanced: false,
-          },
-          generated: new Date(),
-        };
+    const variant: DockerfileVariant = {
+      id: `balanced-${Date.now()}`,
+      content: dockerfileContent,
+      strategy: 'balanced',
+      metadata: {
+        baseImage,
+        optimization: 'balanced',
+        features: ['non-root-user', 'healthcheck', 'production-deps', 'clean-cache'],
+        estimatedSize: '< 250MB',
+        buildComplexity: 'low',
+        securityFeatures: ['non-root'],
+        aiEnhanced: false,
+      },
+      generated: new Date(),
+    };
 
-        logger.info({ variant: variant.id }, 'Balanced variant generated');
-        return Success(variant);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return Failure(`Balanced strategy generation failed: ${message}`);
-      }
-    },
-
-    scoreVariant: (variant, criteria) => scoreVariant(variant, criteria, logger),
-  };
+    logger.info({ variant: variant.id }, 'Balanced variant generated');
+    return Success(variant);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return Failure(`Balanced strategy generation failed: ${message}`);
+  }
 }
 
 /**
- * Get all default strategies
- */
-export function getDefaultStrategies(logger: Logger): SamplingStrategy[] {
-  return [
-    createSecurityFirstStrategy(logger),
-    createPerformanceStrategy(logger),
-    createSizeOptimizedStrategy(logger),
-    createBalancedStrategy(logger),
-  ];
-}
-
-/**
- * Generate variants using specified strategies
+ * Generate variants using strategy names
  */
 export async function generateVariants(
   context: DockerfileContext,
-  strategies: SamplingStrategy[],
+  strategyNames: SamplingStrategyName[],
+  logger: Logger,
+): Promise<Result<DockerfileVariant[]>> {
+  return executeMultipleSamplingStrategies(strategyNames, context, logger);
+}
+
+/**
+ * Score multiple variants
+ */
+export function scoreVariants(
+  variants: DockerfileVariant[],
+  criteria: ScoringCriteria,
+  logger?: Logger,
+): ScoreDetails[] {
+  const scores = variants.map((variant) => {
+    const score = scoreDockerfileContent(variant.content, criteria, variant.id);
+    logger?.debug(
+      {
+        variant: variant.id,
+        total: score.total,
+        breakdown: score.breakdown,
+      },
+      'Variant scored',
+    );
+    return score;
+  });
+
+  logger?.info({ scoreCount: scores.length }, 'Variants scored successfully');
+  return scores;
+}
+
+/**
+ * Direct Dockerfile generation functions registry
+ */
+export const dockerfileGenerators = {
+  'security-first': generateSecurityDockerfile,
+  'performance-optimized': generatePerformanceDockerfile,
+  'size-optimized': generateSizeDockerfile,
+  balanced: generateBalancedDockerfile,
+} as const;
+
+export type SamplingStrategyName = keyof typeof dockerfileGenerators;
+
+/**
+ * Execute a single Dockerfile generation by strategy name
+ */
+export async function executeSamplingStrategy(
+  strategyName: SamplingStrategyName,
+  context: DockerfileContext,
+  logger: Logger,
+): Promise<Result<DockerfileVariant>> {
+  const generator = dockerfileGenerators[strategyName];
+  if (!generator) {
+    return Failure(`Unknown generation strategy: ${strategyName}`);
+  }
+
+  return generator(context, logger);
+}
+
+/**
+ * Execute multiple Dockerfile generation strategies
+ */
+export async function executeMultipleSamplingStrategies(
+  strategyNames: SamplingStrategyName[],
+  context: DockerfileContext,
   logger: Logger,
 ): Promise<Result<DockerfileVariant[]>> {
   const variants: DockerfileVariant[] = [];
   const errors: string[] = [];
 
-  for (const strategy of strategies) {
-    try {
-      const result = await strategy.generateVariant(context, logger);
-      if (result.ok) {
-        variants.push(result.value);
-      } else {
-        errors.push(`${strategy.name}: ${result.error}`);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`${strategy.name}: ${message}`);
+  for (const strategyName of strategyNames) {
+    const result = await executeSamplingStrategy(strategyName, context, logger);
+    if (result.ok) {
+      variants.push(result.value);
+    } else {
+      errors.push(`${strategyName}: ${result.error}`);
     }
   }
 
@@ -581,105 +642,16 @@ export async function generateVariants(
     return Failure(`No variants generated. Errors: ${errors.join('; ')}`);
   }
 
-  if (errors.length > 0) {
-    logger.warn({ errors }, 'Some strategies failed');
-  }
-
-  logger.info(
-    {
-      variantCount: variants.length,
-      strategies: variants.map((v) => v.strategy),
-    },
-    'Variants generated successfully',
-  );
-
+  logger.info({ count: variants.length }, 'Dockerfile variants generated');
   return Success(variants);
 }
 
 /**
- * Score multiple variants
+ * Get list of available generation strategies
  */
-export async function scoreVariants(
-  variants: DockerfileVariant[],
-  criteria: ScoringCriteria,
-  logger: Logger,
-): Promise<Result<ScoreDetails[]>> {
-  const scores: ScoreDetails[] = [];
-  const errors: string[] = [];
-
-  for (const variant of variants) {
-    try {
-      const scoreResult = await scoreVariant(variant, criteria, logger);
-      if (scoreResult.ok) {
-        scores.push(scoreResult.value);
-      } else {
-        errors.push(`Scoring failed for ${variant.id}: ${scoreResult.error}`);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`Scoring error for ${variant.id}: ${message}`);
-    }
-  }
-
-  if (scores.length === 0) {
-    return Failure(`No scores computed. Errors: ${errors.join('; ')}`);
-  }
-
-  logger.info({ scoreCount: scores.length }, 'Variants scored successfully');
-  return Success(scores);
+export function getAvailableSamplingStrategies(): SamplingStrategyName[] {
+  return Object.keys(dockerfileGenerators) as SamplingStrategyName[];
 }
 
-/**
- * Simple strategy manager for backward compatibility
- */
-export class StrategyEngine {
-  private strategies: Map<string, SamplingStrategy> = new Map();
-
-  constructor(
-    private logger: Logger,
-    _promptRegistry?: Record<string, unknown>,
-  ) {
-    this.registerDefaultStrategies();
-  }
-
-  private registerDefaultStrategies(): void {
-    const strategies = getDefaultStrategies(this.logger);
-    strategies.forEach((strategy) => {
-      this.strategies.set(strategy.name, strategy);
-    });
-    this.logger.info({ count: strategies.length }, 'Default strategies registered');
-  }
-
-  registerStrategy(strategy: SamplingStrategy): void {
-    this.strategies.set(strategy.name, strategy);
-    this.logger.info({ strategy: strategy.name }, 'Custom strategy registered');
-  }
-
-  getAvailableStrategies(): string[] {
-    return Array.from(this.strategies.keys());
-  }
-
-  getStrategy(name: string): SamplingStrategy | undefined {
-    return this.strategies.get(name);
-  }
-
-  async generateVariants(
-    context: DockerfileContext,
-    strategyNames?: string[],
-  ): Promise<Result<DockerfileVariant[]>> {
-    const selectedStrategies = strategyNames
-      ? (strategyNames
-          .map((name) => this.strategies.get(name))
-          .filter(Boolean) as SamplingStrategy[])
-      : Array.from(this.strategies.values());
-
-    return generateVariants(context, selectedStrategies, this.logger);
-  }
-
-  async scoreVariants(
-    variants: DockerfileVariant[],
-    criteria: ScoringCriteria,
-  ): Promise<Result<ScoreDetails[]>> {
-    return scoreVariants(variants, criteria, this.logger);
-  }
-}
+// Legacy compatibility exports
+export const samplingStrategies = dockerfileGenerators;

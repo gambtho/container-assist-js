@@ -1,36 +1,36 @@
 /**
- * Resolve Base Images Tool - Flat Architecture
+ * Resolve Base Images Tool - Standardized Implementation
  *
- * Resolves optimal Docker base images for applications
- * Follows architectural requirement: only imports from src/lib/
+ * Resolves optimal Docker base images for applications using standardized
+ * helpers for consistency and improved error handling
+ *
+ * @example
+ * ```typescript
+ * const result = await resolveBaseImages({
+ *   sessionId: 'session-123', // optional
+ *   technology: 'nodejs',
+ *   requirements: { environment: 'production', security: 'high' }
+ * }, context, logger);
+ *
+ * if (result.primaryImage) {
+ *   console.log('Recommended image:', result.primaryImage.name);
+ *   console.log('Rationale:', result.rationale);
+ * }
+ * ```
  */
 
-import { createSessionManager, type SessionManager } from '../../lib/session';
-import { createTimer, type Logger } from '../../lib/logger';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+// Removed wrapTool - using direct implementation
+import type { ToolContext } from '../../mcp/context/types';
+import { createTimer, createLogger } from '../../lib/logger';
 import { createDockerRegistryClient } from '../../lib/docker';
-import {
-  Success,
-  Failure,
-  type Result,
-  updateWorkflowState,
-  type WorkflowState,
-} from '../../domain/types';
+import { Success, Failure, type Result } from '../../domain/types';
 import { getSuggestedBaseImages, getRecommendedBaseImage } from '../../lib/base-images';
-
-interface ResolveBaseImagesContext {
-  sessionManager?: SessionManager;
-}
-
-export interface ResolveBaseImagesConfig {
-  sessionId: string;
-  targetEnvironment?: 'development' | 'staging' | 'production';
-  securityLevel?: 'low' | 'medium' | 'high';
-  performancePriority?: 'size' | 'speed' | 'balanced';
-  architectures?: string[];
-}
+import type { ResolveBaseImagesParams } from './schema';
 
 export interface BaseImageRecommendation {
   sessionId: string;
+  technology?: string;
   primaryImage: {
     name: string;
     tag: string;
@@ -49,43 +49,54 @@ export interface BaseImageRecommendation {
 }
 
 /**
- * Resolve optimal base images for the application
+ * Base image resolution implementation - direct execution without wrapper
  */
-async function resolveBaseImages(
-  config: ResolveBaseImagesConfig,
-  logger: Logger,
-  context?: ResolveBaseImagesContext,
+async function resolveBaseImagesImpl(
+  params: ResolveBaseImagesParams,
+  context: ToolContext,
 ): Promise<Result<BaseImageRecommendation>> {
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+  const logger = context.logger || createLogger({ name: 'resolve-base-images' });
   const timer = createTimer(logger, 'resolve-base-images');
 
   try {
-    const { sessionId, targetEnvironment = 'production', securityLevel = 'medium' } = config;
+    const { technology, requirements = {} } = params;
 
-    logger.info({ sessionId, targetEnvironment, securityLevel }, 'Resolving base images');
+    // Extract requirements
+    const targetEnvironment = (requirements.environment as string) || 'production';
+    const securityLevel = (requirements.security as string) || 'medium';
 
-    // Use sessionManager from context or create new one
-    const sessionManager = context?.sessionManager || createSessionManager(logger);
+    logger.info({ technology, targetEnvironment, securityLevel }, 'Resolving base images');
 
-    // Get or create session
-    let session = await sessionManager.get(sessionId);
-    if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
+    // Resolve session (now always optional)
+    const sessionResult = await getSession(params.sessionId, context);
+
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
     }
 
-    // Get analysis result from session
-    const workflowState = session as
-      | {
-          analysis_result?: { language?: string; framework?: string };
-        }
+    const { id: sessionId, state: session } = sessionResult.value;
+    logger.info({ sessionId, technology, targetEnvironment }, 'Starting base image resolution');
+
+    // Get analysis result from session or use provided technology
+    const sessionState = session as
+      | { analysis_result?: { language?: string; framework?: string } }
       | null
       | undefined;
-    const analysisResult = workflowState?.analysis_result;
-    if (!analysisResult) {
-      return Failure('Repository must be analyzed first - run analyze_repo');
+    const analysisResult = sessionState?.analysis_result;
+
+    // Use provided technology or fall back to session analysis
+    const language = technology || analysisResult?.language;
+    if (!language) {
+      return Failure(
+        'No technology specified. Provide technology parameter or run analyze-repo tool first.',
+      );
     }
 
-    const language = analysisResult?.language ?? 'unknown';
+    const framework = analysisResult?.framework;
     const suggestedImages = getSuggestedBaseImages(language);
 
     // Select primary image based on environment and security level
@@ -123,7 +134,8 @@ async function resolveBaseImages(
           reason: img.includes('alpine') ? 'Smaller size, better security' : 'More compatibility',
         };
       }),
-      rationale: `Selected ${primaryImage} for ${language}${analysisResult?.framework ? `/${analysisResult.framework}` : ''} application based on ${targetEnvironment} environment with ${securityLevel} security requirements`,
+      rationale: `Selected ${primaryImage} for ${language}${framework ? `/${framework}` : ''} application based on ${targetEnvironment} environment with ${securityLevel} security requirements`,
+      technology: language,
       securityConsiderations: [
         securityLevel === 'high'
           ? 'Using minimal Alpine-based image for reduced attack surface'
@@ -137,22 +149,28 @@ async function resolveBaseImages(
       ],
     };
 
-    // Update session with recommendation
-    const currentState = session as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
-      completed_steps: [...(currentState?.completed_steps ?? []), 'resolve-base-images'],
-      metadata: {
-        ...(currentState?.metadata ?? {}),
+    // Update session with recommendation using standardized helper
+    const updateResult = await updateSession(
+      sessionId,
+      {
         base_image_recommendation: recommendation,
+        completed_steps: [...(session.completed_steps || []), 'resolve-base-images'],
       },
-    });
+      context,
+    );
 
-    await sessionManager.update(sessionId, {
-      workflow_state: updatedWorkflowState,
-    });
+    if (!updateResult.ok) {
+      logger.warn(
+        { error: updateResult.error },
+        'Failed to update session, but resolution succeeded',
+      );
+    }
 
-    timer.end({ primaryImage });
-    logger.info({ primaryImage }, 'Base image resolution completed');
+    timer.end({ primaryImage, sessionId, technology: language });
+    logger.info(
+      { sessionId, primaryImage, technology: language },
+      'Base image resolution completed',
+    );
 
     return Success(recommendation);
   } catch (error) {
@@ -164,10 +182,6 @@ async function resolveBaseImages(
 }
 
 /**
- * Resolve base images tool instance
+ * Resolve base images tool
  */
-export const resolveBaseImagesTool = {
-  name: 'resolve-base-images',
-  execute: (config: ResolveBaseImagesConfig, logger: Logger, context?: ResolveBaseImagesContext) =>
-    resolveBaseImages(config, logger, context),
-};
+export const resolveBaseImages = resolveBaseImagesImpl;

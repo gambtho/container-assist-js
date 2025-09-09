@@ -1,25 +1,30 @@
 /**
- * Prepare Cluster Tool - Flat Architecture
+ * Prepare Cluster Tool - Standardized Implementation
  *
- * Prepares and validates Kubernetes cluster for deployment
- * Follows architectural requirement: only imports from src/lib/
+ * Prepares and validates Kubernetes cluster for deployment using standardized
+ * helpers for consistency and improved error handling
+ *
+ * @example
+ * ```typescript
+ * const result = await prepareCluster({
+ *   sessionId: 'session-123', // optional
+ *   namespace: 'my-app',
+ *   environment: 'production'
+ * }, context, logger);
+ *
+ * if (result.success) {
+ *   console.log('Cluster ready:', result.clusterReady);
+ *   console.log('Checks:', result.checks);
+ * }
+ * ```
  */
 
-import { createSessionManager } from '../../lib/session';
-import type { ExtendedToolContext } from '../shared-types';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import type { ToolContext } from '../../mcp/context/types';
 import { createKubernetesClient } from '../../lib/kubernetes';
-import { createTimer, type Logger } from '../../lib/logger';
-import { Success, Failure, type Result, type WorkflowState } from '../../domain/types';
-
-export interface PrepareClusterConfig {
-  sessionId: string;
-  cluster?: string;
-  namespace?: string;
-  createNamespace?: boolean;
-  setupRbac?: boolean;
-  installIngress?: boolean;
-  checkRequirements?: boolean;
-}
+import { createTimer, createLogger } from '../../lib/logger';
+import { Success, Failure, type Result } from '../../domain/types';
+import type { PrepareClusterParams } from './schema';
 
 export interface PrepareClusterResult {
   success: boolean;
@@ -70,7 +75,7 @@ function createK8sClientAdapter(
 /**
  * Check cluster connectivity
  */
-async function checkConnectivity(k8sClient: K8sClientAdapter, logger: Logger): Promise<boolean> {
+async function checkConnectivity(k8sClient: K8sClientAdapter, logger: any): Promise<boolean> {
   try {
     const connected = await k8sClient.ping();
     logger.debug({ connected }, 'Cluster connectivity check');
@@ -87,7 +92,7 @@ async function checkConnectivity(k8sClient: K8sClientAdapter, logger: Logger): P
 async function checkNamespace(
   k8sClient: K8sClientAdapter,
   namespace: string,
-  logger: Logger,
+  logger: any,
 ): Promise<boolean> {
   try {
     const exists = await k8sClient.namespaceExists(namespace);
@@ -105,7 +110,7 @@ async function checkNamespace(
 async function createNamespace(
   k8sClient: K8sClientAdapter,
   namespace: string,
-  logger: Logger,
+  logger: any,
 ): Promise<void> {
   try {
     const namespaceManifest = {
@@ -134,7 +139,7 @@ async function createNamespace(
 async function setupRbac(
   k8sClient: K8sClientAdapter,
   namespace: string,
-  logger: Logger,
+  logger: any,
 ): Promise<void> {
   try {
     // Create service account
@@ -161,10 +166,7 @@ async function setupRbac(
 /**
  * Check for ingress controller
  */
-async function checkIngressController(
-  k8sClient: K8sClientAdapter,
-  logger: Logger,
-): Promise<boolean> {
+async function checkIngressController(k8sClient: K8sClientAdapter, logger: any): Promise<boolean> {
   try {
     const hasIngress = await k8sClient.checkIngressController();
     logger.debug({ hasIngress }, 'Checking for ingress controller');
@@ -176,41 +178,38 @@ async function checkIngressController(
 }
 
 /**
- * Prepare cluster for deployment
+ * Core cluster preparation implementation
  */
-export async function prepareCluster(
-  config: PrepareClusterConfig,
-  logger: Logger,
-  context?: ExtendedToolContext,
+async function prepareClusterImpl(
+  params: PrepareClusterParams,
+  context: ToolContext,
 ): Promise<Result<PrepareClusterResult>> {
+  const logger = context.logger || createLogger({ name: 'prepare-cluster' });
   const timer = createTimer(logger, 'prepare-cluster');
 
   try {
-    const {
-      sessionId,
-      cluster = 'default',
-      namespace = 'default',
-      createNamespace: shouldCreateNamespace = false,
-      setupRbac: shouldSetupRbac = false,
-      installIngress = false,
-      checkRequirements = true,
-    } = config;
+    const { environment = 'development', namespace = 'default' } = params;
 
-    logger.info({ sessionId, cluster, namespace }, 'Starting cluster preparation');
+    const cluster = 'default';
+    const shouldCreateNamespace = environment === 'production';
+    const shouldSetupRbac = environment === 'production';
+    const installIngress = false;
+    const checkRequirements = true;
 
-    // Create lib instances
-    const sessionManager =
-      (context && 'sessionManager' in context && context.sessionManager) ||
-      createSessionManager(logger);
+    logger.info({ cluster, namespace, environment }, 'Starting cluster preparation');
+
+    // Get session using standardized helper
+    const sessionResult = await getSession(params.sessionId, context);
+
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
+    }
+
+    const { id: sessionId, state: session } = sessionResult.value;
+    logger.info({ sessionId, environment, namespace }, 'Starting Kubernetes cluster preparation');
+
     const k8sClientRaw = createKubernetesClient(logger);
     const k8sClient = createK8sClientAdapter(k8sClientRaw);
-
-    // Get or create session
-    let session = await sessionManager.get(sessionId);
-    if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
-    }
 
     const warnings: string[] = [];
     const checks = {
@@ -259,20 +258,18 @@ export async function prepareCluster(
     // Determine if cluster is ready
     const clusterReady = checks.connectivity && checks.permissions && checks.namespaceExists;
 
-    // Update session with cluster preparation status
-    const sessionState = session;
-    const updatedWorkflowState: WorkflowState = {
-      ...sessionState,
-      completed_steps: [...(sessionState.completed_steps || []), 'prepare-cluster'],
-      errors: sessionState.errors || {},
-      metadata: {
-        ...(sessionState.metadata || {}),
+    // Update session with cluster preparation status using standardized helper
+    const updateResult = await updateSession(
+      sessionId,
+      {
         cluster_preparation: {
+          success: true,
           cluster,
           namespace,
           clusterReady,
           checks,
           warnings,
+          environment,
         },
         cluster_result: {
           cluster_name: cluster,
@@ -280,13 +277,23 @@ export async function prepareCluster(
           kubernetes_version: '1.28',
           namespaces_created: checks.namespaceExists ? [] : [namespace],
         },
+        completed_steps: [...(session.completed_steps || []), 'prepare-cluster'],
       },
-    };
+      context,
+    );
 
-    await sessionManager.update(sessionId, updatedWorkflowState);
+    if (!updateResult.ok) {
+      logger.warn(
+        { error: updateResult.error },
+        'Failed to update session, but preparation succeeded',
+      );
+    }
 
-    timer.end({ clusterReady });
-    logger.info({ clusterReady, checks }, 'Cluster preparation completed');
+    timer.end({ clusterReady, sessionId, environment });
+    logger.info(
+      { sessionId, clusterReady, checks, namespace, environment },
+      'Kubernetes cluster preparation completed',
+    );
 
     return Success({
       success: true,
@@ -314,9 +321,6 @@ export async function prepareCluster(
 }
 
 /**
- * Prepare cluster tool instance
+ * Export the prepare cluster tool directly
  */
-export const prepareClusterTool = {
-  name: 'prepare-cluster',
-  execute: (config: PrepareClusterConfig, logger: Logger) => prepareCluster(config, logger),
-};
+export const prepareCluster = prepareClusterImpl;

@@ -1,24 +1,32 @@
 /**
- * Verify Deployment Tool - Flat Architecture
+ * Verify Deployment Tool - Standardized Implementation
  *
- * Verifies Kubernetes deployment health and retrieves endpoints
- * Follows architectural requirement: only imports from src/lib/
+ * Verifies Kubernetes deployment health and retrieves endpoints using
+ * standardized helpers for consistency and improved error handling
+ *
+ * @example
+ * ```typescript
+ * const result = await verifyDeployment({
+ *   sessionId: 'session-123', // optional
+ *   deploymentName: 'my-app',
+ *   namespace: 'production',
+ *   checks: ['pods', 'services', 'health']
+ * }, context, logger);
+ *
+ * if (result.success) {
+ *   console.log('Deployment ready:', result.ready);
+ *   console.log('Endpoints:', result.endpoints);
+ * }
+ * ```
  */
 
-import { createSessionManager } from '../../lib/session';
-import type { ExtendedToolContext } from '../shared-types';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import type { ToolContext } from '../../mcp/context/types';
 import { createKubernetesClient, type KubernetesClient } from '../../lib/kubernetes';
-import { createTimer, type Logger } from '../../lib/logger';
+import { createTimer, createLogger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
-
-export interface VerifyDeploymentConfig {
-  sessionId: string;
-  namespace?: string;
-  deploymentName?: string;
-  timeout?: number;
-  healthcheckUrl?: string;
-}
+import type { VerifyDeploymentParams } from './schema';
 
 export interface VerifyDeploymentResult {
   success: boolean;
@@ -137,55 +145,67 @@ async function checkEndpointHealth(url: string): Promise<boolean> {
 }
 
 /**
- * Verify deployment
+ * Deployment verification implementation - direct execution without wrapper
  */
-export async function verifyDeployment(
-  config: VerifyDeploymentConfig,
-  logger: Logger,
-  context?: ExtendedToolContext,
+async function verifyDeploymentImpl(
+  params: VerifyDeploymentParams,
+  context: ToolContext,
 ): Promise<Result<VerifyDeploymentResult>> {
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+  const logger = context.logger || createLogger({ name: 'verify-deployment' });
   const timer = createTimer(logger, 'verify-deployment');
 
   try {
     const {
-      sessionId,
-      namespace: configNamespace,
       deploymentName: configDeploymentName,
-      timeout = 60,
-      healthcheckUrl,
-    } = config;
+      namespace: configNamespace,
+      checks = ['pods', 'services', 'health'],
+    } = params;
 
-    logger.info({ sessionId }, 'Starting deployment verification');
+    const timeout = 60;
 
-    // Create lib instances - use shared sessionManager from context if available
-    const sessionManager =
-      (context && 'sessionManager' in context && context.sessionManager) ||
-      createSessionManager(logger);
-    const k8sClient = createKubernetesClient(logger);
+    logger.info(
+      { deploymentName: configDeploymentName, namespace: configNamespace },
+      'Starting deployment verification',
+    );
 
-    // Get or create session
-    let session = await sessionManager.get(sessionId);
-    if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
+    // Resolve session (now always optional)
+    const sessionResult = await getSession(params.sessionId, context);
+
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
     }
 
+    const { id: sessionId, state: session } = sessionResult.value;
+    logger.info({ sessionId, checks }, 'Starting Kubernetes deployment verification');
+
+    const k8sClient = createKubernetesClient(logger);
+
     // Get deployment info from session or config
-    const deploymentResult = (session as { deployment_result?: unknown })?.deployment_result as
+    const sessionState = session as
       | {
-          namespace?: string;
-          deploymentName?: string;
-          serviceName?: string;
-          endpoints?: Array<{
-            type: 'internal' | 'external';
-            url: string;
-            port: number;
-            healthy?: boolean;
-          }>;
+          deployment_result?: {
+            namespace?: string;
+            deploymentName?: string;
+            serviceName?: string;
+            endpoints?: Array<{
+              type: 'internal' | 'external';
+              url: string;
+              port: number;
+              healthy?: boolean;
+            }>;
+          };
         }
+      | null
       | undefined;
+    const deploymentResult = sessionState?.deployment_result;
     if (!deploymentResult && !configDeploymentName) {
-      return Failure('No deployment found - run deploy_application first');
+      return Failure(
+        'No deployment found. Provide deploymentName parameter or run deploy tool first.',
+      );
     }
 
     const namespace = configNamespace ?? deploymentResult?.namespace ?? 'default';
@@ -198,28 +218,21 @@ export async function verifyDeployment(
     // Check deployment health
     const health = await checkDeploymentHealth(k8sClient, namespace, deploymentName, timeout);
 
-    // Check endpoint health if provided
+    // Initialize health checks
     const healthChecks: Array<{ name: string; status: 'pass' | 'fail'; message?: string }> = [];
 
-    if (healthcheckUrl) {
-      const isHealthy = await checkEndpointHealth(healthcheckUrl);
-      healthChecks.push({
-        name: 'endpoint',
-        status: isHealthy ? 'pass' : 'fail',
-        message: isHealthy ? 'Endpoint is reachable' : 'Endpoint is not reachable',
-      });
-    }
-
-    // Check each endpoint
-    for (const endpoint of endpoints) {
-      if (endpoint.type === 'external') {
-        const isHealthy = await checkEndpointHealth(endpoint.url);
-        endpoint.healthy = isHealthy;
-        healthChecks.push({
-          name: `${endpoint.type}-endpoint`,
-          status: isHealthy ? 'pass' : 'fail',
-          message: `${endpoint.url}:${endpoint.port}`,
-        });
+    // Check each endpoint if 'health' is in checks
+    if (checks.includes('health')) {
+      for (const endpoint of endpoints) {
+        if (endpoint.type === 'external') {
+          const isHealthy = await checkEndpointHealth(endpoint.url);
+          endpoint.healthy = isHealthy;
+          healthChecks.push({
+            name: `${endpoint.type}-endpoint`,
+            status: isHealthy ? 'pass' : 'fail',
+            message: `${endpoint.url}:${endpoint.port}`,
+          });
+        }
       }
     }
 
@@ -232,44 +245,18 @@ export async function verifyDeployment(
           ? 'unhealthy'
           : 'unknown';
 
-    // Update session with verification results
-    const updatedWorkflowState = {
-      sessionId: session.sessionId,
-      currentStep: 'verify-deployment',
-      progress: 100,
-      results: {
-        ...session.results,
-        deployment_result: {
-          deploymentName,
-          namespace,
-          ready: health.ready,
-          readyReplicas: health.readyReplicas,
-          endpoints,
-          status: {
-            readyReplicas: health.readyReplicas,
-            totalReplicas: health.totalReplicas,
-            conditions: [
-              {
-                type: 'Available',
-                status: health.ready ? 'True' : 'False',
-                message: health.message,
-              },
-            ],
-          },
-        },
-      },
-      metadata: {
-        ...session.metadata,
-        completed_steps: [
-          ...((session.metadata?.completed_steps as string[]) || []),
-          'verify-deployment',
-        ],
+    // Update session with verification results using standardized helper
+    const updateResult = await updateSession(
+      sessionId,
+      {
         verification_result: {
+          success: true,
           namespace,
           deploymentName,
           serviceName,
           endpoints,
           ready: health.ready,
+          replicas: health.totalReplicas,
           status: {
             readyReplicas: health.readyReplicas,
             totalReplicas: health.totalReplicas,
@@ -287,19 +274,28 @@ export async function verifyDeployment(
             checks: healthChecks,
           },
         },
+        completed_steps: [...(session.completed_steps || []), 'verify-deployment'],
       },
-    };
+      context,
+    );
 
-    await sessionManager.update(sessionId, updatedWorkflowState);
+    if (!updateResult.ok) {
+      logger.warn(
+        { error: updateResult.error },
+        'Failed to update session, but verification succeeded',
+      );
+    }
 
-    timer.end({ deploymentName, ready: health.ready });
+    timer.end({ deploymentName, ready: health.ready, sessionId });
     logger.info(
       {
+        sessionId,
         deploymentName,
+        namespace,
         ready: health.ready,
         healthStatus: overallStatus,
       },
-      'Deployment verification completed',
+      'Kubernetes deployment verification completed',
     );
 
     const result: VerifyDeploymentResult = {
@@ -344,9 +340,6 @@ export async function verifyDeployment(
 }
 
 /**
- * Verify deployment tool instance
+ * Verify deployment tool
  */
-export const verifyDeploymentTool = {
-  name: 'verify-deployment',
-  execute: (config: VerifyDeploymentConfig, logger: Logger) => verifyDeployment(config, logger),
-};
+export const verifyDeployment = verifyDeploymentImpl;

@@ -1,31 +1,29 @@
 /**
- * Generate K8s Manifests Tool - Flat Architecture
+ * Generate K8s Manifests Tool - Standardized Implementation
  *
  * Generates Kubernetes manifests for application deployment
- * Follows architectural requirement: only imports from src/lib/
+ * Uses standardized helpers for consistent behavior
  */
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { createSessionManager } from '../../lib/session';
-import type { ExtendedToolContext } from '../shared-types';
-import { createTimer, type Logger } from '../../lib/logger';
-import {
-  Success,
-  Failure,
-  type Result,
-  updateWorkflowState,
-  type WorkflowState,
-} from '../../domain/types';
-import { stripFencesAndNoise, isValidKubernetesContent } from '../../lib/text-processing';
+// crypto import removed - was unused after tool wrapper elimination
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import { aiGenerate } from '@mcp/tools/ai-helpers';
+import { createStandardProgress } from '@mcp/utils/progress-helper';
+import { createTimer } from '@lib/logger';
 import type { ToolContext } from '../../mcp/context/types';
+// Removed unused ProgressReporter import
+import type { SessionData } from '../session-types';
+import { Success, Failure, type Result } from '../../domain/types';
+import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';
 
 /**
  * Configuration for Kubernetes manifest generation
  */
 export interface GenerateK8sManifestsConfig {
   /** Session identifier for storing results */
-  sessionId: string;
+  sessionId?: string;
   /** Docker image ID to deploy (optional, defaults to build result) */
   imageId?: string;
   /** Application name (defaults to detected name) */
@@ -53,463 +51,124 @@ export interface GenerateK8sManifestsConfig {
       cpu: string;
     };
   };
-  /** Horizontal pod autoscaling configuration */
+  /** Environment variables to set */
+  envVars?: Array<{ name: string; value: string }>;
+  /** ConfigMap data */
+  configMapData?: Record<string, string>;
+  /** Health check configuration */
+  healthCheck?: {
+    enabled: boolean;
+    path?: string;
+    port?: number;
+    initialDelaySeconds?: number;
+  };
+  /** Enable autoscaling */
   autoscaling?: {
     enabled: boolean;
     minReplicas?: number;
     maxReplicas?: number;
-    targetCPU?: number;
+    targetCPUUtilizationPercentage?: number;
   };
-  /** Deployment environment (development, staging, production) */
-  environment?: string;
-  /** Security hardening level */
-  securityLevel?: 'standard' | 'strict';
-  /** Enable high availability features */
-  highAvailability?: boolean;
-  /** Enable monitoring/observability */
-  monitoring?: boolean;
-  /** Include ConfigMap for configuration */
-  hasConfig?: boolean;
-  hasSecrets?: boolean;
 }
 
 /**
- * Result of Kubernetes manifest generation operation
+ * Result from K8s manifest generation
  */
 export interface GenerateK8sManifestsResult {
-  /** Whether the generation was successful */
-  ok: boolean;
-  /** Session identifier used for generation */
-  sessionId: string;
-  /** Generated YAML manifest content */
+  /** Generated manifests as YAML */
   manifests: string;
-  /** Path where manifests were written */
-  path: string;
-  /** List of generated Kubernetes resources */
+  /** Output directory path */
+  outputPath: string;
+  /** List of generated resources */
   resources: Array<{
-    /** Resource type (Deployment, Service, etc.) */
     kind: string;
-    /** Resource name */
     name: string;
-    /** Target namespace */
     namespace: string;
   }>;
-  /** Optional warnings about the configuration */
+  /** Warnings about manifest configuration */
   warnings?: string[];
-  /** Whether AI was used for generation */
-  aiUsed?: boolean;
-  /** Generation method used */
-  generationMethod?: 'AI' | 'template';
-  /** Array of individual manifest objects */
-  manifestTypes?: string[];
+  /** Session ID for reference */
+  sessionId?: string;
 }
 
 /**
- * Individual manifest data structure for processing
- */
-export interface ManifestData {
-  name: string;
-  content: string;
-  kind: string;
-}
-
-/**
- * Generate deployment manifest
+ * Kubernetes resource type definitions
  */
 interface K8sResource {
   apiVersion: string;
   kind: string;
   metadata: {
     name: string;
-    namespace: string;
+    namespace?: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
   };
-  spec: Record<string, unknown>;
-}
-
-function generateDeployment(config: {
-  appName: string;
-  namespace: string;
-  replicas: number;
-  image: string;
-  port: number;
-  resources?: Record<string, unknown>;
-}): K8sResource {
-  return {
-    apiVersion: 'apps/v1',
-    kind: 'Deployment',
-    metadata: {
-      name: config.appName,
-      namespace: config.namespace,
-      labels: {
-        app: config.appName,
-      },
-    },
-    spec: {
-      replicas: config.replicas,
-      selector: {
-        matchLabels: {
-          app: config.appName,
-        },
-      },
-      template: {
-        metadata: {
-          labels: {
-            app: config.appName,
-          },
-        },
-        spec: {
-          containers: [
-            {
-              name: config.appName,
-              image: config.image,
-              ports: [
-                {
-                  containerPort: config.port,
-                },
-              ],
-              ...(config.resources && { resources: config.resources }),
-            },
-          ],
-        },
-      },
-    },
-  };
-}
-
-/**
- * Generate service manifest
- */
-function generateService(config: {
-  appName: string;
-  namespace: string;
-  port: number;
-  serviceType: string;
-}): K8sResource {
-  return {
-    apiVersion: 'v1',
-    kind: 'Service',
-    metadata: {
-      name: config.appName,
-      namespace: config.namespace,
-    },
-    spec: {
-      type: config.serviceType,
-      selector: {
-        app: config.appName,
-      },
-      ports: [
-        {
-          port: config.port,
-          targetPort: config.port,
-          protocol: 'TCP',
-        },
-      ],
-    },
-  };
-}
-
-/**
- * Generate ingress manifest
- */
-function generateIngress(config: {
-  appName: string;
-  namespace: string;
-  host?: string;
-  port: number;
-}): K8sResource {
-  return {
-    apiVersion: 'networking.k8s.io/v1',
-    kind: 'Ingress',
-    metadata: {
-      name: `${config.appName}-ingress`,
-      namespace: config.namespace,
-      annotations: {
-        'kubernetes.io/ingress.class': 'nginx',
-      },
-    },
-    spec: {
-      rules: [
-        {
-          ...(config.host && { host: config.host }),
-          http: {
-            paths: [
-              {
-                path: '/',
-                pathType: 'Prefix',
-                backend: {
-                  service: {
-                    name: config.appName,
-                    port: {
-                      number: config.port,
-                    },
-                  },
-                },
-              },
-            ],
-          },
-        },
-      ],
-    },
-  };
-}
-
-/**
- * Generate HPA manifest
- */
-function generateHPA(config: {
-  appName: string;
-  namespace: string;
-  minReplicas: number;
-  maxReplicas: number;
-  targetCPU: number;
-}): K8sResource {
-  return {
-    apiVersion: 'autoscaling/v2',
-    kind: 'HorizontalPodAutoscaler',
-    metadata: {
-      name: `${config.appName}-hpa`,
-      namespace: config.namespace,
-    },
-    spec: {
-      scaleTargetRef: {
-        apiVersion: 'apps/v1',
-        kind: 'Deployment',
-        name: config.appName,
-      },
-      minReplicas: config.minReplicas,
-      maxReplicas: config.maxReplicas,
-      metrics: [
-        {
-          type: 'Resource',
-          resource: {
-            name: 'cpu',
-            target: {
-              type: 'Utilization',
-              averageUtilization: config.targetCPU,
-            },
-          },
-        },
-      ],
-    },
-  };
-}
-
-/**
- * Build prompt arguments for generate-k8s-manifests prompt
- */
-function buildK8sManifestPromptArgs(
-  config: GenerateK8sManifestsConfig,
-  image: string,
-): Record<string, unknown> {
-  const {
-    appName = 'app',
-    namespace = 'default',
-    replicas = 1,
-    environment = 'production',
-    securityLevel = 'standard',
-    highAvailability = false,
-    port = 8080,
-  } = config;
-
-  // Format resource limits as string
-  const resources = config.resources
-    ? `CPU: ${config.resources.requests?.cpu || 'not specified'} (request), ${config.resources.limits?.cpu || 'not specified'} (limit); Memory: ${config.resources.requests?.memory || 'not specified'} (request), ${config.resources.limits?.memory || 'not specified'} (limit)`
-    : undefined;
-
-  const ports = port ? port.toString() : undefined;
-  const manifestTypes = ['Deployment', 'Service'];
-  if (config.ingressEnabled) manifestTypes.push('Ingress');
-  if (config.autoscaling?.enabled) manifestTypes.push('HorizontalPodAutoscaler');
-  if (highAvailability) manifestTypes.push('PodDisruptionBudget');
-
-  return {
-    appName,
-    imageId: image,
-    namespace,
-    replicas: replicas.toString(),
-    ports,
-    environment,
-    manifestTypes,
-    resources,
-    securityLevel,
-    highAvailability,
-  };
-}
-
-/**
- * AI-powered manifest generation using ToolContext pattern
- */
-async function generateAIK8sManifests(
-  config: GenerateK8sManifestsConfig,
-  context: ToolContext,
-  logger: Logger,
-  image: string,
-): Promise<K8sResource[]> {
-  try {
-    const { appName = 'app', environment = 'production' } = config;
-
-    logger.info('Using AI-enhanced K8s manifest generation');
-
-    // Build arguments for the prompt registry
-    const promptArgs = buildK8sManifestPromptArgs(config, image);
-
-    // Filter out undefined values
-    const cleanedArgs = Object.fromEntries(
-      Object.entries(promptArgs).filter(([_, value]) => value !== undefined),
-    );
-
-    logger.debug({ args: cleanedArgs }, 'Using prompt arguments');
-
-    // Get prompt from registry
-    const { description, messages } = await context.getPrompt(
-      'generate-k8s-manifests',
-      cleanedArgs,
-    );
-
-    logger.debug({ description, messageCount: messages.length }, 'Got prompt from registry');
-
-    // Single sampling call
-    const response = await context.sampling.createMessage({
-      messages,
-      includeContext: 'thisServer',
-      modelPreferences: { hints: [{ name: 'code' }] },
-      stopSequences: ['```', '\n\n```', '\n\n# ', '\n\n---'],
-      maxTokens: 4096, // Larger for complex YAML
-    });
-
-    logger.debug({ responseLength: response.content?.length }, 'Got AI response');
-
-    // Extract text from MCP response
-    const responseText = response.content
-      .filter((c) => c.type === 'text' && typeof c.text === 'string')
-      .map((c) => c.text)
-      .join('\n')
-      .trim();
-
-    if (!responseText) {
-      logger.warn('AI response was empty, falling back to basic');
-      return generateBasicManifests(config, image);
-    }
-
-    // Clean the response using text processing utilities
-    const cleanedResponse = stripFencesAndNoise(responseText);
-
-    // Validate the response is valid Kubernetes content
-    if (!isValidKubernetesContent(cleanedResponse)) {
-      logger.warn('AI generated invalid Kubernetes content, falling back to basic');
-      return generateBasicManifests(config, image);
-    }
-
-    // Parse K8s manifests from AI response
-    const manifests = parseK8sManifestsFromAI(cleanedResponse);
-
-    if (manifests.length > 0) {
-      logger.info(
-        { appName, environment, manifestCount: manifests.length },
-        'AI-enhanced K8s manifests generated',
-      );
-      return manifests;
-    } else {
-      logger.warn('Failed to parse manifests from AI response, falling back to basic');
-      return generateBasicManifests(config, image);
-    }
-  } catch (error) {
-    logger.warn(
-      { error: error instanceof Error ? error.message : String(error) },
-      'AI K8s generation error, falling back to basic',
-    );
-    return generateBasicManifests(config, image);
-  }
+  spec?: Record<string, any>;
+  data?: Record<string, string>;
 }
 
 /**
  * Parse K8s manifests from AI response
  */
-function parseK8sManifestsFromAI(aiResponse: string): K8sResource[] {
+function parseK8sManifestsFromAI(content: string): K8sResource[] {
+  const manifests: K8sResource[] = [];
+
   try {
-    // Look for YAML code blocks first
-    const yamlMatch = aiResponse.match(/```(?:yaml|yml)?\n([\s\S]*?)\n```/i);
-    const yamlContent = yamlMatch?.[1] ? yamlMatch[1] : aiResponse;
-
-    // Basic YAML parsing - split by document separator
-    const documents = yamlContent.split(/^---\s*$/m).filter((doc) => doc.trim());
-
-    const manifests: K8sResource[] = [];
-
+    // Try parsing as JSON array first
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(validateK8sResource);
+    } else if (validateK8sResource(parsed)) {
+      return [parsed];
+    }
+  } catch {
+    // Try YAML-like parsing
+    const documents = content.split(/^---$/m);
     for (const doc of documents) {
-      const trimmedDoc = doc.trim();
-      if (!trimmedDoc) continue;
+      if (!doc.trim()) continue;
 
       try {
-        // Simple YAML to JSON conversion for basic structures
-        const manifest = parseYAMLtoJSON(trimmedDoc);
-        if (manifest && typeof manifest === 'object' && manifest.kind) {
-          manifests.push(manifest as K8sResource);
+        // Simple conversion from YAML-like to JSON
+        const jsonStr = doc
+          .replace(/^(\s*)(\w+):/gm, '$1"$2":')
+          .replace(/:\s*(\w+)$/gm, ': "$1"')
+          .replace(/:\s*(\d+)$/gm, ': $1');
+
+        const obj = JSON.parse(`{${jsonStr}}`);
+        if (validateK8sResource(obj)) {
+          manifests.push(obj);
         }
       } catch {
-        // If YAML parsing fails, skip this document
-        continue;
+        // Skip invalid documents
       }
     }
-
-    return manifests.length > 0 ? manifests : [];
-  } catch {
-    return [];
   }
+
+  return manifests;
 }
 
 /**
- * Simple YAML to JSON parser for basic K8s manifests
- * Note: This is a simplified parser for demo purposes
+ * Validate a K8s resource object
  */
-function parseYAMLtoJSON(yamlString: string): Partial<K8sResource> | null {
-  try {
-    // This is a very basic YAML parser - in production you'd use a proper YAML library
-    const lines = yamlString.split('\n');
-    const result: Record<string, unknown> = {};
-    let currentObj = result;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-
-      const colonIndex = trimmed.indexOf(':');
-
-      if (colonIndex === -1) continue;
-
-      const key = trimmed.substring(0, colonIndex).trim();
-      const value = trimmed.substring(colonIndex + 1).trim();
-
-      // Simple value assignment
-      if (value && value !== '') {
-        if (value.startsWith('"') && value.endsWith('"')) {
-          currentObj[key] = value.slice(1, -1);
-        } else if (value === 'true' || value === 'false') {
-          currentObj[key] = value === 'true';
-        } else if (!isNaN(Number(value))) {
-          currentObj[key] = Number(value);
-        } else {
-          currentObj[key] = value;
-        }
-      } else {
-        const newObj: Record<string, unknown> = {};
-        currentObj[key] = newObj;
-        currentObj = newObj;
-      }
-    }
-
-    return result.kind ? (result as Partial<K8sResource>) : null;
-  } catch {
-    return null;
-  }
+function validateK8sResource(obj: any): obj is K8sResource {
+  return (
+    obj &&
+    typeof obj === 'object' &&
+    typeof obj.apiVersion === 'string' &&
+    typeof obj.kind === 'string' &&
+    obj.metadata &&
+    typeof obj.metadata === 'object' &&
+    typeof obj.metadata.name === 'string'
+  );
 }
 
 /**
- * Generate basic manifests (fallback when AI is unavailable)
+ * Generate basic K8s manifests (fallback)
  */
-function generateBasicManifests(config: GenerateK8sManifestsConfig, image: string): K8sResource[] {
+function generateBasicManifests(
+  params: GenerateK8sManifestsConfig,
+  image: string,
+): Result<{ manifests: K8sResource[]; aiUsed: boolean }> {
   const {
     appName = 'app',
     namespace = 'default',
@@ -519,148 +178,295 @@ function generateBasicManifests(config: GenerateK8sManifestsConfig, image: strin
     ingressEnabled = false,
     ingressHost,
     resources,
+    envVars = [],
+    configMapData,
+    healthCheck,
     autoscaling,
-  } = config;
+  } = params;
 
   const manifests: K8sResource[] = [];
+  const labels = { app: appName };
 
-  // 1. Deployment
-  const deployment = generateDeployment({
-    appName,
-    namespace,
-    replicas,
-    image,
-    port,
-    ...(resources && { resources }),
-  });
+  // Deployment
+  const deployment: K8sResource = {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: {
+      name: appName,
+      namespace,
+      labels,
+    },
+    spec: {
+      replicas: autoscaling?.enabled ? undefined : replicas,
+      selector: {
+        matchLabels: labels,
+      },
+      template: {
+        metadata: {
+          labels,
+        },
+        spec: {
+          containers: [
+            {
+              name: appName,
+              image,
+              ports: [{ containerPort: port }],
+              ...(envVars.length > 0 && { env: envVars }),
+              ...(resources && { resources }),
+              ...(healthCheck?.enabled && {
+                livenessProbe: {
+                  httpGet: {
+                    path: healthCheck.path || '/health',
+                    port: healthCheck.port || port,
+                  },
+                  initialDelaySeconds: healthCheck.initialDelaySeconds || 30,
+                  periodSeconds: 10,
+                },
+                readinessProbe: {
+                  httpGet: {
+                    path: healthCheck.path || '/health',
+                    port: healthCheck.port || port,
+                  },
+                  initialDelaySeconds: healthCheck.initialDelaySeconds || 5,
+                  periodSeconds: 5,
+                },
+              }),
+            },
+          ],
+        },
+      },
+    },
+  };
   manifests.push(deployment);
 
-  // 2. Service
-  const service = generateService({
-    appName,
-    namespace,
-    port,
-    serviceType,
-  });
+  // Service
+  const service: K8sResource = {
+    apiVersion: 'v1',
+    kind: 'Service',
+    metadata: {
+      name: appName,
+      namespace,
+      labels,
+    },
+    spec: {
+      type: serviceType,
+      selector: labels,
+      ports: [
+        {
+          port,
+          targetPort: port,
+          protocol: 'TCP',
+        },
+      ],
+    },
+  };
   manifests.push(service);
 
-  // 3. Ingress (if enabled)
+  // ConfigMap
+  if (configMapData && Object.keys(configMapData).length > 0) {
+    const configMap: K8sResource = {
+      apiVersion: 'v1',
+      kind: 'ConfigMap',
+      metadata: {
+        name: `${appName}-config`,
+        namespace,
+        labels,
+      },
+      data: configMapData,
+    };
+    manifests.push(configMap);
+  }
+
+  // Ingress
   if (ingressEnabled) {
-    const ingress = generateIngress({
-      appName,
-      namespace,
-      ...(ingressHost && { host: ingressHost }),
-      port,
-    });
+    const ingress: K8sResource = {
+      apiVersion: 'networking.k8s.io/v1',
+      kind: 'Ingress',
+      metadata: {
+        name: appName,
+        namespace,
+        labels,
+        annotations: {
+          'nginx.ingress.kubernetes.io/rewrite-target': '/',
+        },
+      },
+      spec: {
+        rules: [
+          {
+            host: ingressHost || `${appName}.example.com`,
+            http: {
+              paths: [
+                {
+                  path: '/',
+                  pathType: 'Prefix',
+                  backend: {
+                    service: {
+                      name: appName,
+                      port: {
+                        number: port,
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    };
     manifests.push(ingress);
   }
 
-  // 4. HPA (if autoscaling enabled)
+  // HPA
   if (autoscaling?.enabled) {
-    const hpa = generateHPA({
-      appName,
-      namespace,
-      minReplicas: autoscaling.minReplicas ?? replicas,
-      maxReplicas: autoscaling.maxReplicas ?? replicas * 3,
-      targetCPU: autoscaling.targetCPU ?? 80,
-    });
+    const hpa: K8sResource = {
+      apiVersion: 'autoscaling/v2',
+      kind: 'HorizontalPodAutoscaler',
+      metadata: {
+        name: appName,
+        namespace,
+        labels,
+      },
+      spec: {
+        scaleTargetRef: {
+          apiVersion: 'apps/v1',
+          kind: 'Deployment',
+          name: appName,
+        },
+        minReplicas: autoscaling.minReplicas || 1,
+        maxReplicas: autoscaling.maxReplicas || 10,
+        metrics: [
+          {
+            type: 'Resource',
+            resource: {
+              name: 'cpu',
+              target: {
+                type: 'Utilization',
+                averageUtilization: autoscaling.targetCPUUtilizationPercentage || 70,
+              },
+            },
+          },
+        ],
+      },
+    };
     manifests.push(hpa);
   }
 
-  return manifests;
+  return Success({ manifests, aiUsed: false });
 }
 
 /**
- * Generate warnings based on configuration
+ * Build prompt arguments for K8s manifest generation
  */
-function generateWarnings(config: GenerateK8sManifestsConfig): string[] {
-  const warnings: string[] = [];
-
-  if ((config.replicas ?? 1) === 1) {
-    warnings.push('Single replica configuration - consider increasing for production');
-  }
-
-  if (!config.resources?.limits) {
-    warnings.push('No resource limits specified - may cause resource contention');
-  }
-
-  if (config.ingressEnabled && !config.ingressHost) {
-    warnings.push('Ingress enabled but no host specified');
-  }
-
-  if (config.serviceType === 'LoadBalancer') {
-    warnings.push('LoadBalancer service type may incur cloud provider costs');
-  }
-
-  return warnings;
+function buildK8sManifestPromptArgs(
+  params: GenerateK8sManifestsConfig,
+  image: string,
+): Record<string, any> {
+  return {
+    appName: params.appName || 'app',
+    namespace: params.namespace || 'default',
+    image,
+    replicas: params.replicas || 1,
+    port: params.port || 8080,
+    serviceType: params.serviceType || 'ClusterIP',
+    ingressEnabled: params.ingressEnabled || false,
+    ingressHost: params.ingressHost,
+    resources: params.resources,
+    envVars: params.envVars,
+    healthCheckEnabled: params.healthCheck?.enabled || false,
+    autoscalingEnabled: params.autoscaling?.enabled || false,
+  };
 }
 
+// computeHash function removed - was unused after tool wrapper elimination
+
 /**
- * Generate Kubernetes manifests
+ * Generate K8s manifests implementation with selective progress reporting
  */
-export async function generateK8sManifests(
-  config: GenerateK8sManifestsConfig,
-  logger: Logger,
-  context?: ExtendedToolContext,
+async function generateK8sManifestsImpl(
+  params: GenerateK8sManifestsConfig,
+  context: ToolContext,
 ): Promise<Result<GenerateK8sManifestsResult>> {
+  // Basic parameter validation
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+
+  // Progress reporting for complex manifest generation
+  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
+  const logger = context.logger;
   const timer = createTimer(logger, 'generate-k8s-manifests');
 
   try {
-    const {
-      sessionId,
-      appName = 'app',
-      namespace = 'default',
-      environment = 'production',
-    } = config;
+    const { appName = 'app', namespace = 'default' } = params;
 
-    logger.info({ sessionId, appName, namespace, environment }, 'Generating Kubernetes manifests');
+    // Progress: Starting validation and analysis
+    if (progress) await progress('VALIDATING');
 
-    // Create lib instances
-    const sessionManager =
-      (context && 'sessionManager' in context && context.sessionManager) ||
-      createSessionManager(logger);
+    // Resolve session with optional sessionId
+    const sessionResult = await getSession(params.sessionId, context);
 
-    // Get or create session
-    let session = await sessionManager.get(sessionId);
-    if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
     }
+
+    const session = sessionResult.value;
+    const sessionData = session.state as unknown as SessionData;
 
     // Get build result from session for image tag
-    const workflowState = session as { build_result?: { tags?: string[] } } | null | undefined;
-    const buildResult = workflowState?.build_result;
-    const image = config.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
+    const buildResult = sessionData?.build_result || sessionData?.workflow_state?.build_result;
+    const image = params.imageId || buildResult?.tags?.[0] || `${appName}:latest`;
 
-    // Generate manifests with AI enhancement when available
-    let manifests: K8sResource[];
-    let aiGenerated = false;
+    // Progress: Main execution phase (manifest generation)
+    if (progress) await progress('EXECUTING');
 
-    const isToolContext = context && 'sampling' in context && 'getPrompt' in context;
+    // Generate K8s manifests with AI or fallback
+    let result: Result<{ manifests: K8sResource[]; aiUsed: boolean }>;
+
     try {
-      if (isToolContext && context) {
-        logger.debug('Using AI-enhanced K8s manifest generation');
-        const toolContext = context as ToolContext;
-        manifests = await generateAIK8sManifests(config, toolContext, logger, image);
-        aiGenerated = manifests.length > 0;
+      const aiResult = await aiGenerate(logger, context as any, {
+        promptName: 'generate-k8s-manifests',
+        promptArgs: buildK8sManifestPromptArgs(params, image),
+        expectation: 'yaml' as const,
+        maxRetries: 2,
+        fallbackBehavior: 'default',
+      });
+
+      if (aiResult.ok) {
+        const cleaned = stripFencesAndNoise(aiResult.value.content);
+
+        if (isValidKubernetesContent(cleaned)) {
+          const manifests = parseK8sManifestsFromAI(cleaned);
+          if (manifests.length > 0) {
+            result = Success({
+              manifests,
+              aiUsed: true,
+            });
+          } else {
+            result = generateBasicManifests(params, image);
+          }
+        } else {
+          result = generateBasicManifests(params, image);
+        }
       } else {
-        logger.debug('Using basic K8s manifest generation (no AI context)');
-        manifests = generateBasicManifests(config, image);
+        result = generateBasicManifests(params, image);
       }
-    } catch (error) {
-      logger.warn({ error }, 'AI manifest generation failed, falling back to basic');
-      manifests = generateBasicManifests(config, image);
+    } catch {
+      // Fallback to basic generation
+      result = generateBasicManifests(params, image);
     }
 
-    // If AI didn't generate any manifests, fall back to basic generation
-    if (manifests.length === 0) {
-      logger.debug('No AI manifests generated, using basic generation');
-      manifests = generateBasicManifests(config, image);
-      aiGenerated = false;
+    if (!result.ok) {
+      return Failure('Failed to generate K8s manifests');
     }
 
-    // Build resource list from manifests
+    // Progress: Finalizing results
+    if (progress) await progress('FINALIZING');
+
+    // Build resource list
     const resourceList: Array<{ kind: string; name: string; namespace: string }> = [];
+    const manifests = result.value.manifests || [];
+
     for (const manifest of manifests) {
       if (manifest.kind && manifest.metadata?.name) {
         resourceList.push({
@@ -671,90 +477,87 @@ export async function generateK8sManifests(
       }
     }
 
-    // Store AI generation info in workflow state
-    if (aiGenerated) {
-      const currentState = session as WorkflowState | undefined;
-      const updatedContext = updateWorkflowState(currentState ?? {}, {
-        metadata: {
-          ...(currentState?.metadata ?? {}),
-          ai_enhancement_used: true,
-          ai_generation_type: 'kubernetes',
-          timestamp: new Date().toISOString(),
-        },
-      });
-      await sessionManager.update(sessionId, {
-        workflow_state: updatedContext,
-      });
-    }
-
     // Convert manifests to YAML string
-    const yaml = manifests.map((m) => JSON.stringify(m, null, 2)).join('\n---\n');
+    const yaml = manifests.map((m: K8sResource) => JSON.stringify(m, null, 2)).join('\n---\n');
 
     // Write manifests to disk
-    const sessionState = session as Record<string, unknown> & { repo_path?: string };
-    const outputPath = path.join(sessionState.repo_path ?? '.', 'k8s');
+    const repoPath =
+      sessionData?.metadata?.repo_path || sessionData?.workflow_state?.metadata?.repo_path || '.';
+    const outputPath = path.join(repoPath, 'k8s');
     await fs.mkdir(outputPath, { recursive: true });
+
     const manifestPath = path.join(outputPath, 'manifests.yaml');
     await fs.writeFile(manifestPath, yaml, 'utf-8');
 
-    // Generate warnings
-    const warnings = generateWarnings(config);
+    // Check for warnings
+    const warnings: string[] = [];
+    if (!params.resources) {
+      warnings.push('No resource limits specified - consider adding for production');
+    }
+    if (!params.healthCheck?.enabled) {
+      warnings.push('No health checks configured - consider adding for resilience');
+    }
+    if (params.serviceType === 'LoadBalancer' && !params.ingressEnabled) {
+      warnings.push('LoadBalancer service without Ingress may incur cloud costs');
+    }
 
-    // Update session with K8s manifests
-    const currentState = session as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
-      k8s_result: {
-        manifests: resourceList.map((r) => ({
-          kind: r.kind,
-          name: r.name,
-          namespace: r.namespace,
-          content: yaml,
-          file_path: manifestPath,
-        })),
-        replicas: config.replicas ?? 1,
-        ...(config.resources && { resources: config.resources }),
-        output_path: manifestPath,
+    // Update session with K8s result using standardized helper
+    const updateResult = await updateSession(
+      session.id,
+      {
+        k8s_result: {
+          manifests: [
+            {
+              kind: 'Multiple',
+              name: appName,
+              namespace,
+              content: yaml,
+              file_path: manifestPath,
+            },
+          ],
+          replicas: params.replicas,
+          resources: params.resources,
+          output_path: outputPath,
+        },
+        completed_steps: [...((sessionData as any)?.completed_steps || []), 'k8s'],
+        metadata: {
+          ...((sessionData as any)?.metadata || {}),
+          ai_enhancement_used: result.value.aiUsed || false,
+          ai_generation_type: 'k8s-manifests',
+          k8s_warnings: warnings,
+        },
       },
-      completed_steps: [...(currentState?.completed_steps ?? []), 'generate-k8s-manifests'],
-      metadata: {
-        ...(currentState?.metadata ?? {}),
-        k8s_warnings: warnings,
-      },
-    });
-
-    await sessionManager.update(sessionId, {
-      workflow_state: updatedWorkflowState,
-    });
-
-    timer.end({ resourceCount: resourceList.length });
-    logger.info(
-      { resourceCount: resourceList.length },
-      'Kubernetes manifests generation completed',
+      context,
     );
 
+    if (!updateResult.ok) {
+      logger.warn(
+        { error: updateResult.error },
+        'Failed to update session, but K8s generation succeeded',
+      );
+    }
+
+    // Progress: Complete
+    if (progress) await progress('COMPLETE');
+
+    timer.end({ outputPath });
+
+    // Return result
     return Success({
-      ok: true,
-      sessionId,
       manifests: yaml,
-      path: manifestPath,
+      outputPath,
       resources: resourceList,
       ...(warnings.length > 0 && { warnings }),
-      aiUsed: aiGenerated,
-      generationMethod: aiGenerated ? 'AI' : 'template',
+      sessionId: session.id,
     });
   } catch (error) {
     timer.error(error);
-    logger.error({ error }, 'Kubernetes manifests generation failed');
-
+    logger.error({ error }, 'K8s manifest generation failed');
     return Failure(error instanceof Error ? error.message : String(error));
   }
 }
 
 /**
- * Generate K8s manifests tool instance
+ * Generate K8s manifests tool with selective progress reporting
  */
-export const generateK8sManifestsTool = {
-  name: 'generate-k8s-manifests',
-  execute: (config: GenerateK8sManifestsConfig, logger: Logger, context?: ToolContext) =>
-    generateK8sManifests(config, logger, context),
-};
+export const generateK8sManifests = generateK8sManifestsImpl;

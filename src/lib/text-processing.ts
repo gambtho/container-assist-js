@@ -24,15 +24,10 @@
  * ```
  */
 export const stripFencesAndNoise = (text: string): string => {
-  return (
-    text
-      // Remove opening fence with optional language specifier
-      .replace(/^```[a-z]*\n?/i, '')
-      // Remove closing fence
-      .replace(/```$/, '')
-      // Remove trailing whitespace and newlines
-      .trim()
-  );
+  return text
+    .replace(/^```[a-z]*\n?/i, '')
+    .replace(/```$/, '')
+    .trim();
 };
 
 /**
@@ -185,7 +180,6 @@ export const cleanAIResponse = (text: string): string => {
   // Normalize excessive newlines (more than 2 consecutive)
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 
-  // Remove trailing whitespace from lines
   cleaned = cleaned.replace(/[ \t]+$/gm, '');
 
   // Ensure final newline if content exists

@@ -4,6 +4,6 @@
  * Exports the tool implementation and schema for co-located access
  */
 
-export { buildImage, buildImageTool } from './tool';
+export { buildImage } from './tool';
 export { buildImageSchema, type BuildImageParams } from './schema';
-export type { BuildImageConfig, BuildImageResult } from './tool';
+export type { BuildImageResult } from './tool';

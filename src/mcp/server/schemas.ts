@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
 // Common schemas
-export const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
+const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
 
 export const repoPathSchema = z.string().describe('Path to the repository to analyze');
 

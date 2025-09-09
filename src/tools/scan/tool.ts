@@ -1,28 +1,17 @@
 /**
- * Scan Image Tool - Flat Architecture
+ * Scan Image Tool - Standardized Implementation
  *
  * Scans Docker images for security vulnerabilities
- * Follows architectural requirement: only imports from src/lib/
+ * Uses standardized helpers for consistency
  */
 
-import { createSessionManager } from '../../lib/session';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+// Removed wrapTool - using direct implementation
+import type { ToolContext } from '../../mcp/context/types';
 import { createSecurityScanner } from '../../lib/scanner';
-import { createTimer, type Logger } from '../../lib/logger';
-import {
-  Success,
-  Failure,
-  type Result,
-  updateWorkflowState,
-  type WorkflowState,
-} from '../../domain/types';
-import { createToolProgressReporter } from '../../mcp/server/progress';
-import type { ToolContext } from '../types';
-
-export interface ScanImageConfig {
-  sessionId: string;
-  scanner?: 'trivy' | 'snyk' | 'grype';
-  severityThreshold?: 'low' | 'medium' | 'high' | 'critical';
-}
+import { createTimer, createLogger } from '../../lib/logger';
+import { Success, Failure, type Result } from '../../domain/types';
+import type { ScanImageParams } from './schema';
 
 interface DockerScanResult {
   vulnerabilities?: Array<{
@@ -63,73 +52,60 @@ export interface ScanImageResult {
 }
 
 /**
- * Scan Docker image for vulnerabilities using lib utilities only
+ * Scan image implementation - direct execution without wrapper
  */
-export async function scanImage(
-  config: ScanImageConfig,
-  logger: Logger,
-  context?: ToolContext,
+async function scanImageImpl(
+  params: ScanImageParams,
+  context: ToolContext,
 ): Promise<Result<ScanImageResult>> {
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+  const logger = context.logger || createLogger({ name: 'scan' });
   const timer = createTimer(logger, 'scan-image');
 
-  // Extract abort signal and progress token from context if available
-  const abortSignal = context?.abortSignal;
-  const progressToken = context?.progressToken;
-
-  // Create progress reporter
-  const reportProgress = createToolProgressReporter(
-    progressToken ? { progressToken, logger } : { logger },
-    'scan-image',
-  );
-
   try {
-    await reportProgress('Initializing security scan', 0);
-    const { sessionId, scanner = 'trivy', severityThreshold = 'high' } = config;
+    const { scanner = 'trivy', severity } = params;
 
-    logger.info({ sessionId, scanner, severityThreshold }, 'Starting image security scan');
+    // Map new severity parameter to final threshold
+    const finalSeverityThreshold = severity
+      ? (severity.toLowerCase() as 'low' | 'medium' | 'high' | 'critical')
+      : 'high';
 
-    await reportProgress('Loading scanner configuration', 10);
+    logger.info(
+      { scanner, severityThreshold: finalSeverityThreshold },
+      'Starting image security scan',
+    );
 
-    // Check for abort signal early
-    if (abortSignal?.aborted) {
-      return Failure('Scan operation cancelled');
+    // Resolve session (now always optional)
+    const sessionResult = await getSession(params.sessionId, context);
+
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
     }
 
-    // Use sessionManager from context or create new one
-    const sessionManager = context?.sessionManager || createSessionManager(logger);
+    const { id: sessionId, state: session } = sessionResult.value;
+    logger.info({ sessionId, scanner }, 'Starting image security scan');
+
     const securityScanner = createSecurityScanner(logger, scanner);
 
-    // Get or create session
-    await reportProgress('Loading session', 20);
-    let session = await sessionManager.get(sessionId);
-    if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
+    // Check for built image in session or use provided imageId
+    const buildResult = (session as any)?.build_result;
+    const imageId = params.imageId || buildResult?.imageId;
+
+    if (!imageId) {
+      return Failure(
+        'No image specified. Provide imageId parameter or ensure session has built image from build-image tool.',
+      );
     }
-
-    const workflowState = session as { build_result?: { imageId?: string } } | null | undefined;
-    const buildResult = workflowState?.build_result;
-
-    if (!buildResult?.imageId) {
-      return Failure('No built image found in session - run build_image first');
-    }
-
-    const imageId = buildResult.imageId;
     logger.info({ imageId, scanner }, 'Scanning image for vulnerabilities');
 
-    await reportProgress('Retrieving image information', 30);
-
-    // Check for abort before starting the scan
-    if (abortSignal?.aborted) {
-      return Failure('Scan operation cancelled before scanning');
-    }
-
     // Scan image using security scanner
-    await reportProgress('Scanning for vulnerabilities', 50);
     const scanResultWrapper = await securityScanner.scanImage(imageId);
 
     if (!scanResultWrapper.ok) {
-      return Failure(`Scan failed: ${scanResultWrapper.error || 'Unknown error'}`);
+      return Failure(`Failed to scan image: ${scanResultWrapper.error ?? 'Unknown error'}`);
     }
 
     const scanResult = scanResultWrapper.value;
@@ -187,7 +163,7 @@ export async function scanImage(
       low: ['critical', 'high', 'medium', 'low'],
     };
 
-    const failingSeverities = thresholdMap[severityThreshold];
+    const failingSeverities = thresholdMap[finalSeverityThreshold] || thresholdMap['high'];
     let vulnerabilityCount = 0;
 
     for (const severity of failingSeverities) {
@@ -204,34 +180,36 @@ export async function scanImage(
 
     const passed = vulnerabilityCount === 0;
 
-    await reportProgress('Updating scan results', 80);
-    // Update session with scan results
-    const currentState = session as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
-      scan_result: {
-        success: passed,
-        vulnerabilities: dockerScanResult.vulnerabilities?.map((v) => ({
-          id: v.id ?? 'unknown',
-          severity: v.severity,
-          package: v.package ?? 'unknown',
-          version: v.version ?? 'unknown',
-          description: v.description ?? '',
-          ...(v.fixedVersion && { fixedVersion: v.fixedVersion }),
-        })),
-        summary: dockerScanResult.summary,
+    // Update session with scan results using standardized helper
+    const updateResult = await updateSession(
+      sessionId,
+      {
+        scan_result: {
+          success: passed,
+          vulnerabilities: dockerScanResult.vulnerabilities?.map((v) => ({
+            id: v.id ?? 'unknown',
+            severity: v.severity,
+            package: v.package ?? 'unknown',
+            version: v.version ?? 'unknown',
+            description: v.description ?? '',
+            ...(v.fixedVersion && { fixedVersion: v.fixedVersion }),
+          })),
+          summary: dockerScanResult.summary,
+        },
+        completed_steps: [...(session.completed_steps || []), 'scan'],
+        metadata: {
+          ...session.metadata,
+          scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
+          scanner,
+          scanPassed: passed,
+        },
       },
-      metadata: {
-        ...currentState?.metadata,
-        scanTime: dockerScanResult.scanTime ?? new Date().toISOString(),
-        scanner,
-        scanPassed: passed,
-      },
-      completed_steps: [...(currentState?.completed_steps ?? []), 'scan'],
-    });
+      context,
+    );
 
-    await sessionManager.update(sessionId, {
-      workflow_state: updatedWorkflowState,
-    });
+    if (!updateResult.ok) {
+      logger.warn({ error: updateResult.error }, 'Failed to update session, but scan succeeded');
+    }
 
     timer.end({
       vulnerabilities: scanResult.totalVulnerabilities,
@@ -248,8 +226,6 @@ export async function scanImage(
       },
       'Image scan completed',
     );
-
-    await reportProgress('Scan completed', 100);
 
     return Success({
       success: true,
@@ -274,10 +250,6 @@ export async function scanImage(
 }
 
 /**
- * Scan image tool instance
+ * Scan image tool
  */
-export const scanImageTool = {
-  name: 'scan',
-  execute: (config: ScanImageConfig, logger: Logger, context?: ToolContext) =>
-    scanImage(config, logger, context),
-};
+export const scanImage = scanImageImpl;

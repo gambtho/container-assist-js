@@ -11,9 +11,9 @@ import {
   ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { Tool } from '../../domain/types';
-import type { PromptRegistry } from '../../prompts/prompt-registry';
+import type { PromptRegistry } from '../../core/prompts/registry';
 import type { SessionManager } from '../../lib/session';
-import { createToolContextWithProgress } from '../context/bridge';
+import { createToolContextWithProgress } from '../context/tool-context';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 // Sampling tools are now internal services - not imported here
@@ -98,7 +98,7 @@ export const createSDKToolRegistry = (
         }
 
         try {
-          // Create unified ToolContext - no more dual context system
+          // Create ToolContext - no more dual context system
           const toolContext = _options?.mcpServer
             ? createToolContextWithProgress(
                 _options.mcpServer,

@@ -1,28 +1,23 @@
 /**
- * Push Image Tool - Flat Architecture
+ * Push Image Tool - Standardized Implementation
  *
  * Pushes Docker images to container registries
- * Follows architectural requirement: only imports from src/lib/
+ * Uses standardized helpers for consistency
  */
 
-import { createSessionManager } from '../../lib/session';
-import type { ExtendedToolContext } from '../shared-types';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+// Removed wrapTool - using direct implementation
+import type { ToolContext } from '../../mcp/context/types';
 import { createDockerClient } from '../../lib/docker';
-import { createTimer, type Logger } from '../../lib/logger';
+import { createTimer, createLogger } from '../../lib/logger';
 import {
   Success,
   Failure,
   type Result,
-  updateWorkflowState,
-  type WorkflowState,
+  // updateWorkflowState, // Not used directly
+  // type WorkflowState, // Not used directly
 } from '../../domain/types';
-
-export interface PushImageConfig {
-  sessionId: string;
-  registry?: string;
-  username?: string;
-  password?: string;
-}
+import type { PushImageParams } from './schema';
 
 export interface PushImageResult {
   success: boolean;
@@ -33,44 +28,42 @@ export interface PushImageResult {
 }
 
 /**
- * Push Docker image to registry using lib utilities only
+ * Push image implementation - direct execution without wrapper
  */
-export async function pushImage(
-  config: PushImageConfig,
-  logger: Logger,
-  context?: ExtendedToolContext,
+async function pushImageImpl(
+  params: PushImageParams,
+  context: ToolContext,
 ): Promise<Result<PushImageResult>> {
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+  const logger = context.logger || createLogger({ name: 'push-image' });
   const timer = createTimer(logger, 'push-image');
 
   try {
-    const { sessionId, registry = 'docker.io' } = config;
+    const { registry = 'docker.io' } = params;
 
+    // Resolve session (now always optional)
+    const sessionResult = await getSession(params.sessionId, context);
+
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
+    }
+
+    const { id: sessionId, state: session } = sessionResult.value;
     logger.info({ sessionId, registry }, 'Starting image push');
 
-    // Create lib instances
-    const sessionManager =
-      (context && 'sessionManager' in context && context.sessionManager) ||
-      createSessionManager(logger);
     const dockerClient = createDockerClient(logger);
 
-    // Get or create session using lib session manager
-    let session = await sessionManager.get(sessionId);
-    if (!session) {
-      // Create new session with the specified sessionId
-      session = await sessionManager.create(sessionId);
-    }
+    // Check for tagged images in session
+    const buildResult = (session as any)?.build_result;
+    const imageTag = params.imageId || buildResult?.tags?.[0];
 
-    const workflowState = session as { build_result?: { tags?: string[] } } | null | undefined;
-    const buildResult = workflowState?.build_result;
-
-    if (!buildResult?.tags || buildResult.tags.length === 0) {
-      return Failure('No tagged images found in session - run tag_image first');
-    }
-
-    // Get the first tag to push
-    const imageTag = buildResult.tags[0];
     if (!imageTag) {
-      return Failure('No image tags available to push');
+      return Failure(
+        'No image specified. Provide imageId parameter or ensure session has tagged images from tag-image tool.',
+      );
     }
 
     logger.info({ imageTag, registry }, 'Pushing image to registry');
@@ -93,24 +86,27 @@ export async function pushImage(
 
     const { digest } = pushResult.value;
 
-    // Update session with push results
-    const currentState = session as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState ?? {}, {
-      completed_steps: [...(currentState?.completed_steps ?? []), 'push'],
-      metadata: {
-        ...(currentState?.metadata ?? {}),
-        pushResult: {
-          registry,
-          digest,
-          pushedTags: [imageTag],
-          timestamp: new Date().toISOString(),
+    // Update session with push results using standardized helper
+    const updateResult = await updateSession(
+      sessionId,
+      {
+        completed_steps: [...(session.completed_steps || []), 'push'],
+        metadata: {
+          ...session.metadata,
+          pushResult: {
+            registry,
+            digest,
+            pushedTags: [imageTag],
+            timestamp: new Date().toISOString(),
+          },
         },
       },
-    });
+      context,
+    );
 
-    await sessionManager.update(sessionId, {
-      workflow_state: updatedWorkflowState,
-    });
+    if (!updateResult.ok) {
+      logger.warn({ error: updateResult.error }, 'Failed to update session, but push succeeded');
+    }
 
     timer.end({
       imageTag,
@@ -143,10 +139,6 @@ export async function pushImage(
 }
 
 /**
- * Push image tool instance
+ * Push image tool
  */
-export const pushImageTool = {
-  name: 'push',
-  execute: (config: PushImageConfig, logger: Logger, context?: ExtendedToolContext) =>
-    pushImage(config, logger, context),
-};
+export const pushImage = pushImageImpl;

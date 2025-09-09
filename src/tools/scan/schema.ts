@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 
-export const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
+const sessionIdSchema = z.string().describe('Session identifier for tracking operations');
 
 export const scanImageSchema = z.object({
   sessionId: sessionIdSchema.optional(),
@@ -20,6 +20,10 @@ export const scanImageSchema = z.object({
     .enum(['vulnerability', 'config', 'all'])
     .optional()
     .describe('Type of scan to perform'),
+  scanner: z
+    .enum(['trivy', 'snyk', 'grype'])
+    .optional()
+    .describe('Scanner to use for vulnerability detection'),
 });
 
 export type ScanImageParams = z.infer<typeof scanImageSchema>;

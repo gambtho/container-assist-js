@@ -307,12 +307,5 @@ function initializeConfig(): AppConfig {
   return _configInstance;
 }
 
-/**
- * Get the singleton config instance
- */
-export function createConfig(): AppConfig {
-  return initializeConfig();
-}
-
 // Export the default configuration instance
 export const config = initializeConfig();

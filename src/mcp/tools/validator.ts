@@ -6,7 +6,7 @@
 
 import type { Logger } from 'pino';
 import { Result, Success, Failure } from '@types';
-import type { PromptRegistry } from '@prompts/prompt-registry';
+import type { PromptRegistry } from '../../core/prompts/registry';
 
 /**
  * Parameter validation context with MCP-compatible types
@@ -80,7 +80,7 @@ export class AIParameterValidator {
       // 1. Perform basic validation
       const basicValidation = this.performBasicValidation(toolName, parameters, context);
 
-      // 2. AI-enhanced validation if available
+      // 2. AI-powered validation if available
       if (this.isAIValidationAvailable()) {
         const aiValidation = await this.performAIValidation(toolName, parameters, context);
 
@@ -254,7 +254,7 @@ export class AIParameterValidator {
       rulesApplied.push('context-validation');
       if (context.environment === 'production') {
         if (context.securityLevel === 'basic') {
-          warnings.push('Consider using enhanced or strict security level for production');
+          warnings.push('Consider using standard or strict security level for production');
         }
         if (
           parameters.replicas &&
@@ -291,7 +291,7 @@ export class AIParameterValidator {
   }
 
   /**
-   * Perform AI-enhanced validation
+   * Perform AI-powered validation
    */
   private async performAIValidation(
     toolName: string,

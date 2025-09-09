@@ -4,20 +4,23 @@
  */
 
 import { Result, Success, type Tool } from '@types';
-import type { Logger } from 'pino';
+import { runContainerizationWorkflow } from '@workflows/containerization';
 import {
-  runContainerizationWorkflow,
   runBuildOnlyWorkflow,
-  type ContainerizationConfig as ContainerizationWorkflowConfig,
-  type ContainerizationResult,
+  type ContainerizationConfig,
 } from '@workflows/containerization-workflow';
+import type { ToolContext } from '@mcp/context/types';
+import type {
+  ContainerizationWorkflowParams as ContainerizationWorkflowConfig,
+  ContainerizationWorkflowResult as ContainerizationResult,
+} from '@workflows/types';
 import {
   executeWorkflow as executeIntelligentWorkflow,
   type WorkflowContext,
   type WorkflowResult,
 } from '@workflows/intelligent-orchestration';
 
-interface EnhancedWorkflowConfig extends ContainerizationWorkflowConfig {
+interface EnhancedWorkflowConfig extends Omit<ContainerizationWorkflowConfig, 'sessionId'> {
   toolFactory?: {
     getTool?: (toolName: string) => Tool;
     [key: string]: Tool | ((toolName: string) => Tool) | undefined;
@@ -36,10 +39,18 @@ interface EnhancedWorkflowConfig extends ContainerizationWorkflowConfig {
  */
 export const executeBasicContainerizationWorkflow = async (
   repositoryPath: string,
-  logger: Logger,
+  context: ToolContext,
   config?: Partial<ContainerizationWorkflowConfig>,
 ): Promise<Result<ContainerizationResult>> => {
-  return runContainerizationWorkflow(repositoryPath, logger, config);
+  const params: ContainerizationWorkflowConfig = {
+    sessionId: config?.sessionId || `workflow-${Date.now()}`,
+    projectPath: repositoryPath,
+    ...(config?.buildOptions && { buildOptions: config.buildOptions }),
+    ...(config?.scanOptions && { scanOptions: config.scanOptions }),
+  };
+  return runContainerizationWorkflow(params, context) as unknown as Promise<
+    Result<ContainerizationResult>
+  >;
 };
 
 /**
@@ -51,39 +62,54 @@ export const executeBasicContainerizationWorkflow = async (
  */
 export const executeBuildWorkflow = async (
   repositoryPath: string,
-  logger: Logger,
+  context: ToolContext,
   config?: Partial<ContainerizationWorkflowConfig>,
 ): Promise<Result<ContainerizationResult>> => {
-  const result = await runBuildOnlyWorkflow(repositoryPath, logger, config);
+  const result = await runBuildOnlyWorkflow(
+    repositoryPath,
+    context,
+    config as ContainerizationConfig,
+  );
   if (!result.ok) {
     return result as Result<ContainerizationResult>;
   }
 
   // Convert the build-only result to ContainerizationResult format
   return Success({
-    ok: true,
-    imageId: result.value.imageId,
-    duration: result.value.duration,
-  });
+    success: true,
+    sessionId: config?.sessionId || `build-${Date.now()}`,
+    data: {
+      imageId: result.value.imageId,
+      analysisData: {
+        language: 'unknown',
+      },
+    },
+    metadata: {
+      startTime: new Date(Date.now() - result.value.duration),
+      endTime: new Date(),
+      duration: result.value.duration,
+      steps: [],
+    },
+  } as ContainerizationResult);
 };
 
 /**
  * Execute enhanced workflow using intelligent orchestration
  * @param repositoryPath - Path to the repository
  * @param workflowType - Type of workflow to execute (e.g., 'deployment', 'security')
- * @param logger - Logger instance for workflow execution
+ * @param context - Tool context for workflow execution
  * @param config - Optional workflow configuration with AI service and session management
  * @returns Promise resolving to enhanced workflow execution result
  */
 export const executeWorkflow = async (
   repositoryPath: string,
   workflowType: string,
-  logger: Logger,
+  context: ToolContext,
   config?: Partial<EnhancedWorkflowConfig>,
 ): Promise<Result<WorkflowResult>> => {
-  const context: WorkflowContext = {
+  const workflowContext: WorkflowContext = {
     ...(config?.sessionId ? { sessionId: config.sessionId } : {}),
-    logger,
+    logger: context.logger,
   };
 
   const params = {
@@ -94,7 +120,7 @@ export const executeWorkflow = async (
   return executeIntelligentWorkflow(
     workflowType,
     params,
-    context,
+    workflowContext,
     (config?.toolFactory ?? {}) as {
       getTool?: (toolName: string) => Tool;
       [key: string]: Tool | ((toolName: string) => Tool) | undefined;
@@ -103,34 +129,30 @@ export const executeWorkflow = async (
 };
 
 /**
- * Execute deployment workflow - direct function
+ * Workflow type shortcuts - use executeWorkflow directly for flexibility
+ * @deprecated Use executeWorkflow directly with the workflow type parameter
+ *
+ * Example:
+ *   executeWorkflow(repoPath, 'deployment', context, config)
+ *   executeWorkflow(repoPath, 'security', context, config)
+ *   executeWorkflow(repoPath, 'optimization', context, config)
  */
-export const executeDeploymentWorkflow = async (
+export const executeDeploymentWorkflow = (
   repositoryPath: string,
-  logger: Logger,
+  context: ToolContext,
   config?: Partial<ContainerizationWorkflowConfig>,
-): Promise<Result<WorkflowResult>> => {
-  return executeWorkflow(repositoryPath, 'deployment', logger, config);
-};
+): Promise<Result<WorkflowResult>> =>
+  executeWorkflow(repositoryPath, 'deployment', context, config);
 
-/**
- * Execute security workflow - direct function
- */
-export const executeSecurityWorkflow = async (
+export const executeSecurityWorkflow = (
   repositoryPath: string,
-  logger: Logger,
+  context: ToolContext,
   config?: Partial<ContainerizationWorkflowConfig>,
-): Promise<Result<WorkflowResult>> => {
-  return executeWorkflow(repositoryPath, 'security', logger, config);
-};
+): Promise<Result<WorkflowResult>> => executeWorkflow(repositoryPath, 'security', context, config);
 
-/**
- * Execute optimization workflow - direct function
- */
-export const executeOptimizationWorkflow = async (
+export const executeOptimizationWorkflow = (
   repositoryPath: string,
-  logger: Logger,
+  context: ToolContext,
   config?: Partial<ContainerizationWorkflowConfig>,
-): Promise<Result<WorkflowResult>> => {
-  return executeWorkflow(repositoryPath, 'optimization', logger, config);
-};
+): Promise<Result<WorkflowResult>> =>
+  executeWorkflow(repositoryPath, 'optimization', context, config);

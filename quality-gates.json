@@ -20,10 +20,10 @@
     "baselines": {
       "lint": {
         "errors": 0,
-        "warnings": 4
+        "warnings": 24
       },
       "deadcode": {
-        "count": 214
+        "count": 239
       },
       "typescript": {
         "errors": 0
@@ -37,6 +37,16 @@
           "cpu": "x86_64"
         }
       }
+    },
+    "lint": {
+      "current": 25,
+      "warnings": 25,
+      "errors": 0,
+      "baseline": 25
+    },
+    "deadcode": {
+      "current": 245,
+      "baseline": 245
     }
   }
 }

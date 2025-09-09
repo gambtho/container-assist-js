@@ -42,17 +42,16 @@ jest.mock('node:fs', () => ({
 }));
 
 // Mock lib modules
+const mockSessionManager = {
+  get: jest.fn().mockResolvedValue(null),
+  create: jest.fn().mockResolvedValue(true),
+  update: jest.fn().mockResolvedValue(true),
+};
+
 jest.mock('../../../src/lib/session', () => ({
-  createSessionManager: jest.fn(() => ({
-    get: jest.fn().mockResolvedValue(null),
-    create: jest.fn().mockResolvedValue(true),
-    update: jest.fn().mockResolvedValue(true),
-  })),
+  createSessionManager: jest.fn(() => mockSessionManager),
 }));
 
-// Legacy ai-service module removed - using ToolContext pattern now
-
-// Legacy mcp-host-ai module removed - using ToolContext pattern now
 
 jest.mock('../../../src/lib/logger', () => ({
   createTimer: jest.fn(() => ({
@@ -60,6 +59,9 @@ jest.mock('../../../src/lib/logger', () => ({
     error: jest.fn(),
   })),
 }));
+
+// Mock session helpers
+jest.mock('@mcp/tools/session-helpers');
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 
@@ -78,6 +80,23 @@ describe('analyzeRepo', () => {
 
     // Reset all mocks
     jest.clearAllMocks();
+    
+    // Setup session helper mocks
+    const sessionHelpers = require('@mcp/tools/session-helpers');
+    sessionHelpers.getSession = jest.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        id: 'test-session-123',
+        state: {
+          sessionId: 'test-session-123',
+          workflow_state: {},
+          metadata: {},
+          completed_steps: [],
+        },
+        isNew: false,
+      },
+    });
+    sessionHelpers.updateSession = jest.fn().mockResolvedValue({ ok: true });
 
     // Default mock implementations
     mockFs.stat.mockImplementation((filePath: string) => {
@@ -96,7 +115,7 @@ describe('analyzeRepo', () => {
     });
 
     it('should detect package.json and determine Node.js project', async () => {
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -115,7 +134,7 @@ describe('analyzeRepo', () => {
     });
 
     it('should detect build system from package.json', async () => {
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -129,7 +148,7 @@ describe('analyzeRepo', () => {
     });
 
     it('should provide security recommendations', async () => {
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -152,7 +171,7 @@ describe('analyzeRepo', () => {
         '.nvmrc': nodeExpressBasicRepository['.nvmrc'],
       });
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -169,7 +188,7 @@ describe('analyzeRepo', () => {
         '.nvmrc': nodeExpressBasicRepository['.nvmrc'],
       });
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -180,7 +199,7 @@ describe('analyzeRepo', () => {
 
     it('should use Node version from .nvmrc', async () => {
       // This test verifies .nvmrc is read (currently not implemented in the tool)
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       // Note: Language version detection not fully implemented yet
@@ -193,7 +212,7 @@ describe('analyzeRepo', () => {
     });
 
     it('should detect requirements.txt and determine Python project', async () => {
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -214,7 +233,7 @@ describe('analyzeRepo', () => {
         'runtime.txt': pythonFlaskBasicRepository['runtime.txt'],
       });
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -224,7 +243,7 @@ describe('analyzeRepo', () => {
     });
 
     it('should handle Python version from runtime.txt', async () => {
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       // Note: Version detection from runtime.txt not fully implemented yet
@@ -237,7 +256,7 @@ describe('analyzeRepo', () => {
     });
 
     it('should detect pom.xml and determine Maven project', async () => {
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -255,7 +274,7 @@ describe('analyzeRepo', () => {
         'src/main/java/Application.java': 'public class Application {}',
       });
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -270,7 +289,7 @@ describe('analyzeRepo', () => {
     it('should detect exposed ports from default configurations', async () => {
       setupMockFilesystem(nodeExpressBasicRepository);
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -281,7 +300,7 @@ describe('analyzeRepo', () => {
     it('should use framework-specific default ports', async () => {
       setupMockFilesystem(pythonFlaskBasicRepository);
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -297,7 +316,7 @@ describe('analyzeRepo', () => {
         'Dockerfile': 'FROM node:18-alpine',
       });
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -313,7 +332,7 @@ describe('analyzeRepo', () => {
         'docker-compose.yml': 'version: "3.8"',
       });
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -327,7 +346,7 @@ describe('analyzeRepo', () => {
         'deployment.yaml': 'apiVersion: apps/v1',
       });
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -340,7 +359,7 @@ describe('analyzeRepo', () => {
     it('should return Failure for non-existent repository', async () => {
       mockFs.stat.mockRejectedValue(new Error('ENOENT: no such file or directory'));
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -354,7 +373,7 @@ describe('analyzeRepo', () => {
         isFile: () => true,
       } as any);
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -367,7 +386,7 @@ describe('analyzeRepo', () => {
         'package.json': '{ invalid json',
       });
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -381,7 +400,7 @@ describe('analyzeRepo', () => {
     it('should handle missing access permissions', async () => {
       mockFs.access.mockRejectedValue(new Error('EACCES: permission denied'));
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -397,7 +416,7 @@ describe('analyzeRepo', () => {
         'data.txt': 'some data',
       });
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -412,7 +431,7 @@ describe('analyzeRepo', () => {
     it('should create session if it does not exist', async () => {
       setupMockFilesystem(nodeExpressBasicRepository);
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -423,7 +442,7 @@ describe('analyzeRepo', () => {
     it('should update workflow state with analysis results', async () => {
       setupMockFilesystem(nodeExpressBasicRepository);
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       // Session update should have been called - verified by mocks
@@ -448,7 +467,7 @@ describe('analyzeRepo', () => {
         })
       };
 
-      const result = await analyzeRepo(config, mockLogger, mockContext);
+      const result = await analyzeRepo(config, { ...mockContext, logger: mockLogger });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -460,7 +479,7 @@ describe('analyzeRepo', () => {
       setupMockFilesystem(nodeExpressBasicRepository);
 
 
-      const result = await analyzeRepo(config, mockLogger);
+      const result = await analyzeRepo(config, { logger: mockLogger, sessionManager: mockSessionManager });
 
       expect(result.ok).toBe(true);
       if (result.ok) {

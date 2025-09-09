@@ -1,11 +1,10 @@
 /**
  * Progress notification helper for MCP tools
- * Provides a centralized, reusable pattern for progress reporting
+ * DEPRECATED: Use @mcp/utils/progress-helper instead
+ * This file is kept for backward compatibility only
  */
 
 import type { ProgressToken } from '@modelcontextprotocol/sdk/types.js';
-import type { Logger } from 'pino';
-import type { ProgressReporter } from '@mcp/context/types';
 
 /**
  * Progress notification interface for MCP server
@@ -22,44 +21,8 @@ export interface ProgressNotifier {
 }
 
 /**
- * Create a progress reporter function for tools
- *
- * @param progressToken - Optional progress token from MCP request
- * @param notifier - Optional server instance with progress notification capability
- * @param logger - Logger for debugging progress messages
- * @returns Progress reporter function that handles notifications
- */
-export function createProgressReporter(
-  progressToken?: ProgressToken,
-  notifier?: ProgressNotifier,
-  logger?: Logger,
-): ProgressReporter {
-  return async (message: string, progress?: number, total?: number): Promise<void> => {
-    // Log progress for debugging
-    if (logger) {
-      logger.debug({ progress, message, total }, 'Progress update');
-    }
-
-    // Send progress notification if token and notifier are available
-    if (progressToken && notifier) {
-      try {
-        await notifier.sendProgress(progressToken, {
-          progress: progress || 0,
-          message,
-          ...(total && { total }),
-        });
-      } catch (error) {
-        // Don't fail the operation if progress notification fails
-        if (logger) {
-          logger.warn({ error, progressToken }, 'Failed to send progress notification');
-        }
-      }
-    }
-  };
-}
-
-/**
  * Standard progress stages for common tool operations
+ * @deprecated Use STANDARD_STAGES from @mcp/utils/progress-helper instead
  */
 export const ProgressStages = {
   INITIALIZING: { progress: 0, message: 'Initializing...' },
@@ -70,54 +33,3 @@ export const ProgressStages = {
   FINALIZING: { progress: 90, message: 'Finalizing...' },
   COMPLETE: { progress: 100, message: 'Complete' },
 } as const;
-
-/**
- * Helper to create staged progress reporter with predefined stages
- */
-export function createStagedProgressReporter(
-  progressToken?: ProgressToken,
-  notifier?: ProgressNotifier,
-  logger?: Logger,
-): {
-  reporter: ProgressReporter;
-  reportStage: (stage: keyof typeof ProgressStages) => Promise<void>;
-} {
-  const reporter = createProgressReporter(progressToken, notifier, logger);
-
-  const reportStage = async (stage: keyof typeof ProgressStages): Promise<void> => {
-    const { progress, message } = ProgressStages[stage];
-    await reporter(message, progress);
-  };
-
-  return { reporter, reportStage };
-}
-
-/**
- * Create a progress reporter that works with the MCP server context
- */
-export function createToolProgressReporter(
-  context: {
-    progressToken?: ProgressToken;
-    server?: any; // MCPServer instance
-    logger?: Logger;
-  },
-  toolName: string,
-): ProgressReporter {
-  const notifier: ProgressNotifier | undefined = context.server
-    ? {
-        sendProgress: async (token, progress) => {
-          if (context.server && typeof context.server.sendProgress === 'function') {
-            await context.server.sendProgress(token, progress);
-          }
-        },
-      }
-    : undefined;
-
-  return async (message: string, progress?: number, total?: number): Promise<void> => {
-    const fullMessage = `[${toolName}] ${message}`;
-
-    const reporter = createProgressReporter(context.progressToken, notifier, context.logger);
-
-    await reporter(fullMessage, progress, total);
-  };
-}

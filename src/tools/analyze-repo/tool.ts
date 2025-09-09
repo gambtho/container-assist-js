@@ -21,46 +21,19 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { createSessionManager } from '../../lib/session';
+import { getSession, updateSession } from '@mcp/tools/session-helpers';
+import { createStandardProgress } from '@mcp/utils/progress-helper';
+import { aiGenerate } from '@mcp/tools/ai-helpers';
 import { getRecommendedBaseImage } from '../../lib/base-images';
 import type { ToolContext } from '../../mcp/context/types';
-import type { ExtendedToolContext } from '../shared-types';
-import { createTimer, type Logger } from '../../lib/logger';
-import {
-  Success,
-  Failure,
-  type Result,
-  updateWorkflowState,
-  type WorkflowState,
-} from '../../domain/types';
+import { createTimer, createLogger } from '../../lib/logger';
+import { Success, Failure, type Result } from '../../domain/types';
+import type { AnalyzeRepoParams } from './schema';
 import { DEFAULT_PORTS } from '../../config/defaults';
-import { enhanceAnalysisWithPerspective, selectBestPerspective } from '../analysis-perspectives';
-import type { AnalyzeRepoResult, AnalysisPerspective } from '../types';
+import type { AnalyzeRepoResult } from '../types';
 
 // Re-export for backward compatibility
 export type { AnalyzeRepoResult } from '../types';
-
-/**
- * Configuration for repository analysis
- */
-export interface AnalyzeRepoConfig {
-  /** Unique session identifier for tracking analysis state */
-  sessionId: string;
-  /** Path to the repository root directory */
-  repoPath: string;
-  /** Directory traversal depth (default: 3) */
-  depth?: number;
-  /** Whether to include test files in analysis */
-  includeTests?: boolean;
-  /** Enable enhanced perspective-based analysis */
-  usePerspectives?: boolean;
-  /** Specific analysis perspective to apply */
-  perspective?: AnalysisPerspective;
-  /** Focus analysis on security aspects */
-  securityFocus?: boolean;
-  /** Focus analysis on performance aspects */
-  performanceFocus?: boolean;
-}
 
 // AnalyzeRepoResult is imported from ./types to avoid circular dependency
 
@@ -369,23 +342,29 @@ function getSecurityRecommendations(
 }
 
 /**
- * Analyzes repository structure to detect language, framework, and build system
- * @param config - Configuration options including sessionId, repoPath, depth, and includeTests
- * @param logger - Logger instance for structured logging
- * @returns Promise resolving to analysis result with language detection, dependencies, and recommendations
+ * Repository analysis implementation - direct execution with selective progress
  */
-export async function analyzeRepo(
-  config: AnalyzeRepoConfig,
-  logger: Logger,
-  context?: ExtendedToolContext,
+async function analyzeRepoImpl(
+  params: AnalyzeRepoParams,
+  context: ToolContext,
 ): Promise<Result<AnalyzeRepoResult>> {
+  // Basic parameter validation (essential validation only)
+  if (!params || typeof params !== 'object') {
+    return Failure('Invalid parameters provided');
+  }
+
+  // Optional progress reporting for complex operations
+  const progress = context.progress ? createStandardProgress(context.progress) : undefined;
+  const logger = context.logger || createLogger({ name: 'analyze-repo' });
   const timer = createTimer(logger, 'analyze-repo');
 
   try {
-    const { sessionId, depth = 3, includeTests = false } = config;
-    const { repoPath } = config;
+    const { repoPath = process.cwd(), depth = 3, includeTests = false } = params;
 
     logger.info({ repoPath, depth, includeTests }, 'Starting repository analysis');
+
+    // Progress: Starting analysis
+    if (progress) await progress('VALIDATING');
 
     // Validate repository path
     const validation = await validateRepositoryPath(repoPath);
@@ -393,39 +372,24 @@ export async function analyzeRepo(
       return Failure(validation.error ?? 'Invalid repository path');
     }
 
-    // Create lib instances - use shared sessionManager from context if available
-    const sharedSessionManager =
-      context && 'sessionManager' in context ? context.sessionManager : null;
-    logger.info(
-      {
-        sessionId,
-        hasContext: !!context,
-        hasSharedSessionManager: !!sharedSessionManager,
-        contextKeys: context ? Object.keys(context) : [],
-      },
-      'Session manager setup',
-    );
-    const sessionManager = sharedSessionManager || createSessionManager(logger);
-
-    // AI enhancement available through context parameter
-    const isToolContext = context && 'sampling' in context && 'getPrompt' in context;
-
     // Get or create session
-    let session = await sessionManager.get(sessionId);
-    logger.info(
-      {
-        sessionId,
-        sessionExists: !!session,
-        sessionKeys: session ? Object.keys(session) : [],
-      },
-      'Retrieved session state',
-    );
-
-    if (!session) {
-      // Create new session
-      logger.info({ sessionId }, 'Creating new session');
-      session = await sessionManager.create(sessionId);
+    const sessionResult = await getSession(params.sessionId, context);
+    if (!sessionResult.ok) {
+      return Failure(sessionResult.error);
     }
+
+    const { id: sessionId, state: session } = sessionResult.value;
+    logger.info({ sessionId, repoPath }, 'Starting repository analysis with session');
+
+    // Progress: Main analysis phase
+    if (progress) await progress('EXECUTING');
+
+    // AI enhancement available through context
+    const hasAI =
+      context.sampling &&
+      context.getPrompt &&
+      context.sampling !== null &&
+      context.getPrompt !== null;
 
     // Perform analysis
     const languageInfo = await detectLanguage(repoPath);
@@ -435,51 +399,48 @@ export async function analyzeRepo(
     const ports = await detectPorts(languageInfo.language);
     const dockerInfo = await checkDockerFiles(repoPath);
 
-    // Get AI insights using ToolContext if available
+    // Get AI insights using standardized helper if available
     let aiInsights: string | undefined;
-    if (isToolContext && context) {
+    if (hasAI) {
       try {
         logger.debug('Using AI to enhance repository analysis');
-        const toolContext = context as ToolContext;
 
-        const { description, messages } = await toolContext.getPrompt('enhance-repo-analysis', {
-          language: languageInfo.language,
-          framework: frameworkInfo?.framework,
-          buildSystem: buildSystemRaw?.type,
-          dependencies: dependencies
-            .slice(0, 10)
-            .map((dep) => dep.name)
-            .join(', '), // Limit for prompt length
-          hasTests: dependencies.some(
-            (dep) =>
-              dep.name.includes('test') || dep.name.includes('jest') || dep.name.includes('mocha'),
-          ),
-          hasDocker: dockerInfo.hasDockerfile,
-          ports: ports.join(', '),
-          fileCount: dependencies.length, // Rough estimate
-          repoStructure: `${languageInfo.language} project with ${frameworkInfo?.framework || 'standard'} structure`,
-        });
-
-        logger.debug({ description, messageCount: messages.length }, 'Got prompt from registry');
-
-        const aiResponse = await toolContext.sampling.createMessage({
-          messages,
-          includeContext: 'thisServer',
-          modelPreferences: { hints: [{ name: 'analysis' }] },
+        const aiResult = await aiGenerate(logger, context, {
+          promptName: 'enhance-repo-analysis',
+          promptArgs: {
+            language: languageInfo.language,
+            framework: frameworkInfo?.framework,
+            buildSystem: buildSystemRaw?.type,
+            dependencies: dependencies
+              .slice(0, 10)
+              .map((dep) => dep.name)
+              .join(', '), // Limit for prompt length
+            hasTests: dependencies.some(
+              (dep) =>
+                dep.name.includes('test') ||
+                dep.name.includes('jest') ||
+                dep.name.includes('mocha'),
+            ),
+            hasDocker: dockerInfo.hasDockerfile,
+            ports: ports.join(', '),
+            fileCount: dependencies.length, // Rough estimate
+            repoStructure: `${languageInfo.language} project with ${frameworkInfo?.framework || 'standard'} structure`,
+          },
+          expectation: 'text',
+          fallbackBehavior: 'error',
+          maxRetries: 2,
           maxTokens: 1500,
+          modelHints: ['analysis'],
         });
 
-        const responseText = aiResponse.content
-          .filter(
-            (c: { type: string; text?: string }) => c.type === 'text' && typeof c.text === 'string',
-          )
-          .map((c: { type: string; text?: string }) => c.text || '')
-          .join('\n')
-          .trim();
-
-        if (responseText) {
-          aiInsights = responseText;
+        if (aiResult.ok && aiResult.value.content) {
+          aiInsights = aiResult.value.content;
           logger.info('AI analysis enhancement completed successfully');
+        } else {
+          logger.debug(
+            { error: aiResult.ok ? 'Empty response' : aiResult.error },
+            'AI analysis enhancement failed, continuing with basic analysis',
+          );
         }
       } catch (error) {
         logger.debug(
@@ -532,101 +493,58 @@ export async function analyzeRepo(
       },
     };
 
-    // Update session with analysis result
-    const currentState = session as WorkflowState | undefined;
-    const updatedWorkflowState = updateWorkflowState(currentState || {}, {
-      analysis_result: {
-        language: languageInfo.language,
-        ...(languageInfo.version && { language_version: languageInfo.version }),
-        ...(frameworkInfo?.framework && { framework: frameworkInfo.framework }),
-        ...(frameworkInfo?.version && { framework_version: frameworkInfo.version }),
-        ...(buildSystem && {
-          build_system: {
-            type: buildSystem.type,
-            build_file: buildSystem.buildFile,
-            ...(buildSystem.buildCommand && { build_command: buildSystem.buildCommand }),
-          },
-        }),
-        dependencies: dependencies.map((d) => ({
-          name: d.name,
-          ...(d.version && { version: d.version }),
-          type:
-            d.type === 'production'
-              ? ('runtime' as const)
-              : d.type === 'development'
-                ? ('dev' as const)
-                : ('test' as const),
-        })),
-        has_tests: dependencies.some((dep) => dep.type === 'test'),
-        ports,
-        docker_compose_exists: dockerInfo.hasDockerCompose,
-        recommendations: {
-          baseImage,
-          buildStrategy: buildSystem ? 'multi-stage' : 'single-stage',
-          securityNotes,
-        },
-      },
-      completed_steps: [...(currentState?.completed_steps ?? []), 'analyze-repo'],
-    });
-
-    logger.info(
+    // Update session with analysis result using simplified helper
+    const updateResult = await updateSession(
+      sessionId,
       {
-        sessionId,
-        analysisResultKeys: Object.keys(updatedWorkflowState.analysis_result || {}),
-        completedSteps: updatedWorkflowState.completed_steps,
-      },
-      'Updating session with analysis result',
-    );
-
-    await sessionManager.update(sessionId, updatedWorkflowState);
-
-    // Verify the update
-    const verifySession = await sessionManager.get(sessionId);
-    logger.info(
-      {
-        sessionId,
-        updateSuccessful: !!verifySession,
-        hasAnalysisResult: !!(verifySession as any)?.analysis_result,
-        analysisLanguage: (verifySession as any)?.analysis_result?.language,
-        verifySessionKeys: verifySession ? Object.keys(verifySession) : [],
-        isSharedManager: !!sharedSessionManager,
-      },
-      'Verified session update',
-    );
-
-    // Apply perspective enhancement if requested
-    if (config.usePerspectives) {
-      const selectedPerspective =
-        config.perspective ||
-        selectBestPerspective(result, {
-          ...(config.securityFocus !== undefined && { securityFocus: config.securityFocus }),
-          ...(config.performanceFocus !== undefined && {
-            performanceFocus: config.performanceFocus,
+        analysis_result: {
+          language: languageInfo.language,
+          ...(languageInfo.version && { language_version: languageInfo.version }),
+          ...(frameworkInfo?.framework && { framework: frameworkInfo.framework }),
+          ...(frameworkInfo?.version && { framework_version: frameworkInfo.version }),
+          ...(buildSystem && {
+            build_system: {
+              type: buildSystem.type,
+              build_file: buildSystem.buildFile,
+              ...(buildSystem.buildCommand && { build_command: buildSystem.buildCommand }),
+            },
           }),
-        });
-
-      const enhancedResult = enhanceAnalysisWithPerspective(result, selectedPerspective, logger);
-      if (enhancedResult.ok) {
-        timer.end({ language: languageInfo.language, perspective: selectedPerspective });
-        logger.info(
-          {
-            language: languageInfo.language,
-            perspective: selectedPerspective,
+          dependencies: dependencies.map((d) => ({
+            name: d.name,
+            ...(d.version && { version: d.version }),
+            type:
+              d.type === 'production'
+                ? ('runtime' as const)
+                : d.type === 'development'
+                  ? ('dev' as const)
+                  : ('test' as const),
+          })),
+          has_tests: dependencies.some((dep) => dep.type === 'test'),
+          ports,
+          docker_compose_exists: dockerInfo.hasDockerCompose,
+          recommendations: {
+            baseImage,
+            buildStrategy: buildSystem ? 'multi-stage' : 'single-stage',
+            securityNotes,
           },
-          'Repository analysis completed with perspective',
-        );
+        },
+        completed_steps: [...(session?.completed_steps ?? []), 'analyze-repo'],
+      },
+      context,
+    );
 
-        return Success(enhancedResult.value);
-      } else {
-        logger.warn(
-          { error: enhancedResult.error },
-          'Perspective enhancement failed, returning base analysis',
-        );
-      }
+    if (!updateResult.ok) {
+      logger.warn({ error: updateResult.error }, 'Failed to update session with analysis result');
     }
+
+    // Progress: Finalizing results
+    if (progress) await progress('FINALIZING');
 
     timer.end({ language: languageInfo.language });
     logger.info({ language: languageInfo.language }, 'Repository analysis completed');
+
+    // Progress: Complete
+    if (progress) await progress('COMPLETE');
 
     return Success(result);
   } catch (error) {
@@ -638,10 +556,6 @@ export async function analyzeRepo(
 }
 
 /**
- * Analyze repository tool instance
+ * Analyze repository tool with selective progress reporting
  */
-export const analyzeRepoTool = {
-  name: 'analyze-repo',
-  execute: (config: AnalyzeRepoConfig, logger: Logger, context?: ToolContext) =>
-    analyzeRepo(config, logger, context),
-};
+export const analyzeRepo = analyzeRepoImpl;

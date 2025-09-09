@@ -7,7 +7,7 @@
 
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '@types';
-import { SamplingService } from './sampling/sampling-service';
+import { createDockerfileSampling } from './sampling/functional-strategies';
 import { createMCPAIOrchestrator } from '@workflows/intelligent-orchestration';
 import type { ValidationContext } from '@mcp/tools/validator';
 import type { SamplingConfig, SamplingOptions, SamplingResult } from './sampling/types';
@@ -66,11 +66,11 @@ export async function generateBestDockerfile(
       }
     }
 
-    // 3. Create sampling service
-    const samplingService = new SamplingService(logger);
+    // 3. Create functional dockerfile sampler
+    const dockerfileSampler = createDockerfileSampling(logger);
 
-    // 4. Generate best Dockerfile using sampling
-    const result = await samplingService.generateBestDockerfile(config, options, logger);
+    // 4. Generate best Dockerfile using functional sampling
+    const result = await dockerfileSampler.generateBest(config, options);
 
     if (!result.ok) {
       logger.error({ error: result.error }, 'Sampling service failed');

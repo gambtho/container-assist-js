@@ -13,11 +13,11 @@ import { analyzeRepo } from '../tools/analyze-repo';
 import { generateDockerfile } from '../tools/generate-dockerfile';
 import { buildImage } from '../tools/build-image';
 import { scanImage } from '../tools/scan';
-import { tagImage } from '../tools/tag-image';
+import { tagImage } from '../tools/tag-image/tool';
 import { isFail } from '../domain/types';
 import { getRecommendedBaseImage } from '../lib/base-images';
 import { createTimer, type Logger } from '../lib/logger';
-import type { Deps } from '../app/container';
+import type { ToolContext } from '../mcp/context/types';
 import type {
   ContainerizationWorkflowParams,
   ContainerizationWorkflowResult,
@@ -68,12 +68,18 @@ import type {
  */
 export async function runContainerizationWorkflow(
   params: ContainerizationWorkflowParams,
-  deps: Deps,
+  toolContext: ToolContext,
   options?: { abortSignal?: AbortSignal },
 ): Promise<ContainerizationWorkflowResult> {
-  const logger = deps.logger;
+  const logger = toolContext.logger;
   const timer = createTimer(logger, 'containerization-workflow');
-  const sessionManager = deps.sessionManager;
+
+  // Get sessionManager from context - it must be provided
+  const sessionManager = toolContext.sessionManager;
+  if (!sessionManager) {
+    throw new Error('sessionManager is required in toolContext for containerization workflow');
+  }
+
   const { sessionId, projectPath, buildOptions = {}, scanOptions = {} } = params;
 
   // Initialize workflow context
@@ -134,7 +140,7 @@ export async function runContainerizationWorkflow(
         repoPath: projectPath,
         includeTests: true,
       },
-      logger,
+      toolContext,
     );
 
     if (isFail(analysisResult)) {
@@ -185,7 +191,7 @@ export async function runContainerizationWorkflow(
         multistage: true,
         securityHardening: true,
       },
-      logger,
+      toolContext,
     );
 
     if (!dockerfileResult.ok) {
@@ -256,7 +262,7 @@ export async function runContainerizationWorkflow(
         ...(buildOptions.platform && { platform: buildOptions.platform }),
         ...(buildOptions.noCache && { noCache: buildOptions.noCache }),
       },
-      logger,
+      toolContext,
     );
 
     if (!buildResult.ok) {
@@ -329,12 +335,22 @@ export async function runContainerizationWorkflow(
       {
         sessionId,
         scanner: 'trivy',
-        severityThreshold: scanOptions.severity || 'high',
+        severity: scanOptions.severity || 'high',
       },
-      logger,
+      toolContext,
     );
 
-    // Scan failures are warnings, not workflow failures
+    /**
+     * Security Scan Error Handling Strategy:
+     *
+     * Security scans can fail for various reasons (missing scanner, network issues,
+     * registry authentication, etc.) but these failures shouldn't halt the entire
+     * containerization workflow. The core goal is to produce a working container image.
+     *
+     * Design decision: Treat scan failures as warnings rather than hard failures.
+     * This allows the workflow to complete and produce a deployable image while
+     * still surfacing security concerns through logging and step status.
+     */
     let scan: Record<string, unknown> | null = null;
     if (!scanResult.ok) {
       scanStep.status = 'completed';
@@ -369,11 +385,9 @@ export async function runContainerizationWorkflow(
       {
         sessionId,
         tag: tags[0] || 'latest',
-        imageName: build.imageId || `${analysis.language || 'app'}-app`,
-        sourceTag: 'latest',
-        targetTag: tags[0] || 'latest',
+        imageId: build.imageId || `${analysis.language || 'app'}-app`,
       },
-      logger,
+      toolContext,
     );
 
     if (!tagResult.ok) {
@@ -514,10 +528,17 @@ export const containerizationWorkflow = {
   description: 'Complete containerization pipeline from analysis to tagged image',
   execute: (
     params: ContainerizationWorkflowParams,
-    logger: Logger,
+    _logger: Logger,
     context?: Record<string, unknown>,
-  ) =>
-    runContainerizationWorkflow(params, (context?.deps as Deps) || ({ logger } as Deps), context),
+  ) => {
+    // The context from MCP server needs to be properly structured as ToolContext
+    const toolContext = context as unknown as ToolContext;
+    const options: { abortSignal?: AbortSignal } = {};
+    if (toolContext?.signal) {
+      options.abortSignal = toolContext.signal;
+    }
+    return runContainerizationWorkflow(params, toolContext, options);
+  },
   schema: {
     type: 'object',
     properties: {
