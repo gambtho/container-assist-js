@@ -261,5 +261,3 @@ describe('Dependency Configuration Validation', () => {
     expect(productionConfig.logLevel).toBe('info');
   });
 });
-
-console.log('✅ Service dependencies validation complete - dependency injection working correctly');
