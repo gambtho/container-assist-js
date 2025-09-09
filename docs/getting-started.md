@@ -7,26 +7,42 @@ This guide will help you install, configure, and use the Containerization Assist
 - **Node.js** 20 or higher
 - **Docker** 20.10 or higher  
 - **kubectl** (optional, for Kubernetes deployments)
-- **Git** (for development setup)
 
 ## Installation
-
-### As an MCP Server (Recommended)
 
 ```bash
 npm install -g @thgamble/containerization-assist-mcp
 ```
 
-### For Development
-
-```bash
-git clone https://github.com/gambtho/container-assist-js.git
-cd container-assist-js
-npm install
-npm run build
-```
+> For development setup, see the [Development Setup Guide](./development-setup.md)
 
 ## Configuration
+
+### With VS Code / GitHub Copilot (Recommended)
+
+After installing the package globally, configure VS Code to use the MCP server. Create `.vscode/mcp.json` in your project:
+
+```json
+{
+  "servers": {
+    "containerization-assist": {
+      "command": "containerization-assist-mcp",
+      "args": ["start"],
+      "env": {
+        "DOCKER_SOCKET": "/var/run/docker.sock",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+For Windows users, use:
+```json
+"DOCKER_SOCKET": "//./pipe/docker_engine"
+```
+
+Simply restart VS Code to enable the MCP server in GitHub Copilot.
 
 ### With Claude Desktop
 
@@ -47,128 +63,72 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-For Windows users, use:
-```json
-"DOCKER_SOCKET": "//./pipe/docker_engine"
-```
-
-### With VS Code / GitHub Copilot
-
-For local development with hot reload, the project includes `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "containerization-assist-dev": {
-      "command": "npx",
-      "args": ["tsx", "watch", "./src/cli/cli.ts"],
-      "env": {
-        "MCP_MODE": "true",
-        "MCP_QUIET": "true",
-        "NODE_ENV": "development"
-      }
-    }
-  }
-}
-```
-
-Simply restart VS Code to enable the MCP server in GitHub Copilot.
-
-### With MCP Inspector
+### With MCP Inspector (For Testing)
 
 ```bash
-# Using installed package
 npx @modelcontextprotocol/inspector containerization-assist-mcp start
-
-# Using local development
-npx @modelcontextprotocol/inspector npx tsx src/cli/cli.ts
 ```
 
 ## First Containerization
 
-### Using MCP Tools
+Once configured, you can use natural language commands with GitHub Copilot or Claude to containerize your applications.
 
-The server provides 14 tools using the co-location pattern that work together seamlessly:
+### Quick Start Commands
 
-```javascript
-// 1. Analyze your repository
-const analysis = await client.callTool({
-  name: 'analyze_repository',
-  arguments: {
-    repoPath: './my-app',
-    sessionId: 'session-123'
-  }
-});
+Simply ask your AI assistant:
 
-// 2. Generate optimized Dockerfile
-const dockerfile = await client.callTool({
-  name: 'generate_dockerfile',
-  arguments: {
-    sessionId: 'session-123'
-    // Parameters inferred from analysis
-  }
-});
+1. **"Analyze my Node.js application for containerization"**
+   - The assistant will analyze your repository structure and dependencies
 
-// 3. Build and scan image
-const build = await client.callTool({
-  name: 'build_image',
-  arguments: {
-    sessionId: 'session-123',
-    imageName: 'my-app:latest'
-  }
-});
+2. **"Generate a Dockerfile for this project"**
+   - Creates an optimized Dockerfile based on the analysis
 
-// 4. Deploy to Kubernetes (optional)
-const deployment = await client.callTool({
-  name: 'deploy_application',
-  arguments: {
-    sessionId: 'session-123',
-    namespace: 'default'
-  }
-});
-```
+3. **"Build a Docker image with tag myapp:latest"**
+   - Builds the Docker image with progress tracking
 
-### Using Workflows
+4. **"Scan the image for security vulnerabilities"**
+   - Runs Trivy security scanning on the built image
 
-For complete containerization pipelines:
+5. **"Deploy to Kubernetes"**
+   - Generates manifests and deploys to your cluster
 
-```javascript
-const workflow = await client.callTool({
-  name: 'start_workflow',
-  arguments: {
-    workflowType: 'containerization',
-    repoPath: './my-app',
-    sessionId: 'session-123'
-  }
-});
-```
+### Complete Workflow
 
-Available workflows:
-- **containerization**: Complete flow from analysis to deployment
-- **deployment**: Kubernetes deployment with verification
-- **security**: Vulnerability scanning and remediation
-- **optimization**: Image size and performance optimization
+For a complete containerization workflow, simply say:
 
-Workflows are orchestrated using the intelligent orchestration system in `src/workflows/`.
+**"Start a containerization workflow for my application"**
+
+This will automatically:
+- Analyze your repository
+- Generate an optimized Dockerfile
+- Build the Docker image
+- Scan for vulnerabilities
+- Optionally deploy to Kubernetes
+
+### Programmatic Usage
+
+For developers who want to integrate directly, see the [examples](./examples/) directory for code samples using the MCP client libraries.
 
 ## Available Tools
 
-| Tool | Description | Location |
-|------|-------------|----------|
-| `analyze_repository` | Analyze repository structure and detect language/framework | `src/tools/analyze-repo/` |
-| `resolve_base_images` | Find optimal base images for applications | `src/tools/resolve-base-images/` |
-| `generate_dockerfile` | Create optimized Dockerfiles | `src/tools/generate-dockerfile/` |
-| `fix_dockerfile` | Fix and optimize existing Dockerfiles | `src/tools/fix-dockerfile/` |
-| `build_image` | Build Docker images with progress tracking | `src/tools/build-image/` |
-| `scan_image` | Security vulnerability scanning with Trivy | `src/tools/scan/` |
-| `tag_image` | Tag Docker images | `src/tools/tag-image/` |
-| `push_image` | Push images to registry | `src/tools/push-image/` |
-| `generate_k8s_manifests` | Create Kubernetes deployment configurations | `src/tools/generate-k8s-manifests/` |
-| `prepare_cluster` | Prepare Kubernetes cluster for deployment | `src/tools/prepare-cluster/` |
-| `deploy_application` | Deploy applications to Kubernetes | `src/tools/deploy/` |
-| `verify_deployment` | Verify deployment health and status | `src/tools/verify-deployment/` |
-| `start_workflow` | Start complete containerization workflow | `src/tools/workflow/` |
-| `ops` | Operational tools (ping, health, registry) | `src/tools/ops/` |
+The MCP server provides 14 tools that work together seamlessly:
+
+| Tool | Description |
+|------|-------------|
+| `analyze_repository` | Analyze repository structure and detect language/framework |
+| `resolve_base_images` | Find optimal base images for applications |
+| `generate_dockerfile` | Create optimized Dockerfiles |
+| `fix_dockerfile` | Fix and optimize existing Dockerfiles |
+| `build_image` | Build Docker images with progress tracking |
+| `scan_image` | Security vulnerability scanning with Trivy |
+| `tag_image` | Tag Docker images |
+| `push_image` | Push images to registry |
+| `generate_k8s_manifests` | Create Kubernetes deployment configurations |
+| `prepare_cluster` | Prepare Kubernetes cluster for deployment |
+| `deploy_application` | Deploy applications to Kubernetes |
+| `verify_deployment` | Verify deployment health and status |
+| `start_workflow` | Start complete containerization workflow |
+| `ops` | Operational tools (ping, health, registry) |
 
 ## Environment Variables
 
@@ -246,6 +206,7 @@ npm test
 
 ## Next Steps
 
+- Explore the [Usage Examples](./examples/) for integration patterns
 - Review the [Architecture Guide](./architecture.md) to understand the system design
-- Check the [Development Guide](./development.md) for contributing
-- Explore the [Main README](../README.md) for all available commands
+- For contributing, see the [Development Setup Guide](./development-setup.md)
+- Check the [Main README](../README.md) for complete feature overview

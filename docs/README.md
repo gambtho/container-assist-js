@@ -4,13 +4,21 @@ Welcome to the Containerization Assistant MCP Server documentation.
 
 ## Quick Navigation
 
+### User Guides
 - **[Getting Started](./getting-started.md)** - Installation, setup, and first containerization
-- **[Development Guide](./development.md)** - Development setup, testing, and contribution guidelines  
+- **[External Usage](./external-usage.md)** - Using the MCP server in various environments
+
+### Developer Guides
+- **[Development Setup](./development-setup.md)** - Local development environment, testing, and contribution guidelines
 - **[Architecture](./architecture.md)** - System design, MCP features, and API reference
+- **[Internal Docs](./internal/)** - Technical documentation for maintainers
+
+### Examples
+- **[Usage Examples](./examples/)** - Code examples for different integration scenarios
 
 ## Overview
 
-The Containerization Assistant is a Model Context Protocol (MCP) server that provides AI-powered containerization workflows with Docker and Kubernetes support. It offers 14 tools organized using a co-location pattern for analyzing, building, scanning, and deploying containerized applications.
+The Containerization Assistant is a Model Context Protocol (MCP) server that provides AI-powered containerization workflows with Docker and Kubernetes support. It offers 14 tools for analyzing, building, scanning, and deploying containerized applications through natural language commands in VS Code and other MCP-compatible tools.
 
 ### Key Features
 
@@ -21,17 +29,15 @@ The Containerization Assistant is a Model Context Protocol (MCP) server that pro
 - 📊 **Progress Tracking**: Real-time progress updates via MCP
 - 🔒 **Security Scanning**: Built-in vulnerability scanning with Trivy
 
-## Quick Start
+### Quick Start
 
-```bash
-# Install as MCP server
-npm install -g @thgamble/containerization-assist-mcp
+1. **Install**: `npm install -g @thgamble/containerization-assist-mcp`
+2. **Configure VS Code**: Create `.vscode/mcp.json` (see [Getting Started](./getting-started.md))
+3. **Use**: Ask GitHub Copilot to "analyze my application for containerization"
 
-# Run with MCP Inspector
-npx @modelcontextprotocol/inspector containerization-assist-mcp start
-```
+## Document Organization
 
-For detailed setup instructions, see the [Getting Started Guide](./getting-started.md).
+This documentation is organized into three main sections to serve different needs:
 
 ## Project Links
 

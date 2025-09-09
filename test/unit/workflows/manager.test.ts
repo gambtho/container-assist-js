@@ -313,5 +313,3 @@ describe('Workflow Manager Cross-System Integration', () => {
     expect(crossSystemIntegration.services.workflowManager.startWorkflow).toBeDefined();
   });
 });
-
-console.log('✅ Workflow manager validation complete - workflow management working correctly');

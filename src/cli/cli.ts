@@ -77,8 +77,8 @@ MCP Tools Available:
   • Orchestration: start_workflow, workflow_status
   • Utilities: ping, server_status
 
-For detailed documentation, see: docs/tools/README.md
-For examples and tutorials, see: examples/README.md
+For detailed documentation, see: docs/README.md
+For examples and tutorials, see: docs/examples/
 
 Environment Variables:
   LOG_LEVEL                 Logging level (debug, info, warn, error)
