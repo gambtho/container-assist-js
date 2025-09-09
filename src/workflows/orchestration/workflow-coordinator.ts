@@ -127,32 +127,3 @@ export const executeWorkflow = async (
     },
   );
 };
-
-/**
- * Workflow type shortcuts - use executeWorkflow directly for flexibility
- * @deprecated Use executeWorkflow directly with the workflow type parameter
- *
- * Example:
- *   executeWorkflow(repoPath, 'deployment', context, config)
- *   executeWorkflow(repoPath, 'security', context, config)
- *   executeWorkflow(repoPath, 'optimization', context, config)
- */
-export const executeDeploymentWorkflow = (
-  repositoryPath: string,
-  context: ToolContext,
-  config?: Partial<ContainerizationWorkflowConfig>,
-): Promise<Result<WorkflowResult>> =>
-  executeWorkflow(repositoryPath, 'deployment', context, config);
-
-export const executeSecurityWorkflow = (
-  repositoryPath: string,
-  context: ToolContext,
-  config?: Partial<ContainerizationWorkflowConfig>,
-): Promise<Result<WorkflowResult>> => executeWorkflow(repositoryPath, 'security', context, config);
-
-export const executeOptimizationWorkflow = (
-  repositoryPath: string,
-  context: ToolContext,
-  config?: Partial<ContainerizationWorkflowConfig>,
-): Promise<Result<WorkflowResult>> =>
-  executeWorkflow(repositoryPath, 'optimization', context, config);

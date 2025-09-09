@@ -6,7 +6,6 @@
  */
 
 import { getSession, updateSession } from '@mcp/tools/session-helpers';
-// Removed wrapTool - using direct implementation
 import type { ToolContext } from '../../mcp/context/types';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';

@@ -8,7 +8,7 @@
 import type { Logger } from 'pino';
 import { createLogger } from '../lib/logger';
 import { createSessionManager, SessionManager } from '../lib/session';
-import { PromptRegistry } from '../core/prompts/registry';
+import { createPromptRegistry, PromptRegistry } from '../core/prompts/registry';
 import {
   storeResource,
   getResource,
@@ -123,17 +123,7 @@ export async function createContainer(
   const kubernetesClient = depsOverrides.kubernetesClient ?? createKubernetesClient(logger);
 
   // Create prompt registry
-  const promptRegistry =
-    depsOverrides.promptRegistry ??
-    (await (async () => {
-      const registry = new PromptRegistry(logger);
-      const initResult = await registry.initialize();
-      if (!initResult.ok) {
-        logger.error({ error: initResult.error }, 'Failed to initialize prompt registry');
-        throw new Error(`Prompt registry initialization failed: ${initResult.error}`);
-      }
-      return registry;
-    })());
+  const promptRegistry = depsOverrides.promptRegistry ?? (await createPromptRegistry(logger));
 
   // Create resource manager using simple functions
   const resourceManager = depsOverrides.resourceManager ?? {
@@ -186,29 +176,6 @@ export async function createContainer(
   );
 
   return deps;
-}
-
-/**
- * Create container with test overrides for easy testing
- */
-export async function createTestContainer(overrides: DepsOverrides = {}): Promise<Deps> {
-  const testConfig = createAppConfig();
-
-  // Apply test-specific overrides
-  testConfig.server.logLevel = 'error'; // Quiet logs during tests
-  testConfig.session.ttl = 60; // Short TTL for tests
-  testConfig.session.maxSessions = 10;
-  testConfig.workspace.maxFileSize = 1024 * 1024; // 1MB max for tests
-
-  return await createContainer(
-    {
-      config: testConfig,
-      ai: {
-        enabled: false, // Disable AI by default in tests
-      },
-    },
-    overrides,
-  );
 }
 
 /**
@@ -292,22 +259,17 @@ export function checkContainerHealth(deps: Deps): {
     toolRegistry: deps.toolRegistry !== undefined,
   };
 
-  const optionalServices = {};
-
-  const services = { ...requiredServices, ...optionalServices };
   const healthy = Object.values(requiredServices).every(Boolean);
 
   const details = {
     toolCount: deps.toolRegistry.tools.size,
-    promptCount: deps.promptRegistry.hasPrompt('dockerfile-generation')
-      ? deps.promptRegistry.getPromptNames().length
-      : 0,
+    promptCount: deps.promptRegistry.getPromptNames().length,
     resourceStats: 'getStats' in deps.resourceManager ? deps.resourceManager.getStats() : undefined,
   };
 
   return {
     healthy,
-    services,
+    services: requiredServices,
     details,
   };
 }
@@ -319,15 +281,8 @@ export function checkContainerHealth(deps: Deps): {
 export function getContainerStatus(deps: Deps, serverRunning: boolean = false): ContainerStatus {
   const healthCheck = checkContainerHealth(deps);
 
-  // Count prompts - check if prompt registry has the base prompts
-  const promptCount = deps.promptRegistry.hasPrompt('dockerfile-generation')
-    ? deps.promptRegistry.getPromptNames().length
-    : 0;
-
-  // Get resource stats
+  const promptCount = deps.promptRegistry.getPromptNames().length;
   const resourceStats = deps.resourceManager.getStats();
-
-  // Tool count from registry
   const toolCount = deps.toolRegistry.tools.size;
 
   return {
