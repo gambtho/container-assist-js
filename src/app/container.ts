@@ -8,7 +8,7 @@
 import type { Logger } from 'pino';
 import { createLogger } from '../lib/logger';
 import { createSessionManager, SessionManager } from '../lib/session';
-import { createPromptRegistry, PromptRegistry } from '../core/prompts/registry';
+import { PromptRegistry } from '../core/prompts/registry';
 import {
   storeResource,
   getResource,
@@ -57,7 +57,7 @@ export interface Deps {
 /**
  * Container environment presets
  */
-export type ContainerEnvironment = 'default' | 'test' | 'mcp';
+type ContainerEnvironment = 'default' | 'test' | 'mcp';
 
 /**
  * Configuration overrides for dependency creation
@@ -123,7 +123,10 @@ export async function createContainer(
   const kubernetesClient = depsOverrides.kubernetesClient ?? createKubernetesClient(logger);
 
   // Create prompt registry
-  const promptRegistry = depsOverrides.promptRegistry ?? (await createPromptRegistry(logger));
+  const promptRegistry = depsOverrides.promptRegistry ?? new PromptRegistry(logger);
+  if (!depsOverrides.promptRegistry) {
+    await promptRegistry.initialize();
+  }
 
   // Create resource manager using simple functions
   const resourceManager = depsOverrides.resourceManager ?? {
@@ -244,7 +247,7 @@ export interface ContainerStatus {
 /**
  * Health check for container services
  */
-export function checkContainerHealth(deps: Deps): {
+function checkContainerHealth(deps: Deps): {
   healthy: boolean;
   services: Record<string, boolean>;
   details?: Record<string, unknown>;

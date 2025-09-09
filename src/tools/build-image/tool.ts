@@ -18,20 +18,10 @@ import { promises as fs } from 'node:fs';
 import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import { createStandardProgress } from '@mcp/utils/progress-helper';
 import type { ToolContext } from '../../mcp/context/types';
-import { createDockerClient } from '../../lib/docker';
+import { createDockerClient, type DockerBuildOptions } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
 import { type Result, Success, Failure } from '../../domain/types';
 import type { BuildImageParams } from './schema';
-interface DockerBuildOptions {
-  /** Path to Dockerfile relative to build context */
-  dockerfile?: string;
-  /** Image tag(s) to apply */
-  t?: string;
-  /** Build arguments as key-value pairs */
-  buildargs?: Record<string, string>;
-  /** Target platform (e.g., 'linux/amd64') */
-  platform?: string;
-}
 
 export interface BuildImageResult {
   /** Whether the build completed successfully */
@@ -55,12 +45,12 @@ export interface BuildImageResult {
 }
 
 /**
- * Check if file exists
+ * Check if file exists and is actually a file (not a directory)
  */
 async function fileExists(filePath: string): Promise<boolean> {
   try {
-    await fs.access(filePath);
-    return true;
+    const stats = await fs.stat(filePath);
+    return stats.isFile();
   } catch {
     return false;
   }
@@ -195,9 +185,31 @@ async function buildImageImpl(
 
     if (!(await fileExists(finalDockerfilePath))) {
       // If the specified Dockerfile doesn't exist, check for generated one
-      if (generatedPath && (await fileExists(generatedPath))) {
-        finalDockerfilePath = generatedPath;
-        logger.info({ generatedPath, originalPath: dockerfile }, 'Using generated Dockerfile');
+      if (generatedPath) {
+        const resolvedGeneratedPath = path.resolve(repoPath, generatedPath);
+        if (await fileExists(resolvedGeneratedPath)) {
+          finalDockerfilePath = resolvedGeneratedPath;
+          logger.info(
+            { generatedPath: resolvedGeneratedPath, originalPath: dockerfile },
+            'Using generated Dockerfile',
+          );
+        } else {
+          // Generated path exists but file not found, check for content
+          const dockerfileContent = dockerfileResult?.content as string | undefined;
+          if (dockerfileContent) {
+            // Write the Dockerfile content to generated file
+            finalDockerfilePath = path.join(repoPath, 'Dockerfile.generated');
+            await fs.writeFile(finalDockerfilePath, dockerfileContent, 'utf-8');
+            logger.info(
+              { dockerfilePath: finalDockerfilePath },
+              'Created Dockerfile from session content',
+            );
+          } else {
+            return Failure(
+              `Dockerfile not found at: ${finalDockerfilePath} or ${resolvedGeneratedPath}`,
+            );
+          }
+        }
       } else {
         // Check if we have Dockerfile content in session
         const dockerfileContent = dockerfileResult?.content as string | undefined;
@@ -218,7 +230,17 @@ async function buildImageImpl(
     }
 
     // Read Dockerfile for security analysis
-    const dockerfileContent = await fs.readFile(finalDockerfilePath, 'utf-8');
+    let dockerfileContent: string;
+    try {
+      dockerfileContent = await fs.readFile(finalDockerfilePath, 'utf-8');
+    } catch (error) {
+      const err = error as { code?: string };
+      if (err.code === 'EISDIR') {
+        logger.error({ path: finalDockerfilePath }, 'Attempted to read directory as file');
+        return Failure(`Dockerfile path points to a directory: ${finalDockerfilePath}`);
+      }
+      throw error;
+    }
 
     // Prepare build arguments
     const finalBuildArgs = prepareBuildArgs(buildArgs, session as SessionWithAnalysis);
@@ -231,7 +253,8 @@ async function buildImageImpl(
 
     // Prepare Docker build options
     const buildOptions: DockerBuildOptions = {
-      dockerfile: finalDockerfilePath,
+      context: repoPath, // Build context is the repository path
+      dockerfile: path.relative(repoPath, finalDockerfilePath), // Dockerfile path relative to context
       buildargs: finalBuildArgs,
       ...(platform !== undefined && { platform }),
     };
@@ -251,6 +274,7 @@ async function buildImageImpl(
     if (progress) await progress('EXECUTING');
 
     // Build the image
+    logger.info({ buildOptions, finalDockerfilePath }, 'About to call Docker buildImage');
     const buildResult = await dockerClient.buildImage(buildOptions);
 
     if (!buildResult.ok) {

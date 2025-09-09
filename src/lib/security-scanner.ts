@@ -488,9 +488,11 @@ export class SecurityScanner {
 
   private createTimeoutPromise(timeout: number): Promise<Result<any>> {
     return new Promise((_, reject) => {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         reject(new Error(`Operation timed out after ${timeout}ms`));
       }, timeout);
+      // Prevent this timer from keeping the Node.js process alive
+      timer.unref();
     });
   }
 }

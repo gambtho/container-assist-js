@@ -9,13 +9,8 @@ import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import type { ToolContext } from '../../mcp/context/types';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, createLogger } from '../../lib/logger';
-import {
-  Success,
-  Failure,
-  type Result,
-  // updateWorkflowState, // Not used directly
-  // type WorkflowState, // Not used directly
-} from '../../domain/types';
+import type { SessionData } from '../session-types';
+import { Success, Failure, type Result } from '../../domain/types';
 import type { PushImageParams } from './schema';
 
 export interface PushImageResult {
@@ -56,7 +51,8 @@ async function pushImageImpl(
     const dockerClient = createDockerClient(logger);
 
     // Check for tagged images in session
-    const buildResult = (session as any)?.build_result;
+    const sessionData = session as SessionData;
+    const buildResult = sessionData?.build_result;
     const imageTag = params.imageId || buildResult?.tags?.[0];
 
     if (!imageTag) {

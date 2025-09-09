@@ -5,14 +5,14 @@
  * instead of complex procedural planning logic
  */
 
-export interface WorkflowStep {
+interface WorkflowStep {
   toolName: string;
   description: string;
   required: boolean;
   skipIf?: string; // Condition name to check for skipping
 }
 
-export interface WorkflowDefinition {
+interface WorkflowDefinition {
   name: string;
   description: string;
   steps: WorkflowStep[];
@@ -144,7 +144,7 @@ const WORKFLOW_DEFINITIONS: Record<string, WorkflowDefinition> = {
 /**
  * Get workflow steps with runtime conditions applied
  */
-export function getWorkflowSteps(
+function _getWorkflowSteps(
   workflowName: string,
   params: Record<string, unknown>,
   sessionState?: Record<string, unknown>,
@@ -197,14 +197,14 @@ export function getWorkflowSteps(
 /**
  * Get workflow by name
  */
-export function getWorkflow(name: string): WorkflowDefinition | undefined {
+function _getWorkflow(name: string): WorkflowDefinition | undefined {
   return WORKFLOW_DEFINITIONS[name];
 }
 
 /**
  * Generate workflow recommendations based on results
  */
-export function generateRecommendations(
+function _generateRecommendations(
   workflowType: string,
   results: Record<string, unknown>[],
 ): string[] {

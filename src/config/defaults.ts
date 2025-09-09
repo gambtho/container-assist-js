@@ -40,16 +40,6 @@ export const DEFAULT_TIMEOUTS = {
 } as const;
 
 /**
- * Default cache configurations
- */
-export const DEFAULT_CACHE = {
-  defaultTtl: 300000, // 5 minutes
-  cleanupInterval: 300000, // 5 minutes
-  maxSize: 100,
-  maxFileSize: 10485760, // 10MB
-} as const;
-
-/**
  * Default network configuration
  */
 export const DEFAULT_NETWORK = {

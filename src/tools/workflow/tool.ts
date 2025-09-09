@@ -282,7 +282,7 @@ async function executeStep(
     }
 
     // Execute the actual tool
-    const result = await tool.execute(toolConfig, logger, context as any);
+    const result = await tool.execute(toolConfig, logger, context);
 
     // Handle Result<T> pattern
     if (result && typeof result === 'object' && 'ok' in result) {
@@ -553,9 +553,19 @@ export const getWorkflowStatus = async (
 ): Promise<Result<WorkflowStatusResult>> => {
   const sessionResult = await getSession(sessionId, {
     logger,
-    sampling: null,
-    getPrompt: null,
-  } as any);
+    sampling: {
+      createMessage: async () =>
+        Promise.resolve({
+          role: 'assistant' as const,
+          content: [{ type: 'text' as const, text: '' }],
+        }),
+    },
+    getPrompt: async () =>
+      Promise.resolve({
+        name: 'mock',
+        messages: [],
+      }),
+  } as unknown as ToolContext);
 
   if (!sessionResult.ok) {
     return Failure(sessionResult.error);

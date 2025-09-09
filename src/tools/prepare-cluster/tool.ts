@@ -23,8 +23,13 @@ import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import type { ToolContext } from '../../mcp/context/types';
 import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, createLogger } from '../../lib/logger';
+import type * as pino from 'pino';
 import { Success, Failure, type Result } from '../../domain/types';
 import type { PrepareClusterParams } from './schema';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export interface PrepareClusterResult {
   success: boolean;
@@ -38,8 +43,12 @@ export interface PrepareClusterResult {
     namespaceExists: boolean;
     ingressController?: boolean;
     rbacConfigured?: boolean;
+    kindInstalled?: boolean;
+    kindClusterCreated?: boolean;
+    localRegistryCreated?: boolean;
   };
   warnings?: string[];
+  localRegistryUrl?: string;
 }
 
 interface K8sClientAdapter {
@@ -75,7 +84,10 @@ function createK8sClientAdapter(
 /**
  * Check cluster connectivity
  */
-async function checkConnectivity(k8sClient: K8sClientAdapter, logger: any): Promise<boolean> {
+async function checkConnectivity(
+  k8sClient: K8sClientAdapter,
+  logger: pino.Logger,
+): Promise<boolean> {
   try {
     const connected = await k8sClient.ping();
     logger.debug({ connected }, 'Cluster connectivity check');
@@ -92,7 +104,7 @@ async function checkConnectivity(k8sClient: K8sClientAdapter, logger: any): Prom
 async function checkNamespace(
   k8sClient: K8sClientAdapter,
   namespace: string,
-  logger: any,
+  logger: pino.Logger,
 ): Promise<boolean> {
   try {
     const exists = await k8sClient.namespaceExists(namespace);
@@ -110,7 +122,7 @@ async function checkNamespace(
 async function createNamespace(
   k8sClient: K8sClientAdapter,
   namespace: string,
-  logger: any,
+  logger: pino.Logger,
 ): Promise<void> {
   try {
     const namespaceManifest = {
@@ -139,7 +151,7 @@ async function createNamespace(
 async function setupRbac(
   k8sClient: K8sClientAdapter,
   namespace: string,
-  logger: any,
+  logger: pino.Logger,
 ): Promise<void> {
   try {
     // Create service account
@@ -166,7 +178,10 @@ async function setupRbac(
 /**
  * Check for ingress controller
  */
-async function checkIngressController(k8sClient: K8sClientAdapter, logger: any): Promise<boolean> {
+async function checkIngressController(
+  k8sClient: K8sClientAdapter,
+  logger: pino.Logger,
+): Promise<boolean> {
   try {
     const hasIngress = await k8sClient.checkIngressController();
     logger.debug({ hasIngress }, 'Checking for ingress controller');
@@ -174,6 +189,172 @@ async function checkIngressController(k8sClient: K8sClientAdapter, logger: any):
   } catch (error) {
     logger.warn({ error }, 'Ingress controller check failed');
     return false;
+  }
+}
+
+/**
+ * Check if kind is installed
+ */
+async function checkKindInstalled(logger: pino.Logger): Promise<boolean> {
+  try {
+    await execAsync('kind version');
+    logger.debug('Kind is already installed');
+    return true;
+  } catch {
+    logger.debug('Kind is not installed');
+    return false;
+  }
+}
+
+/**
+ * Install kind if not present
+ */
+async function installKind(logger: pino.Logger): Promise<void> {
+  try {
+    logger.info('Installing kind...');
+
+    // Detect platform
+    const { stdout: osStdout } = await execAsync('uname -s');
+    const { stdout: archStdout } = await execAsync('uname -m');
+    const os = osStdout.trim().toLowerCase();
+    const arch = archStdout.trim();
+
+    // Map architecture names
+    let kindArch = arch;
+    if (arch === 'x86_64') kindArch = 'amd64';
+    if (arch === 'aarch64') kindArch = 'arm64';
+
+    const kindVersion = 'v0.20.0'; // Use latest stable version
+    const kindUrl = `https://kind.sigs.k8s.io/dl/${kindVersion}/kind-${os}-${kindArch}`;
+
+    // Download and install kind
+    await execAsync(`curl -Lo ./kind ${kindUrl}`);
+    await execAsync('chmod +x ./kind');
+    await execAsync('sudo mv ./kind /usr/local/bin/kind');
+
+    logger.info('Kind installed successfully');
+  } catch (error) {
+    logger.error({ error }, 'Failed to install kind');
+    throw new Error(
+      `Kind installation failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/**
+ * Check if kind cluster exists
+ */
+async function checkKindClusterExists(clusterName: string, logger: pino.Logger): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync('kind get clusters');
+    const clusters = stdout
+      .trim()
+      .split('\n')
+      .filter((line) => line.trim());
+    const exists = clusters.includes(clusterName);
+    logger.debug({ clusterName, exists, clusters }, 'Checking kind cluster existence');
+    return exists;
+  } catch (error) {
+    logger.debug({ error }, 'Error checking kind clusters');
+    return false;
+  }
+}
+
+/**
+ * Create kind cluster with local registry
+ */
+async function createKindCluster(clusterName: string, logger: pino.Logger): Promise<void> {
+  try {
+    logger.info({ clusterName }, 'Creating kind cluster...');
+
+    // Create kind cluster with registry config
+    const kindConfig = `
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches:
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5001"]
+    endpoint = ["http://kind-registry:5001"]
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 80
+    protocol: TCP
+  - containerPort: 443
+    hostPort: 443
+    protocol: TCP
+`;
+
+    // Write config to temporary file
+    await execAsync(`echo '${kindConfig}' > /tmp/kind-config.yaml`);
+
+    // Create cluster
+    await execAsync(`kind create cluster --name ${clusterName} --config /tmp/kind-config.yaml`);
+
+    // Clean up config file
+    await execAsync('rm /tmp/kind-config.yaml');
+
+    logger.info({ clusterName }, 'Kind cluster created successfully');
+  } catch (error) {
+    logger.error({ clusterName, error }, 'Failed to create kind cluster');
+    throw new Error(
+      `Kind cluster creation failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/**
+ * Check if local registry container exists
+ */
+async function checkLocalRegistryExists(logger: pino.Logger): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(
+      'docker ps -a --filter "name=kind-registry" --format "{{.Names}}"',
+    );
+    const exists = stdout.trim() === 'kind-registry';
+    logger.debug({ exists }, 'Checking local registry existence');
+    return exists;
+  } catch (error) {
+    logger.debug({ error }, 'Error checking local registry');
+    return false;
+  }
+}
+
+/**
+ * Create local Docker registry for kind
+ */
+async function createLocalRegistry(logger: pino.Logger): Promise<string> {
+  try {
+    logger.info('Creating local Docker registry...');
+
+    // Create registry container
+    await execAsync(`
+      docker run -d --restart=always -p 5001:5000 --name kind-registry registry:2
+    `);
+
+    // Connect registry to kind network
+    try {
+      await execAsync('docker network connect kind kind-registry');
+    } catch {
+      // Network might already be connected, ignore error
+      logger.debug('Registry might already be connected to kind network');
+    }
+
+    const registryUrl = 'localhost:5001';
+    logger.info({ registryUrl }, 'Local Docker registry created successfully');
+    return registryUrl;
+  } catch (error) {
+    logger.error({ error }, 'Failed to create local registry');
+    throw new Error(
+      `Local registry creation failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -190,11 +371,13 @@ async function prepareClusterImpl(
   try {
     const { environment = 'development', namespace = 'default' } = params;
 
-    const cluster = 'default';
+    const cluster = environment === 'development' ? 'kind' : 'default';
     const shouldCreateNamespace = environment === 'production';
     const shouldSetupRbac = environment === 'production';
     const installIngress = false;
     const checkRequirements = true;
+    const shouldSetupKind = environment === 'development';
+    const shouldCreateLocalRegistry = environment === 'development';
 
     logger.info({ cluster, namespace, environment }, 'Starting cluster preparation');
 
@@ -218,7 +401,54 @@ async function prepareClusterImpl(
       namespaceExists: false,
       ingressController: undefined as boolean | undefined,
       rbacConfigured: undefined as boolean | undefined,
+      kindInstalled: undefined as boolean | undefined,
+      kindClusterCreated: undefined as boolean | undefined,
+      localRegistryCreated: undefined as boolean | undefined,
     };
+    let localRegistryUrl: string | undefined;
+
+    // 0. Setup kind and local registry for development
+    if (shouldSetupKind) {
+      // Check/install kind
+      checks.kindInstalled = await checkKindInstalled(logger);
+      if (!checks.kindInstalled) {
+        await installKind(logger);
+        checks.kindInstalled = true;
+        logger.info('Kind installation completed');
+      }
+
+      // Check/create kind cluster
+      const kindClusterName = cluster;
+      const kindClusterExists = await checkKindClusterExists(kindClusterName, logger);
+      if (!kindClusterExists) {
+        await createKindCluster(kindClusterName, logger);
+        checks.kindClusterCreated = true;
+        logger.info({ clusterName: kindClusterName }, 'Kind cluster creation completed');
+
+        // Wait a bit for cluster to be ready
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      } else {
+        checks.kindClusterCreated = true;
+        logger.info({ clusterName: kindClusterName }, 'Kind cluster already exists');
+      }
+
+      // Setup kubectl context for kind
+      await execAsync(`kind export kubeconfig --name ${kindClusterName}`);
+    }
+
+    if (shouldCreateLocalRegistry) {
+      // Check/create local registry
+      const registryExists = await checkLocalRegistryExists(logger);
+      if (!registryExists) {
+        localRegistryUrl = await createLocalRegistry(logger);
+        checks.localRegistryCreated = true;
+        logger.info({ registryUrl: localRegistryUrl }, 'Local registry creation completed');
+      } else {
+        localRegistryUrl = 'localhost:5001';
+        checks.localRegistryCreated = true;
+        logger.info({ registryUrl: localRegistryUrl }, 'Local registry already exists');
+      }
+    }
 
     // 1. Check connectivity
     checks.connectivity = await checkConnectivity(k8sClient, logger);
@@ -270,6 +500,7 @@ async function prepareClusterImpl(
           checks,
           warnings,
           environment,
+          ...(localRegistryUrl && { localRegistryUrl }),
         },
         cluster_result: {
           cluster_name: cluster,
@@ -309,8 +540,16 @@ async function prepareClusterImpl(
           ingressController: checks.ingressController,
         }),
         ...(checks.rbacConfigured !== undefined && { rbacConfigured: checks.rbacConfigured }),
+        ...(checks.kindInstalled !== undefined && { kindInstalled: checks.kindInstalled }),
+        ...(checks.kindClusterCreated !== undefined && {
+          kindClusterCreated: checks.kindClusterCreated,
+        }),
+        ...(checks.localRegistryCreated !== undefined && {
+          localRegistryCreated: checks.localRegistryCreated,
+        }),
       },
       ...(warnings.length > 0 && { warnings }),
+      ...(localRegistryUrl && { localRegistryUrl }),
     });
   } catch (error) {
     timer.error(error);

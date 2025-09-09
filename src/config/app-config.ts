@@ -10,7 +10,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 // Configuration constants (converted from env vars)
-export const CONSTANTS = {
+const CONSTANTS = {
   MCP: {
     NAME: 'containerization-assist',
     DEFAULT_SESSION_TTL: '24h',
@@ -258,54 +258,4 @@ export function createAppConfig(): AppConfig {
   return result.data;
 }
 
-/**
- * Get configuration summary for debugging (minimal version for backwards compatibility)
- */
-export function getConfigSummary(config: AppConfig): {
-  nodeEnv: string;
-  logLevel: string;
-  workflowMode: string;
-  maxSessions: number;
-  dockerRegistry: string;
-} {
-  return {
-    nodeEnv: config.server.nodeEnv,
-    logLevel: config.server.logLevel,
-    workflowMode: config.workflow.mode,
-    maxSessions: config.session.maxSessions, // Use session.maxSessions instead of mcp.maxSessions
-    dockerRegistry: config.docker.registry,
-  };
-}
-
-/**
- * Get full configuration summary for debugging (with workspace)
- */
-export function getFullConfigSummary(config: AppConfig): {
-  nodeEnv: string;
-  logLevel: string;
-  workflowMode: string;
-  maxSessions: number;
-  dockerRegistry: string;
-  workspace: string;
-} {
-  return {
-    ...getConfigSummary(config),
-    workspace: config.workspace.workspaceDir,
-  };
-}
-
-// Create a singleton instance that can be mutated
-let _configInstance: AppConfig;
-
-/**
- * Initialize the singleton config instance
- */
-function initializeConfig(): AppConfig {
-  if (!_configInstance) {
-    _configInstance = createAppConfig();
-  }
-  return _configInstance;
-}
-
-// Export the default configuration instance
-export const config = initializeConfig();
+// Configuration instance will be initialized when needed

@@ -101,7 +101,7 @@ interface K8sResource {
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
   };
-  spec?: Record<string, any>;
+  spec?: Record<string, unknown>;
   data?: Record<string, string>;
 }
 
@@ -148,15 +148,17 @@ function parseK8sManifestsFromAI(content: string): K8sResource[] {
 /**
  * Validate a K8s resource object
  */
-function validateK8sResource(obj: any): obj is K8sResource {
-  return (
-    obj &&
-    typeof obj === 'object' &&
-    typeof obj.apiVersion === 'string' &&
-    typeof obj.kind === 'string' &&
-    obj.metadata &&
-    typeof obj.metadata === 'object' &&
-    typeof obj.metadata.name === 'string'
+function validateK8sResource(obj: unknown): obj is K8sResource {
+  if (!obj || typeof obj !== 'object') return false;
+  const resource = obj as Record<string, unknown>;
+
+  return Boolean(
+    typeof resource.apiVersion === 'string' &&
+      typeof resource.kind === 'string' &&
+      resource.metadata &&
+      typeof resource.metadata === 'object' &&
+      resource.metadata !== null &&
+      typeof (resource.metadata as Record<string, unknown>).name === 'string',
   );
 }
 
@@ -359,7 +361,7 @@ function generateBasicManifests(
 function buildK8sManifestPromptArgs(
   params: GenerateK8sManifestsConfig,
   image: string,
-): Record<string, any> {
+): Record<string, unknown> {
   return {
     appName: params.appName || 'app',
     namespace: params.namespace || 'default',
@@ -422,7 +424,7 @@ async function generateK8sManifestsImpl(
     let result: Result<{ manifests: K8sResource[]; aiUsed: boolean }>;
 
     try {
-      const aiResult = await aiGenerate(logger, context as any, {
+      const aiResult = await aiGenerate(logger, context, {
         promptName: 'generate-k8s-manifests',
         promptArgs: buildK8sManifestPromptArgs(params, image),
         expectation: 'yaml' as const,
@@ -517,9 +519,9 @@ async function generateK8sManifestsImpl(
           resources: params.resources,
           output_path: outputPath,
         },
-        completed_steps: [...((sessionData as any)?.completed_steps || []), 'k8s'],
+        completed_steps: [...(sessionData?.completed_steps || []), 'k8s'],
         metadata: {
-          ...((sessionData as any)?.metadata || {}),
+          ...(sessionData?.metadata || {}),
           ai_enhancement_used: result.value.aiUsed || false,
           ai_generation_type: 'k8s-manifests',
           k8s_warnings: warnings,

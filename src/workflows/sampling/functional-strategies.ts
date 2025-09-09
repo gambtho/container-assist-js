@@ -112,39 +112,9 @@ export interface AnalysisSampler {
 // STRATEGY FACTORY REGISTRY
 // ============================================================================
 
-export const samplingStrategies = {
-  dockerfile: createDockerfileSampling,
-  analysis: createAnalysisSampling,
-} as const;
-
-export type SamplingStrategyType = keyof typeof samplingStrategies;
-
 // ============================================================================
 // MAIN SAMPLING FUNCTION
 // ============================================================================
-
-/**
- * Main functional entry point for all sampling operations
- */
-export async function sample<T>(
-  strategyType: SamplingStrategyType,
-  _operation: string,
-  ..._args: unknown[]
-): Promise<Result<T>> {
-  try {
-    // This will be implemented based on the specific strategy factories
-    const strategyFactory = samplingStrategies[strategyType];
-    if (!strategyFactory) {
-      return Failure(`Unknown sampling strategy: ${strategyType}`);
-    }
-
-    // Implementation will be completed in next phase
-    return Failure('Implementation pending');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return Failure(`Sampling operation failed: ${message}`);
-  }
-}
 
 // ============================================================================
 // DOCKERFILE SAMPLING FUNCTIONS (TO BE IMPLEMENTED)

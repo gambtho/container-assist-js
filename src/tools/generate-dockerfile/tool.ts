@@ -8,8 +8,9 @@ import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import { createStandardProgress } from '@mcp/utils/progress-helper';
 import { aiGenerate } from '@mcp/tools/ai-helpers';
 import { createTimer, createLogger } from '@lib/logger';
-import type { SessionData } from '../session-types';
+import type { SessionData, SessionAnalysisResult } from '../session-types';
 import type { ToolContext } from '../../mcp/context/types';
+import type { AnalyzeRepoResult } from '../types';
 import { Success, Failure, type Result } from '../../domain/types';
 import { getDefaultPort } from '@config/defaults';
 import { getRecommendedBaseImage } from '@lib/base-images';
@@ -71,7 +72,7 @@ export interface GenerateDockerfileResult {
  * Template-based Dockerfile generation (fallback when AI unavailable)
  */
 function generateTemplateDockerfile(
-  analysisResult: any,
+  analysisResult: AnalyzeRepoResult,
   params: GenerateDockerfileConfig,
 ): Result<Pick<GenerateDockerfileResult, 'content' | 'baseImage'>> {
   const { language, framework, dependencies = [], ports = [] } = analysisResult;
@@ -99,7 +100,7 @@ function generateTemplateDockerfile(
       // Handle Node.js projects
       dockerfile += `# Copy package files\n`;
       dockerfile += `COPY package*.json ./\n`;
-      if (dependencies.some((d: any) => d.name === 'yarn')) {
+      if (dependencies.some((d) => d.name === 'yarn')) {
         dockerfile += `COPY yarn.lock ./\n`;
         dockerfile += `RUN yarn install --frozen-lockfile\n\n`;
       } else {
@@ -204,28 +205,69 @@ function generateTemplateDockerfile(
 }
 
 /**
+ * Convert SessionAnalysisResult to AnalyzeRepoResult for compatibility
+ */
+function sessionToAnalyzeRepoResult(sessionResult: SessionAnalysisResult): AnalyzeRepoResult {
+  return {
+    ok: true,
+    sessionId: 'session-converted', // This won't be used in template generation
+    language: sessionResult.language || 'unknown',
+    ...(sessionResult.framework && { framework: sessionResult.framework }),
+    dependencies:
+      sessionResult.dependencies?.map((d) => {
+        const dep: { name: string; version?: string; type: string } = {
+          name: d.name,
+          type: 'dependency',
+        };
+        if (d.version) {
+          dep.version = d.version;
+        }
+        return dep;
+      }) || [],
+    ports: sessionResult.ports || [],
+    ...(sessionResult.build_system && {
+      buildSystem: {
+        type: sessionResult.build_system.type || 'unknown',
+        buildFile: sessionResult.build_system.build_file || '',
+        buildCommand: sessionResult.build_system.build_command || '',
+      },
+    }),
+    hasDockerfile: false, // These won't be used in template generation
+    hasDockerCompose: false,
+    hasKubernetes: false,
+  };
+}
+
+/**
  * Build arguments for AI prompt from analysis result
  */
-function buildArgsFromAnalysis(analysisResult: any): Record<string, any> {
+function buildArgsFromAnalysis(analysisResult: SessionAnalysisResult): Record<string, unknown> {
   const {
     language = 'unknown',
     framework = '',
     dependencies = [],
     ports = [],
+    build_system,
     summary = '',
-    packageManager = 'npm',
-    buildSystem,
   } = analysisResult;
+
+  // Infer package manager from build system
+  const packageManager =
+    build_system?.type === 'maven' || build_system?.type === 'gradle'
+      ? build_system.type
+      : language === 'javascript' || language === 'typescript'
+        ? 'npm'
+        : 'unknown';
 
   return {
     language,
     framework,
-    dependencies: dependencies.map((d: any) => d.name || d).join(', '),
-    ports: ports.join(', '),
-    summary,
+    dependencies: dependencies?.map((d) => d.name || d).join(', ') || '',
+    ports: ports?.join(', ') || '',
+    summary: summary || `${language} ${framework ? `${framework} ` : ''}application`,
     packageManager,
-    buildSystem: buildSystem?.type || 'none',
-    buildCommand: buildSystem?.build_command || '',
+    buildSystem: build_system?.type || 'none',
+    buildCommand: build_system?.build_command || '',
   };
 }
 
@@ -277,7 +319,7 @@ async function generateDockerfileImpl(
     if (progress) await progress('EXECUTING');
 
     // Generate Dockerfile with AI or fallback
-    const aiResult = await aiGenerate(logger, context as any, {
+    const aiResult = await aiGenerate(logger, context, {
       promptName: 'dockerfile-generation',
       promptArgs: buildArgsFromAnalysis(analysisResult),
       expectation: 'dockerfile',
@@ -294,7 +336,10 @@ async function generateDockerfileImpl(
       const cleaned = stripFencesAndNoise(aiResult.value.content);
       if (!isValidDockerfileContent(cleaned)) {
         // Fall back to template if AI output is invalid
-        const fallbackResult = generateTemplateDockerfile(analysisResult, params);
+        const fallbackResult = generateTemplateDockerfile(
+          sessionToAnalyzeRepoResult(analysisResult),
+          params,
+        );
         if (!fallbackResult.ok) {
           return Failure(fallbackResult.error);
         }
@@ -310,7 +355,10 @@ async function generateDockerfileImpl(
       }
     } else {
       // Use template fallback
-      const fallbackResult = generateTemplateDockerfile(analysisResult, params);
+      const fallbackResult = generateTemplateDockerfile(
+        sessionToAnalyzeRepoResult(analysisResult),
+        params,
+      );
       if (!fallbackResult.ok) {
         return Failure(fallbackResult.error);
       }
@@ -358,9 +406,9 @@ async function generateDockerfileImpl(
       sessionId,
       {
         dockerfile_result: dockerfileResult,
-        completed_steps: [...((sessionData as any)?.completed_steps || []), 'dockerfile'],
+        completed_steps: [...(sessionData?.completed_steps || []), 'dockerfile'],
         metadata: {
-          ...((sessionData as any)?.metadata || {}),
+          ...(sessionData?.metadata || {}),
           dockerfile_baseImage: baseImageUsed,
           dockerfile_optimization: optimization,
           dockerfile_warnings: warnings,

@@ -3,6 +3,7 @@
  */
 
 import Docker from 'dockerode';
+import tar from 'tar-fs';
 import type { Logger } from 'pino';
 import { Success, Failure, type Result } from '../../domain/types';
 /**
@@ -109,7 +110,12 @@ export const createDockerClient = (logger: Logger): DockerClient => {
     async buildImage(options: DockerBuildOptions): Promise<Result<DockerBuildResult>> {
       try {
         logger.debug({ options }, 'Starting Docker build');
-        const stream = await docker.buildImage(options.context || '.', {
+
+        // Create tar stream from the build context directory
+        const contextPath = options.context || '.';
+        const tarStream = tar.pack(contextPath);
+
+        const stream = await docker.buildImage(tarStream, {
           t: options.t || (Array.isArray(options.tags) ? options.tags[0] : options.tags),
           dockerfile: options.dockerfile,
           buildargs: options.buildargs || options.buildArgs,

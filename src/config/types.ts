@@ -3,10 +3,10 @@
  */
 
 // Type aliases for better type safety
-export type NodeEnv = 'development' | 'production' | 'test';
-export type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
-export type WorkflowMode = 'interactive' | 'auto' | 'batch';
-export type StoreType = 'memory' | 'file' | 'redis';
+type NodeEnv = 'development' | 'production' | 'test';
+type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
+type WorkflowMode = 'interactive' | 'auto' | 'batch';
+type StoreType = 'memory' | 'file' | 'redis';
 
 // Extended configuration interface to match current usage
 export interface ApplicationConfig {
