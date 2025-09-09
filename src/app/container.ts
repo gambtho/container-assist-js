@@ -8,7 +8,7 @@
 import type { Logger } from 'pino';
 import { createLogger } from '../lib/logger';
 import { createSessionManager, SessionManager } from '../lib/session';
-import { createPromptRegistry, PromptRegistry } from '../core/prompts/registry';
+import { PromptRegistry } from '../core/prompts/registry';
 import {
   storeResource,
   getResource,
@@ -123,7 +123,10 @@ export async function createContainer(
   const kubernetesClient = depsOverrides.kubernetesClient ?? createKubernetesClient(logger);
 
   // Create prompt registry
-  const promptRegistry = depsOverrides.promptRegistry ?? (await createPromptRegistry(logger));
+  const promptRegistry = depsOverrides.promptRegistry ?? new PromptRegistry(logger);
+  if (!depsOverrides.promptRegistry) {
+    await promptRegistry.initialize();
+  }
 
   // Create resource manager using simple functions
   const resourceManager = depsOverrides.resourceManager ?? {
