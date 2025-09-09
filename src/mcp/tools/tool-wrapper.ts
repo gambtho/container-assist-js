@@ -10,8 +10,7 @@
 
 import { createLogger, type Logger } from '@lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
-import type { ToolContext } from '../context/types';
-import type { ExtendedToolContext } from '../../tools/shared-types';
+import type { ToolContext } from '../../domain/types/tool-context';
 import { createStandardProgress } from '../utils/progress-helper';
 
 /**
@@ -20,7 +19,7 @@ import { createStandardProgress } from '../utils/progress-helper';
  * @template TResult - Tool result types
  */
 export interface ToolImplementation<TParams, TResult> {
-  (params: TParams, context: ExtendedToolContext, logger: Logger): Promise<Result<TResult>>;
+  (params: TParams, context: ToolContext): Promise<Result<TResult>>;
 }
 
 /**
@@ -29,7 +28,7 @@ export interface ToolImplementation<TParams, TResult> {
  * @template TResult - Tool result types
  */
 export interface ToolHandler<TParams, TResult> {
-  (params: TParams, context: ExtendedToolContext): Promise<Result<StandardToolResponse<TResult>>>;
+  (params: TParams, context: ToolContext): Promise<Result<StandardToolResponse<TResult>>>;
 }
 
 /**
@@ -83,12 +82,12 @@ export function wrapTool<TParams, TResult>(
   toolName: string,
   implementation: ToolImplementation<TParams, TResult>,
 ): ToolHandler<TParams, TResult> {
-  return async (params: TParams, context: ExtendedToolContext) => {
-    // Create unified logging context
-    const logger = createLogger({ name: toolName });
+  return async (params: TParams, context: ToolContext) => {
+    // Use logger from context
+    const logger = context.logger || createLogger({ name: toolName });
 
     // Create standardized progress reporter
-    const progressReporter = (context as ToolContext)?.progress;
+    const progressReporter = context.progressReporter;
     const progress = createStandardProgress(progressReporter);
 
     try {
@@ -108,7 +107,7 @@ export function wrapTool<TParams, TResult>(
       await progress('EXECUTING');
 
       // Execute the actual tool implementation
-      const result = await implementation(params, context, logger);
+      const result = await implementation(params, context);
 
       // Stage 3: Finalizing
       logger.debug(`${toolName}: Finalizing results`);

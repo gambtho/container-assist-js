@@ -154,7 +154,7 @@ describe('generateDockerfile', () => {
       },
     });
     
-    mockAiGenerate.mockResolvedValue({
+    mockAiGenerate.mockResolvedValueOnce({
       ok: true,
       value: 'FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm ci\nCMD ["npm", "start"]',
     });
@@ -180,7 +180,7 @@ describe('generateDockerfile', () => {
       });
       
       // Also update the resolveSession mock
-      mockResolveSession.mockResolvedValue({
+      mockResolveSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -266,8 +266,7 @@ describe('generateDockerfile', () => {
       });
       
       // Mock AI to return multi-stage dockerfile
-      const { aiGenerate: aiMulti } = require('@mcp/tools/ai-helpers');
-      aiMulti.mockResolvedValue({
+      mockAiGenerate.mockResolvedValueOnce({
         ok: true,
         value: 'FROM node:18-alpine AS builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\nFROM node:18-alpine\nWORKDIR /app\nCOPY --from=builder /app/dist ./dist\nCOPY package*.json ./\nRUN npm ci --only=production\nCMD ["npm", "start"]',
       });
@@ -283,7 +282,7 @@ describe('generateDockerfile', () => {
 
     it('should apply security hardening', async () => {
       // Mock AI to return dockerfile with security hardening
-      mockAiGenerate.mockResolvedValue({
+      mockAiGenerate.mockResolvedValueOnce({
         ok: true,
         value: 'FROM node:18-alpine\nRUN adduser -D appuser\nWORKDIR /app\nCOPY --chown=appuser:appuser . .\nRUN npm ci\nUSER appuser\nCMD ["npm", "start"]',
       });
@@ -302,7 +301,7 @@ describe('generateDockerfile', () => {
       config.includeHealthcheck = true;
       
       // Mock AI to return dockerfile with healthcheck
-      mockAiGenerate.mockResolvedValue({
+      mockAiGenerate.mockResolvedValueOnce({
         ok: true,
         value: 'FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm ci\nHEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD node healthcheck.js\nCMD ["npm", "start"]',
       });
@@ -360,7 +359,7 @@ describe('generateDockerfile', () => {
         repo_path: '/test/repo',
       });
       
-      mockResolveSession.mockResolvedValue({
+      mockResolveSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -373,7 +372,7 @@ describe('generateDockerfile', () => {
         },
       });
       
-      mockAiGenerate.mockResolvedValue({
+      mockAiGenerate.mockResolvedValueOnce({
         ok: true,
         value: 'FROM python:3.11-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install -r requirements.txt\nCOPY . .\nCMD ["python", "app.py"]',
       });
@@ -403,7 +402,7 @@ describe('generateDockerfile', () => {
         metadata: {},
       });
       
-      mockResolveSession.mockResolvedValue({
+      mockResolveSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -416,7 +415,7 @@ describe('generateDockerfile', () => {
         },
       });
       
-      mockAiGenerate.mockResolvedValue({
+      mockAiGenerate.mockResolvedValueOnce({
         ok: true,
         value: 'FROM openjdk:17-slim AS builder\nWORKDIR /app\nCOPY pom.xml .\nCOPY src ./src\nRUN mvn clean package\n\nFROM openjdk:17-slim\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nCMD ["java", "-jar", "app.jar"]',
       });
@@ -443,7 +442,7 @@ describe('generateDockerfile', () => {
         repo_path: '/test/repo',
       });
       
-      mockResolveSession.mockResolvedValue({
+      mockResolveSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -456,7 +455,7 @@ describe('generateDockerfile', () => {
         },
       });
       
-      mockAiGenerate.mockResolvedValue({
+      mockAiGenerate.mockResolvedValueOnce({
         ok: true,
         value: 'FROM golang:1.20-alpine AS builder\nWORKDIR /app\nCOPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN go build -o main .\n\nFROM alpine:latest\nRUN apk --no-cache add ca-certificates\nWORKDIR /root/\nCOPY --from=builder /app/main .\nCMD ["./main"]',
       });
@@ -480,7 +479,7 @@ describe('generateDockerfile', () => {
       });
       
       // Mock resolveSession to return session without analysis_result
-      mockResolveSession.mockResolvedValue({
+      mockResolveSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -513,7 +512,7 @@ describe('generateDockerfile', () => {
       });
       
       // Mock resolveSession with analysis result
-      mockResolveSession.mockResolvedValue({
+      mockResolveSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -550,7 +549,7 @@ describe('generateDockerfile', () => {
         repo_path: '/test/repo',
       });
       
-      mockResolveSession.mockResolvedValue({
+      mockResolveSession.mockResolvedValueOnce({
         ok: true,
         value: {
           id: 'test-session-123',
@@ -568,7 +567,7 @@ describe('generateDockerfile', () => {
       config.baseImage = 'node:20-bullseye';
       
       // Mock AI to use custom base image
-      mockAiGenerate.mockResolvedValue({
+      mockAiGenerate.mockResolvedValueOnce({
         ok: true,
         value: 'FROM node:20-bullseye\nWORKDIR /app\nCOPY . .\nRUN npm ci\nCMD ["npm", "start"]',
       });
@@ -586,7 +585,7 @@ describe('generateDockerfile', () => {
       config.customInstructions = 'RUN apt-get update && apt-get install -y curl';
       
       // Mock AI to include custom instructions
-      mockAiGenerate.mockResolvedValue({
+      mockAiGenerate.mockResolvedValueOnce({
         ok: true,
         value: 'FROM node:18-alpine\nWORKDIR /app\nRUN apt-get update && apt-get install -y curl\nCOPY . .\nRUN npm ci\nCMD ["npm", "start"]',
       });
@@ -603,7 +602,7 @@ describe('generateDockerfile', () => {
       config.customCommands = ['npm run build', 'npm prune --production'];
       
       // Mock AI to include custom commands
-      mockAiGenerate.mockResolvedValue({
+      mockAiGenerate.mockResolvedValueOnce({
         ok: true,
         value: 'FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm ci\nRUN npm run build\nRUN npm prune --production\nCMD ["npm", "start"]',
       });

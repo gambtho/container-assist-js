@@ -46,7 +46,7 @@ export async function createTemplateEngine(
       const templateDir = resolve(finalConfig.templateDirectory);
       const loadResult = await engine.loadFromDirectory(templateDir);
 
-      if (loadResult.isFailure()) {
+      if (!loadResult.ok) {
         logger.warn(
           { error: loadResult.error },
           'Failed to load external templates, continuing with builtins',

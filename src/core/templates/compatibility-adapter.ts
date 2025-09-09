@@ -15,7 +15,7 @@ import {
   ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
 import { SimpleTemplateEngine } from './simple-template-engine';
-// Result types imported for future use
+// Result types available but not used directly in this file
 
 /**
  * Template context interface (simplified from original)
@@ -138,7 +138,7 @@ export class PromptRegistryCompatAdapter {
 
     // Render template using SimpleTemplateEngine
     const renderResult = this.engine.render(name, args || {});
-    if (renderResult.isFailure()) {
+    if (!renderResult.ok) {
       throw new McpError(
         ErrorCode.InternalError,
         `Template rendering failed: ${renderResult.error}`,
@@ -216,7 +216,7 @@ export class PromptRegistryCompatAdapter {
 
     // Render template
     const renderResult = this.engine.render(name, args || {});
-    if (renderResult.isFailure()) {
+    if (!renderResult.ok) {
       throw new McpError(
         ErrorCode.InternalError,
         `Template rendering failed: ${renderResult.error}`,

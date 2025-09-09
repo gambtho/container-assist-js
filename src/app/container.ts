@@ -117,7 +117,7 @@ export async function createContainer(
     depsOverrides.promptRegistry ??
     (await (async () => {
       const engineResult = await createTemplateEngine(logger);
-      if (engineResult.isFailure()) {
+      if (!engineResult.ok) {
         logger.error(
           { error: engineResult.error },
           'Failed to create template engine, using fallback',
@@ -210,16 +210,16 @@ export async function createTestContainer(overrides: DepsOverrides = {}): Promis
 /**
  * Create container specifically for MCP server usage
  */
-export function createMCPContainer(
+export async function createMCPContainer(
   configOverrides: ContainerConfigOverrides = {},
   depsOverrides: DepsOverrides = {},
-): Deps {
+): Promise<Deps> {
   const mcpConfig = configOverrides.config ?? createAppConfig();
 
   // MCP server specific overrides
   mcpConfig.mcp.name = 'mcp-server';
 
-  return createContainer(
+  return await createContainer(
     {
       config: mcpConfig,
       ...configOverrides,

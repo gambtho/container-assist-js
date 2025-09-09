@@ -61,7 +61,7 @@ export class SimpleTemplateEngine {
 
       for (const file of files) {
         const loadResult = await this.loadTemplateFile(file);
-        if (loadResult.isFailure()) {
+        if (!loadResult.ok) {
           this.logger.warn({ file, error: loadResult.error }, 'Failed to load template file');
           continue;
         }
@@ -122,8 +122,8 @@ export class SimpleTemplateEngine {
       return {
         name: parsed.name || parsed.id || fileName,
         content: templateContent,
-        description: parsed.description,
-        variables: parsed.variables?.map((v) => v.name),
+        description: parsed.description || undefined,
+        variables: parsed.variables?.map((v) => v.name) || undefined,
       };
     } catch {
       // Fallback: treat as plain text template

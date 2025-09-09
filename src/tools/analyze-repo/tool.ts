@@ -25,8 +25,7 @@ import { wrapTool } from '@mcp/tools/tool-wrapper';
 import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
 import { aiGenerate } from '@mcp/tools/ai-helpers';
 import { getRecommendedBaseImage } from '../../lib/base-images';
-import type { ToolContext } from '../../mcp/context/types';
-import type { ExtendedToolContext } from '../shared-types';
+import type { ToolContext } from '../../domain/types/tool-context';
 import { createTimer, type Logger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
 import type { AnalyzeRepoParams } from './schema';
@@ -348,9 +347,9 @@ function getSecurityRecommendations(
  */
 async function analyzeRepoImpl(
   params: AnalyzeRepoParams,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<AnalyzeRepoResult>> {
+  const logger = context.logger;
   const timer = createTimer(logger, 'analyze-repo');
 
   try {
@@ -378,8 +377,8 @@ async function analyzeRepoImpl(
     const { id: sessionId, state: session } = sessionResult.value;
     logger.info({ sessionId, repoPath }, 'Starting repository analysis with session');
 
-    // AI enhancement available through context parameter
-    const isToolContext = context && 'sampling' in context && 'getPrompt' in context;
+    // AI enhancement available through context
+    const hasAI = context.sampling && context.prompts;
 
     // Perform analysis
     const languageInfo = await detectLanguage(repoPath);
@@ -391,12 +390,11 @@ async function analyzeRepoImpl(
 
     // Get AI insights using standardized helper if available
     let aiInsights: string | undefined;
-    if (isToolContext && context) {
+    if (hasAI) {
       try {
         logger.debug('Using AI to enhance repository analysis');
-        const toolContext = context as ToolContext;
 
-        const aiResult = await aiGenerate(logger, toolContext, {
+        const aiResult = await aiGenerate(logger, context, {
           promptName: 'enhance-repo-analysis',
           promptArgs: {
             language: languageInfo.language,
@@ -576,7 +574,8 @@ export const analyzeRepoTool = wrapTool('analyze-repo', analyzeRepoImpl);
 export const analyzeRepo = async (
   params: AnalyzeRepoParams,
   logger: Logger,
-  context?: ExtendedToolContext,
+  context?: ToolContext,
 ): Promise<Result<AnalyzeRepoResult>> => {
-  return analyzeRepoImpl(params, context || {}, logger);
+  const unifiedContext: ToolContext = context || { logger };
+  return analyzeRepoImpl(params, unifiedContext);
 };

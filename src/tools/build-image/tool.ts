@@ -24,7 +24,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { wrapTool } from '@mcp/tools/tool-wrapper';
 import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
-import type { ExtendedToolContext } from '../shared-types';
+import type { ToolContext } from '../../domain/types/tool-context';
 import { createDockerClient } from '../../lib/docker';
 import { createTimer, type Logger } from '../../lib/logger';
 import { type Result, Success, Failure } from '../../domain/types';
@@ -153,9 +153,9 @@ function analyzeBuildSecurity(dockerfile: string, buildArgs: Record<string, stri
  */
 async function buildImageImpl(
   params: BuildImageParams,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<BuildImageResult>> {
+  const logger = context.logger;
   const timer = createTimer(logger, 'build-image');
 
   try {
@@ -324,7 +324,8 @@ export const buildImageTool = wrapTool('build-image', buildImageImpl);
 export const buildImage = async (
   params: BuildImageParams,
   logger: Logger,
-  context?: ExtendedToolContext,
+  context?: ToolContext,
 ): Promise<Result<BuildImageResult>> => {
-  return buildImageImpl(params, context || {}, logger);
+  const unifiedContext: ToolContext = context || { logger };
+  return buildImageImpl(params, unifiedContext);
 };

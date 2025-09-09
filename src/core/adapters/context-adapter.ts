@@ -27,23 +27,39 @@ export function adaptMCPContext(
   logger: Logger,
   options: Partial<ToolContextOptions> = {},
 ): ToolContext {
-  return {
-    logger,
-    sampling: mcpContext.sampling
-      ? {
-          createMessage: mcpContext.sampling.createMessage.bind(mcpContext.sampling),
-        }
-      : undefined,
-    prompts: mcpContext.getPrompt
-      ? {
-          getPrompt: mcpContext.getPrompt.bind(mcpContext),
-        }
-      : undefined,
-    abortSignal: mcpContext.signal || options.abortSignal,
-    progressReporter: mcpContext.progress || options.progressReporter,
-    progressToken: options.progressToken,
-    config: options.config,
-  };
+  const context: ToolContext = { logger };
+  
+  if (mcpContext.sampling) {
+    context.sampling = {
+      createMessage: mcpContext.sampling.createMessage.bind(mcpContext.sampling),
+    };
+  }
+  
+  if (mcpContext.getPrompt) {
+    context.prompts = {
+      getPrompt: mcpContext.getPrompt.bind(mcpContext),
+    };
+  }
+  
+  const abortSignal = mcpContext.signal || options.abortSignal;
+  if (abortSignal) {
+    context.abortSignal = abortSignal;
+  }
+  
+  const progressReporter = mcpContext.progress || options.progressReporter;
+  if (progressReporter) {
+    context.progressReporter = progressReporter;
+  }
+  
+  if (options.progressToken) {
+    context.progressToken = options.progressToken;
+  }
+  
+  if (options.config) {
+    context.config = options.config;
+  }
+  
+  return context;
 }
 
 /**
@@ -54,35 +70,49 @@ export function adaptLegacyToolContext(
   legacyContext: LegacyToolContext,
   fallbackLogger: Logger,
 ): ToolContext {
-  return {
+  const context: ToolContext = {
     logger: legacyContext.logger || fallbackLogger,
-    sessionManager: legacyContext.sessionManager,
-    prompts: legacyContext.promptRegistry
-      ? {
-          getPrompt: async (name: string, args?: Record<string, unknown>) => {
-            // Adapt PromptRegistry to PromptService interface
-            const prompt = await legacyContext.promptRegistry!.getPrompt(name, args);
-            return {
-              description: `Prompt: ${name}`,
-              messages: [
-                {
-                  role: 'user' as const,
-                  content: [{ type: 'text' as const, text: prompt }],
-                },
-              ],
-            };
-          },
-        }
-      : undefined,
-    abortSignal: legacyContext.abortSignal,
-    progressToken: legacyContext.progressToken,
-    server: legacyContext.server,
     config: {
       debug: false,
       timeout: 30000,
       maxTokens: 2048,
     },
   };
+  
+  if (legacyContext.sessionManager) {
+    context.sessionManager = legacyContext.sessionManager;
+  }
+  
+  if (legacyContext.promptRegistry) {
+    context.prompts = {
+      getPrompt: async (name: string, args?: Record<string, unknown>) => {
+        const prompt = await legacyContext.promptRegistry!.getPrompt(name, args);
+        return {
+          description: `Prompt: ${name}`,
+          messages: [
+            {
+              role: 'user' as const,
+              content: [{ type: 'text' as const, text: prompt }],
+            },
+          ],
+        };
+      },
+    };
+  }
+  
+  if (legacyContext.abortSignal) {
+    context.abortSignal = legacyContext.abortSignal;
+  }
+  
+  if (legacyContext.progressToken) {
+    context.progressToken = legacyContext.progressToken;
+  }
+  
+  if (legacyContext.server) {
+    context.server = legacyContext.server;
+  }
+  
+  return context;
 }
 
 /**
@@ -129,16 +159,20 @@ export function adaptExtendedToolContext(
   }
 
   // Default fallback
-  return {
+  const context: ToolContext = {
     logger: fallbackLogger,
-    sessionManager:
-      'sessionManager' in extendedContext ? extendedContext.sessionManager : undefined,
     config: {
       debug: false,
       timeout: 30000,
       maxTokens: 2048,
     },
   };
+  
+  if ('sessionManager' in extendedContext && extendedContext.sessionManager) {
+    context.sessionManager = extendedContext.sessionManager;
+  }
+  
+  return context;
 }
 
 /**
@@ -149,18 +183,8 @@ export function createUnifiedToolContext(
   services: ServiceContainer,
   options: ToolContextOptions = {},
 ): ToolContext {
-  return {
+  const context: ToolContext = {
     logger: services.logger,
-    sampling: services.sampling,
-    prompts: services.prompts,
-    sessionManager: services.sessionManager,
-    docker: services.docker,
-    kubernetes: services.kubernetes,
-    resourceManager: services.resourceManager,
-    server: services.server,
-    abortSignal: options.abortSignal,
-    progressReporter: options.progressReporter,
-    progressToken: options.progressToken,
     config: {
       debug: false,
       timeout: 30000,
@@ -168,6 +192,48 @@ export function createUnifiedToolContext(
       ...options.config,
     },
   };
+  
+  if (services.sampling) {
+    context.sampling = services.sampling;
+  }
+  
+  if (services.prompts) {
+    context.prompts = services.prompts;
+  }
+  
+  if (services.sessionManager) {
+    context.sessionManager = services.sessionManager;
+  }
+  
+  if (services.docker) {
+    context.docker = services.docker;
+  }
+  
+  if (services.kubernetes) {
+    context.kubernetes = services.kubernetes;
+  }
+  
+  if (services.resourceManager) {
+    context.resourceManager = services.resourceManager;
+  }
+  
+  if (services.server) {
+    context.server = services.server;
+  }
+  
+  if (options.abortSignal) {
+    context.abortSignal = options.abortSignal;
+  }
+  
+  if (options.progressReporter) {
+    context.progressReporter = options.progressReporter;
+  }
+  
+  if (options.progressToken) {
+    context.progressToken = options.progressToken;
+  }
+  
+  return context;
 }
 
 /**

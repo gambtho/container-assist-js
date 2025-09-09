@@ -22,7 +22,7 @@
 import * as yaml from 'js-yaml';
 import { wrapTool } from '@mcp/tools/tool-wrapper';
 import { resolveSession, updateSessionData } from '@mcp/tools/session-helpers';
-import type { ExtendedToolContext } from '../shared-types';
+import type { ToolContext } from '../../domain/types/tool-context';
 import { createKubernetesClient } from '../../lib/kubernetes';
 import { createTimer, type Logger } from '../../lib/logger';
 import { Success, Failure, type Result } from '../../domain/types';
@@ -108,9 +108,9 @@ function orderManifests(manifests: unknown[]): unknown[] {
  */
 async function deployApplicationImpl(
   params: DeployApplicationParams,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<DeployApplicationResult>> {
+  const logger = context.logger;
   const timer = createTimer(logger, 'deploy-application');
 
   // Extract abort signal from context if available
@@ -380,7 +380,8 @@ export const deployApplicationTool = wrapTool('deploy', deployApplicationImpl);
 export const deployApplication = async (
   params: DeployApplicationParams,
   logger: Logger,
-  context?: ExtendedToolContext,
+  context?: ToolContext,
 ): Promise<Result<DeployApplicationResult>> => {
-  return deployApplicationImpl(params, context || {}, logger);
+  const unifiedContext: ToolContext = context || { logger };
+  return deployApplicationImpl(params, unifiedContext);
 };

@@ -540,17 +540,6 @@ CMD ["${getStartCommand(language, packageManager)}"]`;
   };
 }
 
-/**
- * Get all default strategies
- */
-export function getDefaultStrategies(logger: Logger): SamplingStrategy[] {
-  return [
-    createSecurityFirstStrategy(logger),
-    createPerformanceStrategy(logger),
-    createSizeOptimizedStrategy(logger),
-    createBalancedStrategy(logger),
-  ];
-}
 
 /**
  * Generate variants using specified strategies

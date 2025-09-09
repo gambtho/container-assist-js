@@ -11,7 +11,7 @@ import { aiGenerate } from '@mcp/tools/ai-helpers';
 import { reportProgress } from '@mcp/utils/progress-helper';
 import { createTimer, type Logger } from '@lib/logger';
 import type { SessionData } from '../session-types';
-import type { ExtendedToolContext } from '../shared-types';
+import type { ToolContext } from '../../domain/types/tool-context';
 import type { ProgressReporter } from '@mcp/context/types';
 import { Success, Failure, type Result } from '../../domain/types';
 import { getDefaultPort } from '@config/defaults';
@@ -244,9 +244,9 @@ function computeHash(input: string): string {
  */
 async function generateDockerfileImpl(
   params: GenerateDockerfileConfig,
-  context: ExtendedToolContext,
-  logger: Logger,
+  context: ToolContext,
 ): Promise<Result<GenerateDockerfileResult>> {
+  const logger = context.logger;
   const timer = createTimer(logger, 'generate-dockerfile');
 
   try {
@@ -436,7 +436,8 @@ export const generateDockerfileTool = wrapTool('generate-dockerfile', generateDo
 export async function generateDockerfile(
   config: GenerateDockerfileConfig,
   logger: Logger,
-  context?: ExtendedToolContext,
+  context?: ToolContext,
 ): Promise<Result<GenerateDockerfileResult>> {
-  return generateDockerfileImpl(config, context || {}, logger);
+  const unifiedContext: ToolContext = context || { logger };
+  return generateDockerfileImpl(config, unifiedContext);
 }

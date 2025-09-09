@@ -37,31 +37,8 @@ export function createUnifiedToolContext(
 ): ToolContext {
   const { logger } = services;
 
-  return {
-    // Core required service
+  const context: ToolContext = {
     logger,
-
-    // AI/Sampling services
-    sampling: services.sampling || createMCPSamplingService(services.server, logger),
-    prompts: services.prompts,
-
-    // Session and state
-    sessionManager: services.sessionManager,
-
-    // Infrastructure
-    docker: services.docker,
-    kubernetes: services.kubernetes,
-    resourceManager: services.resourceManager,
-
-    // Control/lifecycle
-    abortSignal: options.abortSignal,
-    progressReporter: options.progressReporter,
-
-    // MCP protocol
-    server: services.server,
-    progressToken: options.progressToken,
-
-    // Configuration (with sensible defaults)
     config: {
       debug: false,
       timeout: 30000,
@@ -70,6 +47,50 @@ export function createUnifiedToolContext(
       ...options.config,
     },
   };
+
+  // Only assign properties that have values
+  const samplingService = services.sampling || createMCPSamplingService(services.server, logger);
+  if (samplingService) {
+    context.sampling = samplingService;
+  }
+
+  if (services.prompts) {
+    context.prompts = services.prompts;
+  }
+
+  if (services.sessionManager) {
+    context.sessionManager = services.sessionManager;
+  }
+
+  if (services.docker) {
+    context.docker = services.docker;
+  }
+
+  if (services.kubernetes) {
+    context.kubernetes = services.kubernetes;
+  }
+
+  if (services.resourceManager) {
+    context.resourceManager = services.resourceManager;
+  }
+
+  if (options.abortSignal) {
+    context.abortSignal = options.abortSignal;
+  }
+
+  if (options.progressReporter) {
+    context.progressReporter = options.progressReporter;
+  }
+
+  if (services.server) {
+    context.server = services.server;
+  }
+
+  if (options.progressToken) {
+    context.progressToken = options.progressToken;
+  }
+
+  return context;
 }
 
 /**

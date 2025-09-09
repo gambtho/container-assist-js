@@ -682,18 +682,6 @@ export function createDeploymentStrategy(logger: Logger): AnalysisStrategy {
   };
 }
 
-/**
- * Get all available strategies
- */
-export function getAllStrategies(logger: Logger): AnalysisStrategy[] {
-  return [
-    createComprehensiveStrategy(logger),
-    createSecurityStrategy(logger),
-    createPerformanceStrategy(logger),
-    createArchitectureStrategy(logger),
-    createDeploymentStrategy(logger),
-  ];
-}
 
 /**
  * Analysis strategies registry - simplified functional API
