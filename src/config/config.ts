@@ -148,7 +148,7 @@ function createConfiguration(): ApplicationConfig {
  * @param env - Environment name (development, production, test)
  * @returns ApplicationConfig configured for the specified environment
  */
-function createConfigurationForEnv(env: string): ApplicationConfig {
+function _createConfigurationForEnv(env: string): ApplicationConfig {
   // Set NODE_ENV for consistent environment-specific configuration
   const originalNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = env;
@@ -183,7 +183,7 @@ function createConfigurationForEnv(env: string): ApplicationConfig {
  * @param config - The application configuration
  * @returns Summary object with key configuration values
  */
-function getConfigurationSummary(config: ApplicationConfig): {
+function _getConfigurationSummary(config: ApplicationConfig): {
   nodeEnv: string;
   logLevel: string;
   workflowMode: string;
@@ -199,9 +199,10 @@ function getConfigurationSummary(config: ApplicationConfig): {
   };
 }
 
+// Export functions used by tests
 export {
   createDefaultConfig,
   createConfiguration,
-  createConfigurationForEnv,
-  getConfigurationSummary,
+  _createConfigurationForEnv as createConfigurationForEnv,
+  _getConfigurationSummary as getConfigurationSummary,
 };

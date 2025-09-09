@@ -88,7 +88,7 @@ npx @modelcontextprotocol/inspector npx tsx src/cli/cli.ts
 
 ### Using MCP Tools
 
-The server provides 14 tools organized with the co-location pattern that work together seamlessly:
+The server provides 14 tools using the co-location pattern that work together seamlessly:
 
 ```javascript
 // 1. Analyze your repository

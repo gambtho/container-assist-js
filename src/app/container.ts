@@ -57,7 +57,7 @@ export interface Deps {
 /**
  * Container environment presets
  */
-export type ContainerEnvironment = 'default' | 'test' | 'mcp';
+type ContainerEnvironment = 'default' | 'test' | 'mcp';
 
 /**
  * Configuration overrides for dependency creation
@@ -244,7 +244,7 @@ export interface ContainerStatus {
 /**
  * Health check for container services
  */
-export function checkContainerHealth(deps: Deps): {
+function checkContainerHealth(deps: Deps): {
   healthy: boolean;
   services: Record<string, boolean>;
   details?: Record<string, unknown>;

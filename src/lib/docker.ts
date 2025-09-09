@@ -5,12 +5,6 @@
  */
 
 // Re-export from infrastructure
-export {
-  createDockerClient,
-  type DockerClient,
-  type DockerBuildResult,
-  type DockerBuildOptions,
-  type DockerPushResult,
-} from '../infrastructure/docker/client';
+export { createDockerClient } from '../infrastructure/docker/client';
 
-export { createDockerRegistryClient, type ImageMetadata } from '../infrastructure/docker/registry';
+export { createDockerRegistryClient } from '../infrastructure/docker/registry';

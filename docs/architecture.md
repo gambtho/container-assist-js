@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Containerization Assist MCP Server is a sophisticated, AI-powered MCP implementation that showcases advanced MCP SDK v1.17.5 features. All enhanced features are integrated directly into the main server, providing a seamless experience.
+The Containerization Assist MCP Server is a sophisticated, AI-powered MCP implementation that provides comprehensive containerization workflows with Docker and Kubernetes support.
 
 ## Single Entry Point
 
@@ -58,11 +58,11 @@ MCP Server (src/mcp/server/)
 
 ## Key Components
 
-### 1. Enhanced Server (`enhanceServer()`)
-- Automatically called in `ContainerizationMCPServer` constructor
-- Replaces default tool handler with enhanced version
-- Adds progress reporting and cancellation support
-- Creates `ToolContext` for each execution
+### 1. MCP Server Core
+- Implements Model Context Protocol specification
+- Provides tool registration and routing
+- Handles request/response lifecycle
+- Manages tool execution context
 
 ### 2. Session Manager
 - Tracks state across tool executions
@@ -76,13 +76,13 @@ MCP Server (src/mcp/server/)
 - Analyzes execution results
 - Provides next-step recommendations
 
-### 4. Enhanced Tools (14 total)
-All tools automatically support:
-- Progress reporting via `_meta.progressToken`
-- Cancellation via `AbortSignal`
-- AI parameter validation
-- Session-aware execution
-- Intelligent recommendations
+### 4. Tool Implementations (14 total)
+All tools follow the co-location pattern and provide:
+- Zod schema validation
+- Result-based error handling
+- Session state integration
+- Structured logging
+- AI-powered enhancements where applicable
 
 ### 5. Workflow Orchestrator
 4 intelligent workflows that:
@@ -158,42 +158,16 @@ All tools automatically support:
 }
 ```
 
-## Progress Notification Protocol
+## Tool Execution Flow
 
 ```typescript
-// Client includes progress token
-{
-  "_meta": {
-    "progressToken": "unique-token"
-  }
-}
-
-// Server sends notifications
-{
-  "method": "notifications/progress",
-  "params": {
-    "progressToken": "unique-token",
-    "progress": 50,
-    "total": 100,
-    "message": "Building image..."
-  }
-}
-```
-
-## Cancellation Protocol
-
-```typescript
-// Client provides AbortSignal
-const controller = new AbortController();
-request.signal = controller.signal;
-
-// Cancel anytime
-controller.abort();
-
-// Server handles gracefully
-if (signal?.aborted) {
-  throw new CancelledError();
-}
+// Tool execution pattern
+1. Parameter validation using Zod schemas
+2. Session state loading and management
+3. Core tool logic execution
+4. Result processing and formatting
+5. Session state updates
+6. Structured response return
 ```
 
 ## File Structure
@@ -242,15 +216,15 @@ src/
 
 ## Configuration
 
-All enhanced features are enabled by default:
+The server is configured with sensible defaults:
 
 ```typescript
 // In server.ts constructor
 constructor(logger?: Logger, options: MCPServerOptions = {}) {
   // ... initialization ...
   
-  // This single line enables ALL enhanced features!
-  enhanceServer(this);
+  // Tool registration and setup
+  this.setupTools();
 }
 ```
 
@@ -266,24 +240,27 @@ constructor(logger?: Logger, options: MCPServerOptions = {}) {
 ## Testing
 
 ```bash
-# Run integration tests
+# Run all tests
 npm test
 
-# Test enhanced features
-npm run test:enhanced
+# Run unit tests
+npm run test:unit
 
-# Test with mock AI
-containerization-assist-mcp --mock
+# Run integration tests
+npm run test:integration
+
+# Test with coverage
+npm run test:coverage
 ```
 
 ## Summary
 
-The enhanced MCP server seamlessly integrates advanced features into the standard MCP protocol, providing:
-- 🚀 AI-powered intelligence for all operations
-- 📊 Real-time progress reporting
-- ⏹️ Graceful cancellation support
-- 🔄 Session-aware execution
+The Containerization Assist MCP Server provides a comprehensive containerization solution with:
+- 🚀 AI-powered Docker and Kubernetes workflows
+- 🛠️ 14 specialized tools with co-location pattern
+- 🔄 Session-aware state management
 - 🎯 Intelligent workflow orchestration
-- 📚 Enhanced resources and prompts
+- 📚 Comprehensive prompt and resource management
+- ⚡ Result-based error handling throughout
 
-All features work out of the box with zero configuration!
+The architecture provides a solid foundation for reliable, maintainable containerization automation.

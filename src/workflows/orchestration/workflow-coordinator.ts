@@ -1,8 +1,3 @@
-/**
- * Simple Workflow Functions - Direct function calls replacing coordinator pattern
- * Eliminates unnecessary wrapper class and delegation
- */
-
 import { Result, Success, type Tool } from '@types';
 import { runContainerizationWorkflow } from '@workflows/containerization';
 import {

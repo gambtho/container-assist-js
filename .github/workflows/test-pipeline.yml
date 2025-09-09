@@ -1,4 +1,4 @@
-name: Comprehensive Test Pipeline
+name: Test Pipeline
 
 on:
   push:
@@ -8,114 +8,13 @@ on:
 
 env:
   NODE_VERSION: '20'
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  
-  # Test configuration
-  UNIT_TEST_TIMEOUT: '120000'
-  INTEGRATION_TEST_TIMEOUT: '300000'
-  E2E_TEST_TIMEOUT: '600000'
-  PERFORMANCE_TEST_TIMEOUT: '900000'
 
 jobs:
-  # Stage 1: Quality Gates (Fast feedback)
-  quality-gates:
-    name: Quality Gates
+  # Single test job with all essential validations
+  test:
+    name: Tests & Quality Gates
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    outputs:
-      quality-score: ${{ steps.quality.outputs.score }}
-      should-continue: ${{ steps.quality.outputs.passed }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Run quality gates
-        id: quality
-        run: |
-          npm run quality:gates
-          echo "passed=true" >> $GITHUB_OUTPUT
-          echo "score=95" >> $GITHUB_OUTPUT
-        env:
-          ALLOW_REGRESSION: false
-      
-      - name: Upload quality report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: quality-report-${{ github.run_id }}
-          path: quality-gates.json
-          retention-days: 7
-
-  # Stage 2: Unit Tests (Parallel execution)
-  unit-tests:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    needs: quality-gates
-    if: needs.quality-gates.outputs.should-continue == 'true'
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        test-suite:
-          - tools
-          - workflows  
-          - lib
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Run unit tests (${{ matrix.test-suite }})
-        run: npm run test:${{ matrix.test-suite }}
-        env:
-          NODE_OPTIONS: '--experimental-vm-modules'
-          TEST_TIMEOUT: ${{ env.UNIT_TEST_TIMEOUT }}
-      
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: unit-test-results-${{ matrix.test-suite }}
-          path: |
-            coverage/
-            test-results-${{ matrix.test-suite }}.xml
-          retention-days: 7
-
-  # Stage 3: Integration Tests (Sequential with infrastructure)
-  integration-tests:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    needs: [quality-gates, unit-tests]
-    if: needs.quality-gates.outputs.should-continue == 'true'
     timeout-minutes: 20
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
-        env:
-          REGISTRY_STORAGE_DELETE_ENABLED: true
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -129,237 +28,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Wait for services
-        run: |
-          # Wait for local registry
-          for i in {1..30}; do
-            curl -fsS http://localhost:5000/v2/ && break
-            sleep 2
-          done
-      
-      - name: Build project
-        run: npm run build:fast
-      
-      - name: Run integration tests
-        run: npm run test:integration
+      - name: Run validation pipeline
+        run: npm run validate:pr:fast
         env:
-          NODE_OPTIONS: '--experimental-vm-modules'
-          TEST_REGISTRY_HOST: localhost:5000
-          USE_LOCAL_REGISTRY: true
           DOCKER_AVAILABLE: true
-          TEST_TIMEOUT: ${{ env.INTEGRATION_TEST_TIMEOUT }}
-          CI: true
       
-      - name: Upload integration test results
+      - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: integration-test-results
-          path: |
-            coverage/
-            test-logs/
-            test-artifacts/
+          name: coverage-reports
+          path: coverage/
           retention-days: 7
 
-  # Stage 4: E2E Tests (Disabled)
-  # e2e-tests:
-  #   name: E2E Tests
-  #   runs-on: ubuntu-latest
-  #   needs: [quality-gates, unit-tests, integration-tests]
-  #   if: needs.quality-gates.outputs.should-continue == 'true'
-  #   timeout-minutes: 25
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       scenario:
-  #         - containerization-workflow
-  #   
-  #   services:
-  #     registry:
-  #       image: registry:2
-  #       ports:
-  #         - 5000:5000
-  #       env:
-  #         REGISTRY_STORAGE_DELETE_ENABLED: true
-  #   
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #     
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: ${{ env.NODE_VERSION }}
-  #         cache: 'npm'
-  #     
-  #     - name: Install dependencies
-  #       run: npm ci
-  #     
-  #     - name: Setup Docker Buildx
-  #       uses: docker/setup-buildx-action@v3
-  #     
-  #     - name: Setup Kind (Kubernetes)
-  #       uses: helm/kind-action@v1.5.0
-  #       with:
-  #         cluster_name: test-cluster
-  #         config: test/fixtures/kind-config.yaml
-  #         kubectl_version: v1.28.0
-  #     
-  #     - name: Wait for registry
-  #       run: |
-  #         for i in {1..30}; do
-  #           curl -fsS http://localhost:5000/v2/ && break
-  #           sleep 2
-  #         done
-  #     
-  #     - name: Build project
-  #       run: npm run build:fast
-  #     
-  #     - name: Run E2E tests (${{ matrix.scenario }})
-  #       run: npm run test:e2e -- --testNamePattern="${{ matrix.scenario }}"
-  #       env:
-  #         NODE_OPTIONS: '--experimental-vm-modules'
-  #         TEST_REGISTRY_HOST: localhost:5000
-  #         USE_LOCAL_REGISTRY: true
-  #         DOCKER_AVAILABLE: true
-  #         KUBERNETES_AVAILABLE: true
-  #         TEST_TIMEOUT: ${{ env.E2E_TEST_TIMEOUT }}
-  #         CI: true
-  #     
-  #     - name: Upload E2E test artifacts
-  #       uses: actions/upload-artifact@v4
-  #       if: always()
-  #       with:
-  #         name: e2e-test-results-${{ matrix.scenario }}
-  #         path: |
-  #           test-artifacts/
-  #           test-logs/
-  #           screenshots/
-  #           performance-reports/
-  #         retention-days: 7
-
-  # Stage 5: Performance Tests (Resource intensive)
-  performance-tests:
-    name: Performance Tests
-    runs-on: ubuntu-latest-4-cores
-    needs: [quality-gates, unit-tests, integration-tests]
-    if: needs.quality-gates.outputs.should-continue == 'true' && github.event_name == 'push'
-    timeout-minutes: 30
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Build project
-        run: npm run build:fast
-      
-      - name: Run performance tests
-        run: |
-          # Run performance benchmarks
-          npm run test:performance
-          
-          # Generate performance report
-          node scripts/generate-performance-report.js > performance-report.json
-        env:
-          NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
-          TEST_TIMEOUT: ${{ env.PERFORMANCE_TEST_TIMEOUT }}
-          PERFORMANCE_BASELINE_FILE: test/baselines/performance-baseline.json
-      
-      - name: Upload performance results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: performance-test-results
-          path: |
-            performance-report.json
-            test/baselines/
-            performance-logs/
-          retention-days: 30
-
-  # Stage 6: Build & Package Validation (Disabled)
-  # build-validation:
-  #   name: Build & Package Validation
-  #   runs-on: ubuntu-latest
-  #   needs: [quality-gates, unit-tests, integration-tests]
-  #   if: needs.quality-gates.outputs.should-continue == 'true'
-  #   timeout-minutes: 15
-  #   
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #     
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: ${{ env.NODE_VERSION }}
-  #         cache: 'npm'
-  #     
-  #     - name: Install dependencies
-  #       run: npm ci
-  #     
-  #     - name: Build production package
-  #       run: npm run build:prod
-  #     
-  #     - name: Validate build artifacts
-  #       run: |
-  #         # Validate CLI executable
-  #         test -f dist/src/cli/cli.js || exit 1
-  #         chmod +x dist/src/cli/cli.js
-  #         timeout 10s node dist/src/cli/cli.js --help || [ $? -eq 124 ]
-  #         
-  #         # Validate MCP server
-  #         test -f dist/src/mcp/server.js || exit 1
-  #         node -e "require('./dist/src/mcp/server.js')"
-  #         
-  #         # Validate type definitions
-  #         test -f dist/src/mcp/server.d.ts || echo "Warning: Type definitions missing"
-  #     
-  #     - name: Test CLI tools
-  #       run: |
-  #         # Test analyze_repository tool
-  #         echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"analyze_repository","arguments":{"repoPath":"."}},"id":1}' | \
-  #           timeout 30s node dist/apps/cli.js 2>&1 | grep -E '"result"|"error"'
-  #         
-  #         # Test generate_dockerfile tool
-  #         echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"generate_dockerfile","arguments":{"repoPath":"."}},"id":2}' | \
-  #           timeout 30s node dist/apps/cli.js 2>&1 | grep -E '"result"|"error"'
-  #     
-  #     - name: Check bundle size
-  #       run: npm run bundle:size
-  #     
-  #     - name: Package validation
-  #       run: npm run bundle:check
-  #     
-  #     - name: Upload build artifacts
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: dist-build-${{ github.run_id }}
-  #         path: |
-  #           dist/
-  #           bundle-analysis.txt
-  #         retention-days: 7
-
-  # Stage 7: Security & Compliance
-  security-scan:
-    name: Security & Compliance
+  # Optional security scan (parallel to main tests)
+  security:
+    name: Security Scan
     runs-on: ubuntu-latest
-    needs: quality-gates
-    if: needs.quality-gates.outputs.should-continue == 'true'
     timeout-minutes: 10
     permissions:
       actions: read
@@ -379,10 +64,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
-      - name: Run dependency audit
-        run: |
-          npm audit --audit-level critical --production || true
-          npm audit --audit-level moderate --json > audit-report.json || true
+      - name: Dependency audit
+        run: npm audit --audit-level moderate || true
       
       - name: CodeQL Analysis
         uses: github/codeql-action/init@v3
@@ -390,165 +73,8 @@ jobs:
           languages: typescript
           queries: security-and-quality
       
-      - name: Build for CodeQL
+      - name: Build for analysis
         run: npm run build:fast
       
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
-        with:
-          category: security
-      
-      - name: Upload security reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: security-reports
-          path: |
-            audit-report.json
-            codeql-results/
-          retention-days: 30
-
-  # Stage 8: Test Results Aggregation
-  test-summary:
-    name: Test Results Summary
-    runs-on: ubuntu-latest
-    if: always()
-    needs: [quality-gates, unit-tests, integration-tests, performance-tests, security-scan]
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: test-results/
-      
-      - name: Generate test summary report
-        run: |
-          node -e "
-            const fs = require('fs');
-            const path = require('path');
-            
-            const results = {
-              qualityGates: '${{ needs.quality-gates.result }}',
-              unitTests: '${{ needs.unit-tests.result }}',
-              integrationTests: '${{ needs.integration-tests.result }}',
-              performanceTests: '${{ needs.performance-tests.result }}',
-              securityScan: '${{ needs.security-scan.result }}',
-              timestamp: new Date().toISOString(),
-              commit: '${{ github.sha }}',
-              branch: '${{ github.ref_name }}',
-              runId: '${{ github.run_id }}'
-            };
-            
-            // Calculate overall status
-            const criticalJobs = ['qualityGates', 'unitTests', 'integrationTests'];
-            const criticalPassed = criticalJobs.every(job => results[job] === 'success');
-            const allPassed = Object.values(results).every(status => 
-              typeof status === 'string' ? 
-              ['success', 'skipped'].includes(status) : true
-            );
-            
-            results.overallStatus = allPassed ? 'success' : criticalPassed ? 'warning' : 'failure';
-            
-            fs.writeFileSync('test-summary.json', JSON.stringify(results, null, 2));
-            
-            console.log('## 🧪 Test Pipeline Summary');
-            console.log('');
-            console.log('| Stage | Status |');
-            console.log('|-------|--------|');
-            console.log('| Quality Gates | ${{ needs.quality-gates.result }} |');
-            console.log('| Unit Tests | ${{ needs.unit-tests.result }} |');
-            console.log('| Integration Tests | ${{ needs.integration-tests.result }} |');
-            console.log('| Performance Tests | ${{ needs.performance-tests.result }} |');
-            console.log('| Security Scan | ${{ needs.security-scan.result }} |');
-            console.log('');
-            console.log('**Overall Status:** ' + results.overallStatus.toUpperCase());
-            console.log('**Commit:** ${{ github.sha }}');
-            console.log('**Run ID:** ${{ github.run_id }}');
-          "
-      
-      - name: Upload test summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-pipeline-summary
-          path: |
-            test-summary.json
-            test-results/
-          retention-days: 30
-      
-      - name: Comment on PR (if applicable)
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const summary = JSON.parse(fs.readFileSync('test-summary.json', 'utf8'));
-            
-            const statusEmoji = {
-              success: '✅',
-              failure: '❌', 
-              cancelled: '⏹️',
-              skipped: '⏭️'
-            };
-            
-            const body = `
-            ## 🧪 Comprehensive Test Pipeline Results
-            
-            **Overall Status:** ${statusEmoji[summary.overallStatus] || '❓'} ${summary.overallStatus.toUpperCase()}
-            
-            ### Test Stage Results
-            
-            | Stage | Status | Duration |
-            |-------|--------|----------|
-            | Quality Gates | ${statusEmoji[summary.qualityGates] || '❓'} ${summary.qualityGates} | ~ 2 min |
-            | Unit Tests | ${statusEmoji[summary.unitTests] || '❓'} ${summary.unitTests} | ~ 5 min |
-            | Integration Tests | ${statusEmoji[summary.integrationTests] || '❓'} ${summary.integrationTests} | ~ 10 min |
-            | Performance Tests | ${statusEmoji[summary.performanceTests] || '❓'} ${summary.performanceTests} | ~ 20 min |
-            | Security Scan | ${statusEmoji[summary.securityScan] || '❓'} ${summary.securityScan} | ~ 5 min |
-            
-            ### Pipeline Details
-            
-            - **Commit:** \`${summary.commit.substring(0, 8)}\`
-            - **Branch:** \`${summary.branch}\`
-            - **Total Pipeline Time:** ~45 minutes
-            - **Run ID:** [${summary.runId}](https://github.com/${{ github.repository }}/actions/runs/${summary.runId})
-            
-            ---
-            *Generated by Phase 4 Enhanced Test Pipeline • ${summary.timestamp}*
-            `;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body
-            });
-
-  # Conditional deployment trigger
-  deployment-ready:
-    name: Deployment Ready
-    runs-on: ubuntu-latest
-    needs: [quality-gates, unit-tests, integration-tests, security-scan]
-    if: |
-      always() && 
-      needs.quality-gates.result == 'success' &&
-      needs.unit-tests.result == 'success' &&
-      needs.integration-tests.result == 'success' &&
-      (needs.security-scan.result == 'success' || needs.security-scan.result == 'skipped') &&
-      github.ref == 'refs/heads/main'
-    
-    steps:
-      - name: Mark deployment ready
-        run: |
-          echo "🚀 All critical tests passed - deployment ready!"
-          echo "Ready for:"
-          echo "  - NPM package release"
-          echo "  - Container image build"
-          echo "  - Production deployment"

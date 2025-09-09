@@ -28,18 +28,6 @@ import { Success, Failure, type Result } from '../../domain/types';
 import { DEFAULT_TIMEOUTS } from '../../config/defaults';
 import type { DeployApplicationParams } from './schema';
 
-// interface K8sManifest {
-//   apiVersion: string;
-//   kind: string;
-//   metadata: {
-//     name: string;
-//     namespace?: string;
-//     labels?: Record<string, string>;
-//     annotations?: Record<string, string>;
-//   };
-//   spec?: Record<string, unknown>;
-// }
-
 export interface DeployApplicationResult {
   success: boolean;
   sessionId: string;
@@ -112,17 +100,8 @@ async function deployApplicationImpl(
   const logger = context.logger || createLogger({ name: 'deploy-application' });
   const timer = createTimer(logger, 'deploy-application');
 
-  // Extract abort signal from context if available
-  // const abortSignal = context?.abortSignal; // TODO: implement abort handling
-
   try {
-    const {
-      // imageId, // TODO: use imageId when implementing actual deployment
-      namespace = 'default',
-      replicas = 1,
-      // port = 8080, // TODO: use port when implementing actual deployment
-      environment = 'development',
-    } = params;
+    const { namespace = 'default', replicas = 1, environment = 'development' } = params;
 
     const cluster = 'default';
     const dryRun = false;
