@@ -6,6 +6,8 @@
  * client/sampling protocol compliance.
  */
 
+import { Logger, SessionManager } from '@lib/index';
+
 /**
  * MCP-compatible text message structure
  * Based on actual MCP protocol format with content arrays
@@ -207,7 +209,7 @@ export interface ToolContext {
    * });
    * ```
    */
-  sessionManager?: import('../../lib/session').SessionManager;
+  sessionManager?: SessionManager;
 
   /**
    * Logger for debugging and error tracking - Required for all tools
@@ -219,7 +221,7 @@ export interface ToolContext {
    * context.logger.error('Failed to parse package.json', { error: error.message });
    * ```
    */
-  logger: import('../../lib/logger').Logger;
+  logger: Logger;
 }
 
 /**
