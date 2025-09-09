@@ -22,7 +22,6 @@
 import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import { aiGenerate } from '@mcp/tools/ai-helpers';
 import { createStandardProgress } from '@mcp/utils/progress-helper';
-// Removed wrapTool - using direct implementation with selective progress
 import type { ToolContext } from '../../mcp/context/types';
 import { createTimer, createLogger, type Logger } from '../../lib/logger';
 import { getRecommendedBaseImage } from '../../lib/base-images';

@@ -7,13 +7,11 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-// crypto import removed - was unused after tool wrapper elimination
 import { getSession, updateSession } from '@mcp/tools/session-helpers';
 import { aiGenerate } from '@mcp/tools/ai-helpers';
 import { createStandardProgress } from '@mcp/utils/progress-helper';
 import { createTimer } from '@lib/logger';
 import type { ToolContext } from '../../mcp/context/types';
-// Removed unused ProgressReporter import
 import type { SessionData } from '../session-types';
 import { Success, Failure, type Result } from '../../domain/types';
 import { stripFencesAndNoise, isValidKubernetesContent } from '@lib/text-processing';

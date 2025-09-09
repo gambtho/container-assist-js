@@ -24,15 +24,15 @@ export interface TestServiceBindings {
  */
 export class TestContainer {
   private services: Map<string, any> = new Map();
-  
+
   bind(key: string, value: any): void {
     this.services.set(key, value);
   }
-  
+
   get<T>(key: string): T {
     return this.services.get(key);
   }
-  
+
   has(key: string): boolean {
     return this.services.has(key);
   }
@@ -43,38 +43,38 @@ export class TestContainer {
  */
 export function createTestContainer(overrides?: TestServiceBindings): TestContainer {
   const container = new TestContainer();
-  
+
   // Default bindings with mocks
   container.bind('Logger', overrides?.Logger || createMockLogger());
-  
+
   if (overrides?.DockerClient) {
     container.bind('DockerClient', overrides.DockerClient);
   }
-  
+
   if (overrides?.KubernetesClient) {
     container.bind('KubernetesClient', overrides.KubernetesClient);
   }
-  
+
   if (overrides?.AIService) {
     container.bind('AIService', overrides.AIService);
   }
-  
+
   if (overrides?.SessionManager) {
     container.bind('SessionManager', overrides.SessionManager);
   }
-  
+
   if (overrides?.ConfigService) {
     container.bind('ConfigService', overrides.ConfigService);
   }
-  
+
   if (overrides?.CacheService) {
     container.bind('CacheService', overrides.CacheService);
   }
-  
+
   if (overrides?.SecurityScanner) {
     container.bind('SecurityScanner', overrides.SecurityScanner);
   }
-  
+
   return container;
 }
 
@@ -83,21 +83,21 @@ export function createTestContainer(overrides?: TestServiceBindings): TestContai
  */
 export function createIntegrationContainer(overrides?: TestServiceBindings): TestContainer {
   const container = new TestContainer();
-  
+
   // Use real logger for integration tests
   container.bind('Logger', overrides?.Logger || createMockLogger());
-  
+
   // Add other services as needed, preferring real implementations
   // but still allowing overrides for controlled testing
-  
+
   if (overrides?.DockerClient) {
     container.bind('DockerClient', overrides.DockerClient);
   }
-  
+
   if (overrides?.KubernetesClient) {
     container.bind('KubernetesClient', overrides.KubernetesClient);
   }
-  
+
   return container;
 }
 
@@ -109,7 +109,7 @@ export interface TestServerHelper {
   getContainer(): TestContainer;
   startServer(): Promise<any>;
   stopServer(): Promise<void>;
-  getStatus(): { running: boolean; tools?: number; resources?: number; prompts?: number; workflows?: number; [key: string]: any };
+  getStatus(): { running: boolean; tools?: number; resources?: number; prompts?: number; workflows?: number;[key: string]: any };
   registerTestTool(name: string, description: string): void;
   registerTestPrompt(name: string, content: string): void;
   getTools(): Array<{ name: string; description: string }>;
@@ -139,7 +139,7 @@ export function createTestServer(overrides?: TestServiceBindings): TestServerHel
   const resources: Map<string, string> = new Map();
   const sessions: Map<string, { id: string }> = new Map();
   const prompts: Map<string, { name: string; content: string }> = new Map();
-  
+
   return {
     async cleanup() {
       if (server && running) {
